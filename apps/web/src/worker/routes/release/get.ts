@@ -1,32 +1,116 @@
-import type { Context } from "hono";
-import { desc, eq } from "drizzle-orm";
-import { badRequest } from "../../lib/errors";
-import { releases } from "../../db/schema";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { and, asc, desc, eq } from "drizzle-orm";
+import { orgMembers, projects, releases, releaseItems } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
-import { verifyProjectAccess, verifyReleaseAccess } from "./helpers";
+import {
+  getReleasesQuerySchema,
+  getReleasesResponseSchema,
+  getReleaseResponseSchema,
+} from "./schemas";
 
-export async function getReleases(c: Context<AppRouteEnv>) {
-  const user = c.get("user");
-  const db = c.get("db");
-  const projectId = c.req.query("projectId");
-  if (!projectId) throw badRequest("projectId query param required");
+const errorResponseSchema = z.object({ error: z.string() });
 
-  await verifyProjectAccess(db, user, projectId);
+const listRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["releases"],
+  summary: "List releases for a project",
+  request: { query: getReleasesQuerySchema },
+  responses: {
+    200: {
+      content: { "application/json": { schema: getReleasesResponseSchema } },
+      description: "List of releases",
+    },
+    401: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Unauthorized",
+    },
+    403: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Forbidden",
+    },
+  },
+});
 
-  const data = await db
-    .select()
-    .from(releases)
-    .where(eq(releases.projectId, projectId))
-    .orderBy(desc(releases.createdAt));
+const detailRoute = createRoute({
+  method: "get",
+  path: "/:releaseId",
+  tags: ["releases"],
+  summary: "Get release with items",
+  request: {
+    params: z.object({ releaseId: z.string() }),
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: getReleaseResponseSchema } },
+      description: "Release with items",
+    },
+    401: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Unauthorized",
+    },
+    404: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Not found",
+    },
+  },
+});
 
-  return c.json({ data });
-}
+export function registerGetReleases(api: OpenAPIHono<AppRouteEnv>) {
+  api.openapi(listRoute, async (c) => {
+    const db = c.get("db");
+    const user = c.get("user");
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-export async function getReleaseById(c: Context<AppRouteEnv>) {
-  const user = c.get("user");
-  const db = c.get("db");
-  const releaseId = c.req.param("rid");
+    const { projectId } = c.req.valid("query");
 
-  const release = await verifyReleaseAccess(db, user, releaseId);
-  return c.json({ data: release });
+    const project = await db.query.projects.findFirst({
+      where: eq(projects.id, projectId),
+    });
+    if (!project) return c.json({ error: "Forbidden" }, 403);
+
+    const membership = await db.query.orgMembers.findFirst({
+      where: and(eq(orgMembers.orgId, project.orgId), eq(orgMembers.userId, user.id)),
+    });
+    if (!membership) return c.json({ error: "Forbidden" }, 403);
+
+    const data = await db
+      .select()
+      .from(releases)
+      .where(eq(releases.projectId, projectId))
+      .orderBy(desc(releases.createdAt));
+
+    return c.json({ data }, 200);
+  });
+
+  api.openapi(detailRoute, async (c) => {
+    const db = c.get("db");
+    const user = c.get("user");
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+
+    const { releaseId } = c.req.valid("param");
+
+    const release = await db.query.releases.findFirst({
+      where: eq(releases.id, releaseId),
+    });
+    if (!release) return c.json({ error: "Not found" }, 404);
+
+    const project = await db.query.projects.findFirst({
+      where: eq(projects.id, release.projectId),
+    });
+    if (!project) return c.json({ error: "Not found" }, 404);
+
+    const membership = await db.query.orgMembers.findFirst({
+      where: and(eq(orgMembers.orgId, project.orgId), eq(orgMembers.userId, user.id)),
+    });
+    if (!membership) return c.json({ error: "Forbidden" }, 403 as any);
+
+    const items = await db
+      .select()
+      .from(releaseItems)
+      .where(eq(releaseItems.releaseId, releaseId))
+      .orderBy(asc(releaseItems.sortOrder));
+
+    return c.json({ data: { ...release, items } }, 200);
+  });
 }

@@ -1,17 +1,19 @@
-import { Hono } from "hono";
+import { OpenAPIHono } from "@hono/zod-openapi";
+import { requireAuth } from "../../auth/middleware";
 import type { AppRouteEnv } from "../types";
-import { getReleaseById, getReleases } from "./get";
-import { createRelease, publishRelease } from "./post";
-import { updateReleaseById } from "./put";
-import { deleteReleaseById } from "./delete";
+import { registerGetReleases } from "./get";
+import { registerPostRelease } from "./post";
+import { registerPutRelease } from "./put";
+import { registerDeleteRelease } from "./delete";
+import { registerGenerateNotes } from "./generate-notes";
 
-const releaseRoutes = new Hono<AppRouteEnv>();
+const releaseRoutes = new OpenAPIHono<AppRouteEnv>();
 
-releaseRoutes.get("/", getReleases);
-releaseRoutes.post("/", createRelease);
-releaseRoutes.get("/:rid", getReleaseById);
-releaseRoutes.put("/:rid", updateReleaseById);
-releaseRoutes.post("/:rid/publish", publishRelease);
-releaseRoutes.delete("/:rid", deleteReleaseById);
+releaseRoutes.use("*", requireAuth);
+registerGetReleases(releaseRoutes);
+registerPostRelease(releaseRoutes);
+registerPutRelease(releaseRoutes);
+registerDeleteRelease(releaseRoutes);
+registerGenerateNotes(releaseRoutes);
 
 export default releaseRoutes;

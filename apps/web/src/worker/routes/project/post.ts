@@ -1,42 +1,122 @@
-import type { Context } from "hono";
-import { eq } from "drizzle-orm";
-import { createProjectSchema } from "@releaselayer/shared";
-import { badRequest } from "../../lib/errors";
-import { generateId, generateSdkKey } from "../../lib/slug";
-import { parseJsonBody } from "../../lib/request";
-import { projects, sdkConfigs } from "../../db/schema";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { and, eq } from "drizzle-orm";
+import { orgMembers, projects } from "../../db/schema";
+import { toSlug, unixNow } from "../../lib/slug";
 import type { AppRouteEnv } from "../types";
 import {
-  assertProjectLimit,
-  assertProjectSlugAvailable,
-  requireOrgMembership,
-} from "./helpers";
+  createProjectRequestSchema,
+  createProjectResponseSchema,
+} from "./schemas";
 
-export async function createProject(c: Context<AppRouteEnv>) {
-  const user = c.get("user");
-  const db = c.get("db");
-  const body = await parseJsonBody<unknown>(c);
-  const parsed = createProjectSchema.safeParse(body);
-  if (!parsed.success) throw badRequest(parsed.error.issues[0]?.message ?? "Invalid project payload");
+const errorResponseSchema = z.object({
+  error: z.string(),
+});
 
-  const orgId = c.req.query("orgId");
-  if (!orgId) throw badRequest("orgId query param required");
+const route = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["projects"],
+  summary: "Create project",
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: createProjectRequestSchema,
+        },
+      },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: {
+        "application/json": {
+          schema: createProjectResponseSchema,
+        },
+      },
+      description: "Project created",
+    },
+    401: {
+      content: {
+        "application/json": {
+          schema: errorResponseSchema,
+        },
+      },
+      description: "Unauthorized",
+    },
+    403: {
+      content: {
+        "application/json": {
+          schema: errorResponseSchema,
+        },
+      },
+      description: "Forbidden",
+    },
+  },
+});
 
-  requireOrgMembership(user, orgId);
-  await assertProjectLimit(db, orgId);
-  await assertProjectSlugAvailable(db, orgId, parsed.data.slug);
+export function registerPostProject(api: OpenAPIHono<AppRouteEnv>) {
+  return api.openapi(route, async (c) => {
+    const db = c.get("db");
+    const user = c.get("user");
 
-  const id = generateId();
-  const sdkKey = generateSdkKey();
+    if (!user) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
 
-  await db.batch([
-    db.insert(projects).values({ id, orgId, sdkKey, ...parsed.data }),
-    db.insert(sdkConfigs).values({ projectId: id }),
-  ]);
+    const payload = c.req.valid("json");
+    const orgId = payload.orgId.trim();
+    const name = payload.name.trim();
 
-  const project = await db.query.projects.findFirst({
-    where: eq(projects.id, id),
+    const membership = await db.query.orgMembers.findFirst({
+      where: and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, user.id)),
+    });
+
+    if (!membership) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
+    const requestedSlug = payload.slug?.trim() ? toSlug(payload.slug) : toSlug(name);
+    const baseSlug = requestedSlug || "project";
+
+    let slug = baseSlug;
+    let suffix = 2;
+    while (true) {
+      const existing = await db.query.projects.findFirst({
+        where: and(eq(projects.orgId, orgId), eq(projects.slug, slug)),
+      });
+      if (!existing) {
+        break;
+      }
+      slug = `${baseSlug}-${suffix}`;
+      suffix += 1;
+    }
+
+    const now = unixNow();
+    const inserted = await db
+      .insert(projects)
+      .values({
+        orgId,
+        name,
+        slug,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning({ id: projects.id });
+    const projectId = inserted[0]!.id;
+
+    const created = (await db.query.projects.findFirst({
+      where: eq(projects.id, projectId),
+    })) ?? null;
+
+    const data = created
+      ? {
+          ...created,
+          id: String(created.id),
+          orgId: String(created.orgId),
+        }
+      : null;
+
+    return c.json({ data }, 201);
   });
-
-  return c.json({ data: project }, 201);
 }

@@ -1,16 +1,13 @@
-import { Hono } from "hono";
+import { OpenAPIHono } from "@hono/zod-openapi";
+import { requireAuth } from "../../auth/middleware";
 import type { AppRouteEnv } from "../types";
-import { getProjectById, getProjects } from "./get";
-import { createProject } from "./post";
-import { updateProjectById } from "./put";
-import { deleteProjectById } from "./delete";
+import { registerGetProjects } from "./get";
+import { registerPostProject } from "./post";
 
-const projectRoutes = new Hono<AppRouteEnv>();
+const projectRoutes = new OpenAPIHono<AppRouteEnv>();
 
-projectRoutes.get("/", getProjects);
-projectRoutes.post("/", createProject);
-projectRoutes.get("/:pid", getProjectById);
-projectRoutes.put("/:pid", updateProjectById);
-projectRoutes.delete("/:pid", deleteProjectById);
+projectRoutes.use("*", requireAuth);
+registerGetProjects(projectRoutes);
+registerPostProject(projectRoutes);
 
 export default projectRoutes;

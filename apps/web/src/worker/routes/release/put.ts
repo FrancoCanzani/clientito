@@ -1,42 +1,113 @@
-import type { Context } from "hono";
-import { eq } from "drizzle-orm";
-import { updateReleaseSchema } from "@releaselayer/shared";
-import { badRequest } from "../../lib/errors";
-import { parseJsonBody } from "../../lib/request";
-import { releases } from "../../db/schema";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { and, asc, eq } from "drizzle-orm";
+import { orgMembers, projects, releases, releaseItems } from "../../db/schema";
+import { unixNow, uniqueId } from "../../lib/slug";
 import type { AppRouteEnv } from "../types";
-import { verifyReleaseAccess } from "./helpers";
+import { updateReleaseRequestSchema, updateReleaseResponseSchema } from "./schemas";
 
-export async function updateReleaseById(c: Context<AppRouteEnv>) {
-  const user = c.get("user");
-  const db = c.get("db");
-  const releaseId = c.req.param("rid");
+const errorResponseSchema = z.object({ error: z.string() });
 
-  await verifyReleaseAccess(db, user, releaseId);
+const route = createRoute({
+  method: "put",
+  path: "/:releaseId",
+  tags: ["releases"],
+  summary: "Update release",
+  request: {
+    params: z.object({ releaseId: z.string() }),
+    body: {
+      content: { "application/json": { schema: updateReleaseRequestSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: updateReleaseResponseSchema } },
+      description: "Release updated",
+    },
+    401: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Unauthorized",
+    },
+    403: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Forbidden",
+    },
+    404: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Not found",
+    },
+  },
+});
 
-  const body = await parseJsonBody<unknown>(c);
-  const parsed = updateReleaseSchema.safeParse(body);
-  if (!parsed.success) throw badRequest(parsed.error.issues[0]?.message ?? "Invalid release payload");
+export function registerPutRelease(api: OpenAPIHono<AppRouteEnv>) {
+  return api.openapi(route, async (c) => {
+    const db = c.get("db");
+    const user = c.get("user");
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-  const { targetTraits, metadata, ...rest } = parsed.data;
-  const updateData: Record<string, unknown> = {
-    ...rest,
-    updatedAt: Math.floor(Date.now() / 1000),
-  };
+    const { releaseId } = c.req.valid("param");
+    const payload = c.req.valid("json");
 
-  if (targetTraits !== undefined) {
-    updateData.targetTraits = JSON.stringify(targetTraits);
-  }
+    const release = await db.query.releases.findFirst({
+      where: eq(releases.id, releaseId),
+    });
+    if (!release) return c.json({ error: "Not found" }, 404);
 
-  if (metadata !== undefined) {
-    updateData.metadata = JSON.stringify(metadata);
-  }
+    const project = await db.query.projects.findFirst({
+      where: eq(projects.id, release.projectId),
+    });
+    if (!project) return c.json({ error: "Not found" }, 404);
 
-  await db.update(releases).set(updateData).where(eq(releases.id, releaseId));
+    const membership = await db.query.orgMembers.findFirst({
+      where: and(eq(orgMembers.orgId, project.orgId), eq(orgMembers.userId, user.id)),
+    });
+    if (!membership) return c.json({ error: "Forbidden" }, 403 as any);
 
-  const updated = await db.query.releases.findFirst({
-    where: eq(releases.id, releaseId),
+    const now = unixNow();
+    const updates: Record<string, unknown> = { updatedAt: now };
+
+    if (payload.title !== undefined) updates.title = payload.title.trim();
+    if (payload.version !== undefined) updates.version = payload.version.trim() || null;
+    if (payload.notes !== undefined) updates.notes = payload.notes;
+    if (payload.status !== undefined) {
+      updates.status = payload.status;
+      if (payload.status === "published" && !release.publishedAt) {
+        updates.publishedAt = now;
+      }
+    }
+
+    await db.update(releases).set(updates).where(eq(releases.id, releaseId));
+
+    if (payload.items !== undefined) {
+      await db.delete(releaseItems).where(eq(releaseItems.releaseId, releaseId));
+
+      if (payload.items.length > 0) {
+        const itemValues = payload.items.map((item, index) => ({
+          id: uniqueId(),
+          releaseId,
+          kind: item.kind || "manual",
+          title: item.title,
+          description: item.description || null,
+          prNumber: item.prNumber || null,
+          prUrl: item.prUrl || null,
+          prAuthor: item.prAuthor || null,
+          sortOrder: item.sortOrder ?? index,
+          createdAt: now,
+        }));
+        await db.insert(releaseItems).values(itemValues);
+      }
+    }
+
+    const updated = await db.query.releases.findFirst({
+      where: eq(releases.id, releaseId),
+    });
+
+    const items = await db
+      .select()
+      .from(releaseItems)
+      .where(eq(releaseItems.releaseId, releaseId))
+      .orderBy(asc(releaseItems.sortOrder));
+
+    return c.json({ data: { ...updated!, items } }, 200);
   });
-
-  return c.json({ data: updated });
 }
