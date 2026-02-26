@@ -3,13 +3,19 @@ import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { createAuth } from "../../auth";
 import { authMiddleware } from "./auth/middleware";
-import githubRoutes from "./routes/github/router";
+import { createDb } from "./db/client";
+import { runScheduledIncrementalSync } from "./lib/gmail";
+import classifyRoutes from "./routes/classify/router";
+import contactsRoutes from "./routes/contacts/router";
+import customersRoutes from "./routes/customers/router";
+import emailsRoutes from "./routes/emails/router";
 import healthRoutes from "./routes/health/router";
 import orgRoutes from "./routes/org/router";
-import projectRoutes from "./routes/project/router";
-import releaseRoutes from "./routes/release/router";
+import remindersRoutes from "./routes/reminders/router";
+import syncRoutes from "./routes/sync/router";
+import type { AppRouteEnv } from "./routes/types";
 
-const app = new Hono();
+const app = new Hono<AppRouteEnv>();
 
 app.use(
   "/api/*",
@@ -30,14 +36,27 @@ app.onError((err, c) => {
 app.use("*", authMiddleware);
 
 app.all("/api/auth/*", async (c) => {
-  const auth = createAuth(c.env as Env);
+  const auth = createAuth(c.env);
   return auth.handler(c.req.raw);
 });
 
 app.route("/api/health", healthRoutes);
 app.route("/api/orgs", orgRoutes);
-app.route("/api/projects", projectRoutes);
-app.route("/api/releases", releaseRoutes);
-app.route("/api/github", githubRoutes);
+app.route("/api/sync", syncRoutes);
+app.route("/api/classify", classifyRoutes);
+app.route("/api/contacts", contactsRoutes);
+app.route("/api/customers", customersRoutes);
+app.route("/api/emails", emailsRoutes);
+app.route("/api/reminders", remindersRoutes);
 
-export default app;
+async function handleScheduledSync(env: Env) {
+  const db = createDb(env.DB);
+  await runScheduledIncrementalSync(db, env);
+}
+
+export default {
+  fetch: app.fetch,
+  scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(handleScheduledSync(env));
+  },
+};

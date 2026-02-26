@@ -2,7 +2,10 @@ import { z } from "@hono/zod-openapi";
 
 export const createOrganizationRequestSchema = z.object({
   name: z.string().trim().min(1, "Organization name is required"),
-  slug: z.string().trim().optional(),
+});
+
+export const updateOrganizationRequestSchema = z.object({
+  name: z.string().trim().min(1, "Organization name is required"),
 });
 
 export const organizationResponseSchema = z.object({
@@ -28,4 +31,8 @@ export const listOrganizationsResponseSchema = z.object({
 
 export const createOrganizationResponseSchema = z.object({
   data: organizationResponseSchema.nullable(),
+});
+
+export const updateOrganizationResponseSchema = z.object({
+  data: organizationResponseSchema,
 });

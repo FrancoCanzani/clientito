@@ -1,5 +1,11 @@
-import { integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import { relations } from "drizzle-orm";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 import { user } from "./auth-schema";
 
 export const organizations = sqliteTable(
@@ -32,8 +38,8 @@ export const orgMembers = sqliteTable(
   (table) => [primaryKey({ columns: [table.orgId, table.userId] })]
 );
 
-export const projects = sqliteTable(
-  "projects",
+export const customers = sqliteTable(
+  "customers",
   {
     id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
     orgId: integer("org_id")
@@ -41,62 +47,115 @@ export const projects = sqliteTable(
       .references(() => organizations.id, { onDelete: "cascade" })
       .$type<string>(),
     name: text("name").notNull(),
-    slug: text("slug").notNull(),
-    githubRepoOwner: text("github_repo_owner"),
-    githubRepoName: text("github_repo_name"),
-    githubConnectedByUserId: text("github_connected_by_user_id"),
-    githubConnectedAt: integer("github_connected_at"),
+    company: text("company"),
+    email: text("email").notNull(),
+    phone: text("phone"),
+    website: text("website"),
+    vatEin: text("vat_ein"),
+    address: text("address"),
+    notes: text("notes").notNull().default(""),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
-  (table) => [uniqueIndex("project_org_slug").on(table.orgId, table.slug)]
+  (table) => [
+    index("customers_org_idx").on(table.orgId),
+    uniqueIndex("customers_org_email_unique").on(table.orgId, table.email),
+  ],
 );
 
-export const releases = sqliteTable(
-  "releases",
+export const emails = sqliteTable(
+  "emails",
   {
-    id: text("id").primaryKey(),
-    projectId: integer("project_id")
+    id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
+    orgId: integer("org_id")
       .notNull()
-      .references(() => projects.id, { onDelete: "cascade" })
+      .references(() => organizations.id, { onDelete: "cascade" })
       .$type<string>(),
-    title: text("title").notNull(),
-    slug: text("slug").notNull(),
-    version: text("version"),
-    notes: text("notes"),
-    status: text("status").notNull().default("draft"),
-    publishedAt: integer("published_at"),
-    createdByUserId: text("created_by_user_id")
+    gmailId: text("gmail_id").notNull().unique(),
+    threadId: text("thread_id"),
+    customerId: integer("customer_id")
+      .references(() => customers.id, { onDelete: "set null" })
+      .$type<string>(),
+    fromAddr: text("from_addr").notNull(),
+    toAddr: text("to_addr"),
+    subject: text("subject"),
+    snippet: text("snippet"),
+    bodyText: text("body_text"),
+    date: integer("date").notNull(),
+    isCustomer: integer("is_customer", { mode: "boolean" }).notNull().default(false),
+    classified: integer("classified", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    index("emails_org_idx").on(table.orgId),
+    index("emails_customer_idx").on(table.customerId),
+    index("emails_org_date_idx").on(table.orgId, table.date),
+  ],
+);
+
+export const reminders = sqliteTable(
+  "reminders",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
+    orgId: integer("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" })
+      .$type<string>(),
+    customerId: integer("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" })
+      .$type<string>(),
+    userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    message: text("message").notNull(),
+    dueAt: integer("due_at").notNull(),
+    done: integer("done", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    index("reminders_customer_idx").on(table.customerId),
+    index("reminders_org_done_idx").on(table.orgId, table.done),
+  ],
+);
+
+export const contacts = sqliteTable(
+  "contacts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
+    orgId: integer("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" })
+      .$type<string>(),
+    email: text("email").notNull(),
+    name: text("name"),
+    domain: text("domain").notNull(),
+    emailCount: integer("email_count").notNull().default(1),
+    latestEmailDate: integer("latest_email_date"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
-  (table) => [uniqueIndex("release_project_slug").on(table.projectId, table.slug)]
+  (table) => [
+    uniqueIndex("contacts_org_email_unique").on(table.orgId, table.email),
+    index("contacts_org_domain_idx").on(table.orgId, table.domain),
+  ],
 );
 
-export const releaseItems = sqliteTable("release_items", {
-  id: text("id").primaryKey(),
-  releaseId: text("release_id")
+export const syncState = sqliteTable("sync_state", {
+  id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
+  orgId: integer("org_id")
     .notNull()
-    .references(() => releases.id, { onDelete: "cascade" }),
-  kind: text("kind").notNull().default("manual"),
-  title: text("title").notNull(),
-  description: text("description"),
-  prNumber: integer("pr_number"),
-  prUrl: text("pr_url"),
-  prAuthor: text("pr_author"),
-  sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: integer("created_at").notNull(),
+    .references(() => organizations.id, { onDelete: "cascade" })
+    .$type<string>()
+    .unique(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  historyId: text("history_id"),
+  lastSync: integer("last_sync"),
+  lockUntil: integer("lock_until"),
+  phase: text("phase"),
+  progressCurrent: integer("progress_current"),
+  progressTotal: integer("progress_total"),
+  error: text("error"),
 });
-
-export const releasesRelations = relations(releases, ({ many }) => ({
-  items: many(releaseItems),
-}));
-
-export const releaseItemsRelations = relations(releaseItems, ({ one }) => ({
-  release: one(releases, {
-    fields: [releaseItems.releaseId],
-    references: [releases.id],
-  }),
-}));

@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "releaselayer",
+	"name": "hauler",
 	"main": "./src/worker/index.ts",
 	"compatibility_date": "2025-10-08",
 	"compatibility_flags": ["nodejs_compat"],
@@ -21,12 +21,9 @@
 			"migrations_dir": "drizzle"
 		}
 	],
-	"r2_buckets": [
-		{
-			"binding": "R2",
-			"bucket_name": "releaselayer-assets"
-		}
-	],
+	"triggers": {
+		"crons": ["*/5 * * * *"]
+	},
 	"ai": {
 		"binding": "AI"
 	}

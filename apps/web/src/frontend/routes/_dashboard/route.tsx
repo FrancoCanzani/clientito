@@ -1,4 +1,4 @@
-import { fetchOrganizations } from "@/features/workspace/workspace-api";
+import { fetchOrganizations } from "@/features/workspace/api";
 import { authClient } from "@/lib/auth-client";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/_dashboard")({
 
     if (firstOrganization && onGetStartedRoute) {
       throw redirect({
-        to: "/$orgId/projects",
+        to: "/$orgId",
         params: { orgId: firstOrganization.id },
         replace: true,
       });

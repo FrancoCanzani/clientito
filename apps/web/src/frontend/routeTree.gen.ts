@@ -9,21 +9,20 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardNewOrgRouteImport } from './routes/_dashboard/new-org'
 import { Route as DashboardGetStartedRouteImport } from './routes/_dashboard/get-started'
 import { Route as DashboardOrgIdRouteRouteImport } from './routes/_dashboard/$orgId/route'
-import { Route as DashboardOrgIdProjectsIndexRouteImport } from './routes/_dashboard/$orgId/projects/index'
-import { Route as DashboardOrgIdProjectsProjectIdReleasesIndexRouteImport } from './routes/_dashboard/$orgId/projects/$projectId/releases/index'
-import { Route as DashboardOrgIdProjectsProjectIdReleasesReleaseIdRouteImport } from './routes/_dashboard/$orgId/projects/$projectId/releases/$releaseId'
+import { Route as DashboardOrgIdIndexRouteImport } from './routes/_dashboard/$orgId/index'
+import { Route as DashboardOrgIdManageRouteImport } from './routes/_dashboard/$orgId/manage'
+import { Route as DashboardOrgIdEmailsIndexRouteImport } from './routes/_dashboard/$orgId/emails/index'
+import { Route as DashboardOrgIdCustomersIndexRouteImport } from './routes/_dashboard/$orgId/customers/index'
+import { Route as DashboardOrgIdContactsIndexRouteImport } from './routes/_dashboard/$orgId/contacts/index'
+import { Route as DashboardOrgIdCustomersNewRouteImport } from './routes/_dashboard/$orgId/customers/new'
+import { Route as DashboardOrgIdCustomersCustomerIdRouteImport } from './routes/_dashboard/$orgId/customers/$customerId'
 
-const RegisterRoute = RegisterRouteImport.update({
-  id: '/register',
-  path: '/register',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -38,6 +37,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardNewOrgRoute = DashboardNewOrgRouteImport.update({
+  id: '/new-org',
+  path: '/new-org',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const DashboardGetStartedRoute = DashboardGetStartedRouteImport.update({
   id: '/get-started',
   path: '/get-started',
@@ -48,107 +52,143 @@ const DashboardOrgIdRouteRoute = DashboardOrgIdRouteRouteImport.update({
   path: '/$orgId',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
-const DashboardOrgIdProjectsIndexRoute =
-  DashboardOrgIdProjectsIndexRouteImport.update({
-    id: '/projects/',
-    path: '/projects/',
+const DashboardOrgIdIndexRoute = DashboardOrgIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardOrgIdRouteRoute,
+} as any)
+const DashboardOrgIdManageRoute = DashboardOrgIdManageRouteImport.update({
+  id: '/manage',
+  path: '/manage',
+  getParentRoute: () => DashboardOrgIdRouteRoute,
+} as any)
+const DashboardOrgIdEmailsIndexRoute =
+  DashboardOrgIdEmailsIndexRouteImport.update({
+    id: '/emails/',
+    path: '/emails/',
     getParentRoute: () => DashboardOrgIdRouteRoute,
   } as any)
-const DashboardOrgIdProjectsProjectIdReleasesIndexRoute =
-  DashboardOrgIdProjectsProjectIdReleasesIndexRouteImport.update({
-    id: '/projects/$projectId/releases/',
-    path: '/projects/$projectId/releases/',
+const DashboardOrgIdCustomersIndexRoute =
+  DashboardOrgIdCustomersIndexRouteImport.update({
+    id: '/customers/',
+    path: '/customers/',
     getParentRoute: () => DashboardOrgIdRouteRoute,
   } as any)
-const DashboardOrgIdProjectsProjectIdReleasesReleaseIdRoute =
-  DashboardOrgIdProjectsProjectIdReleasesReleaseIdRouteImport.update({
-    id: '/projects/$projectId/releases/$releaseId',
-    path: '/projects/$projectId/releases/$releaseId',
+const DashboardOrgIdContactsIndexRoute =
+  DashboardOrgIdContactsIndexRouteImport.update({
+    id: '/contacts/',
+    path: '/contacts/',
+    getParentRoute: () => DashboardOrgIdRouteRoute,
+  } as any)
+const DashboardOrgIdCustomersNewRoute =
+  DashboardOrgIdCustomersNewRouteImport.update({
+    id: '/customers/new',
+    path: '/customers/new',
+    getParentRoute: () => DashboardOrgIdRouteRoute,
+  } as any)
+const DashboardOrgIdCustomersCustomerIdRoute =
+  DashboardOrgIdCustomersCustomerIdRouteImport.update({
+    id: '/customers/$customerId',
+    path: '/customers/$customerId',
     getParentRoute: () => DashboardOrgIdRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/register': typeof RegisterRoute
   '/$orgId': typeof DashboardOrgIdRouteRouteWithChildren
   '/get-started': typeof DashboardGetStartedRoute
-  '/$orgId/projects/': typeof DashboardOrgIdProjectsIndexRoute
-  '/$orgId/projects/$projectId/releases/$releaseId': typeof DashboardOrgIdProjectsProjectIdReleasesReleaseIdRoute
-  '/$orgId/projects/$projectId/releases/': typeof DashboardOrgIdProjectsProjectIdReleasesIndexRoute
+  '/new-org': typeof DashboardNewOrgRoute
+  '/$orgId/manage': typeof DashboardOrgIdManageRoute
+  '/$orgId/': typeof DashboardOrgIdIndexRoute
+  '/$orgId/customers/$customerId': typeof DashboardOrgIdCustomersCustomerIdRoute
+  '/$orgId/customers/new': typeof DashboardOrgIdCustomersNewRoute
+  '/$orgId/contacts/': typeof DashboardOrgIdContactsIndexRoute
+  '/$orgId/customers/': typeof DashboardOrgIdCustomersIndexRoute
+  '/$orgId/emails/': typeof DashboardOrgIdEmailsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/register': typeof RegisterRoute
-  '/$orgId': typeof DashboardOrgIdRouteRouteWithChildren
   '/get-started': typeof DashboardGetStartedRoute
-  '/$orgId/projects': typeof DashboardOrgIdProjectsIndexRoute
-  '/$orgId/projects/$projectId/releases/$releaseId': typeof DashboardOrgIdProjectsProjectIdReleasesReleaseIdRoute
-  '/$orgId/projects/$projectId/releases': typeof DashboardOrgIdProjectsProjectIdReleasesIndexRoute
+  '/new-org': typeof DashboardNewOrgRoute
+  '/$orgId/manage': typeof DashboardOrgIdManageRoute
+  '/$orgId': typeof DashboardOrgIdIndexRoute
+  '/$orgId/customers/$customerId': typeof DashboardOrgIdCustomersCustomerIdRoute
+  '/$orgId/customers/new': typeof DashboardOrgIdCustomersNewRoute
+  '/$orgId/contacts': typeof DashboardOrgIdContactsIndexRoute
+  '/$orgId/customers': typeof DashboardOrgIdCustomersIndexRoute
+  '/$orgId/emails': typeof DashboardOrgIdEmailsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_dashboard': typeof DashboardRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/register': typeof RegisterRoute
   '/_dashboard/$orgId': typeof DashboardOrgIdRouteRouteWithChildren
   '/_dashboard/get-started': typeof DashboardGetStartedRoute
-  '/_dashboard/$orgId/projects/': typeof DashboardOrgIdProjectsIndexRoute
-  '/_dashboard/$orgId/projects/$projectId/releases/$releaseId': typeof DashboardOrgIdProjectsProjectIdReleasesReleaseIdRoute
-  '/_dashboard/$orgId/projects/$projectId/releases/': typeof DashboardOrgIdProjectsProjectIdReleasesIndexRoute
+  '/_dashboard/new-org': typeof DashboardNewOrgRoute
+  '/_dashboard/$orgId/manage': typeof DashboardOrgIdManageRoute
+  '/_dashboard/$orgId/': typeof DashboardOrgIdIndexRoute
+  '/_dashboard/$orgId/customers/$customerId': typeof DashboardOrgIdCustomersCustomerIdRoute
+  '/_dashboard/$orgId/customers/new': typeof DashboardOrgIdCustomersNewRoute
+  '/_dashboard/$orgId/contacts/': typeof DashboardOrgIdContactsIndexRoute
+  '/_dashboard/$orgId/customers/': typeof DashboardOrgIdCustomersIndexRoute
+  '/_dashboard/$orgId/emails/': typeof DashboardOrgIdEmailsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/login'
-    | '/register'
     | '/$orgId'
     | '/get-started'
-    | '/$orgId/projects/'
-    | '/$orgId/projects/$projectId/releases/$releaseId'
-    | '/$orgId/projects/$projectId/releases/'
+    | '/new-org'
+    | '/$orgId/manage'
+    | '/$orgId/'
+    | '/$orgId/customers/$customerId'
+    | '/$orgId/customers/new'
+    | '/$orgId/contacts/'
+    | '/$orgId/customers/'
+    | '/$orgId/emails/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
-    | '/register'
-    | '/$orgId'
     | '/get-started'
-    | '/$orgId/projects'
-    | '/$orgId/projects/$projectId/releases/$releaseId'
-    | '/$orgId/projects/$projectId/releases'
+    | '/new-org'
+    | '/$orgId/manage'
+    | '/$orgId'
+    | '/$orgId/customers/$customerId'
+    | '/$orgId/customers/new'
+    | '/$orgId/contacts'
+    | '/$orgId/customers'
+    | '/$orgId/emails'
   id:
     | '__root__'
     | '/'
     | '/_dashboard'
     | '/login'
-    | '/register'
     | '/_dashboard/$orgId'
     | '/_dashboard/get-started'
-    | '/_dashboard/$orgId/projects/'
-    | '/_dashboard/$orgId/projects/$projectId/releases/$releaseId'
-    | '/_dashboard/$orgId/projects/$projectId/releases/'
+    | '/_dashboard/new-org'
+    | '/_dashboard/$orgId/manage'
+    | '/_dashboard/$orgId/'
+    | '/_dashboard/$orgId/customers/$customerId'
+    | '/_dashboard/$orgId/customers/new'
+    | '/_dashboard/$orgId/contacts/'
+    | '/_dashboard/$orgId/customers/'
+    | '/_dashboard/$orgId/emails/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
-  RegisterRoute: typeof RegisterRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/register': {
-      id: '/register'
-      path: '/register'
-      fullPath: '/register'
-      preLoaderRoute: typeof RegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -170,6 +210,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_dashboard/new-org': {
+      id: '/_dashboard/new-org'
+      path: '/new-org'
+      fullPath: '/new-org'
+      preLoaderRoute: typeof DashboardNewOrgRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/get-started': {
       id: '/_dashboard/get-started'
       path: '/get-started'
@@ -184,42 +231,77 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardOrgIdRouteRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
-    '/_dashboard/$orgId/projects/': {
-      id: '/_dashboard/$orgId/projects/'
-      path: '/projects'
-      fullPath: '/$orgId/projects/'
-      preLoaderRoute: typeof DashboardOrgIdProjectsIndexRouteImport
+    '/_dashboard/$orgId/': {
+      id: '/_dashboard/$orgId/'
+      path: '/'
+      fullPath: '/$orgId/'
+      preLoaderRoute: typeof DashboardOrgIdIndexRouteImport
       parentRoute: typeof DashboardOrgIdRouteRoute
     }
-    '/_dashboard/$orgId/projects/$projectId/releases/': {
-      id: '/_dashboard/$orgId/projects/$projectId/releases/'
-      path: '/projects/$projectId/releases'
-      fullPath: '/$orgId/projects/$projectId/releases/'
-      preLoaderRoute: typeof DashboardOrgIdProjectsProjectIdReleasesIndexRouteImport
+    '/_dashboard/$orgId/manage': {
+      id: '/_dashboard/$orgId/manage'
+      path: '/manage'
+      fullPath: '/$orgId/manage'
+      preLoaderRoute: typeof DashboardOrgIdManageRouteImport
       parentRoute: typeof DashboardOrgIdRouteRoute
     }
-    '/_dashboard/$orgId/projects/$projectId/releases/$releaseId': {
-      id: '/_dashboard/$orgId/projects/$projectId/releases/$releaseId'
-      path: '/projects/$projectId/releases/$releaseId'
-      fullPath: '/$orgId/projects/$projectId/releases/$releaseId'
-      preLoaderRoute: typeof DashboardOrgIdProjectsProjectIdReleasesReleaseIdRouteImport
+    '/_dashboard/$orgId/emails/': {
+      id: '/_dashboard/$orgId/emails/'
+      path: '/emails'
+      fullPath: '/$orgId/emails/'
+      preLoaderRoute: typeof DashboardOrgIdEmailsIndexRouteImport
+      parentRoute: typeof DashboardOrgIdRouteRoute
+    }
+    '/_dashboard/$orgId/customers/': {
+      id: '/_dashboard/$orgId/customers/'
+      path: '/customers'
+      fullPath: '/$orgId/customers/'
+      preLoaderRoute: typeof DashboardOrgIdCustomersIndexRouteImport
+      parentRoute: typeof DashboardOrgIdRouteRoute
+    }
+    '/_dashboard/$orgId/contacts/': {
+      id: '/_dashboard/$orgId/contacts/'
+      path: '/contacts'
+      fullPath: '/$orgId/contacts/'
+      preLoaderRoute: typeof DashboardOrgIdContactsIndexRouteImport
+      parentRoute: typeof DashboardOrgIdRouteRoute
+    }
+    '/_dashboard/$orgId/customers/new': {
+      id: '/_dashboard/$orgId/customers/new'
+      path: '/customers/new'
+      fullPath: '/$orgId/customers/new'
+      preLoaderRoute: typeof DashboardOrgIdCustomersNewRouteImport
+      parentRoute: typeof DashboardOrgIdRouteRoute
+    }
+    '/_dashboard/$orgId/customers/$customerId': {
+      id: '/_dashboard/$orgId/customers/$customerId'
+      path: '/customers/$customerId'
+      fullPath: '/$orgId/customers/$customerId'
+      preLoaderRoute: typeof DashboardOrgIdCustomersCustomerIdRouteImport
       parentRoute: typeof DashboardOrgIdRouteRoute
     }
   }
 }
 
 interface DashboardOrgIdRouteRouteChildren {
-  DashboardOrgIdProjectsIndexRoute: typeof DashboardOrgIdProjectsIndexRoute
-  DashboardOrgIdProjectsProjectIdReleasesReleaseIdRoute: typeof DashboardOrgIdProjectsProjectIdReleasesReleaseIdRoute
-  DashboardOrgIdProjectsProjectIdReleasesIndexRoute: typeof DashboardOrgIdProjectsProjectIdReleasesIndexRoute
+  DashboardOrgIdManageRoute: typeof DashboardOrgIdManageRoute
+  DashboardOrgIdIndexRoute: typeof DashboardOrgIdIndexRoute
+  DashboardOrgIdCustomersCustomerIdRoute: typeof DashboardOrgIdCustomersCustomerIdRoute
+  DashboardOrgIdCustomersNewRoute: typeof DashboardOrgIdCustomersNewRoute
+  DashboardOrgIdContactsIndexRoute: typeof DashboardOrgIdContactsIndexRoute
+  DashboardOrgIdCustomersIndexRoute: typeof DashboardOrgIdCustomersIndexRoute
+  DashboardOrgIdEmailsIndexRoute: typeof DashboardOrgIdEmailsIndexRoute
 }
 
 const DashboardOrgIdRouteRouteChildren: DashboardOrgIdRouteRouteChildren = {
-  DashboardOrgIdProjectsIndexRoute: DashboardOrgIdProjectsIndexRoute,
-  DashboardOrgIdProjectsProjectIdReleasesReleaseIdRoute:
-    DashboardOrgIdProjectsProjectIdReleasesReleaseIdRoute,
-  DashboardOrgIdProjectsProjectIdReleasesIndexRoute:
-    DashboardOrgIdProjectsProjectIdReleasesIndexRoute,
+  DashboardOrgIdManageRoute: DashboardOrgIdManageRoute,
+  DashboardOrgIdIndexRoute: DashboardOrgIdIndexRoute,
+  DashboardOrgIdCustomersCustomerIdRoute:
+    DashboardOrgIdCustomersCustomerIdRoute,
+  DashboardOrgIdCustomersNewRoute: DashboardOrgIdCustomersNewRoute,
+  DashboardOrgIdContactsIndexRoute: DashboardOrgIdContactsIndexRoute,
+  DashboardOrgIdCustomersIndexRoute: DashboardOrgIdCustomersIndexRoute,
+  DashboardOrgIdEmailsIndexRoute: DashboardOrgIdEmailsIndexRoute,
 }
 
 const DashboardOrgIdRouteRouteWithChildren =
@@ -228,11 +310,13 @@ const DashboardOrgIdRouteRouteWithChildren =
 interface DashboardRouteRouteChildren {
   DashboardOrgIdRouteRoute: typeof DashboardOrgIdRouteRouteWithChildren
   DashboardGetStartedRoute: typeof DashboardGetStartedRoute
+  DashboardNewOrgRoute: typeof DashboardNewOrgRoute
 }
 
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardOrgIdRouteRoute: DashboardOrgIdRouteRouteWithChildren,
   DashboardGetStartedRoute: DashboardGetStartedRoute,
+  DashboardNewOrgRoute: DashboardNewOrgRoute,
 }
 
 const DashboardRouteRouteWithChildren = DashboardRouteRoute._addFileChildren(
@@ -243,7 +327,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   LoginRoute: LoginRoute,
-  RegisterRoute: RegisterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

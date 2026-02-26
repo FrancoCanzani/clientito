@@ -1,46 +1,31 @@
 import { createMiddleware } from "hono/factory";
-import { type Context, type Env as HonoEnv, type Next } from "hono";
+import { type Context, type Next } from "hono";
 import { createAuth } from "../../../auth";
-import { createDb, type Database } from "../db/client";
+import { createDb } from "../db/client";
+import type { AppRouteEnv } from "../routes/types";
 
-export type AuthUser = {
-  id: string;
-  email: string;
-  name: string | null;
-};
+export const authMiddleware = createMiddleware<AppRouteEnv>(async (c, next) => {
+  c.set("db", createDb(c.env.DB));
 
-type AuthEnv = HonoEnv & {
-  Variables: {
-    user: AuthUser | null;
-    db: Database;
-  };
-};
-
-export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
-  const workerEnv = c.env as Env;
-  c.set("db", createDb(workerEnv.DB));
-
-  const auth = createAuth(workerEnv);
+  const auth = createAuth(c.env);
   const session = await auth.api.getSession({
     headers: c.req.raw.headers,
   });
 
   if (!session?.user) {
     c.set("user", null);
+    c.set("session", null);
     await next();
     return;
   }
 
-  c.set("user", {
-    id: session.user.id,
-    email: session.user.email,
-    name: session.user.name ?? null,
-  });
+  c.set("user", session.user);
+  c.set("session", session.session);
 
   await next();
 });
 
-export async function requireAuth(c: Context<AuthEnv>, next: Next) {
+export async function requireAuth(c: Context<AppRouteEnv>, next: Next) {
   const user = c.get("user");
   if (!user) {
     return c.json({ error: "Unauthorized" }, 401);

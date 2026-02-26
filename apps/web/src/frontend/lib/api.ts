@@ -20,18 +20,13 @@ export async function apiFetch(path: string, options?: RequestInit): Promise<Res
         ? body.error
         : response.statusText;
 
-    throw new ApiError(response.status, errorMessage || "Request failed");
+    const error = new Error(errorMessage || "Request failed") as Error & {
+      status?: number;
+    };
+    error.name = "ApiError";
+    error.status = response.status;
+    throw error;
   }
 
   return response;
-}
-
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
 }

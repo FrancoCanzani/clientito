@@ -1,11 +1,13 @@
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -15,15 +17,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { useLogout } from "@/features/auth/api/auth-api";
-import CreateOrganizationSheet from "@/features/workspace/components/create-organization-sheet";
-import CreateProjectSheet from "@/features/workspace/components/create-project-sheet";
-import {
-  getRouteApi,
-  Link,
-  useNavigate,
-} from "@tanstack/react-router";
-import { useState } from "react";
+import { useLogout } from "@/features/auth/api";
+import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 
 const dashboardRouteApi = getRouteApi("/_dashboard");
 const organizationRouteApi = getRouteApi("/_dashboard/$orgId");
@@ -31,92 +26,85 @@ const organizationRouteApi = getRouteApi("/_dashboard/$orgId");
 export default function AppSidebar() {
   const logout = useLogout();
   const navigate = useNavigate();
-  const [isOrgSheetOpen, setIsOrgSheetOpen] = useState(false);
-  const [isProjectSheetOpen, setIsProjectSheetOpen] = useState(false);
 
   const { organizations } = dashboardRouteApi.useLoaderData();
-  const { orgId: selectedOrgId, projects } = organizationRouteApi.useLoaderData();
+  const { orgId: selectedOrgId } = organizationRouteApi.useLoaderData();
+  const selectedOrganization = organizations.find((org) => org.id === selectedOrgId);
 
   return (
     <Sidebar>
-      <CreateOrganizationSheet
-        open={isOrgSheetOpen}
-        onOpenChange={setIsOrgSheetOpen}
-        onCreated={(orgId) => {
-          navigate({
-            to: "/$orgId/projects",
-            params: { orgId },
-          });
-        }}
-      />
-
-      <CreateProjectSheet
-        orgId={selectedOrgId}
-        open={isProjectSheetOpen}
-        onOpenChange={setIsProjectSheetOpen}
-      />
-
       <SidebarHeader className="space-y-2 border-b">
-        <h1>ReleaseLayer</h1>
+        <h1>Clientito</h1>
 
-        <Select
-          value={selectedOrgId}
-          onValueChange={(nextOrgId) => {
-            navigate({
-              to: "/$orgId/projects",
-              params: { orgId: nextOrgId },
-            });
-          }}
-        >
-          <SelectTrigger className="w-full bg-card text-xs">
-            <SelectValue placeholder="Select organization" />
-          </SelectTrigger>
-          <SelectContent>
-            {organizations.map((org) => (
-              <SelectItem key={org.id} value={org.id}>
-                {org.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div className="flex flex-col gap-1 divide-y *:text-xs">
-          <SidebarMenuButton onClick={() => setIsOrgSheetOpen(true)}>
-            New org
-          </SidebarMenuButton>
-          <SidebarMenuButton onClick={() => setIsProjectSheetOpen(true)}>
-            New project
-          </SidebarMenuButton>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton className="w-full text-xs">
+              {selectedOrganization?.name ?? "Select organization"}
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuLabel>Organizations</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={selectedOrgId}
+              onValueChange={(value) => {
+                navigate({
+                  to: "/$orgId",
+                  params: { orgId: value },
+                });
+              }}
+            >
+              {organizations.map((org) => (
+                <DropdownMenuRadioItem key={org.id} value={org.id}>
+                  {org.name}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/$orgId/manage" params={{ orgId: selectedOrgId }}>
+                Manage org
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/new-org">
+                New org
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarHeader>
 
       <SidebarContent className="gap-2 p-2">
-        <div>Projects</div>
-        <ScrollArea className="h-[calc(100svh-260px)]">
-          <SidebarMenu>
-            {projects.map((project) => (
-              <SidebarMenuItem key={project.id}>
-                <SidebarMenuButton asChild>
-                  <Link
-                    to="/$orgId/projects/$projectId/releases"
-                    params={{
-                      orgId: project.orgId,
-                      projectId: project.id,
-                    }}
-                  >
-                    <span>{project.name}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-
-          {projects.length === 0 && (
-            <p className="px-2 pt-1 text-xs text-muted-foreground">
-              No projects in this org.
-            </p>
-          )}
-        </ScrollArea>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link to="/$orgId" params={{ orgId: selectedOrgId }}>
+                Home
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link to="/$orgId/customers" params={{ orgId: selectedOrgId }}>
+                Customers
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link to="/$orgId/contacts" params={{ orgId: selectedOrgId }}>
+                Contacts
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link to="/$orgId/emails" params={{ orgId: selectedOrgId }}>
+                Search Emails
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarContent>
 
       <SidebarFooter className="border-t p-2">
