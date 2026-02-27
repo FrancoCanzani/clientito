@@ -7,11 +7,11 @@ export type EmailSection = {
 };
 
 export function formatInboxSectionDate(timestamp: number): string {
-  return format(new Date(timestamp), "MMMM d, yyyy");
+  return format(new Date(timestamp), "EEE, MMM d");
 }
 
 export function formatInboxRowDate(timestamp: number): string {
-  return format(new Date(timestamp), "EEE, MMM d");
+  return format(new Date(timestamp), "p");
 }
 
 export function groupEmailsByDay(emails: EmailListItem[]): EmailSection[] {

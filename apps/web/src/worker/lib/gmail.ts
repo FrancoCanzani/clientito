@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import { account } from "../db/auth-schema";
 import type { Database } from "../db/client";
 import { emails, syncState } from "../db/schema";
-import { upsertContact } from "./contacts";
+import { parseEmailHeader, upsertContact } from "./contacts";
 
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -58,6 +58,7 @@ type GmailMessage = {
   historyId?: string;
   internalDate?: string;
   snippet?: string;
+  labelIds?: string[];
   payload?: GmailMessagePart;
 };
 
@@ -509,7 +510,7 @@ async function getMessage(
   return gmailRequest<GmailMessage>(accessToken, `/messages/${messageId}`, {
     format: "full",
     fields:
-      "id,threadId,historyId,internalDate,snippet,payload(mimeType,headers,body/data,parts(mimeType,headers,body/data,parts))",
+      "id,threadId,historyId,internalDate,snippet,labelIds,payload(mimeType,headers,body/data,parts(mimeType,headers,body/data,parts))",
   });
 }
 
@@ -623,10 +624,14 @@ async function processMessageIds({
       try {
         const rawFrom = getHeaderValue(message.payload?.headers, "From");
         const rawTo = getHeaderValue(message.payload?.headers, "To");
-        const fromAddr = extractAddress(rawFrom);
+        const parsedFrom = rawFrom ? parseEmailHeader(rawFrom) : null;
+        const fromAddr = parsedFrom?.email ?? extractAddress(rawFrom);
+        const fromName = parsedFrom?.name ?? null;
         const toAddr = extractAddress(rawTo);
         const subject = getHeaderValue(message.payload?.headers, "Subject");
         const bodyText = extractMessageBodyText(message);
+        const labelIds = message.labelIds ?? [];
+        const isRead = !labelIds.includes("UNREAD");
         const internalDate = Number(message.internalDate ?? "");
         const date =
           Number.isFinite(internalDate) && internalDate > 0
@@ -641,11 +646,14 @@ async function processMessageIds({
             threadId: message.threadId ?? null,
             customerId: null,
             fromAddr,
+            fromName,
             toAddr: toAddr || null,
             subject,
             snippet: message.snippet ?? null,
             bodyText: bodyText || null,
             date,
+            isRead,
+            labelIds,
             isCustomer: false,
             classified: false,
             createdAt: Date.now(),

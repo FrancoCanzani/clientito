@@ -51,6 +51,7 @@ export function registerGetEmailList(api: OpenAPIHono<AppRouteEnv>) {
       search,
       customerId,
       isCustomer,
+      category,
     } = c.req.valid("query");
 
     if (!(await ensureOrgAccess(db, orgId, user.id))) {
@@ -80,6 +81,32 @@ export function registerGetEmailList(api: OpenAPIHono<AppRouteEnv>) {
       conditions.push(eq(emails.isCustomer, false));
     }
 
+    const hasLabel = (label: string) =>
+      sql<boolean>`exists(
+        select 1
+        from json_each(coalesce(${emails.labelIds}, '[]'))
+        where value = ${label}
+      )`;
+    const hasAnyCategoryLabel = sql<boolean>`exists(
+      select 1
+      from json_each(coalesce(${emails.labelIds}, '[]'))
+      where value like 'CATEGORY_%'
+    )`;
+
+    if (category === "primary") {
+      conditions.push(
+        sql<boolean>`(${hasLabel("CATEGORY_PERSONAL")} or not ${hasAnyCategoryLabel})`,
+      );
+    } else if (category === "promotions") {
+      conditions.push(hasLabel("CATEGORY_PROMOTIONS"));
+    } else if (category === "social") {
+      conditions.push(hasLabel("CATEGORY_SOCIAL"));
+    } else if (category === "notifications") {
+      conditions.push(
+        sql<boolean>`(${hasLabel("CATEGORY_UPDATES")} or ${hasLabel("CATEGORY_FORUMS")})`,
+      );
+    }
+
     const whereClause = and(...conditions);
 
     const totalRows = await db
@@ -93,12 +120,15 @@ export function registerGetEmailList(api: OpenAPIHono<AppRouteEnv>) {
         id: emails.id,
         gmailId: emails.gmailId,
         fromAddr: emails.fromAddr,
+        fromName: emails.fromName,
         toAddr: emails.toAddr,
         subject: emails.subject,
         snippet: emails.snippet,
         bodyText: emails.bodyText,
         threadId: emails.threadId,
         date: emails.date,
+        isRead: emails.isRead,
+        labelIds: emails.labelIds,
         isCustomer: emails.isCustomer,
         classified: emails.classified,
         createdAt: emails.createdAt,

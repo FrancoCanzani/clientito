@@ -18,14 +18,6 @@ export const Route = createFileRoute("/_dashboard")({
       throw redirect({ to: "/get-started" });
     }
 
-    if (firstOrganization && onGetStartedRoute) {
-      throw redirect({
-        to: "/$orgId",
-        params: { orgId: firstOrganization.id },
-        replace: true,
-      });
-    }
-
     return { organizations };
   },
 });

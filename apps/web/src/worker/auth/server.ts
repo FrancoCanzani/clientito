@@ -27,7 +27,7 @@ export function createAuth(env: Env) {
           "https://www.googleapis.com/auth/gmail.send",
         ],
         accessType: "offline",
-        prompt: "select_account consent",
+        prompt: "select_account",
       },
     },
     secret: env.BETTER_AUTH_SECRET,

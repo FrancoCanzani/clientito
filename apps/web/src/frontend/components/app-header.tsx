@@ -60,12 +60,12 @@ export default function AppHeader() {
   const sectionName = getSectionName(pathname);
 
   return (
-    <header className="sticky top-0 z-50 bg-background">
+    <header className="sticky top-0 z-50 bg-olive-50">
       <div className="mx-auto flex max-w-4xl items-center px-4 py-3 text-sm">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbPage className="font-semibold">
+              <BreadcrumbPage className="text-lg font-medium">
                 Clientito
               </BreadcrumbPage>
             </BreadcrumbItem>

@@ -4,10 +4,13 @@ export type EmailSearchResult = {
   id: string;
   gmailId: string;
   fromAddr: string;
+  fromName: string | null;
   toAddr: string | null;
   subject: string | null;
   snippet: string | null;
   date: number;
+  isRead: boolean;
+  labelIds: string[];
   isCustomer: boolean;
   customerId: string | null;
   customerName: string | null;
@@ -17,12 +20,15 @@ export type EmailListItem = {
   id: string;
   gmailId: string;
   fromAddr: string;
+  fromName: string | null;
   toAddr: string | null;
   subject: string | null;
   snippet: string | null;
   bodyText: string | null;
   threadId: string | null;
   date: number;
+  isRead: boolean;
+  labelIds: string[];
   isCustomer: boolean;
   classified: boolean;
   createdAt: number;
@@ -58,6 +64,7 @@ export async function fetchEmails(
     search?: string;
     customerId?: string;
     isCustomer?: "true" | "false";
+    category?: "primary" | "promotions" | "social" | "notifications";
     limit?: number;
     offset?: number;
   },
@@ -66,6 +73,7 @@ export async function fetchEmails(
   if (params?.search) query.set("search", params.search);
   if (params?.customerId) query.set("customerId", params.customerId);
   if (params?.isCustomer) query.set("isCustomer", params.isCustomer);
+  if (params?.category) query.set("category", params.category);
   if (params?.limit) query.set("limit", String(params.limit));
   if (params?.offset) query.set("offset", String(params.offset));
 

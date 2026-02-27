@@ -6,12 +6,15 @@ export function toEmailListResponse(row: {
   id: string;
   gmailId: string;
   fromAddr: string;
+  fromName: string | null;
   toAddr: string | null;
   subject: string | null;
   snippet: string | null;
   bodyText: string | null;
   threadId: string | null;
   date: number;
+  isRead: boolean;
+  labelIds: string[] | null;
   isCustomer: boolean;
   classified: boolean;
   createdAt: number;
@@ -22,12 +25,15 @@ export function toEmailListResponse(row: {
     id: String(row.id),
     gmailId: row.gmailId,
     fromAddr: row.fromAddr,
+    fromName: row.fromName,
     toAddr: row.toAddr,
     subject: row.subject,
     snippet: row.snippet,
     bodyText: row.bodyText,
     threadId: row.threadId,
     date: row.date,
+    isRead: row.isRead,
+    labelIds: row.labelIds ?? [],
     isCustomer: row.isCustomer,
     classified: row.classified,
     createdAt: row.createdAt,
@@ -40,10 +46,13 @@ export function toEmailSearchResponse(row: {
   id: string;
   gmailId: string;
   fromAddr: string;
+  fromName: string | null;
   toAddr: string | null;
   subject: string | null;
   snippet: string | null;
   date: number;
+  isRead: boolean;
+  labelIds: string[] | null;
   isCustomer: boolean;
   customerId: string | null;
   customerName: string | null;
@@ -52,10 +61,13 @@ export function toEmailSearchResponse(row: {
     id: String(row.id),
     gmailId: row.gmailId,
     fromAddr: row.fromAddr,
+    fromName: row.fromName,
     toAddr: row.toAddr,
     subject: row.subject,
     snippet: row.snippet,
     date: row.date,
+    isRead: row.isRead,
+    labelIds: row.labelIds ?? [],
     isCustomer: row.isCustomer,
     customerId: row.customerId ? String(row.customerId) : null,
     customerName: row.customerName ?? null,

@@ -6,10 +6,13 @@ export const emailSearchItemSchema = z.object({
   id: z.string(),
   gmailId: z.string(),
   fromAddr: z.string(),
+  fromName: z.string().nullable(),
   toAddr: z.string().nullable(),
   subject: z.string().nullable(),
   snippet: z.string().nullable(),
   date: z.number(),
+  isRead: z.boolean(),
+  labelIds: z.array(z.string()),
   isCustomer: z.boolean(),
   customerId: z.string().nullable(),
   customerName: z.string().nullable(),
@@ -32,6 +35,9 @@ export const listEmailsQuerySchema = z.object({
   search: z.string().trim().optional(),
   customerId: z.string().trim().optional(),
   isCustomer: z.enum(["true", "false"]).optional(),
+  category: z
+    .enum(["primary", "promotions", "social", "notifications"])
+    .optional(),
 });
 
 export const emailListItemSchema = emailSearchItemSchema.extend({
