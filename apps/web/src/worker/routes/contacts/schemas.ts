@@ -3,6 +3,9 @@ import { z } from "@hono/zod-openapi";
 export const listContactsQuerySchema = z.object({
   orgId: z.string().trim().min(1, "orgId is required"),
   search: z.string().trim().optional(),
+  domain: z.string().trim().optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
 });
 
 export const contactItemSchema = z.object({

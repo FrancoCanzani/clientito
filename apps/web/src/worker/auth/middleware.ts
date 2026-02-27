@@ -1,6 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import { type Context, type Next } from "hono";
-import { createAuth } from "../../../auth";
+import { createAuth } from "./server";
 import { createDb } from "../db/client";
 import type { AppRouteEnv } from "../routes/types";
 

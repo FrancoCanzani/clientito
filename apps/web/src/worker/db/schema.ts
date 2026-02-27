@@ -141,6 +141,31 @@ export const contacts = sqliteTable(
   ],
 );
 
+export const customerSummaries = sqliteTable(
+  "customer_summaries",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
+    customerId: integer("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" })
+      .$type<string>(),
+    orgId: integer("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" })
+      .$type<string>(),
+    summary: text("summary").notNull(),
+    generatedAt: integer("generated_at").notNull(),
+    triggerReason: text("trigger_reason"),
+  },
+  (table) => [
+    index("customer_summaries_customer_idx").on(table.customerId),
+    index("customer_summaries_org_generated_idx").on(
+      table.orgId,
+      table.generatedAt,
+    ),
+  ],
+);
+
 export const syncState = sqliteTable("sync_state", {
   id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
   orgId: integer("org_id")

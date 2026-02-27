@@ -1,7 +1,18 @@
 const DOMAIN_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9-]+)+$/i;
 
 export function normalizeEmailAddress(value: string): string {
-  return value.trim().toLowerCase();
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return "";
+
+  const withoutMailto = trimmed.startsWith("mailto:")
+    ? trimmed.slice("mailto:".length)
+    : trimmed;
+  const unwrapped = withoutMailto
+    .replace(/^['"<\s]+/, "")
+    .replace(/[>'",;\s]+$/, "");
+  const match = unwrapped.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
+
+  return (match?.[0] ?? unwrapped).toLowerCase();
 }
 
 export function extractDomainFromEmail(email: string): string | null {

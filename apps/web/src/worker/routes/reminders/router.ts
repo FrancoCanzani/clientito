@@ -1,10 +1,10 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { requireAuth } from "../../auth/middleware";
 import type { AppRouteEnv } from "../types";
-import { registerDeleteReminder } from "./delete";
-import { registerGetReminders } from "./get";
-import { registerPatchReminder } from "./patch";
-import { registerPostReminder } from "./post";
+import { registerDeleteReminder } from "./remove";
+import { registerGetReminders } from "./list";
+import { registerPatchReminder } from "./update";
+import { registerPostReminder } from "./create";
 
 const remindersRoutes = new OpenAPIHono<AppRouteEnv>();
 

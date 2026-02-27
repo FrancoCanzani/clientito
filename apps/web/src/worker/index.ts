@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
-import { createAuth } from "../../auth";
 import { authMiddleware } from "./auth/middleware";
+import { createAuth } from "./auth/server";
 import { createDb } from "./db/client";
 import { runScheduledIncrementalSync } from "./lib/gmail";
+import { runScheduledSummaryGeneration } from "./lib/summaries";
 import classifyRoutes from "./routes/classify/router";
 import contactsRoutes from "./routes/contacts/router";
 import customersRoutes from "./routes/customers/router";
@@ -22,7 +23,7 @@ app.use(
   cors({
     origin: (origin) => origin || "http://localhost:5173",
     credentials: true,
-  })
+  }),
 );
 
 app.onError((err, c) => {
@@ -56,7 +57,12 @@ async function handleScheduledSync(env: Env) {
 
 export default {
   fetch: app.fetch,
-  scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(handleScheduledSync(env));
+  scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    const db = createDb(env.DB);
+    if (event.cron === "0 * * * *") {
+      ctx.waitUntil(runScheduledSummaryGeneration(db, env));
+    } else {
+      ctx.waitUntil(handleScheduledSync(env));
+    }
   },
 };

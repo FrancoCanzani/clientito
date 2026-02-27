@@ -7,6 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCustomers } from "@/features/customers/api";
 
+const STATUS_DOT_COLORS: Record<string, string> = {
+  healthy: "bg-green-500",
+  at_risk: "bg-amber-500",
+  churned: "bg-red-500",
+  new: "bg-blue-500",
+};
+
 const organizationRouteApi = getRouteApi("/_dashboard/$orgId");
 
 export default function CustomersPage() {
@@ -69,6 +76,12 @@ export default function CustomersPage() {
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
+                  {customer.summaryStatus && STATUS_DOT_COLORS[customer.summaryStatus] && (
+                    <span
+                      className={`inline-block h-2 w-2 shrink-0 rounded-full ${STATUS_DOT_COLORS[customer.summaryStatus]}`}
+                      title={customer.summaryStatus.replace("_", " ")}
+                    />
+                  )}
                   <p className="truncate text-sm font-medium">
                     {customer.name}
                   </p>

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getHealth } from "./get";
+import { getHealth } from "./status";
 
 const healthRoutes = new Hono();
 

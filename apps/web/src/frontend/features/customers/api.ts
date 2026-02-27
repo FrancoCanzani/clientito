@@ -1,5 +1,15 @@
 import { apiFetch } from "@/lib/api";
 
+export type CustomerHealthSummary = {
+  status: "healthy" | "at_risk" | "churned" | "new" | "unknown";
+  keyChanges: string[];
+  risks: string[];
+  nextBestAction: string;
+  confidence: number;
+  generatedAt: number;
+  triggerReason: string | null;
+};
+
 export type CustomerListItem = {
   id: string;
   orgId: string;
@@ -16,6 +26,7 @@ export type CustomerListItem = {
   emailCount: number;
   latestEmailDate: number | null;
   pendingRemindersCount: number;
+  summaryStatus: string | null;
 };
 
 export type CustomerListResponse = {
@@ -83,6 +94,14 @@ export async function fetchCustomers(
   const response = await apiFetch(`/customers?${query.toString()}`);
   const json: CustomerListResponse = await response.json();
   return json;
+}
+
+export async function fetchCustomerSummary(
+  customerId: string,
+): Promise<CustomerHealthSummary | null> {
+  const response = await apiFetch(`/customers/${customerId}/summary`);
+  const json: DataResponse<CustomerHealthSummary | null> = await response.json();
+  return json.data;
 }
 
 export async function fetchCustomerDetail(id: string): Promise<CustomerDetail> {

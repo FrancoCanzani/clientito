@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import EmailSearchPage from "@/features/emails/pages/email-search-page";
+import EmailInboxPage from "@/features/emails/pages/email-inbox-page";
 
 export const Route = createFileRoute("/_dashboard/$orgId/emails/")({
-  component: EmailSearchPage,
+  component: EmailInboxPage,
 });

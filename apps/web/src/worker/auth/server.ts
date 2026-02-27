@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
-import * as authSchema from "./src/worker/db/auth-schema";
+import * as authSchema from "../db/auth-schema";
 
 export function createAuth(env: Env) {
   const db = drizzle(env.DB, { schema: authSchema, casing: "snake_case" });
@@ -27,6 +27,7 @@ export function createAuth(env: Env) {
           "https://www.googleapis.com/auth/gmail.send",
         ],
         accessType: "offline",
+        prompt: "select_account consent",
       },
     },
     secret: env.BETTER_AUTH_SECRET,

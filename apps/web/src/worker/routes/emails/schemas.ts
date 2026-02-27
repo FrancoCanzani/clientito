@@ -25,6 +25,32 @@ export const searchEmailsResponseSchema = z.object({
   data: z.array(emailSearchItemSchema),
 });
 
+export const listEmailsQuerySchema = z.object({
+  orgId: z.string().trim().min(1),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+  search: z.string().trim().optional(),
+  customerId: z.string().trim().optional(),
+  isCustomer: z.enum(["true", "false"]).optional(),
+});
+
+export const emailListItemSchema = emailSearchItemSchema.extend({
+  bodyText: z.string().nullable(),
+  threadId: z.string().nullable(),
+  classified: z.boolean(),
+  createdAt: z.number(),
+});
+
+export const listEmailsResponseSchema = z.object({
+  data: z.array(emailListItemSchema),
+  pagination: z.object({
+    total: z.number(),
+    limit: z.number(),
+    offset: z.number(),
+    hasMore: z.boolean(),
+  }),
+});
+
 export const markAsCustomerRequestSchema = z.object({
   orgId: z.string().trim().min(1),
   emailAddress: z.string().trim().min(1),

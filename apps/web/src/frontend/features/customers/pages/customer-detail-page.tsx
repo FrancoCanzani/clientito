@@ -11,6 +11,7 @@ import { fetchContacts } from "@/features/contacts/api";
 import {
   addCustomerContact,
   fetchCustomerDetail,
+  fetchCustomerSummary,
   removeCustomerContact,
   updateCustomer,
   createTask,
@@ -19,6 +20,7 @@ import {
   type Task,
   type CustomerContact,
   type CustomerEmail,
+  type CustomerHealthSummary,
 } from "@/features/customers/api";
 
 const orgRoute = getRouteApi("/_dashboard/$orgId");
@@ -242,6 +244,61 @@ function ContactRow({
   );
 }
 
+const STATUS_COLORS: Record<string, string> = {
+  healthy: "bg-green-500",
+  at_risk: "bg-amber-500",
+  churned: "bg-red-500",
+  new: "bg-blue-500",
+  unknown: "bg-gray-400",
+};
+
+function SummaryCard({ summary }: { summary: CustomerHealthSummary }) {
+  return (
+    <div className="rounded border p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-block h-2.5 w-2.5 rounded-full ${STATUS_COLORS[summary.status] ?? "bg-gray-400"}`}
+          />
+          <span className="text-sm font-medium capitalize">
+            {summary.status.replace("_", " ")}
+          </span>
+        </div>
+        <span className="text-[10px] text-muted-foreground">
+          Confidence: {Math.round(summary.confidence * 100)}% · {new Date(summary.generatedAt).toLocaleDateString()}
+        </span>
+      </div>
+
+      {summary.keyChanges.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground">Key Changes</p>
+          <ul className="mt-1 space-y-0.5">
+            {summary.keyChanges.map((change, i) => (
+              <li key={i} className="text-xs">{change}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {summary.risks.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground">Risks</p>
+          <ul className="mt-1 space-y-0.5">
+            {summary.risks.map((risk, i) => (
+              <li key={i} className="text-xs text-amber-600">{risk}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div>
+        <p className="text-xs font-medium text-muted-foreground">Next Best Action</p>
+        <p className="mt-0.5 text-xs">{summary.nextBestAction}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function CustomerDetailPage() {
   const { orgId } = orgRoute.useLoaderData();
   const { customerId } =
@@ -252,6 +309,12 @@ export default function CustomerDetailPage() {
   const detail = useQuery({
     queryKey: ["customer-detail", orgId, customerId],
     queryFn: () => fetchCustomerDetail(customerId),
+  });
+
+  const summaryQuery = useQuery({
+    queryKey: ["customer-summary", customerId],
+    queryFn: () => fetchCustomerSummary(customerId),
+    staleTime: 5 * 60 * 1000,
   });
 
   const [contactSearch, setContactSearch] = useState("");
@@ -381,6 +444,10 @@ export default function CustomerDetailPage() {
         </TabsList>
 
         <TabsContent value="info" className="space-y-3 pt-2">
+          {summaryQuery.data && <SummaryCard summary={summaryQuery.data} />}
+          {summaryQuery.isLoading && (
+            <Skeleton className="h-24 w-full rounded" />
+          )}
           <EditableField
             label="Company"
             value={customer.company ?? ""}

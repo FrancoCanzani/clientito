@@ -15,15 +15,15 @@ export function parseEmailHeader(raw: string): {
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
-  let name: string | null = null;
-  let email: string;
+  const addressMatch = trimmed.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
+  if (!addressMatch) return null;
+  const email = normalizeEmailAddress(addressMatch[0]);
+  if (!email) return null;
 
-  const match = trimmed.match(/^(.+?)\s*<([^>]+)>$/);
-  if (match) {
-    name = match[1].replace(/^["']|["']$/g, "").trim() || null;
-    email = normalizeEmailAddress(match[2]);
-  } else {
-    email = normalizeEmailAddress(trimmed);
+  let name: string | null = null;
+  const displayMatch = trimmed.match(/^(.+?)\s*</);
+  if (displayMatch) {
+    name = displayMatch[1].replace(/^["']|["']$/g, "").trim() || null;
   }
 
   const domain = extractDomainFromEmail(email);

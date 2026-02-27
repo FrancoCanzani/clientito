@@ -1,12 +1,14 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { requireAuth } from "../../auth/middleware";
 import type { AppRouteEnv } from "../types";
-import { registerGetEmailSearch } from "./get";
-import { registerPostMarkAsCustomer } from "./post";
+import { registerGetEmailList } from "./list";
+import { registerGetEmailSearch } from "./search";
+import { registerPostMarkAsCustomer } from "./mark-customer";
 
 const emailsRoutes = new OpenAPIHono<AppRouteEnv>();
 
 emailsRoutes.use("*", requireAuth);
+registerGetEmailList(emailsRoutes);
 registerGetEmailSearch(emailsRoutes);
 registerPostMarkAsCustomer(emailsRoutes);
 

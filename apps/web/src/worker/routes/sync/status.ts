@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { contacts, customers, syncState } from "../../db/schema";
 import { ensureOrgAccess } from "../../lib/access";
 import type { AppRouteEnv } from "../types";
@@ -57,6 +57,10 @@ export function registerGetSyncStatus(api: OpenAPIHono<AppRouteEnv>) {
     // Count contacts that have no matching customer
     let needsContactReview = false;
     if (hasSynced) {
+      const userEmail = user.email?.trim().toLowerCase() ?? null;
+      const ownEmailCondition = userEmail
+        ? sql`trim(replace(replace(lower(${contacts.email}), '<', ''), '>', '')) != ${userEmail}`
+        : sql`1 = 1`;
       const result = await db
         .select({ count: sql<number>`count(*)` })
         .from(contacts)
@@ -70,7 +74,7 @@ export function registerGetSyncStatus(api: OpenAPIHono<AppRouteEnv>) {
         .where(
           and(
             eq(contacts.orgId, orgId),
-            ne(contacts.email, user.email),
+            ownEmailCondition,
             sql`${customers.id} is null`,
           ),
         );

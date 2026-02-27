@@ -1,7 +1,11 @@
 import { eq } from "drizzle-orm";
 import type { Database } from "../../db/client";
 import { syncState } from "../../db/schema";
-import { runIncrementalGmailSync, startFullGmailSync } from "../../lib/gmail";
+import {
+  isGmailReconnectRequiredError,
+  runIncrementalGmailSync,
+  startFullGmailSync,
+} from "../../lib/gmail";
 import { monthsToGmailQuery } from "./helpers";
 
 export async function updateSyncProgress(
@@ -53,7 +57,11 @@ export function runFullSyncInBackground(
       await clearSyncProgress(db, orgId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Sync failed";
-      console.error("Background full sync failed", { orgId, error });
+      if (isGmailReconnectRequiredError(error)) {
+        console.warn("Background full sync requires Google reconnect", { orgId });
+      } else {
+        console.error("Background full sync failed", { orgId, error });
+      }
       await setSyncError(db, orgId, message).catch(() => {});
     }
   })();
@@ -73,7 +81,13 @@ export function runIncrementalSyncInBackground(
       await clearSyncProgress(db, orgId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Sync failed";
-      console.error("Background incremental sync failed", { orgId, error });
+      if (isGmailReconnectRequiredError(error)) {
+        console.warn("Background incremental sync requires Google reconnect", {
+          orgId,
+        });
+      } else {
+        console.error("Background incremental sync failed", { orgId, error });
+      }
       await setSyncError(db, orgId, message).catch(() => {});
     }
   })();

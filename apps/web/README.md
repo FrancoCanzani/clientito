@@ -1,4 +1,4 @@
-# ReleaseLayer Web App (Starter)
+# Clientito Web App (Starter)
 
 `apps/web` now contains a minimal full-stack starter:
 - React frontend with landing, login/register, and an authenticated dashboard shell

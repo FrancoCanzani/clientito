@@ -19,6 +19,7 @@ export const customerListItemSchema = customerSchema.extend({
   emailCount: z.number(),
   latestEmailDate: z.number().nullable(),
   pendingRemindersCount: z.number(),
+  summaryStatus: z.string().nullable(),
 });
 
 export const emailSchema = z.object({

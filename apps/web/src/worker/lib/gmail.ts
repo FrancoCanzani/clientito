@@ -4,7 +4,6 @@ import type { Database } from "../db/client";
 import { emails, syncState } from "../db/schema";
 import { upsertContact } from "./contacts";
 
-
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 const TOKEN_REFRESH_BUFFER_MS = 60_000;
@@ -22,6 +21,8 @@ const GMAIL_RATE_LIMIT_REASONS = new Set([
   "dailylimitexceeded",
 ]);
 const SYNC_LOCK_TTL_MS = 4 * 60_000;
+const GOOGLE_RECONNECT_REQUIRED_MESSAGE =
+  "Google connection expired. Please sign out and sign in with Google again.";
 
 type GoogleOAuthConfig = {
   GOOGLE_CLIENT_ID?: string;
@@ -103,6 +104,14 @@ export class GmailSyncStateError extends Error {}
 
 export class GmailHistoryExpiredError extends Error {}
 
+export function isGmailReconnectRequiredError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return error.message === GOOGLE_RECONNECT_REQUIRED_MESSAGE;
+}
+
 function toEpochMs(
   value: Date | number | string | null | undefined,
 ): number | null {
@@ -157,6 +166,10 @@ async function refreshGoogleAccessToken(
     .json()
     .catch(() => ({}))) as GoogleTokenResponse;
   if (!response.ok || !payload.access_token) {
+    if (payload.error === "invalid_grant") {
+      throw new Error(GOOGLE_RECONNECT_REQUIRED_MESSAGE);
+    }
+
     const message =
       payload.error_description ??
       payload.error ??
@@ -196,7 +209,7 @@ export async function getGmailToken(
   }
 
   if (!googleAccount.refreshToken) {
-    throw new Error("Google refresh token is missing.");
+    throw new Error(GOOGLE_RECONNECT_REQUIRED_MESSAGE);
   }
 
   const refreshed = await refreshGoogleAccessToken(
@@ -954,11 +967,18 @@ export async function runScheduledIncrementalSync(
         state.historyId,
       );
     } catch (error) {
-      console.error("Scheduled Gmail incremental sync failed", {
-        orgId: state.orgId,
-        userId: state.userId,
-        error,
-      });
+      if (isGmailReconnectRequiredError(error)) {
+        console.warn("Scheduled Gmail sync requires Google reconnect", {
+          orgId: state.orgId,
+          userId: state.userId,
+        });
+      } else {
+        console.error("Scheduled Gmail incremental sync failed", {
+          orgId: state.orgId,
+          userId: state.userId,
+          error,
+        });
+      }
     }
   }
 }

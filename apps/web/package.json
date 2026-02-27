@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@hono/zod-openapi": "^1.2.2",
+    "@phosphor-icons/react": "^2.1.10",
     "@tanstack/react-form": "^1.28.3",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-router": "^1.162.6",

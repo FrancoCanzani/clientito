@@ -1,8 +1,5 @@
-import AppSidebar from "@/components/app-sidebar";
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar";
+import AppHeader from "@/components/app-header";
+import BottomNav from "@/components/bottom-nav";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$orgId")({
@@ -36,14 +33,12 @@ export const Route = createFileRoute("/_dashboard/$orgId")({
 
 function DashboardOrganizationLayout() {
   return (
-    <SidebarProvider defaultOpen>
-      <AppSidebar />
-
-      <SidebarInset className="min-h-screen">
-        <main className="flex-1 px-4 py-4">
-          <Outlet />
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+    <div className="min-h-screen">
+      <AppHeader />
+      <main className="mx-auto max-w-3xl px-4 py-4 pb-24">
+        <Outlet />
+      </main>
+      <BottomNav />
+    </div>
   );
 }

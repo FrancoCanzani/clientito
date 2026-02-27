@@ -88,12 +88,21 @@ export function registerGetCustomers(api: OpenAPIHono<AppRouteEnv>) {
         company: customers.company,
         email: customers.email,
         phone: customers.phone,
+        website: customers.website,
+        vatEin: customers.vatEin,
+        address: customers.address,
         notes: customers.notes,
         createdAt: customers.createdAt,
         updatedAt: customers.updatedAt,
         emailCount: sql<number>`count(distinct ${emails.id})`,
         latestEmailDate: sql<number | null>`max(${emails.date})`,
         pendingRemindersCount: sql<number>`count(distinct case when ${reminders.done} = 0 then ${reminders.id} end)`,
+        summaryStatus: sql<string | null>`(
+          SELECT json_extract(summary, '$.status')
+          FROM customer_summaries
+          WHERE customer_id = ${customers.id}
+          ORDER BY generated_at DESC LIMIT 1
+        )`,
       })
       .from(customers)
       .leftJoin(emails, eq(emails.customerId, customers.id))
@@ -111,6 +120,7 @@ export function registerGetCustomers(api: OpenAPIHono<AppRouteEnv>) {
           emailCount: Number(row.emailCount) || 0,
           latestEmailDate: row.latestEmailDate ? Number(row.latestEmailDate) : null,
           pendingRemindersCount: Number(row.pendingRemindersCount) || 0,
+          summaryStatus: row.summaryStatus ?? null,
         })),
         pagination: {
           total,

@@ -20,7 +20,15 @@ const listContactsRoute = createRoute({
     200: {
       content: {
         "application/json": {
-          schema: z.object({ data: z.array(contactItemSchema) }),
+          schema: z.object({
+            data: z.array(contactItemSchema),
+            pagination: z.object({
+              total: z.number(),
+              limit: z.number(),
+              offset: z.number(),
+              hasMore: z.boolean(),
+            }),
+          }),
         },
       },
       description: "Contacts list",
@@ -43,7 +51,7 @@ export function registerGetContacts(api: OpenAPIHono<AppRouteEnv>) {
 
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-    const { orgId, search } = c.req.valid("query");
+    const { orgId, search, domain, limit = 100, offset = 0 } = c.req.valid("query");
     if (!(await ensureOrgAccess(db, orgId, user.id))) {
       return c.json({ error: "Forbidden" }, 403);
     }
@@ -52,7 +60,12 @@ export function registerGetContacts(api: OpenAPIHono<AppRouteEnv>) {
     const userEmail = user.email?.trim().toLowerCase() ?? null;
     const baseConditions = [eq(contacts.orgId, orgId)];
     if (userEmail) {
-      baseConditions.push(sql`lower(${contacts.email}) != ${userEmail}`);
+      baseConditions.push(
+        sql`trim(replace(replace(lower(${contacts.email}), '<', ''), '>', '')) != ${userEmail}`,
+      );
+    }
+    if (domain) {
+      baseConditions.push(eq(contacts.domain, domain));
     }
     const whereClause = searchPattern
       ? and(
@@ -64,6 +77,12 @@ export function registerGetContacts(api: OpenAPIHono<AppRouteEnv>) {
           ),
         )
       : and(...baseConditions);
+
+    const totalRows = await db
+      .select({ total: sql<number>`count(*)` })
+      .from(contacts)
+      .where(whereClause);
+    const total = Number(totalRows[0]?.total ?? 0);
 
     const rows = await db
       .select({
@@ -84,7 +103,9 @@ export function registerGetContacts(api: OpenAPIHono<AppRouteEnv>) {
         ),
       )
       .where(whereClause)
-      .orderBy(desc(contacts.emailCount));
+      .orderBy(desc(contacts.emailCount))
+      .limit(limit)
+      .offset(offset);
 
     return c.json(
       {
@@ -97,6 +118,12 @@ export function registerGetContacts(api: OpenAPIHono<AppRouteEnv>) {
           latestEmailDate: row.latestEmailDate,
           isAlreadyCustomer: row.customerEmail !== null,
         })),
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + rows.length < total,
+        },
       },
       200,
     );

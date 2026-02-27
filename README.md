@@ -1,4 +1,4 @@
-# ReleaseLayer Monorepo
+# Clientito Monorepo
 
 Starter workspace with:
 - `apps/web`: Cloudflare Worker + React app (auth + dashboard shell + health API)

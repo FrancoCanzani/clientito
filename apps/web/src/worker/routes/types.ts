@@ -1,4 +1,4 @@
-import type { createAuth } from "../../../auth";
+import type { createAuth } from "../auth/server";
 import type { Database } from "../db/client";
 
 type BetterAuthSession = ReturnType<typeof createAuth>["$Infer"]["Session"];
