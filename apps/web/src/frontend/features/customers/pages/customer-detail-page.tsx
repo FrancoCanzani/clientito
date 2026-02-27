@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fetchContacts } from "@/features/contacts/api";
+import { formatRelativeTimestamp } from "@/lib/dates";
 import {
   addCustomerContact,
   fetchCustomerDetail,
@@ -24,18 +25,6 @@ import {
 } from "@/features/customers/api";
 
 const orgRoute = getRouteApi("/_dashboard/$orgId");
-
-function formatRelative(timestamp: number): string {
-  const diff = Date.now() - timestamp;
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(timestamp).toLocaleDateString();
-}
 
 function TaskRow({
   task,
@@ -188,7 +177,7 @@ function CustomerEmailRow({ email }: { email: CustomerEmail }) {
           {email.subject ?? "(no subject)"}
         </p>
         <span className="shrink-0 text-[10px] text-muted-foreground">
-          {formatRelative(email.date)}
+          {formatRelativeTimestamp(email.date)}
         </span>
       </div>
       <p className="truncate text-xs text-muted-foreground">

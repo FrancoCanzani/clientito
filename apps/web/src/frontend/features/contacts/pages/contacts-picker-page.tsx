@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { formatRelativeTimestamp } from "@/lib/dates";
 import {
   Select,
   SelectContent,
@@ -32,10 +33,37 @@ const PERSONAL_DOMAINS = new Set([
   "live.com",
 ]);
 
-type ViewMode = "domains" | "people";
+const COMMON_SECOND_LEVEL_TLDS = new Set([
+  "co.uk",
+  "com.ar",
+  "com.au",
+  "com.br",
+  "com.mx",
+  "com.tr",
+  "co.jp",
+  "co.in",
+]);
+
+const COMPANY_NAME_OVERRIDES: Record<string, string> = {
+  "bbva.com": "BBVA",
+  "caixabank.com": "CaixaBank",
+  "cloudflare.com": "Cloudflare",
+  "github.com": "GitHub",
+  "hbomax.com": "HBO Max",
+  "idealista.com": "Idealista",
+  "infojobs.net": "InfoJobs",
+  "linkedin.com": "LinkedIn",
+  "nba.com": "NBA",
+  "stripe.com": "Stripe",
+  "vercel.com": "Vercel",
+};
+
+type ViewMode = "companies" | "people";
 type SortOption = "activity" | "az" | "za";
 
-type DomainGroup = {
+type CompanyGroup = {
+  key: string;
+  companyName: string;
   domain: string;
   contacts: Contact[];
   totalEmails: number;
@@ -65,19 +93,60 @@ function sortContacts(contacts: Contact[], sort: SortOption): Contact[] {
   return sorted;
 }
 
-function groupByDomain(contacts: Contact[], sort: SortOption): DomainGroup[] {
+function toRootDomain(domain: string): string {
+  const normalized = domain.trim().toLowerCase();
+  const parts = normalized.split(".").filter(Boolean);
+  if (parts.length <= 2) return normalized;
+
+  const lastTwo = parts.slice(-2).join(".");
+  if (COMMON_SECOND_LEVEL_TLDS.has(lastTwo) && parts.length >= 3) {
+    return parts.slice(-3).join(".");
+  }
+
+  return lastTwo;
+}
+
+function toTitleCase(value: string): string {
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1).toLowerCase()}`)
+    .join(" ");
+}
+
+function toCompanyName(domain: string): string {
+  const override = COMPANY_NAME_OVERRIDES[domain];
+  if (override) return override;
+
+  const label = domain.split(".")[0] ?? domain;
+  const cleaned = label
+    .replace(/[-_]+/g, " ")
+    .replace(
+      /\b(mail|email|mailer|notify|notification|notifications|news|noreply|comms|marketing|push|send|sg)\b/gi,
+      " ",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) return toTitleCase(label);
+  return toTitleCase(cleaned);
+}
+
+function groupByCompany(contacts: Contact[], sort: SortOption): CompanyGroup[] {
   const map = new Map<string, Contact[]>();
   for (const c of contacts) {
-    const key = c.domain || "unknown";
+    const key = toRootDomain(c.domain || "unknown");
     const list = map.get(key) ?? [];
     list.push(c);
     map.set(key, list);
   }
 
-  const groups: DomainGroup[] = [];
+  const groups: CompanyGroup[] = [];
   for (const [domain, domainContacts] of map) {
     const sortedContacts = sortContacts(domainContacts, sort);
     groups.push({
+      key: domain,
+      companyName: toCompanyName(domain),
       domain,
       contacts: sortedContacts,
       totalEmails: domainContacts.reduce((sum, c) => sum + c.emailCount, 0),
@@ -89,26 +158,14 @@ function groupByDomain(contacts: Contact[], sort: SortOption): DomainGroup[] {
     groups.sort((a, b) => {
       if (a.isPersonal !== b.isPersonal) return a.isPersonal ? 1 : -1;
       if (a.totalEmails !== b.totalEmails) return b.totalEmails - a.totalEmails;
-      return a.domain.localeCompare(b.domain);
+      return a.companyName.localeCompare(b.companyName);
     });
     return groups;
   }
 
   const multiplier = sort === "az" ? 1 : -1;
-  groups.sort((a, b) => multiplier * a.domain.localeCompare(b.domain));
+  groups.sort((a, b) => multiplier * a.companyName.localeCompare(b.companyName));
   return groups;
-}
-
-function formatRelative(timestamp: number): string {
-  const diff = Date.now() - timestamp;
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(timestamp).toLocaleDateString();
 }
 
 function getInitials(name: string | null, email: string): string {
@@ -198,7 +255,7 @@ function PersonRow({
         </Badge>
         {contact.latestEmailDate && (
           <span className="text-[10px] text-muted-foreground">
-            {formatRelative(contact.latestEmailDate)}
+            {formatRelativeTimestamp(contact.latestEmailDate)}
           </span>
         )}
         {contact.isAlreadyCustomer && (
@@ -209,13 +266,17 @@ function PersonRow({
   );
 }
 
-function DomainGroupCard({
+function CompanyGroupCard({
   group,
+  expanded,
+  onToggleExpand,
   selectedEmails,
   onToggle,
   onToggleAll,
 }: {
-  group: DomainGroup;
+  group: CompanyGroup;
+  expanded: boolean;
+  onToggleExpand: () => void;
   selectedEmails: Set<string>;
   onToggle: (email: string) => void;
   onToggleAll: (emails: string[], selected: boolean) => void;
@@ -247,7 +308,18 @@ function DomainGroupCard({
               className="h-3.5 w-3.5 rounded border-border accent-primary"
             />
           )}
-          <CardTitle className="text-sm">{group.domain}</CardTitle>
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            className="h-5 w-5 rounded border text-xs text-muted-foreground hover:border-border hover:text-foreground"
+            aria-label={`${expanded ? "Collapse" : "Expand"} ${group.companyName}`}
+          >
+            {expanded ? "-" : "+"}
+          </button>
+          <div className="min-w-0">
+            <CardTitle className="truncate text-sm">{group.companyName}</CardTitle>
+            <p className="truncate text-[10px] text-muted-foreground">{group.domain}</p>
+          </div>
           <Badge variant="outline" className="text-[10px]">
             {group.contacts.length} contact{group.contacts.length !== 1 ? "s" : ""}
           </Badge>
@@ -256,18 +328,20 @@ function DomainGroupCard({
           </span>
         </div>
       </CardHeader>
-      <CardContent className="p-0">
-        <div className="divide-y">
-          {group.contacts.map((contact) => (
-            <ContactCheckboxRow
-              key={contact.email}
-              contact={contact}
-              selected={selectedEmails.has(contact.email)}
-              onToggle={onToggle}
-            />
-          ))}
-        </div>
-      </CardContent>
+      {expanded && (
+        <CardContent className="p-0">
+          <div className="divide-y">
+            {group.contacts.map((contact) => (
+              <ContactCheckboxRow
+                key={contact.email}
+                contact={contact}
+                selected={selectedEmails.has(contact.email)}
+                onToggle={onToggle}
+              />
+            ))}
+          </div>
+        </CardContent>
+      )}
     </Card>
   );
 }
@@ -282,7 +356,8 @@ export default function ContactsPickerPage() {
   const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
   const [showPersonal, setShowPersonal] = useState(false);
   const [sort, setSort] = useState<SortOption>("activity");
-  const [viewMode, setViewMode] = useState<ViewMode>("domains");
+  const [viewMode, setViewMode] = useState<ViewMode>("companies");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [allContacts, setAllContacts] = useState<Contact[]>([]);
   const [offset, setOffset] = useState(0);
 
@@ -294,6 +369,7 @@ export default function ContactsPickerPage() {
         setDebouncedSearch(value);
         setOffset(0);
         setAllContacts([]);
+        setExpandedGroups(new Set());
       }, 300),
     );
   }
@@ -317,7 +393,7 @@ export default function ContactsPickerPage() {
   );
 
   const groups = useMemo(
-    () => groupByDomain(displayContacts, sort),
+    () => groupByCompany(displayContacts, sort),
     [displayContacts, sort],
   );
 
@@ -340,6 +416,15 @@ export default function ContactsPickerPage() {
         if (selected) next.add(email);
         else next.delete(email);
       }
+      return next;
+    });
+  }
+
+  function handleToggleGroup(groupKey: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
       return next;
     });
   }
@@ -381,11 +466,11 @@ export default function ContactsPickerPage() {
 
       <div className="flex items-center gap-1">
         <Button
-          variant={viewMode === "domains" ? "default" : "outline"}
+          variant={viewMode === "companies" ? "default" : "outline"}
           size="sm"
-          onClick={() => setViewMode("domains")}
+          onClick={() => setViewMode("companies")}
         >
-          Domains
+          Companies
         </Button>
         <Button
           variant={viewMode === "people" ? "default" : "outline"}
@@ -398,13 +483,13 @@ export default function ContactsPickerPage() {
 
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          placeholder="Search contacts..."
+          placeholder="Search companies or contacts..."
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
           className="min-w-[220px] flex-1"
         />
 
-        {viewMode === "domains" && (
+        {viewMode === "companies" && (
           <Select value={sort} onValueChange={(value) => setSort(value as SortOption)}>
             <SelectTrigger className="h-8 min-w-[150px]">
               <SelectValue placeholder="Sort" />
@@ -424,12 +509,14 @@ export default function ContactsPickerPage() {
         )}
       </div>
 
-      {viewMode === "domains" ? (
+      {viewMode === "companies" ? (
         <>
           {businessGroups.map((group) => (
-            <DomainGroupCard
-              key={group.domain}
+            <CompanyGroupCard
+              key={group.key}
               group={group}
+              expanded={expandedGroups.has(group.key)}
+              onToggleExpand={() => handleToggleGroup(group.key)}
               selectedEmails={selectedEmails}
               onToggle={handleToggle}
               onToggleAll={handleToggleAll}
@@ -450,9 +537,11 @@ export default function ContactsPickerPage() {
               {showPersonal && (
                 <div className="mt-2 space-y-4">
                   {personalGroups.map((group) => (
-                    <DomainGroupCard
-                      key={group.domain}
+                    <CompanyGroupCard
+                      key={group.key}
                       group={group}
+                      expanded={expandedGroups.has(group.key)}
+                      onToggleExpand={() => handleToggleGroup(group.key)}
                       selectedEmails={selectedEmails}
                       onToggle={handleToggle}
                       onToggleAll={handleToggleAll}

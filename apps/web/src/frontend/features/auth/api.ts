@@ -1,5 +1,6 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { signOut, useSession } from "@/lib/auth-client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { redirect } from "@tanstack/react-router";
 
 export function useAuth() {
   const session = useSession();
@@ -26,6 +27,9 @@ export function useLogout() {
     },
     onSuccess: () => {
       queryClient.clear();
+      throw redirect({
+        to: "/login",
+      });
     },
   });
 }

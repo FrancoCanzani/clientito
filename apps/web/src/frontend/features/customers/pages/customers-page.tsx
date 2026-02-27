@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatRelativeTimestamp } from "@/lib/dates";
 import { fetchCustomers } from "@/features/customers/api";
 
 const STATUS_DOT_COLORS: Record<string, string> = {
@@ -94,7 +95,7 @@ export default function CustomersPage() {
                 <p className="truncate text-xs text-muted-foreground">
                   {customer.email}
                   {customer.latestEmailDate
-                    ? ` · Last email ${formatRelative(customer.latestEmailDate)}`
+                    ? ` · Last email ${formatRelativeTimestamp(customer.latestEmailDate)}`
                     : null}
                 </p>
               </div>
@@ -120,16 +121,4 @@ export default function CustomersPage() {
       )}
     </div>
   );
-}
-
-function formatRelative(timestamp: number): string {
-  const diff = Date.now() - timestamp;
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(timestamp).toLocaleDateString();
 }

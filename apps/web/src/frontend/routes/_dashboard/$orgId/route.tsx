@@ -35,7 +35,7 @@ function DashboardOrganizationLayout() {
   return (
     <div className="min-h-screen">
       <AppHeader />
-      <main className="mx-auto max-w-3xl px-4 py-4 pb-24">
+      <main className="mx-auto max-w-4xl px-4 py-4 pb-24">
         <Outlet />
       </main>
       <BottomNav />

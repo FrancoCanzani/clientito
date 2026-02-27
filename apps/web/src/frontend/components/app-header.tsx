@@ -1,4 +1,11 @@
 import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -54,54 +61,69 @@ export default function AppHeader() {
 
   return (
     <header className="sticky top-0 z-50 bg-background">
-      <nav className="mx-auto flex max-w-3xl items-center gap-1.5 px-4 py-3 text-sm">
-        <span className="font-semibold">Clientito</span>
-        <span className="text-muted-foreground">/</span>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-accent">
-            {selectedOrganization?.name ?? "Select organization"}
-            <CaretDownIcon className="size-3" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuLabel>Organizations</DropdownMenuLabel>
-            <DropdownMenuRadioGroup
-              value={selectedOrgId}
-              onValueChange={(value) => {
-                navigate({
-                  to: "/$orgId",
-                  params: { orgId: value },
-                });
-              }}
-            >
-              {organizations.map((org) => (
-                <DropdownMenuRadioItem key={org.id} value={org.id}>
-                  {org.name}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="/$orgId/manage" params={{ orgId: selectedOrgId }}>
-                Manage org
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/new-org">New org</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => logout.mutate()}
-              disabled={logout.isPending}
-            >
-              {logout.isPending ? "Signing out..." : "Sign out"}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <span className="text-muted-foreground">/</span>
-        <span>{sectionName}</span>
-      </nav>
+      <div className="mx-auto flex max-w-4xl items-center px-4 py-3 text-sm">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-semibold">
+                Clientito
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  asChild
+                  className="flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-accent"
+                >
+                  <button type="button">
+                    {selectedOrganization?.name ?? "Select organization"}
+                    <CaretDownIcon className="size-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuLabel>Organizations</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={selectedOrgId}
+                    onValueChange={(value) => {
+                      navigate({
+                        to: "/$orgId",
+                        params: { orgId: value },
+                      });
+                    }}
+                  >
+                    {organizations.map((org) => (
+                      <DropdownMenuRadioItem key={org.id} value={org.id}>
+                        {org.name}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/$orgId/manage" params={{ orgId: selectedOrgId }}>
+                      Manage org
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/new-org">New org</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => logout.mutate()}
+                    disabled={logout.isPending}
+                  >
+                    {logout.isPending ? "Signing out..." : "Sign out"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{sectionName}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </div>
     </header>
   );
 }
