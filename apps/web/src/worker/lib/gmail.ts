@@ -20,6 +20,7 @@ const GMAIL_RATE_LIMIT_REASONS = new Set([
   "quotaexceeded",
   "dailylimitexceeded",
 ]);
+const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
 const SYNC_LOCK_TTL_MS = 4 * 60_000;
 const GOOGLE_RECONNECT_REQUIRED_MESSAGE =
   "Google connection expired. Please sign out and sign in with Google again.";
@@ -43,16 +44,20 @@ type GmailListResponse = {
   nextPageToken?: string;
 };
 
-type GmailMessagePart = {
+export type GmailMessagePart = {
+  partId?: string;
+  filename?: string;
   mimeType?: string;
   body?: {
     data?: string;
+    attachmentId?: string;
+    size?: number;
   };
   parts?: GmailMessagePart[];
   headers?: Array<{ name?: string; value?: string }>;
 };
 
-type GmailMessage = {
+export type GmailMessage = {
   id: string;
   threadId?: string;
   historyId?: string;
@@ -60,6 +65,11 @@ type GmailMessage = {
   snippet?: string;
   labelIds?: string[];
   payload?: GmailMessagePart;
+};
+
+type GmailAttachmentResponse = {
+  data?: string;
+  size?: number;
 };
 
 type GmailHistoryResponse = {
@@ -93,6 +103,16 @@ export type GmailSyncResult = {
   inserted: number;
   skipped: number;
   historyId: string | null;
+};
+
+export type GmailAttachmentMeta = {
+  attachmentId: string;
+  filename: string | null;
+  mimeType: string | null;
+  size: number | null;
+  contentId: string | null;
+  isInline: boolean;
+  isImage: boolean;
 };
 
 export type SyncProgressFn = (
@@ -284,7 +304,7 @@ async function runConcurrent<T, R>(
   return results;
 }
 
-function decodeBase64Url(input: string): string {
+function decodeBase64UrlToBytes(input: string): Uint8Array {
   const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
   const padding = "=".repeat((4 - (normalized.length % 4 || 4)) % 4);
   const binary = atob(`${normalized}${padding}`);
@@ -292,6 +312,11 @@ function decodeBase64Url(input: string): string {
   for (let index = 0; index < binary.length; index += 1) {
     bytes[index] = binary.charCodeAt(index);
   }
+  return bytes;
+}
+
+function decodeBase64Url(input: string): string {
+  const bytes = decodeBase64UrlToBytes(input);
   return new TextDecoder().decode(bytes);
 }
 
@@ -330,7 +355,12 @@ function htmlToPlainText(html: string): string {
     .trim();
 }
 
-function extractMessageBodyText(message: GmailMessage): string | null {
+export function extractMessageBodyHtml(message: GmailMessage): string | null {
+  const html = extractBodyByMimeType(message.payload, "text/html");
+  return html && html.trim().length > 0 ? html.trim() : null;
+}
+
+export function extractMessageBodyText(message: GmailMessage): string | null {
   const plain = extractBodyByMimeType(message.payload, "text/plain");
   if (plain && plain.trim().length > 0) {
     return plain.trim();
@@ -358,6 +388,60 @@ function getHeaderValue(
   );
 
   return header?.value?.trim() ?? null;
+}
+
+function normalizeContentId(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim().replace(/^<|>$/g, "");
+  return normalized.length > 0 ? normalized : null;
+}
+
+export function extractMessageAttachments(
+  message: GmailMessage,
+): GmailAttachmentMeta[] {
+  const attachmentsById = new Map<string, GmailAttachmentMeta>();
+
+  function visit(part: GmailMessagePart | undefined) {
+    if (!part) {
+      return;
+    }
+
+    const attachmentId = part.body?.attachmentId?.trim();
+    const contentId = normalizeContentId(
+      getHeaderValue(part.headers, "Content-ID"),
+    );
+    const contentDisposition = (
+      getHeaderValue(part.headers, "Content-Disposition") ?? ""
+    ).toLowerCase();
+    const mimeType = part.mimeType?.trim() || null;
+    const isImage = mimeType?.toLowerCase().startsWith("image/") ?? false;
+    const isInline = contentDisposition.includes("inline") || Boolean(contentId);
+    const filename = part.filename?.trim() || null;
+    const size =
+      typeof part.body?.size === "number" ? Math.max(0, part.body.size) : null;
+
+    if (attachmentId) {
+      attachmentsById.set(attachmentId, {
+        attachmentId,
+        filename,
+        mimeType,
+        size,
+        contentId,
+        isInline,
+        isImage,
+      });
+    }
+
+    for (const child of part.parts ?? []) {
+      visit(child);
+    }
+  }
+
+  visit(message.payload);
+  return Array.from(attachmentsById.values());
 }
 
 function extractAddress(headerValue: string | null): string {
@@ -514,6 +598,47 @@ async function getMessage(
   });
 }
 
+export async function getGmailMessageById(
+  db: Database,
+  env: Env,
+  userId: string,
+  messageId: string,
+): Promise<GmailMessage> {
+  const accessToken = await getGmailToken(db, userId, {
+    GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
+  });
+
+  return gmailRequest<GmailMessage>(accessToken, `/messages/${messageId}`, {
+    format: "full",
+    fields: "id,threadId,historyId,internalDate,snippet,labelIds,payload",
+  });
+}
+
+export async function getGmailAttachmentBytes(
+  db: Database,
+  env: Env,
+  userId: string,
+  messageId: string,
+  attachmentId: string,
+): Promise<Uint8Array> {
+  const accessToken = await getGmailToken(db, userId, {
+    GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
+  });
+
+  const payload = await gmailRequest<GmailAttachmentResponse>(
+    accessToken,
+    `/messages/${messageId}/attachments/${attachmentId}`,
+  );
+
+  if (!payload.data) {
+    throw new Error("Attachment data missing from Gmail response.");
+  }
+
+  return decodeBase64UrlToBytes(payload.data);
+}
+
 async function listMessagesPage(
   accessToken: string,
   pageToken?: string,
@@ -630,7 +755,12 @@ async function processMessageIds({
         const toAddr = extractAddress(rawTo);
         const subject = getHeaderValue(message.payload?.headers, "Subject");
         const bodyText = extractMessageBodyText(message);
-        const labelIds = message.labelIds ?? [];
+        const bodyHtml = extractMessageBodyHtml(message);
+        const labelIds = [...(message.labelIds ?? [])];
+        const hasAttachments = extractMessageAttachments(message).length > 0;
+        if (hasAttachments && !labelIds.includes(HAS_ATTACHMENT_LABEL)) {
+          labelIds.push(HAS_ATTACHMENT_LABEL);
+        }
         const isRead = !labelIds.includes("UNREAD");
         const internalDate = Number(message.internalDate ?? "");
         const date =
@@ -651,6 +781,7 @@ async function processMessageIds({
             subject,
             snippet: message.snippet ?? null,
             bodyText: bodyText || null,
+            bodyHtml: bodyHtml || null,
             date,
             isRead,
             labelIds,

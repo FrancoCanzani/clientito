@@ -19,7 +19,6 @@ import { Route as DashboardOrgIdIndexRouteImport } from './routes/_dashboard/$or
 import { Route as DashboardOrgIdManageRouteImport } from './routes/_dashboard/$orgId/manage'
 import { Route as DashboardOrgIdEmailsIndexRouteImport } from './routes/_dashboard/$orgId/emails/index'
 import { Route as DashboardOrgIdCustomersIndexRouteImport } from './routes/_dashboard/$orgId/customers/index'
-import { Route as DashboardOrgIdContactsIndexRouteImport } from './routes/_dashboard/$orgId/contacts/index'
 import { Route as DashboardOrgIdCustomersNewRouteImport } from './routes/_dashboard/$orgId/customers/new'
 import { Route as DashboardOrgIdCustomersCustomerIdRouteImport } from './routes/_dashboard/$orgId/customers/$customerId'
 
@@ -74,12 +73,6 @@ const DashboardOrgIdCustomersIndexRoute =
     path: '/customers/',
     getParentRoute: () => DashboardOrgIdRouteRoute,
   } as any)
-const DashboardOrgIdContactsIndexRoute =
-  DashboardOrgIdContactsIndexRouteImport.update({
-    id: '/contacts/',
-    path: '/contacts/',
-    getParentRoute: () => DashboardOrgIdRouteRoute,
-  } as any)
 const DashboardOrgIdCustomersNewRoute =
   DashboardOrgIdCustomersNewRouteImport.update({
     id: '/customers/new',
@@ -103,7 +96,6 @@ export interface FileRoutesByFullPath {
   '/$orgId/': typeof DashboardOrgIdIndexRoute
   '/$orgId/customers/$customerId': typeof DashboardOrgIdCustomersCustomerIdRoute
   '/$orgId/customers/new': typeof DashboardOrgIdCustomersNewRoute
-  '/$orgId/contacts/': typeof DashboardOrgIdContactsIndexRoute
   '/$orgId/customers/': typeof DashboardOrgIdCustomersIndexRoute
   '/$orgId/emails/': typeof DashboardOrgIdEmailsIndexRoute
 }
@@ -116,7 +108,6 @@ export interface FileRoutesByTo {
   '/$orgId': typeof DashboardOrgIdIndexRoute
   '/$orgId/customers/$customerId': typeof DashboardOrgIdCustomersCustomerIdRoute
   '/$orgId/customers/new': typeof DashboardOrgIdCustomersNewRoute
-  '/$orgId/contacts': typeof DashboardOrgIdContactsIndexRoute
   '/$orgId/customers': typeof DashboardOrgIdCustomersIndexRoute
   '/$orgId/emails': typeof DashboardOrgIdEmailsIndexRoute
 }
@@ -132,7 +123,6 @@ export interface FileRoutesById {
   '/_dashboard/$orgId/': typeof DashboardOrgIdIndexRoute
   '/_dashboard/$orgId/customers/$customerId': typeof DashboardOrgIdCustomersCustomerIdRoute
   '/_dashboard/$orgId/customers/new': typeof DashboardOrgIdCustomersNewRoute
-  '/_dashboard/$orgId/contacts/': typeof DashboardOrgIdContactsIndexRoute
   '/_dashboard/$orgId/customers/': typeof DashboardOrgIdCustomersIndexRoute
   '/_dashboard/$orgId/emails/': typeof DashboardOrgIdEmailsIndexRoute
 }
@@ -148,7 +138,6 @@ export interface FileRouteTypes {
     | '/$orgId/'
     | '/$orgId/customers/$customerId'
     | '/$orgId/customers/new'
-    | '/$orgId/contacts/'
     | '/$orgId/customers/'
     | '/$orgId/emails/'
   fileRoutesByTo: FileRoutesByTo
@@ -161,7 +150,6 @@ export interface FileRouteTypes {
     | '/$orgId'
     | '/$orgId/customers/$customerId'
     | '/$orgId/customers/new'
-    | '/$orgId/contacts'
     | '/$orgId/customers'
     | '/$orgId/emails'
   id:
@@ -176,7 +164,6 @@ export interface FileRouteTypes {
     | '/_dashboard/$orgId/'
     | '/_dashboard/$orgId/customers/$customerId'
     | '/_dashboard/$orgId/customers/new'
-    | '/_dashboard/$orgId/contacts/'
     | '/_dashboard/$orgId/customers/'
     | '/_dashboard/$orgId/emails/'
   fileRoutesById: FileRoutesById
@@ -259,13 +246,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardOrgIdCustomersIndexRouteImport
       parentRoute: typeof DashboardOrgIdRouteRoute
     }
-    '/_dashboard/$orgId/contacts/': {
-      id: '/_dashboard/$orgId/contacts/'
-      path: '/contacts'
-      fullPath: '/$orgId/contacts/'
-      preLoaderRoute: typeof DashboardOrgIdContactsIndexRouteImport
-      parentRoute: typeof DashboardOrgIdRouteRoute
-    }
     '/_dashboard/$orgId/customers/new': {
       id: '/_dashboard/$orgId/customers/new'
       path: '/customers/new'
@@ -288,7 +268,6 @@ interface DashboardOrgIdRouteRouteChildren {
   DashboardOrgIdIndexRoute: typeof DashboardOrgIdIndexRoute
   DashboardOrgIdCustomersCustomerIdRoute: typeof DashboardOrgIdCustomersCustomerIdRoute
   DashboardOrgIdCustomersNewRoute: typeof DashboardOrgIdCustomersNewRoute
-  DashboardOrgIdContactsIndexRoute: typeof DashboardOrgIdContactsIndexRoute
   DashboardOrgIdCustomersIndexRoute: typeof DashboardOrgIdCustomersIndexRoute
   DashboardOrgIdEmailsIndexRoute: typeof DashboardOrgIdEmailsIndexRoute
 }
@@ -299,7 +278,6 @@ const DashboardOrgIdRouteRouteChildren: DashboardOrgIdRouteRouteChildren = {
   DashboardOrgIdCustomersCustomerIdRoute:
     DashboardOrgIdCustomersCustomerIdRoute,
   DashboardOrgIdCustomersNewRoute: DashboardOrgIdCustomersNewRoute,
-  DashboardOrgIdContactsIndexRoute: DashboardOrgIdContactsIndexRoute,
   DashboardOrgIdCustomersIndexRoute: DashboardOrgIdCustomersIndexRoute,
   DashboardOrgIdEmailsIndexRoute: DashboardOrgIdEmailsIndexRoute,
 }

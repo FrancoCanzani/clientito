@@ -7,6 +7,7 @@ import { createDb } from "./db/client";
 import { runScheduledIncrementalSync } from "./lib/gmail";
 import { runScheduledSummaryGeneration } from "./lib/summaries";
 import classifyRoutes from "./routes/classify/router";
+import dashboardRoutes from "./routes/dashboard/router";
 import contactsRoutes from "./routes/contacts/router";
 import customersRoutes from "./routes/customers/router";
 import emailsRoutes from "./routes/emails/router";
@@ -49,6 +50,7 @@ app.route("/api/contacts", contactsRoutes);
 app.route("/api/customers", customersRoutes);
 app.route("/api/emails", emailsRoutes);
 app.route("/api/reminders", remindersRoutes);
+app.route("/api/dashboard", dashboardRoutes);
 
 async function handleScheduledSync(env: Env) {
   const db = createDb(env.DB);

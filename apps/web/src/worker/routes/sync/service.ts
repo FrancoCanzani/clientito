@@ -41,10 +41,12 @@ export function runFullSyncInBackground(
   orgId: string,
   userId: string,
   months?: number,
+  continueFullSync?: boolean,
 ) {
   return (async () => {
     try {
       const gmailQuery = monthsToGmailQuery(months);
+      const shouldRunFollowUpFullSync = continueFullSync === true && Boolean(gmailQuery);
       await startFullGmailSync(
         db,
         env,
@@ -53,6 +55,16 @@ export function runFullSyncInBackground(
         (phase, current, total) => updateSyncProgress(db, orgId, phase, current, total),
         gmailQuery,
       );
+
+      if (shouldRunFollowUpFullSync) {
+        await startFullGmailSync(
+          db,
+          env,
+          orgId,
+          userId,
+          (phase, current, total) => updateSyncProgress(db, orgId, phase, current, total),
+        );
+      }
 
       await clearSyncProgress(db, orgId);
     } catch (error) {

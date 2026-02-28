@@ -8,6 +8,7 @@ import {
   emails,
   reminders,
 } from "../../db/schema";
+import { buildSystemPrompt, getOrgAIContext } from "../../lib/ai-context";
 import { getWorkersAIModel, truncate } from "../classify/helpers";
 
 export const customerHealthSchema = z.object({
@@ -74,12 +75,15 @@ export async function generateAndStoreSummary(
     .join("\n");
 
   const model = getWorkersAIModel(env);
+  const aiContext = await getOrgAIContext(db, orgId);
+
+  const basePrompt =
+    "Analyze a CRM customer's activity. Return JSON with: status (healthy/at_risk/churned/new/unknown), keyChanges (up to 3 recent changes), risks (up to 3), nextBestAction (one concrete action), confidence (0-1).";
 
   const { output } = await generateText({
     model,
     output: Output.object({ schema: customerHealthSchema }),
-    system:
-      "Analyze a logistics CRM customer's activity. Return JSON with: status (healthy/at_risk/churned/new/unknown), keyChanges (up to 3 recent changes), risks (up to 3), nextBestAction (one concrete action), confidence (0-1).",
+    system: buildSystemPrompt(basePrompt, aiContext),
     prompt: `Customer: ${customer.name} (${customer.email})${customer.company ? ` at ${customer.company}` : ""}
 
 Recent emails (${recentEmails.length}):

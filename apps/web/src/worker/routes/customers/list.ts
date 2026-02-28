@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { and, asc, eq, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
 import { customers, emails, reminders } from "../../db/schema";
 import { ensureOrgAccess } from "../../lib/access";
 import type { AppRouteEnv } from "../types";
@@ -55,7 +55,7 @@ export function registerGetCustomers(api: OpenAPIHono<AppRouteEnv>) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const { orgId, limit = 50, offset = 0, search } = c.req.valid("query");
+    const { orgId, limit = 50, offset = 0, search, sortBy = "name", order = "asc" } = c.req.valid("query");
     if (!(await ensureOrgAccess(db, orgId, user.id))) {
       return c.json({ error: "Forbidden" }, 403);
     }
@@ -109,7 +109,17 @@ export function registerGetCustomers(api: OpenAPIHono<AppRouteEnv>) {
       .leftJoin(reminders, eq(reminders.customerId, customers.id))
       .where(whereClause)
       .groupBy(customers.id)
-      .orderBy(asc(customers.name))
+      .orderBy(() => {
+        const dir = order === "desc" ? desc : asc;
+        switch (sortBy) {
+          case "activity":
+            return dir(sql`max(${emails.date})`);
+          case "emails":
+            return dir(sql`count(distinct ${emails.id})`);
+          default:
+            return dir(customers.name);
+        }
+      })
       .limit(limit)
       .offset(offset);
 

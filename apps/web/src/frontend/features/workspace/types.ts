@@ -2,6 +2,7 @@ export interface Organization {
   id: string;
   name: string;
   slug: string;
+  aiContext: string | null;
   role: string;
   createdAt: number;
 }
@@ -20,4 +21,5 @@ export interface CreateOrganizationInput {
 
 export interface UpdateOrganizationInput {
   name: string;
+  aiContext?: string | null;
 }

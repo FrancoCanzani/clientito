@@ -56,7 +56,7 @@ export function registerPostSyncStart(api: OpenAPIHono<AppRouteEnv>) {
 
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-    const { orgId, months } = c.req.valid("json");
+    const { orgId, months, continueFullSync } = c.req.valid("json");
     if (!(await ensureOrgAccess(db, orgId, user.id))) {
       return c.json({ error: "Forbidden" }, 403);
     }
@@ -65,7 +65,9 @@ export function registerPostSyncStart(api: OpenAPIHono<AppRouteEnv>) {
       return c.json({ error: "Sync already in progress" }, 409);
     }
 
-    c.executionCtx.waitUntil(runFullSyncInBackground(db, c.env, orgId, user.id, months));
+    c.executionCtx.waitUntil(
+      runFullSyncInBackground(db, c.env, orgId, user.id, months, continueFullSync),
+    );
     return c.json({ data: { status: "started" } }, 202);
   });
 }

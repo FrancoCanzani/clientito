@@ -1,6 +1,12 @@
 import AppHeader from "@/components/app-header";
 import BottomNav from "@/components/bottom-nav";
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { useActionableEmails } from "@/features/emails/hooks/use-actionable-emails";
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  useParams,
+} from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$orgId")({
   loader: async ({ params, parentMatchPromise }) => {
@@ -32,6 +38,9 @@ export const Route = createFileRoute("/_dashboard/$orgId")({
 });
 
 function DashboardOrganizationLayout() {
+  const { orgId } = useParams({ from: "/_dashboard/$orgId" });
+  useActionableEmails(orgId, true);
+
   return (
     <div className="min-h-screen bg-olive-50">
       <AppHeader />

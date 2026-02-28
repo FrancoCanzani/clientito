@@ -17,6 +17,7 @@ export const organizations = sqliteTable(
     createdByUserId: text("created_by_user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    aiContext: text("ai_context"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   }
@@ -82,6 +83,7 @@ export const emails = sqliteTable(
     subject: text("subject"),
     snippet: text("snippet"),
     bodyText: text("body_text"),
+    bodyHtml: text("body_html"),
     date: integer("date").notNull(),
     isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
     labelIds: text("label_ids", { mode: "json" }).$type<string[] | null>(),

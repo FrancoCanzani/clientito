@@ -16,7 +16,8 @@ import { createOrganization } from "@/features/workspace/api";
 import { ArrowsClockwiseIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 type Step = 0 | 1 | 2;
 
@@ -35,6 +36,11 @@ export default function GetStartedPage() {
   const [orgError, setOrgError] = useState<string | null>(null);
   const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
   const [contactSearch, setContactSearch] = useState("");
+  const lastSyncErrorRef = useRef<string | null>(null);
+
+  function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
+  }
 
   const createOrgMutation = useMutation({
     mutationFn: createOrganization,
@@ -83,10 +89,31 @@ export default function GetStartedPage() {
         )
       : 0;
 
+  useEffect(() => {
+    const syncError = syncStatus.data?.error ?? null;
+    if (!syncError) {
+      lastSyncErrorRef.current = null;
+      return;
+    }
+
+    if (lastSyncErrorRef.current === syncError) {
+      return;
+    }
+
+    lastSyncErrorRef.current = syncError;
+    toast.error(syncError);
+  }, [syncStatus.data?.error]);
+
   const fullSyncMutation = useMutation({
-    mutationFn: () => startFullSync(orgId!, 12),
+    mutationFn: () => startFullSync(orgId!, 12, true),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sync-status", orgId] });
+      toast.success(
+        "Sync started. We will import the last 12 months first, then continue with full Gmail in the background.",
+      );
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to start sync."));
     },
   });
 
@@ -94,6 +121,10 @@ export default function GetStartedPage() {
     mutationFn: () => runIncrementalSync(orgId!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sync-status", orgId] });
+      toast.success("Sync started in the background.");
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to start sync."));
     },
   });
 
@@ -132,11 +163,15 @@ export default function GetStartedPage() {
       await queryClient.invalidateQueries({ queryKey: ["contacts", orgId] });
       await queryClient.invalidateQueries({ queryKey: ["customers", orgId] });
       await queryClient.invalidateQueries({ queryKey: ["sync-status", orgId] });
+      toast.success("Setup finished.");
       navigate({
         to: "/$orgId",
         params: { orgId },
         replace: true,
       });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to finish setup."));
     },
   });
 
@@ -218,26 +253,25 @@ export default function GetStartedPage() {
         <section className="space-y-2 w-1/2">
           <h2 className="text-lg font-medium">Sync your Gmail</h2>
           <p className="text-sm text-muted-foreground">
-            We will import your email history, build your contact agenda, and
-            prepare your first customer suggestions.
+            We will import your last 12 months first so you can continue setup,
+            then we will keep syncing your full Gmail in the background.
           </p>
           <div className="flex items-center justify-center gap-3 mt-8">
-            {!isSyncRunning ||
-              (!hasSynced && (
-                <Button
-                  onClick={handleSync}
-                  variant={"outline"}
-                  disabled={
-                    !orgId ||
-                    isSyncRunning ||
-                    fullSyncMutation.isPending ||
-                    incrementalSyncMutation.isPending
-                  }
-                >
-                  <ArrowsClockwiseIcon />
-                  Start sync
-                </Button>
-              ))}
+            {!isSyncRunning && (
+              <Button
+                onClick={handleSync}
+                variant={"outline"}
+                disabled={
+                  !orgId ||
+                  isSyncRunning ||
+                  fullSyncMutation.isPending ||
+                  incrementalSyncMutation.isPending
+                }
+              >
+                <ArrowsClockwiseIcon />
+                Start sync
+              </Button>
+            )}
             {isSyncRunning && (
               <span className="text-xs text-muted-foreground">
                 {progressTotal > 0
@@ -263,6 +297,12 @@ export default function GetStartedPage() {
           )}
           {syncStatus.data?.error ? (
             <p className="text-xs text-destructive">{syncStatus.data.error}</p>
+          ) : null}
+          {isSyncRunning && hasSynced ? (
+            <p className="text-xs text-muted-foreground">
+              Initial sync is done. Full mailbox sync is still running in the
+              background, you can continue now.
+            </p>
           ) : null}
           <div className="flex justify-end mt-12">
             <Button onClick={() => setStep(2)} disabled={!hasSynced}>

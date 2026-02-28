@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,8 +18,6 @@ import {
   fetchContactsPaginated,
   type Contact,
 } from "../api";
-
-const orgRoute = getRouteApi("/_dashboard/$orgId");
 
 const PERSONAL_DOMAINS = new Set([
   "gmail.com",
@@ -43,20 +40,6 @@ const COMMON_SECOND_LEVEL_TLDS = new Set([
   "co.jp",
   "co.in",
 ]);
-
-const COMPANY_NAME_OVERRIDES: Record<string, string> = {
-  "bbva.com": "BBVA",
-  "caixabank.com": "CaixaBank",
-  "cloudflare.com": "Cloudflare",
-  "github.com": "GitHub",
-  "hbomax.com": "HBO Max",
-  "idealista.com": "Idealista",
-  "infojobs.net": "InfoJobs",
-  "linkedin.com": "LinkedIn",
-  "nba.com": "NBA",
-  "stripe.com": "Stripe",
-  "vercel.com": "Vercel",
-};
 
 type ViewMode = "companies" | "people";
 type SortOption = "activity" | "az" | "za";
@@ -115,9 +98,6 @@ function toTitleCase(value: string): string {
 }
 
 function toCompanyName(domain: string): string {
-  const override = COMPANY_NAME_OVERRIDES[domain];
-  if (override) return override;
-
   const label = domain.split(".")[0] ?? domain;
   const cleaned = label
     .replace(/[-_]+/g, " ")
@@ -346,9 +326,13 @@ function CompanyGroupCard({
   );
 }
 
-export default function ContactsPickerPage() {
-  const { orgId } = orgRoute.useLoaderData();
-  const navigate = useNavigate();
+export default function ContactsPickerContent({
+  orgId,
+  onClose,
+}: {
+  orgId: string;
+  onClose: () => void;
+}) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -443,13 +427,13 @@ export default function ContactsPickerPage() {
       queryClient.invalidateQueries({ queryKey: ["contacts", orgId] });
       queryClient.invalidateQueries({ queryKey: ["customers", orgId] });
       queryClient.invalidateQueries({ queryKey: ["sync-status", orgId] });
-      navigate({ to: "/$orgId", params: { orgId } });
+      onClose();
     },
   });
 
   if (contactsQuery.isLoading && offset === 0) {
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
+      <div className="space-y-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-32 w-full" />
@@ -458,12 +442,7 @@ export default function ContactsPickerPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4 pb-20">
-      <h2 className="text-lg font-medium">Select your customers</h2>
-      <p className="text-sm text-muted-foreground">
-        Choose which contacts are customers. Your own email is excluded.
-      </p>
-
+    <div className="space-y-4">
       <div className="flex items-center gap-1">
         <Button
           variant={viewMode === "companies" ? "default" : "outline"}
@@ -583,20 +562,18 @@ export default function ContactsPickerPage() {
       )}
 
       {selectedEmails.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 border-t bg-background p-4">
-          <div className="mx-auto flex max-w-2xl items-center justify-between">
-            <span className="text-sm text-muted-foreground">
-              {selectedEmails.size} contact{selectedEmails.size !== 1 ? "s" : ""} selected
-            </span>
-            <Button
-              onClick={() => createCustomers.mutate()}
-              disabled={createCustomers.isPending}
-            >
-              {createCustomers.isPending
-                ? "Saving..."
-                : `Save ${selectedEmails.size} as customers`}
-            </Button>
-          </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">
+            {selectedEmails.size} contact{selectedEmails.size !== 1 ? "s" : ""} selected
+          </span>
+          <Button
+            onClick={() => createCustomers.mutate()}
+            disabled={createCustomers.isPending}
+          >
+            {createCustomers.isPending
+              ? "Saving..."
+              : `Save ${selectedEmails.size} as customers`}
+          </Button>
         </div>
       )}
     </div>

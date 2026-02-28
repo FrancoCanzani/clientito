@@ -1,5 +1,3 @@
-import { apiFetch } from "@/lib/api";
-
 export type Contact = {
   id: string;
   email: string;
@@ -25,8 +23,6 @@ export type CreateCustomersFromContactsResult = {
   emailsLinked: number;
 };
 
-type DataResponse<T> = { data: T };
-
 export async function fetchContacts(
   orgId: string,
   search?: string,
@@ -47,7 +43,9 @@ export async function fetchContactsPaginated(
   if (params?.limit) query.set("limit", String(params.limit));
   if (params?.offset) query.set("offset", String(params.offset));
 
-  const response = await apiFetch(`/contacts?${query.toString()}`);
+  const response = await fetch(`/api/contacts?${query}`, {
+    credentials: "include",
+  });
   return response.json();
 }
 
@@ -55,11 +53,12 @@ export async function createCustomersFromContacts(
   orgId: string,
   emails: string[],
 ): Promise<CreateCustomersFromContactsResult> {
-  const response = await apiFetch("/contacts", {
+  const response = await fetch("/api/contacts", {
     method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ orgId, emails }),
   });
-  const json: DataResponse<CreateCustomersFromContactsResult> =
-    await response.json();
+  const json = await response.json();
   return json.data;
 }

@@ -80,6 +80,7 @@ export function registerPatchOrganization(api: OpenAPIHono<AppRouteEnv>) {
       user.id,
       orgId,
       payload.name,
+      payload.aiContext,
     );
 
     if (result.status === "forbidden") {

@@ -59,6 +59,8 @@ export const listCustomersQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional(),
   offset: z.coerce.number().int().min(0).optional(),
   search: z.string().trim().optional(),
+  sortBy: z.enum(["name", "activity", "emails"]).optional(),
+  order: z.enum(["asc", "desc"]).optional(),
 });
 
 export const customerIdParamsSchema = z.object({

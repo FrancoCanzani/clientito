@@ -7,6 +7,7 @@ export type OrganizationRecord = {
   id: string;
   name: string;
   slug: string;
+  aiContext: string | null;
   createdByUserId: string;
   createdAt: number;
   updatedAt: number;
@@ -23,6 +24,7 @@ export function toOrganizationListResponse(row: {
   id: string;
   name: string;
   slug: string;
+  aiContext: string | null;
   role: string;
   createdAt: number;
 }) {

@@ -1,0 +1,1 @@
+ALTER TABLE `organizations` ADD `ai_context` text;

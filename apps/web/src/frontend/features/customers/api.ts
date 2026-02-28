@@ -1,5 +1,3 @@
-import { apiFetch } from "@/lib/api";
-
 export type CustomerHealthSummary = {
   status: "healthy" | "at_risk" | "churned" | "new" | "unknown";
   keyChanges: string[];
@@ -80,33 +78,46 @@ export type CustomerDetail = {
   contacts: CustomerContact[];
 };
 
-type DataResponse<T> = { data: T };
-
 export async function fetchCustomers(
   orgId: string,
-  params?: { search?: string; limit?: number; offset?: number },
+  params?: {
+    search?: string;
+    limit?: number;
+    offset?: number;
+    sortBy?: "name" | "activity" | "emails";
+    order?: "asc" | "desc";
+  },
 ): Promise<CustomerListResponse> {
   const query = new URLSearchParams({ orgId });
   if (params?.search) query.set("search", params.search);
   if (params?.limit) query.set("limit", String(params.limit));
   if (params?.offset) query.set("offset", String(params.offset));
+  if (params?.sortBy) query.set("sortBy", params.sortBy);
+  if (params?.order) query.set("order", params.order);
 
-  const response = await apiFetch(`/customers?${query.toString()}`);
-  const json: CustomerListResponse = await response.json();
-  return json;
+  const response = await fetch(`/api/customers?${query}`, {
+    credentials: "include",
+  });
+  return response.json();
 }
 
 export async function fetchCustomerSummary(
   customerId: string,
 ): Promise<CustomerHealthSummary | null> {
-  const response = await apiFetch(`/customers/${customerId}/summary`);
-  const json: DataResponse<CustomerHealthSummary | null> = await response.json();
+  const response = await fetch(`/api/customers/${customerId}/summary`, {
+    credentials: "include",
+  });
+  const json = await response.json();
   return json.data;
 }
 
-export async function fetchCustomerDetail(id: string): Promise<CustomerDetail> {
-  const response = await apiFetch(`/customers/${id}`);
-  const json: DataResponse<CustomerDetail> = await response.json();
+export async function fetchCustomerDetail(
+  id: string,
+): Promise<CustomerDetail> {
+  const response = await fetch(`/api/customers/${id}`, {
+    credentials: "include",
+  });
+  const json = await response.json();
   return json.data;
 }
 
@@ -121,11 +132,13 @@ export async function createCustomer(input: {
   address?: string;
   notes?: string;
 }): Promise<CustomerListItem> {
-  const response = await apiFetch("/customers", {
+  const response = await fetch("/api/customers", {
     method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  const json: DataResponse<CustomerListItem> = await response.json();
+  const json = await response.json();
   return json.data;
 }
 
@@ -141,8 +154,10 @@ export async function updateCustomer(
     notes?: string;
   },
 ): Promise<void> {
-  await apiFetch(`/customers/${id}`, {
+  await fetch(`/api/customers/${id}`, {
     method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(updates),
   });
 }
@@ -151,12 +166,13 @@ export async function addCustomerContact(
   customerId: string,
   email: string,
 ): Promise<{ email: string; emailsLinked: number }> {
-  const response = await apiFetch(`/customers/${customerId}/contacts`, {
+  const response = await fetch(`/api/customers/${customerId}/contacts`, {
     method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email }),
   });
-  const json: DataResponse<{ email: string; emailsLinked: number }> =
-    await response.json();
+  const json = await response.json();
   return json.data;
 }
 
@@ -164,14 +180,14 @@ export async function removeCustomerContact(
   customerId: string,
   email: string,
 ): Promise<{ email: string; emailsLinked: number }> {
-  const response = await apiFetch(
-    `/customers/${customerId}/contacts/${encodeURIComponent(email)}`,
+  const response = await fetch(
+    `/api/customers/${customerId}/contacts/${encodeURIComponent(email)}`,
     {
       method: "DELETE",
+      credentials: "include",
     },
   );
-  const json: DataResponse<{ email: string; emailsLinked: number }> =
-    await response.json();
+  const json = await response.json();
   return json.data;
 }
 
@@ -181,11 +197,13 @@ export async function createTask(input: {
   message: string;
   dueAt: number;
 }): Promise<Task> {
-  const response = await apiFetch("/reminders", {
+  const response = await fetch("/api/reminders", {
     method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  const json: DataResponse<Task> = await response.json();
+  const json = await response.json();
   return json.data;
 }
 
@@ -193,14 +211,19 @@ export async function updateTask(
   id: string,
   updates: { message?: string; dueAt?: number; done?: boolean },
 ): Promise<Task> {
-  const response = await apiFetch(`/reminders/${id}`, {
+  const response = await fetch(`/api/reminders/${id}`, {
     method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(updates),
   });
-  const json: DataResponse<Task> = await response.json();
+  const json = await response.json();
   return json.data;
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  await apiFetch(`/reminders/${id}`, { method: "DELETE" });
+  await fetch(`/api/reminders/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
 }

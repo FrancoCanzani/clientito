@@ -15,6 +15,7 @@ export async function listOrganizationsForUser(db: Database, userId: string) {
       id: organizations.id,
       name: organizations.name,
       slug: organizations.slug,
+      aiContext: organizations.aiContext,
       role: orgMembers.role,
       createdAt: organizations.createdAt,
     })
@@ -70,6 +71,7 @@ export async function updateOrganizationForOwner(
   userId: string,
   orgId: string,
   nameInput: string,
+  aiContext?: string | null,
 ): Promise<UpdateOrganizationResult> {
   const membership = await db.query.orgMembers.findFirst({
     where: and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)),
@@ -79,12 +81,17 @@ export async function updateOrganizationForOwner(
     return { status: "forbidden" };
   }
 
+  const updateData: Record<string, unknown> = {
+    name: nameInput.trim(),
+    updatedAt: unixNow(),
+  };
+  if (aiContext !== undefined) {
+    updateData.aiContext = aiContext;
+  }
+
   const updatedRows = await db
     .update(organizations)
-    .set({
-      name: nameInput.trim(),
-      updatedAt: unixNow(),
-    })
+    .set(updateData)
     .where(eq(organizations.id, orgId))
     .returning();
 

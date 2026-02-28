@@ -3,6 +3,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
 import { customers, emails } from "../../db/schema";
+import { buildSystemPrompt, getOrgAIContext } from "../../lib/ai-context";
 import { resolveCustomerName } from "../../lib/customer-name";
 import {
   getWorkersAIModel,
@@ -34,22 +35,25 @@ export type ClassificationBatchResult = {
   failed: number;
 };
 
+const DEFAULT_CLASSIFY_PROMPT = [
+  "You classify emails for a CRM.",
+  "Mark is_customer true only for senders who are actual customers or potential customers requesting services, quotes, or coordination.",
+  "Mark is_customer false for internal team mail, newsletters, automated notices, spam, and vendors selling services.",
+].join(" ");
+
 async function classifyEmailWithAI(
   env: Env,
   input: { from: string; subject: string; body: string },
+  aiContext: string | null,
 ): Promise<ClassificationOutput | null> {
   const { output } = await generateText({
     model: getWorkersAIModel(env),
     output: Output.object({
       schema: classificationSchema,
       name: "email_classification",
-      description: "Customer classification result for a logistics CRM email",
+      description: "Customer classification result for a CRM email",
     }),
-    system: [
-      "You classify emails for a transport/logistics CRM.",
-      "Mark is_customer true only for senders requesting transport, quotes, shipment updates, bookings, pickup or delivery coordination.",
-      "Mark is_customer false for internal team mail, newsletters, automated notices, spam, and vendors selling services.",
-    ].join(" "),
+    system: buildSystemPrompt(DEFAULT_CLASSIFY_PROMPT, aiContext),
     prompt: [
       `From: ${input.from}`,
       `Subject: ${input.subject}`,
@@ -71,6 +75,7 @@ export async function extractCustomerFromEmail(
   from: string,
   subject: string | null,
   body: string | null,
+  aiContext: string | null = null,
 ): Promise<{ name: string | null; company: string | null }> {
   const { output } = await generateText({
     model: getWorkersAIModel(env),
@@ -79,7 +84,7 @@ export async function extractCustomerFromEmail(
       name: "customer_contact_extraction",
       description: "Extract contact name and company from a logistics email",
     }),
-    system: "Extract contact name and company from a logistics email.",
+    system: buildSystemPrompt("Extract contact name and company from an email.", aiContext),
     prompt: [
       `From: ${from}`,
       `Subject: ${subject ?? ""}`,
@@ -143,6 +148,8 @@ export async function classifyOrgEmails(
   orgId: string,
   limit = 50,
 ): Promise<ClassificationBatchResult> {
+  const aiContext = await getOrgAIContext(db, orgId);
+
   const pendingEmails = await db
     .select()
     .from(emails)
@@ -162,11 +169,15 @@ export async function classifyOrgEmails(
     CLASSIFY_CONCURRENCY,
     async (email) => {
       try {
-        return await classifyEmailWithAI(env, {
-          from: email.fromAddr,
-          subject: truncate(email.subject, 300),
-          body: truncate(email.bodyText ?? email.snippet, 1000),
-        });
+        return await classifyEmailWithAI(
+          env,
+          {
+            from: email.fromAddr,
+            subject: truncate(email.subject, 300),
+            body: truncate(email.bodyText ?? email.snippet, 1000),
+          },
+          aiContext,
+        );
       } catch (error) {
         console.error("Email classification failed", { emailId: email.id, error });
         return null;

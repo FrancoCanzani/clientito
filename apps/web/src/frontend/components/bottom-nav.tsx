@@ -1,5 +1,4 @@
 import {
-  AddressBookIcon,
   EnvelopeIcon,
   HouseLineIcon,
   UsersIcon,
@@ -11,7 +10,6 @@ const organizationRouteApi = getRouteApi("/_dashboard/$orgId");
 const navItems = [
   { label: "Home", path: "" as const, icon: HouseLineIcon },
   { label: "Customers", path: "customers" as const, icon: UsersIcon },
-  { label: "Contacts", path: "contacts" as const, icon: AddressBookIcon },
   { label: "Emails", path: "emails" as const, icon: EnvelopeIcon },
 ];
 

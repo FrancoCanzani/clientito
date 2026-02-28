@@ -3,6 +3,7 @@ import { z } from "@hono/zod-openapi";
 export const syncRequestSchema = z.object({
   orgId: z.string().trim().min(1, "orgId is required"),
   months: z.coerce.number().int().min(1).optional(),
+  continueFullSync: z.boolean().optional(),
 });
 
 export const syncStatusQuerySchema = z.object({

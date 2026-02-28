@@ -34,8 +34,6 @@ function getSectionName(pathname: string): string {
   switch (section) {
     case "customers":
       return "Customers";
-    case "contacts":
-      return "Contacts";
     case "emails":
       return "Emails";
     case "manage":

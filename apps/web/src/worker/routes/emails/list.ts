@@ -51,6 +51,7 @@ export function registerGetEmailList(api: OpenAPIHono<AppRouteEnv>) {
       search,
       customerId,
       isCustomer,
+      isRead,
       category,
     } = c.req.valid("query");
 
@@ -79,6 +80,12 @@ export function registerGetEmailList(api: OpenAPIHono<AppRouteEnv>) {
       conditions.push(eq(emails.isCustomer, true));
     } else if (isCustomer === "false") {
       conditions.push(eq(emails.isCustomer, false));
+    }
+
+    if (isRead === "true") {
+      conditions.push(eq(emails.isRead, true));
+    } else if (isRead === "false") {
+      conditions.push(eq(emails.isRead, false));
     }
 
     const hasLabel = (label: string) =>
@@ -125,6 +132,7 @@ export function registerGetEmailList(api: OpenAPIHono<AppRouteEnv>) {
         subject: emails.subject,
         snippet: emails.snippet,
         bodyText: emails.bodyText,
+        bodyHtml: emails.bodyHtml,
         threadId: emails.threadId,
         date: emails.date,
         isRead: emails.isRead,

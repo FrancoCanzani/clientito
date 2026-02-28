@@ -11,6 +11,7 @@ export function toEmailListResponse(row: {
   subject: string | null;
   snippet: string | null;
   bodyText: string | null;
+  bodyHtml: string | null;
   threadId: string | null;
   date: number;
   isRead: boolean;
@@ -21,6 +22,8 @@ export function toEmailListResponse(row: {
   customerId: string | null;
   customerName: string | null;
 }) {
+  const labelIds = row.labelIds ?? [];
+
   return {
     id: String(row.id),
     gmailId: row.gmailId,
@@ -30,10 +33,12 @@ export function toEmailListResponse(row: {
     subject: row.subject,
     snippet: row.snippet,
     bodyText: row.bodyText,
+    bodyHtml: row.bodyHtml,
     threadId: row.threadId,
     date: row.date,
     isRead: row.isRead,
-    labelIds: row.labelIds ?? [],
+    labelIds,
+    hasAttachment: labelIds.includes("HAS_ATTACHMENT"),
     isCustomer: row.isCustomer,
     classified: row.classified,
     createdAt: row.createdAt,
