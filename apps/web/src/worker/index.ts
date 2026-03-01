@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
+import { routeAgentRequest } from "agents";
 import { authMiddleware } from "./auth/middleware";
 import { createAuth } from "./auth/server";
 import { createDb } from "./db/client";
@@ -16,6 +17,8 @@ import orgRoutes from "./routes/org/router";
 import remindersRoutes from "./routes/reminders/router";
 import syncRoutes from "./routes/sync/router";
 import type { AppRouteEnv } from "./routes/types";
+
+export { ChatAgent } from "./agents/chat";
 
 const app = new Hono<AppRouteEnv>();
 
@@ -58,7 +61,11 @@ async function handleScheduledSync(env: Env) {
 }
 
 export default {
-  fetch: app.fetch,
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const agentResponse = await routeAgentRequest(request, env);
+    if (agentResponse) return agentResponse;
+    return app.fetch(request, env, ctx);
+  },
   scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     const db = createDb(env.DB);
     if (event.cron === "0 * * * *") {

@@ -1,8 +1,7 @@
-export function normalizeEmailAddress(input: string): string {
-  return input.trim().toLowerCase();
-}
+import { sql } from "drizzle-orm";
+import { emails } from "../../db/schema";
 
-export function toEmailListResponse(row: {
+type EmailListRow = {
   id: string;
   gmailId: string;
   fromAddr: string;
@@ -21,7 +20,45 @@ export function toEmailListResponse(row: {
   createdAt: number;
   customerId: string | null;
   customerName: string | null;
-}) {
+};
+
+type EmailSearchRow = {
+  id: string;
+  gmailId: string;
+  fromAddr: string;
+  fromName: string | null;
+  toAddr: string | null;
+  subject: string | null;
+  snippet: string | null;
+  date: number;
+  isRead: boolean;
+  labelIds: string[] | null;
+  isCustomer: boolean;
+  customerId: string | null;
+  customerName: string | null;
+};
+
+export function normalizeEmailAddress(input: string): string {
+  return input.trim().toLowerCase();
+}
+
+export function hasEmailLabel(label: string) {
+  return sql<boolean>`exists(
+    select 1
+    from json_each(coalesce(${emails.labelIds}, '[]'))
+    where value = ${label}
+  )`;
+}
+
+export function hasAnyEmailCategoryLabel() {
+  return sql<boolean>`exists(
+    select 1
+    from json_each(coalesce(${emails.labelIds}, '[]'))
+    where value like 'CATEGORY_%'
+  )`;
+}
+
+export function toEmailListResponse(row: EmailListRow) {
   const labelIds = row.labelIds ?? [];
 
   return {
@@ -47,21 +84,7 @@ export function toEmailListResponse(row: {
   };
 }
 
-export function toEmailSearchResponse(row: {
-  id: string;
-  gmailId: string;
-  fromAddr: string;
-  fromName: string | null;
-  toAddr: string | null;
-  subject: string | null;
-  snippet: string | null;
-  date: number;
-  isRead: boolean;
-  labelIds: string[] | null;
-  isCustomer: boolean;
-  customerId: string | null;
-  customerName: string | null;
-}) {
+export function toEmailSearchResponse(row: EmailSearchRow) {
   return {
     id: String(row.id),
     gmailId: row.gmailId,

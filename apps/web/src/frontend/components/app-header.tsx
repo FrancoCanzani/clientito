@@ -23,6 +23,7 @@ import {
   useNavigate,
   useRouterState,
 } from "@tanstack/react-router";
+import { Button } from "./ui/button";
 
 const dashboardRouteApi = getRouteApi("/_dashboard");
 const organizationRouteApi = getRouteApi("/_dashboard/$orgId");
@@ -58,7 +59,7 @@ export default function AppHeader() {
   const sectionName = getSectionName(pathname);
 
   return (
-    <header className="sticky top-0 z-50 bg-olive-50">
+    <header className="sticky top-0 z-50 bg-background">
       <div className="mx-auto flex max-w-4xl items-center px-4 py-3 text-sm">
         <Breadcrumb>
           <BreadcrumbList>
@@ -74,10 +75,10 @@ export default function AppHeader() {
                   asChild
                   className="flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-accent"
                 >
-                  <button type="button">
+                  <Button type="button" variant={"ghost"}>
                     {selectedOrganization?.name ?? "Select organization"}
-                    <CaretDownIcon className="size-3" />
-                  </button>
+                    <CaretDownIcon className="size-2.5" />
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   <DropdownMenuLabel>Organizations</DropdownMenuLabel>
@@ -107,7 +108,12 @@ export default function AppHeader() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={() => logout.mutate()}
+                    onClick={() => {
+                      logout.mutate();
+                      throw navigate({
+                        to: "/",
+                      });
+                    }}
                     disabled={logout.isPending}
                   >
                     {logout.isPending ? "Signing out..." : "Sign out"}

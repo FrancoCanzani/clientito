@@ -5,68 +5,19 @@ import { createTask } from "@/features/customers/api";
 import {
   CheckIcon,
   CircleNotchIcon,
-  DownloadSimpleIcon,
-  ImageIcon,
   PaperclipIcon,
   SparkleIcon,
   UserPlusIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import DOMPurify from "dompurify";
-import {
-  analyzeEmail,
-  fetchEmailDetail,
-  markAsCustomer,
-  type EmailAnalysis,
-  type EmailAttachment,
-  type EmailListItem,
-} from "../api";
-
-function formatBytes(size: number | null): string {
-  if (!size || size <= 0) {
-    return "Unknown size";
-  }
-
-  const units = ["B", "KB", "MB", "GB"];
-  let value = size;
-  let index = 0;
-  while (value >= 1024 && index < units.length - 1) {
-    value /= 1024;
-    index += 1;
-  }
-
-  const decimals = value >= 10 || index === 0 ? 0 : 1;
-  return `${value.toFixed(decimals)} ${units[index]}`;
-}
-
-function AttachmentItem({ attachment }: { attachment: EmailAttachment }) {
-  return (
-    <a
-      href={attachment.downloadUrl}
-      target="_blank"
-      rel="noreferrer"
-      className="group flex items-center justify-between gap-3 rounded-md bg-card/30 px-3 py-2 text-xs hover:bg-accent/40"
-    >
-      <div className="min-w-0 flex items-center gap-2">
-        {attachment.isImage ? (
-          <ImageIcon className="size-4 text-muted-foreground" />
-        ) : (
-          <PaperclipIcon className="size-4 text-muted-foreground" />
-        )}
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">
-            {attachment.filename || "Untitled attachment"}
-          </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {formatBytes(attachment.size)}
-            {attachment.mimeType ? ` · ${attachment.mimeType}` : ""}
-          </p>
-        </div>
-      </div>
-      <DownloadSimpleIcon className="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
-    </a>
-  );
-}
+import { useMemo } from "react";
+import { markAsCustomer } from "../mutations/mark-as-customer";
+import { analyzeEmail } from "../queries/analyze-email";
+import { fetchEmailDetail } from "../queries/fetch-email-detail";
+import type { EmailAnalysis, EmailListItem } from "../types";
+import { prepareEmailHtml } from "../utils/prepare-email-html";
+import { AttachmentItem } from "./attachment-item";
+import { EmailHtmlRenderer } from "./email-html-renderer";
 
 const SENTIMENT_COLORS: Record<string, string> = {
   positive: "bg-green-100 text-green-800",
@@ -164,9 +115,9 @@ function AIAnalysisPanel({
               Mark as customer first to add tasks.
             </p>
           )}
-          {analysis.suggestedTasks.map((task, i) => (
+          {analysis.suggestedTasks.map((task, index) => (
             <SuggestedTaskItem
-              key={i}
+              key={`${task.message}-${index}`}
               task={task}
               orgId={orgId}
               customerId={customerId}
@@ -226,16 +177,13 @@ export function EmailDetailContent({
   const downloadableAttachments = attachments.filter(
     (attachment) => !attachment.isInline || !attachment.isImage,
   );
-  const inlineImages = attachments.filter(
-    (attachment) => attachment.isInline && attachment.isImage,
+  const preparedHtml = useMemo(
+    () => (bodyHtml ? prepareEmailHtml(bodyHtml) : null),
+    [bodyHtml],
   );
-  const hasAnyAttachment = downloadableAttachments.length > 0;
-  const sanitizedHtml = bodyHtml
-    ? DOMPurify.sanitize(bodyHtml, { USE_PROFILES: { html: true } })
-    : null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col space-y-7">
+    <div className="flex h-full min-h-0 flex-col items-start space-y-3">
       <div className="space-y-1 text-xs leading-relaxed">
         <p>
           <span className="text-muted-foreground">From: </span>
@@ -313,7 +261,7 @@ export function EmailDetailContent({
               </p>
             )}
 
-            {hasAnyAttachment && (
+            {downloadableAttachments.length > 0 && (
               <section className="space-y-2">
                 <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
                   <PaperclipIcon className="size-3.5" />
@@ -330,22 +278,11 @@ export function EmailDetailContent({
               </section>
             )}
 
-            {inlineImages.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {inlineImages.length} inline image
-                {inlineImages.length === 1 ? "" : "s"} loaded from the original
-                email.
-              </p>
-            )}
-
             <div>
-              {sanitizedHtml ? (
-                <div
-                  className="prose prose-sm max-w-none text-xs leading-relaxed text-foreground"
-                  dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-                />
+              {preparedHtml ? (
+                <EmailHtmlRenderer html={preparedHtml} />
               ) : (
-                <pre className="prose prose-sm max-w-none text-xs leading-relaxed text-foreground">
+                <pre className="whitespace-pre-wrap text-xs leading-relaxed text-foreground">
                   {bodyText ?? ""}
                 </pre>
               )}

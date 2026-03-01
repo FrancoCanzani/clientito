@@ -133,6 +133,8 @@ export function isGmailReconnectRequiredError(error: unknown): boolean {
   return error.message === GOOGLE_RECONNECT_REQUIRED_MESSAGE;
 }
 
+export { GOOGLE_RECONNECT_REQUIRED_MESSAGE };
+
 function toEpochMs(
   value: Date | number | string | null | undefined,
 ): number | null {
@@ -206,6 +208,21 @@ async function refreshGoogleAccessToken(
   };
 }
 
+async function clearGoogleConnectionTokens(
+  db: Database,
+  userId: string,
+): Promise<void> {
+  await db
+    .update(account)
+    .set({
+      accessToken: null,
+      refreshToken: null,
+      accessTokenExpiresAt: null,
+      refreshTokenExpiresAt: null,
+    })
+    .where(and(eq(account.userId, userId), eq(account.providerId, "google")));
+}
+
 export async function getGmailToken(
   db: Database,
   userId: string,
@@ -230,13 +247,22 @@ export async function getGmailToken(
   }
 
   if (!googleAccount.refreshToken) {
+    await clearGoogleConnectionTokens(db, userId);
     throw new Error(GOOGLE_RECONNECT_REQUIRED_MESSAGE);
   }
 
-  const refreshed = await refreshGoogleAccessToken(
-    googleAccount.refreshToken,
-    config,
-  );
+  let refreshed: Awaited<ReturnType<typeof refreshGoogleAccessToken>>;
+  try {
+    refreshed = await refreshGoogleAccessToken(
+      googleAccount.refreshToken,
+      config,
+    );
+  } catch (error) {
+    if (isGmailReconnectRequiredError(error)) {
+      await clearGoogleConnectionTokens(db, userId);
+    }
+    throw error;
+  }
   const nextExpiresAt =
     refreshed.expiresIn > 0
       ? new Date(Date.now() + refreshed.expiresIn * 1000)
@@ -1089,11 +1115,36 @@ export async function runScheduledIncrementalSync(
       orgId: syncState.orgId,
       userId: syncState.userId,
       historyId: syncState.historyId,
+      error: syncState.error,
+      refreshToken: account.refreshToken,
     })
-    .from(syncState);
+    .from(syncState)
+    .leftJoin(
+      account,
+      and(eq(account.userId, syncState.userId), eq(account.providerId, "google")),
+    );
 
   for (const state of states) {
     if (!state.historyId) {
+      continue;
+    }
+
+    if (!state.refreshToken) {
+      if (state.error !== GOOGLE_RECONNECT_REQUIRED_MESSAGE) {
+        console.warn("Scheduled Gmail sync requires Google reconnect", {
+          orgId: state.orgId,
+          userId: state.userId,
+        });
+      }
+      await db
+        .update(syncState)
+        .set({
+          phase: "error",
+          progressCurrent: null,
+          progressTotal: null,
+          error: GOOGLE_RECONNECT_REQUIRED_MESSAGE,
+        })
+        .where(eq(syncState.orgId, String(state.orgId)));
       continue;
     }
 
@@ -1105,18 +1156,54 @@ export async function runScheduledIncrementalSync(
         state.userId,
         state.historyId,
       );
+      if (state.error) {
+        await db
+          .update(syncState)
+          .set({
+            phase: null,
+            progressCurrent: null,
+            progressTotal: null,
+            error: null,
+          })
+          .where(eq(syncState.orgId, String(state.orgId)));
+      }
     } catch (error) {
+      if (error instanceof GmailSyncStateError) {
+        // Another sync is already running for this org; skip scheduled run.
+        continue;
+      }
+
       if (isGmailReconnectRequiredError(error)) {
-        console.warn("Scheduled Gmail sync requires Google reconnect", {
-          orgId: state.orgId,
-          userId: state.userId,
-        });
+        if (state.error !== GOOGLE_RECONNECT_REQUIRED_MESSAGE) {
+          console.warn("Scheduled Gmail sync requires Google reconnect", {
+            orgId: state.orgId,
+            userId: state.userId,
+          });
+        }
+        await db
+          .update(syncState)
+          .set({
+            phase: "error",
+            progressCurrent: null,
+            progressTotal: null,
+            error: GOOGLE_RECONNECT_REQUIRED_MESSAGE,
+          })
+          .where(eq(syncState.orgId, String(state.orgId)));
       } else {
         console.error("Scheduled Gmail incremental sync failed", {
           orgId: state.orgId,
           userId: state.userId,
           error,
         });
+        await db
+          .update(syncState)
+          .set({
+            phase: "error",
+            progressCurrent: null,
+            progressTotal: null,
+            error: error instanceof Error ? error.message : "Sync failed",
+          })
+          .where(eq(syncState.orgId, String(state.orgId)));
       }
     }
   }

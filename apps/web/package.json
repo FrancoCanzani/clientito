@@ -12,12 +12,15 @@
     "publish": true
   },
   "dependencies": {
+    "@ai-sdk/react": "^3.0.107",
+    "@cloudflare/ai-chat": "^0.1.5",
     "@hono/zod-openapi": "^1.2.2",
     "@phosphor-icons/react": "^2.1.10",
     "@tanstack/react-form": "^1.28.3",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-router": "^1.162.6",
     "@types/dompurify": "^3.2.0",
+    "agents": "^0.6.0",
     "ai": "^6.0.100",
     "better-auth": "^1.4.19",
     "class-variance-authority": "^0.7.1",
@@ -27,6 +30,7 @@
     "drizzle-orm": "^0.45.1",
     "hono": "4.11.1",
     "lucide-react": "^0.575.0",
+    "motion": "^12.34.3",
     "radix-ui": "^1.4.3",
     "react": "19.2.1",
     "react-dom": "19.2.1",

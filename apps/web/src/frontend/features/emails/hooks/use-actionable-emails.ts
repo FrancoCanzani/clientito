@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { fetchActionableEmails } from "../api";
+import { fetchActionableEmails } from "../queries/fetch-actionable-emails";
 
 const POLL_INTERVAL = 30_000;
 

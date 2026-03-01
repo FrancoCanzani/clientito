@@ -6,6 +6,7 @@ export type SyncStatus = {
   progressCurrent: number | null;
   progressTotal: number | null;
   error: string | null;
+  needsGoogleReconnect: boolean;
   needsContactReview: boolean;
 };
 

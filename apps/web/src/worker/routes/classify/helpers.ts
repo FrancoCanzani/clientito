@@ -1,6 +1,6 @@
 import { createWorkersAI } from "workers-ai-provider";
 
-const CLASSIFIER_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+export const DEFAULT_WORKERS_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
 export function parseAddress(value: string): string {
   const match = value.match(/<([^>]+)>/);
@@ -23,7 +23,7 @@ export function toNullableString(value: string | null): string | null {
 
 export function getWorkersAIModel(env: Env) {
   const workersAI = createWorkersAI({ binding: env.AI });
-  return workersAI(CLASSIFIER_MODEL, { safePrompt: false });
+  return workersAI(DEFAULT_WORKERS_AI_MODEL, { safePrompt: false });
 }
 
 export async function runConcurrent<T, R>(

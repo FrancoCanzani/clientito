@@ -1,9 +1,10 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { customers, emails } from "../../db/schema";
 import { ensureOrgAccess } from "../../lib/access";
 import type { AppRouteEnv } from "../types";
 import { errorResponseSchema } from "./schemas";
+import { hasEmailLabel } from "./utils";
 
 const actionableQuerySchema = z.object({
   orgId: z.string().trim().min(1),
@@ -71,6 +72,8 @@ export function registerGetActionableEmails(api: OpenAPIHono<AppRouteEnv>) {
         and(
           eq(emails.orgId, orgId),
           eq(emails.isCustomer, true),
+          hasEmailLabel("INBOX"),
+          sql<boolean>`not ${hasEmailLabel("SENT")}`,
           gt(emails.date, since),
         ),
       )

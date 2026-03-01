@@ -17,6 +17,7 @@ import { ArrowsClockwiseIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { signIn } from "@/lib/auth-client";
 import { toast } from "sonner";
 
 type Step = 0 | 1 | 2;
@@ -36,7 +37,7 @@ export default function GetStartedPage() {
   const [orgError, setOrgError] = useState<string | null>(null);
   const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
   const [contactSearch, setContactSearch] = useState("");
-  const lastSyncErrorRef = useRef<string | null>(null);
+  const lastSyncToastKeyRef = useRef<string | null>(null);
 
   function getErrorMessage(error: unknown, fallback: string): string {
     return error instanceof Error ? error.message : fallback;
@@ -89,20 +90,50 @@ export default function GetStartedPage() {
         )
       : 0;
 
+  async function reconnectGoogle() {
+    const result = await signIn.social({
+      provider: "google",
+      callbackURL: "/get-started",
+    });
+
+    if (result?.error) {
+      toast.error(result.error.message || "Failed to reconnect Google.");
+    }
+  }
+
   useEffect(() => {
     const syncError = syncStatus.data?.error ?? null;
-    if (!syncError) {
-      lastSyncErrorRef.current = null;
+    const needsGoogleReconnect =
+      syncStatus.data?.needsGoogleReconnect === true && Boolean(syncError);
+    const nextToastKey = syncError
+      ? `${syncError}:${needsGoogleReconnect ? "reconnect" : "default"}`
+      : null;
+
+    if (!nextToastKey) {
+      lastSyncToastKeyRef.current = null;
       return;
     }
 
-    if (lastSyncErrorRef.current === syncError) {
+    if (lastSyncToastKeyRef.current === nextToastKey) {
       return;
     }
 
-    lastSyncErrorRef.current = syncError;
+    lastSyncToastKeyRef.current = nextToastKey;
+
+    if (needsGoogleReconnect) {
+      toast.error(syncError, {
+        action: {
+          label: "Reconnect",
+          onClick: () => {
+            void reconnectGoogle();
+          },
+        },
+      });
+      return;
+    }
+
     toast.error(syncError);
-  }, [syncStatus.data?.error]);
+  }, [syncStatus.data?.error, syncStatus.data?.needsGoogleReconnect]);
 
   const fullSyncMutation = useMutation({
     mutationFn: () => startFullSync(orgId!, 12, true),

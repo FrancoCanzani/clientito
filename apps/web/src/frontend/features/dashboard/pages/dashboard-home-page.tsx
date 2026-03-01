@@ -1,28 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/api";
+import { DashboardBriefingStream } from "@/features/dashboard/components/dashboard-briefing-stream";
+import { getGreeting } from "@/features/dashboard/utils";
 import { formatInboxRowDate } from "@/features/emails/utils";
 import { getRouteApi, Link } from "@tanstack/react-router";
+import { format } from "date-fns";
 
 const indexRoute = getRouteApi("/_dashboard/$orgId/");
 const orgRoute = getRouteApi("/_dashboard/$orgId");
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
-
-function formatTaskDueTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 export default function DashboardHomePage() {
-  const { unreadPrimaryEmails, tasksForToday, briefing } =
-    indexRoute.useLoaderData();
+  const { unreadPrimaryEmails, tasksForToday } = indexRoute.useLoaderData();
   const { orgId } = orgRoute.useLoaderData();
   const { user } = useAuth();
   const firstName = user?.name?.split(" ")[0];
@@ -34,11 +22,7 @@ export default function DashboardHomePage() {
         {firstName ? `, ${firstName}` : ""}
       </h2>
 
-      {briefing && (
-        <p className="text-sm leading-relaxed text-pretty text-muted-foreground">
-          {briefing}
-        </p>
-      )}
+      <DashboardBriefingStream orgId={orgId} />
 
       <section className="space-y-3">
         <div className="flex items-end justify-between gap-3">
@@ -101,7 +85,7 @@ export default function DashboardHomePage() {
                   {task.message}
                 </p>
                 <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-                  {formatTaskDueTime(task.dueAt)}
+                  {format(task.dueAt, "p")}
                 </span>
               </div>
             ))}

@@ -8,7 +8,11 @@ import {
   listEmailsQuerySchema,
   listEmailsResponseSchema,
 } from "./schemas";
-import { toEmailListResponse } from "./helpers";
+import {
+  hasAnyEmailCategoryLabel,
+  hasEmailLabel,
+  toEmailListResponse,
+} from "./utils";
 
 const listEmailsRoute = createRoute({
   method: "get",
@@ -53,6 +57,7 @@ export function registerGetEmailList(api: OpenAPIHono<AppRouteEnv>) {
       isCustomer,
       isRead,
       category,
+      view = "inbox",
     } = c.req.valid("query");
 
     if (!(await ensureOrgAccess(db, orgId, user.id))) {
@@ -88,30 +93,41 @@ export function registerGetEmailList(api: OpenAPIHono<AppRouteEnv>) {
       conditions.push(eq(emails.isRead, false));
     }
 
-    const hasLabel = (label: string) =>
-      sql<boolean>`exists(
-        select 1
-        from json_each(coalesce(${emails.labelIds}, '[]'))
-        where value = ${label}
-      )`;
-    const hasAnyCategoryLabel = sql<boolean>`exists(
-      select 1
-      from json_each(coalesce(${emails.labelIds}, '[]'))
-      where value like 'CATEGORY_%'
-    )`;
+    // Apply view-based label filtering
+    switch (view) {
+      case "inbox":
+        conditions.push(hasEmailLabel("INBOX"));
+        conditions.push(sql<boolean>`not ${hasEmailLabel("SENT")}`);
+        break;
+      case "sent":
+        conditions.push(hasEmailLabel("SENT"));
+        break;
+      case "spam":
+        conditions.push(hasEmailLabel("SPAM"));
+        break;
+      case "trash":
+        conditions.push(hasEmailLabel("TRASH"));
+        break;
+      case "all":
+        // No label filter
+        break;
+    }
 
-    if (category === "primary") {
-      conditions.push(
-        sql<boolean>`(${hasLabel("CATEGORY_PERSONAL")} or not ${hasAnyCategoryLabel})`,
-      );
-    } else if (category === "promotions") {
-      conditions.push(hasLabel("CATEGORY_PROMOTIONS"));
-    } else if (category === "social") {
-      conditions.push(hasLabel("CATEGORY_SOCIAL"));
-    } else if (category === "notifications") {
-      conditions.push(
-        sql<boolean>`(${hasLabel("CATEGORY_UPDATES")} or ${hasLabel("CATEGORY_FORUMS")})`,
-      );
+    // Category filtering only applies for inbox view
+    if (view === "inbox") {
+      if (category === "primary") {
+        conditions.push(
+          sql<boolean>`(${hasEmailLabel("CATEGORY_PERSONAL")} or not ${hasAnyEmailCategoryLabel()})`,
+        );
+      } else if (category === "promotions") {
+        conditions.push(hasEmailLabel("CATEGORY_PROMOTIONS"));
+      } else if (category === "social") {
+        conditions.push(hasEmailLabel("CATEGORY_SOCIAL"));
+      } else if (category === "notifications") {
+        conditions.push(
+          sql<boolean>`(${hasEmailLabel("CATEGORY_UPDATES")} or ${hasEmailLabel("CATEGORY_FORUMS")})`,
+        );
+      }
     }
 
     const whereClause = and(...conditions);

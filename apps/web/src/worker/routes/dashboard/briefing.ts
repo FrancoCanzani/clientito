@@ -1,16 +1,13 @@
 import { generateText } from "ai";
-import { and, eq, gt, sql } from "drizzle-orm";
 import type { Hono } from "hono";
-import {
-  customers,
-  customerSummaries,
-  emails,
-  reminders,
-} from "../../db/schema";
 import { ensureOrgAccess } from "../../lib/access";
-import { buildSystemPrompt, getOrgAIContext } from "../../lib/ai-context";
-import { getWorkersAIModel, truncate } from "../classify/helpers";
+import { getAiErrorDetails } from "../../lib/ai-errors";
+import {
+  DEFAULT_WORKERS_AI_MODEL,
+  getWorkersAIModel,
+} from "../classify/helpers";
 import type { AppRouteEnv } from "../types";
+import { buildDashboardBriefingPayload } from "./briefing-content";
 
 export function registerGetBriefing(app: Hono<AppRouteEnv>) {
   app.get("/briefing", async (c) => {
@@ -25,92 +22,51 @@ export function registerGetBriefing(app: Hono<AppRouteEnv>) {
       return c.json({ error: "Forbidden" }, 403);
     }
 
-    const now = Date.now();
-    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+    const briefingPayload = await buildDashboardBriefingPayload({ db, orgId });
 
-    const [overdueReminders, atRiskCustomers, newCustomerEmails, pendingCount] =
-      await Promise.all([
-        db
-          .select({ id: reminders.id, message: reminders.message })
-          .from(reminders)
-          .where(
-            and(
-              eq(reminders.orgId, orgId),
-              eq(reminders.done, false),
-              sql`${reminders.dueAt} < ${now}`,
-            ),
-          ),
-        db
-          .select({
-            customerId: customerSummaries.customerId,
-            customerName: customers.name,
-          })
-          .from(customerSummaries)
-          .innerJoin(customers, eq(customerSummaries.customerId, customers.id))
-          .where(
-            and(
-              eq(customerSummaries.orgId, orgId),
-              sql`json_extract(${customerSummaries.summary}, '$.status') IN ('at_risk', 'churned')`,
-            ),
-          )
-          .limit(10),
-        db
-          .select({ id: emails.id })
-          .from(emails)
-          .where(
-            and(
-              eq(emails.orgId, orgId),
-              eq(emails.isCustomer, true),
-              gt(emails.date, oneDayAgo),
-            ),
-          ),
-        db
-          .select({ count: sql<number>`count(*)` })
-          .from(reminders)
-          .where(and(eq(reminders.orgId, orgId), eq(reminders.done, false))),
-      ]);
+    try {
+      const { text } = await generateText({
+        model: getWorkersAIModel(c.env),
+        system: briefingPayload.system,
+        prompt: briefingPayload.prompt,
+      });
 
-    const aiContext = await getOrgAIContext(db, orgId);
-
-    const contextLines = [
-      `Overdue tasks: ${overdueReminders.length}`,
-      `Pending tasks total: ${pendingCount[0]?.count ?? 0}`,
-      `New customer emails (last 24h): ${newCustomerEmails.length}`,
-      `At-risk/churned customers: ${atRiskCustomers.length}`,
-    ];
-
-    if (overdueReminders.length > 0) {
-      contextLines.push(
-        `Overdue tasks: ${overdueReminders
-          .slice(0, 5)
-          .map((r) => truncate(r.message, 80))
-          .join("; ")}`,
+      const normalizedText = typeof text === "string" ? text.trim() : "";
+      return c.json(
+        {
+          data: {
+            text:
+              normalizedText.length > 0
+                ? normalizedText
+                : briefingPayload.fallbackText,
+          },
+        },
+        200,
       );
+    } catch (error) {
+      const aiError = getAiErrorDetails(error);
+      const logData = {
+        orgId,
+        route: "/api/dashboard/briefing",
+        model: DEFAULT_WORKERS_AI_MODEL,
+        cfRay: c.req.header("cf-ray") ?? null,
+        context: briefingPayload.context,
+        aiError,
+      };
+
+      if (aiError.code === 1031) {
+        console.warn("Dashboard briefing AI unavailable, using fallback", {
+          ...logData,
+          diagnosis:
+            "Workers AI upstream failure (provider-side transient). This is not caused by prompt or local DB data.",
+        });
+      } else {
+        console.error("Dashboard briefing generation failed", {
+          ...logData,
+        });
+      }
+
+      return c.json({ data: { text: briefingPayload.fallbackText } }, 200);
     }
-
-    if (atRiskCustomers.length > 0) {
-      contextLines.push(
-        `At-risk customers: ${atRiskCustomers
-          .slice(0, 5)
-          .map((c) => c.customerName)
-          .join(", ")}`,
-      );
-    }
-
-    const basePrompt = [
-      "You are a CRM assistant. Write a short briefing based on the user's current data.",
-      "Be direct and specific — mention actual numbers, customer names, and task details when available.",
-      "If there's nothing urgent, just say everything looks good.",
-      "No bullet points, no headers, no filler.",
-      "Plain conversational tone, like a colleague giving a quick update.",
-    ].join(" ");
-
-    const { text } = await generateText({
-      model: getWorkersAIModel(c.env),
-      system: buildSystemPrompt(basePrompt, aiContext),
-      prompt: contextLines.join("\n"),
-    });
-
-    return c.json({ data: { text } }, 200);
   });
 }

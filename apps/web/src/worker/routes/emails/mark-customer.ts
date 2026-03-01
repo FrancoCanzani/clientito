@@ -5,7 +5,7 @@ import { ensureOrgAccess } from "../../lib/access";
 import { resolveCustomerName } from "../../lib/customer-name";
 import { extractCustomerFromEmail } from "../classify/service";
 import type { AppRouteEnv } from "../types";
-import { normalizeEmailAddress } from "./helpers";
+import { normalizeEmailAddress } from "./utils";
 import {
   errorResponseSchema,
   markAsCustomerRequestSchema,

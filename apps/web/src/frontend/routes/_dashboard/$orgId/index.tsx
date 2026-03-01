@@ -1,11 +1,11 @@
-import { fetchBriefing, fetchReminders } from "@/features/dashboard/api";
+import { fetchReminders } from "@/features/dashboard/api";
 import DashboardHomePage from "@/features/dashboard/pages/dashboard-home-page";
-import { fetchEmails } from "@/features/emails/api";
+import { fetchEmails } from "@/features/emails/queries/fetch-emails";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$orgId/")({
   loader: async ({ params }) => {
-    const [unreadPrimaryEmails, reminders, briefing] = await Promise.all([
+    const [unreadPrimaryEmails, reminders] = await Promise.all([
       fetchEmails(params.orgId, {
         category: "primary",
         isRead: "false",
@@ -13,7 +13,6 @@ export const Route = createFileRoute("/_dashboard/$orgId/")({
         offset: 0,
       }),
       fetchReminders(params.orgId, "false"),
-      fetchBriefing(params.orgId).catch(() => null),
     ]);
 
     const now = new Date();
@@ -40,7 +39,7 @@ export const Route = createFileRoute("/_dashboard/$orgId/")({
       .filter((task) => task.dueAt >= startOfToday && task.dueAt <= endOfToday)
       .sort((a, b) => a.dueAt - b.dueAt);
 
-    return { unreadPrimaryEmails, tasksForToday, briefing };
+    return { unreadPrimaryEmails, tasksForToday };
   },
   staleTime: 5 * 60 * 1000,
   component: DashboardHomePage,

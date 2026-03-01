@@ -11,7 +11,7 @@ import {
   type GmailAttachmentMeta,
 } from "../../lib/gmail";
 import type { AppRouteEnv } from "../types";
-import { toEmailListResponse } from "./helpers";
+import { toEmailListResponse } from "./utils";
 import {
   emailDetailQuerySchema,
   emailDetailResponseSchema,

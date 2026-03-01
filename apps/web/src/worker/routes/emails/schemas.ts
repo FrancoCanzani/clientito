@@ -39,6 +39,7 @@ export const listEmailsQuerySchema = z.object({
   category: z
     .enum(["primary", "promotions", "social", "notifications"])
     .optional(),
+  view: z.enum(["inbox", "sent", "spam", "trash", "all"]).optional(),
 });
 
 export const emailListItemSchema = emailSearchItemSchema.extend({

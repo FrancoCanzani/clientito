@@ -11,7 +11,7 @@
 	"assets": {
 		"directory": "./dist/client",
 		"not_found_handling": "single-page-application",
-		"run_worker_first": ["/api/*", "/sdk/*"]
+		"run_worker_first": ["/api/*", "/sdk/*", "/agents/*"]
 	},
 	"d1_databases": [
 		{
@@ -19,6 +19,20 @@
 			"database_name": "releaselayer-db",
 			"database_id": "LOCAL",
 			"migrations_dir": "drizzle"
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "CHAT_AGENT",
+				"class_name": "ChatAgent"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["ChatAgent"]
 		}
 	],
 	"triggers": {

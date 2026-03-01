@@ -1,5 +1,6 @@
 import AppHeader from "@/components/app-header";
-import BottomNav from "@/components/bottom-nav";
+import { CommandCenter } from "@/features/agent/components/command-center";
+import { useAuth } from "@/features/auth/api";
 import { useActionableEmails } from "@/features/emails/hooks/use-actionable-emails";
 import {
   createFileRoute,
@@ -39,15 +40,16 @@ export const Route = createFileRoute("/_dashboard/$orgId")({
 
 function DashboardOrganizationLayout() {
   const { orgId } = useParams({ from: "/_dashboard/$orgId" });
+  const { user } = useAuth();
   useActionableEmails(orgId, true);
 
   return (
-    <div className="min-h-screen bg-olive-50">
+    <div className="min-h-screen">
       <AppHeader />
       <main className="mx-auto max-w-4xl px-4 py-4 pb-24">
         <Outlet />
       </main>
-      <BottomNav />
+      {user && <CommandCenter orgId={orgId} userId={user.id} />}
     </div>
   );
 }

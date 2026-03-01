@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import type { EmailListItem } from "./api";
+import type { EmailListItem } from "./types";
 
 export type EmailSection = {
   label: string;

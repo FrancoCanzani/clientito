@@ -21,6 +21,7 @@ export const syncStatusResponseSchema = z.object({
     progressCurrent: z.number().nullable(),
     progressTotal: z.number().nullable(),
     error: z.string().nullable(),
+    needsGoogleReconnect: z.boolean(),
     needsContactReview: z.boolean(),
   }),
 });

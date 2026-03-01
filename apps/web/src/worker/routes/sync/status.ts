@@ -1,7 +1,9 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { and, eq, sql } from "drizzle-orm";
+import { account } from "../../db/auth-schema";
 import { contacts, customers, syncState } from "../../db/schema";
 import { ensureOrgAccess } from "../../lib/access";
+import { GOOGLE_RECONNECT_REQUIRED_MESSAGE } from "../../lib/gmail";
 import type { AppRouteEnv } from "../types";
 import {
   errorResponseSchema,
@@ -51,8 +53,20 @@ export function registerGetSyncStatus(api: OpenAPIHono<AppRouteEnv>) {
     const state = await db.query.syncState.findFirst({
       where: eq(syncState.orgId, orgId),
     });
+    const googleAccount = await db.query.account.findFirst({
+      where: and(
+        eq(account.userId, user.id),
+        eq(account.providerId, "google"),
+      ),
+      columns: {
+        refreshToken: true,
+      },
+    });
 
     const hasSynced = Boolean(state?.historyId);
+    const needsGoogleReconnect =
+      !googleAccount?.refreshToken ||
+      state?.error === GOOGLE_RECONNECT_REQUIRED_MESSAGE;
 
     // Count contacts that have no matching customer
     let needsContactReview = false;
@@ -91,6 +105,7 @@ export function registerGetSyncStatus(api: OpenAPIHono<AppRouteEnv>) {
           progressCurrent: state?.progressCurrent ?? null,
           progressTotal: state?.progressTotal ?? null,
           error: state?.error ?? null,
+          needsGoogleReconnect,
           needsContactReview,
         },
       },

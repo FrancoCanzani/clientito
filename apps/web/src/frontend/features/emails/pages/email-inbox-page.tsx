@@ -9,11 +9,18 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   fetchEmailDetail,
-  fetchEmails,
-  type EmailListItem,
-} from "@/features/emails/api";
+} from "@/features/emails/queries/fetch-email-detail";
+import { fetchEmails } from "@/features/emails/queries/fetch-emails";
 import { EmailDetailDialog } from "@/features/emails/components/email-detail-dialog";
 import { EmailDetailSheet } from "@/features/emails/components/email-detail-sheet";
+import type { EmailListItem } from "@/features/emails/types";
+import {
+  FILTER_TABS,
+  VIEW_LABELS,
+  getCategoryFromTab,
+  isInboxFilterTab,
+  type EmailView,
+} from "@/features/emails/utils/inbox-filters";
 import { formatInboxRowDate, groupEmailsByDay } from "@/features/emails/utils";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -26,36 +33,12 @@ import { useDebouncedCallback } from "use-debounce";
 const orgRoute = getRouteApi("/_dashboard/$orgId");
 const emailsRoute = getRouteApi("/_dashboard/$orgId/emails/");
 
-const FILTER_TABS = [
-  { key: "all", label: "All" },
-  { key: "primary", label: "Principal" },
-  { key: "promotions", label: "Promotions" },
-  { key: "social", label: "Social" },
-  { key: "notifications", label: "Notifications" },
-] as const;
-type InboxFilterTab = (typeof FILTER_TABS)[number]["key"];
-
-function getCategoryFromTab(tab: InboxFilterTab) {
-  switch (tab) {
-    case "all":
-      return undefined;
-    case "primary":
-    case "promotions":
-    case "social":
-    case "notifications":
-      return tab;
-  }
-}
-
-function isInboxFilterTab(value: string): value is InboxFilterTab {
-  return FILTER_TABS.some((tab) => tab.key === value);
-}
-
 export default function EmailInboxPage() {
   const { orgId } = orgRoute.useLoaderData();
   const navigate = emailsRoute.useNavigate();
   const search = emailsRoute.useSearch();
   const selectedTab = search.tab ?? "primary";
+  const currentView = (search as { view?: EmailView }).view ?? "inbox";
   const appliedSearch = search.q ?? "";
   const selectedEmailId = search.emailId ?? null;
   const { initialEmails } = emailsRoute.useLoaderData();
@@ -101,13 +84,14 @@ export default function EmailInboxPage() {
   );
 
   const emailsQuery = useInfiniteQuery({
-    queryKey: ["emails", orgId, selectedTab, appliedSearch],
+    queryKey: ["emails", orgId, currentView, selectedTab, appliedSearch],
     queryFn: async ({ pageParam }) =>
       fetchEmails(orgId, {
         limit: 50,
         offset: pageParam,
         search: appliedSearch || undefined,
-        category: getCategoryFromTab(selectedTab),
+        category: currentView === "inbox" ? getCategoryFromTab(selectedTab) : undefined,
+        view: currentView,
       }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) =>
@@ -150,30 +134,37 @@ export default function EmailInboxPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-7">
       <div className="flex items-center justify-between gap-2">
-        <Select
-          value={selectedTab}
-          onValueChange={(value) => {
-            if (!isInboxFilterTab(value)) return;
-            navigate({
-              search: (prev) => ({
-                ...prev,
-                tab: value,
-                emailId: undefined,
-              }),
-            });
-          }}
-        >
-          <SelectTrigger size="sm" className="">
-            <SelectValue placeholder="Filter" />
-          </SelectTrigger>
-          <SelectContent>
-            {FILTER_TABS.map((tab) => (
-              <SelectItem key={tab.key} value={tab.key}>
-                {tab.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {currentView !== "inbox" && (
+          <span className="text-sm font-medium shrink-0">
+            {VIEW_LABELS[currentView]}
+          </span>
+        )}
+        {currentView === "inbox" && (
+          <Select
+            value={selectedTab}
+            onValueChange={(value) => {
+              if (!isInboxFilterTab(value)) return;
+              navigate({
+                search: (prev) => ({
+                  ...prev,
+                  tab: value,
+                  emailId: undefined,
+                }),
+              });
+            }}
+          >
+            <SelectTrigger size="sm" className="">
+              <SelectValue placeholder="Filter" />
+            </SelectTrigger>
+            <SelectContent>
+              {FILTER_TABS.map((tab) => (
+                <SelectItem key={tab.key} value={tab.key}>
+                  {tab.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <Input
           key={`email-search-${selectedTab}-${appliedSearch}`}

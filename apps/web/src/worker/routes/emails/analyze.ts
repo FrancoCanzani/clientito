@@ -5,7 +5,12 @@ import { z } from "zod";
 import { emails } from "../../db/schema";
 import { ensureOrgAccess } from "../../lib/access";
 import { buildSystemPrompt, getOrgAIContext } from "../../lib/ai-context";
-import { getWorkersAIModel, truncate } from "../classify/helpers";
+import { getAiErrorDetails } from "../../lib/ai-errors";
+import {
+  DEFAULT_WORKERS_AI_MODEL,
+  getWorkersAIModel,
+  truncate,
+} from "../classify/helpers";
 import type { AppRouteEnv } from "../types";
 import {
   analyzeEmailQuerySchema,
@@ -44,6 +49,10 @@ const analyzeEmailRoute = createRoute({
     404: {
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Not found",
+    },
+    503: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "AI provider unavailable",
     },
   },
 });
@@ -89,18 +98,47 @@ export function registerGetEmailAnalysis(api: OpenAPIHono<AppRouteEnv>) {
 
     const body = truncate(email.bodyText ?? email.snippet, 2000);
 
-    const { output } = await generateText({
-      model: getWorkersAIModel(c.env),
-      output: Output.object({ schema: analysisSchema }),
-      system: buildSystemPrompt(basePrompt, aiContext),
-      prompt: [
-        `From: ${email.fromName ? `${email.fromName} <${email.fromAddr}>` : email.fromAddr}`,
-        `Subject: ${email.subject ?? "(no subject)"}`,
-        `Body: ${body}`,
-      ].join("\n"),
-      temperature: 0,
-    });
+    try {
+      const { output } = await generateText({
+        model: getWorkersAIModel(c.env),
+        output: Output.object({ schema: analysisSchema }),
+        system: buildSystemPrompt(basePrompt, aiContext),
+        prompt: [
+          `From: ${email.fromName ? `${email.fromName} <${email.fromAddr}>` : email.fromAddr}`,
+          `Subject: ${email.subject ?? "(no subject)"}`,
+          `Body: ${body}`,
+        ].join("\n"),
+        temperature: 0,
+      });
 
-    return c.json({ data: output }, 200);
+      return c.json({ data: output }, 200);
+    } catch (error) {
+      const aiError = getAiErrorDetails(error);
+      const logData = {
+        orgId,
+        emailId,
+        route: "/api/emails/analyze",
+        model: DEFAULT_WORKERS_AI_MODEL,
+        cfRay: c.req.header("cf-ray") ?? null,
+        aiError,
+      };
+
+      if (aiError.code === 1031) {
+        console.warn("Email analysis AI unavailable", {
+          ...logData,
+          diagnosis:
+            "Workers AI upstream failure (provider-side transient). This is not caused by prompt or local email data.",
+        });
+      } else {
+        console.error("Email analysis failed", {
+          ...logData,
+        });
+      }
+
+      return c.json(
+        { error: "AI is temporarily unavailable. Please retry in a moment." },
+        503,
+      );
+    }
   });
 }

@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { and, desc, eq, like, or } from "drizzle-orm";
+import { and, desc, eq, like, or, sql } from "drizzle-orm";
 import { customers, emails } from "../../db/schema";
 import { ensureOrgAccess } from "../../lib/access";
 import type { AppRouteEnv } from "../types";
@@ -8,7 +8,7 @@ import {
   searchEmailsQuerySchema,
   searchEmailsResponseSchema,
 } from "./schemas";
-import { toEmailSearchResponse } from "./helpers";
+import { hasEmailLabel, toEmailSearchResponse } from "./utils";
 
 const searchEmailsRoute = createRoute({
   method: "get",
@@ -71,6 +71,8 @@ export function registerGetEmailSearch(api: OpenAPIHono<AppRouteEnv>) {
       .where(
         and(
           eq(emails.orgId, orgId),
+          hasEmailLabel("INBOX"),
+          sql<boolean>`not ${hasEmailLabel("SENT")}`,
           or(
             like(emails.fromAddr, pattern),
             like(emails.toAddr, pattern),
