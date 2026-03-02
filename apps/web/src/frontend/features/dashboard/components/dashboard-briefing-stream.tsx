@@ -2,10 +2,10 @@ import { Button } from "@/components/ui/button";
 import { useCompletion } from "@ai-sdk/react";
 import { useEffect } from "react";
 
-export function DashboardBriefingStream({ orgId }: { orgId: string }) {
+export function DashboardBriefingStream() {
   const { completion, complete, error, isLoading, setCompletion } =
     useCompletion({
-      id: `dashboard-briefing-${orgId}`,
+      id: "dashboard-briefing",
       api: "/api/dashboard/briefing/stream",
       streamProtocol: "text",
       credentials: "include",
@@ -13,10 +13,8 @@ export function DashboardBriefingStream({ orgId }: { orgId: string }) {
 
   useEffect(() => {
     setCompletion("");
-    void complete("Generate dashboard briefing", {
-      body: { orgId },
-    });
-  }, [complete, orgId, setCompletion]);
+    void complete("Generate dashboard briefing");
+  }, [complete, setCompletion]);
 
   const text = completion ?? "";
 
@@ -39,9 +37,7 @@ export function DashboardBriefingStream({ orgId }: { orgId: string }) {
           variant="ghost"
           onClick={() => {
             setCompletion("");
-            void complete("Generate dashboard briefing", {
-              body: { orgId },
-            });
+            void complete("Generate dashboard briefing");
           }}
         >
           Retry

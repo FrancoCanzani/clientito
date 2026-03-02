@@ -1,6 +1,8 @@
-import { fetchOrganizations } from "@/features/workspace/api";
+import AppHeader from "@/components/app-header";
+import { CommandPalette } from "@/components/command-palette";
+import { useAutoGmailSync } from "@/features/dashboard/hooks/use-auto-gmail-sync";
 import { authClient } from "@/lib/auth-client";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard")({
   beforeLoad: async () => {
@@ -9,15 +11,19 @@ export const Route = createFileRoute("/_dashboard")({
       throw redirect({ to: "/login" });
     }
   },
-  loader: async ({ location }) => {
-    const organizations = (await fetchOrganizations()).data;
-    const firstOrganization = organizations[0];
-    const onGetStartedRoute = location.pathname === "/get-started";
-
-    if (!firstOrganization && !onGetStartedRoute) {
-      throw redirect({ to: "/get-started" });
-    }
-
-    return { organizations };
-  },
+  component: DashboardLayout,
 });
+
+function DashboardLayout() {
+  useAutoGmailSync();
+
+  return (
+    <div className="min-h-screen">
+      <AppHeader />
+      <main className="mx-auto max-w-4xl px-4 py-4 pb-24">
+        <Outlet />
+      </main>
+      <CommandPalette />
+    </div>
+  );
+}

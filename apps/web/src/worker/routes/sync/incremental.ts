@@ -1,15 +1,11 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { ensureOrgAccess } from "../../lib/access";
 import type { AppRouteEnv } from "../types";
 import {
   errorResponseSchema,
   syncAcceptedResponseSchema,
   syncRequestSchema,
 } from "./schemas";
-import {
-  isSyncInProgress,
-  runIncrementalSyncInBackground,
-} from "./service";
+import { isSyncInProgress, runIncrementalSyncInBackground } from "./service";
 
 const incrementalSyncRoute = createRoute({
   method: "post",
@@ -38,10 +34,6 @@ const incrementalSyncRoute = createRoute({
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Unauthorized",
     },
-    403: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Forbidden",
-    },
     409: {
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Conflict",
@@ -56,16 +48,15 @@ export function registerPostSyncIncremental(api: OpenAPIHono<AppRouteEnv>) {
 
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-    const { orgId } = c.req.valid("json");
-    if (!(await ensureOrgAccess(db, orgId, user.id))) {
-      return c.json({ error: "Forbidden" }, 403);
-    }
+    c.req.valid("json");
 
-    if (await isSyncInProgress(db, orgId)) {
+    if (await isSyncInProgress(db, user.id)) {
       return c.json({ error: "Sync already in progress" }, 409);
     }
 
-    c.executionCtx.waitUntil(runIncrementalSyncInBackground(db, c.env, orgId, user.id));
+    c.executionCtx.waitUntil(
+      runIncrementalSyncInBackground(db, c.env, user.id),
+    );
     return c.json({ data: { status: "started" } }, 202);
   });
 }

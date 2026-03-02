@@ -1,8 +1,7 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { account } from "../../db/auth-schema";
-import { contacts, customers, syncState } from "../../db/schema";
-import { ensureOrgAccess } from "../../lib/access";
+import { syncState } from "../../db/schema";
 import { GOOGLE_RECONNECT_REQUIRED_MESSAGE } from "../../lib/gmail";
 import type { AppRouteEnv } from "../types";
 import {
@@ -31,10 +30,6 @@ const syncStatusRoute = createRoute({
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Unauthorized",
     },
-    403: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Forbidden",
-    },
   },
 });
 
@@ -45,19 +40,41 @@ export function registerGetSyncStatus(api: OpenAPIHono<AppRouteEnv>) {
 
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-    const { orgId } = c.req.valid("query");
-    if (!(await ensureOrgAccess(db, orgId, user.id))) {
-      return c.json({ error: "Forbidden" }, 403);
-    }
+    c.req.valid("query");
 
     const state = await db.query.syncState.findFirst({
-      where: eq(syncState.orgId, orgId),
+      where: eq(syncState.userId, user.id),
     });
+    const now = Date.now();
+    const hasLiveLock =
+      typeof state?.lockUntil === "number" &&
+      Number.isFinite(state.lockUntil) &&
+      state.lockUntil > now;
+    const isStaleInProgressState =
+      Boolean(state?.phase) && state?.phase !== "error" && !hasLiveLock;
+
+    if (isStaleInProgressState) {
+      await db
+        .update(syncState)
+        .set({
+          phase: null,
+          progressCurrent: null,
+          progressTotal: null,
+          lockUntil: null,
+        })
+        .where(eq(syncState.userId, user.id));
+    }
+
+    const effectivePhase = isStaleInProgressState ? null : (state?.phase ?? null);
+    const effectiveProgressCurrent = isStaleInProgressState
+      ? null
+      : (state?.progressCurrent ?? null);
+    const effectiveProgressTotal = isStaleInProgressState
+      ? null
+      : (state?.progressTotal ?? null);
+
     const googleAccount = await db.query.account.findFirst({
-      where: and(
-        eq(account.userId, user.id),
-        eq(account.providerId, "google"),
-      ),
+      where: and(eq(account.userId, user.id), eq(account.providerId, "google")),
       columns: {
         refreshToken: true,
       },
@@ -68,45 +85,18 @@ export function registerGetSyncStatus(api: OpenAPIHono<AppRouteEnv>) {
       !googleAccount?.refreshToken ||
       state?.error === GOOGLE_RECONNECT_REQUIRED_MESSAGE;
 
-    // Count contacts that have no matching customer
-    let needsContactReview = false;
-    if (hasSynced) {
-      const userEmail = user.email?.trim().toLowerCase() ?? null;
-      const ownEmailCondition = userEmail
-        ? sql`trim(replace(replace(lower(${contacts.email}), '<', ''), '>', '')) != ${userEmail}`
-        : sql`1 = 1`;
-      const result = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(contacts)
-        .leftJoin(
-          customers,
-          and(
-            eq(customers.orgId, contacts.orgId),
-            eq(customers.email, contacts.email),
-          ),
-        )
-        .where(
-          and(
-            eq(contacts.orgId, orgId),
-            ownEmailCondition,
-            sql`${customers.id} is null`,
-          ),
-        );
-      needsContactReview = (Number(result[0]?.count) ?? 0) > 0;
-    }
-
     return c.json(
       {
         data: {
           hasSynced,
           historyId: state?.historyId ?? null,
           lastSync: state?.lastSync ?? null,
-          phase: state?.phase ?? null,
-          progressCurrent: state?.progressCurrent ?? null,
-          progressTotal: state?.progressTotal ?? null,
+          phase: effectivePhase,
+          progressCurrent: effectiveProgressCurrent,
+          progressTotal: effectiveProgressTotal,
           error: state?.error ?? null,
           needsGoogleReconnect,
-          needsContactReview,
+          needsContactReview: false,
         },
       },
       200,

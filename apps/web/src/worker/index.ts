@@ -1,24 +1,19 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
-import { routeAgentRequest } from "agents";
 import { authMiddleware } from "./auth/middleware";
 import { createAuth } from "./auth/server";
 import { createDb } from "./db/client";
 import { runScheduledIncrementalSync } from "./lib/gmail";
-import { runScheduledSummaryGeneration } from "./lib/summaries";
-import classifyRoutes from "./routes/classify/router";
+import companiesRoutes from "./routes/companies/router";
 import dashboardRoutes from "./routes/dashboard/router";
-import contactsRoutes from "./routes/contacts/router";
-import customersRoutes from "./routes/customers/router";
 import emailsRoutes from "./routes/emails/router";
 import healthRoutes from "./routes/health/router";
-import orgRoutes from "./routes/org/router";
-import remindersRoutes from "./routes/reminders/router";
+import notesRoutes from "./routes/notes/router";
+import peopleRoutes from "./routes/people/router";
 import syncRoutes from "./routes/sync/router";
+import tasksRoutes from "./routes/tasks/router";
 import type { AppRouteEnv } from "./routes/types";
-
-export { ChatAgent } from "./agents/chat";
 
 const app = new Hono<AppRouteEnv>();
 
@@ -46,14 +41,13 @@ app.all("/api/auth/*", async (c) => {
 });
 
 app.route("/api/health", healthRoutes);
-app.route("/api/orgs", orgRoutes);
 app.route("/api/sync", syncRoutes);
-app.route("/api/classify", classifyRoutes);
-app.route("/api/contacts", contactsRoutes);
-app.route("/api/customers", customersRoutes);
 app.route("/api/emails", emailsRoutes);
-app.route("/api/reminders", remindersRoutes);
 app.route("/api/dashboard", dashboardRoutes);
+app.route("/api/people", peopleRoutes);
+app.route("/api/companies", companiesRoutes);
+app.route("/api/tasks", tasksRoutes);
+app.route("/api/notes", notesRoutes);
 
 async function handleScheduledSync(env: Env) {
   const db = createDb(env.DB);
@@ -62,16 +56,9 @@ async function handleScheduledSync(env: Env) {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
-    const agentResponse = await routeAgentRequest(request, env);
-    if (agentResponse) return agentResponse;
     return app.fetch(request, env, ctx);
   },
-  scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    const db = createDb(env.DB);
-    if (event.cron === "0 * * * *") {
-      ctx.waitUntil(runScheduledSummaryGeneration(db, env));
-    } else {
-      ctx.waitUntil(handleScheduledSync(env));
-    }
+  scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(handleScheduledSync(env));
   },
 };

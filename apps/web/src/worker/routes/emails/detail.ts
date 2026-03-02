@@ -1,7 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
-import { customers, emails, syncState } from "../../db/schema";
-import { ensureOrgAccess } from "../../lib/access";
+import { emails } from "../../db/schema";
 import {
   extractMessageAttachments,
   extractMessageBodyHtml,
@@ -11,12 +10,12 @@ import {
   type GmailAttachmentMeta,
 } from "../../lib/gmail";
 import type { AppRouteEnv } from "../types";
-import { toEmailListResponse } from "./utils";
 import {
   emailDetailQuerySchema,
   emailDetailResponseSchema,
   errorResponseSchema,
 } from "./schemas";
+import { toEmailListResponse } from "./utils";
 
 const getEmailDetailRoute = createRoute({
   method: "get",
@@ -38,10 +37,6 @@ const getEmailDetailRoute = createRoute({
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Unauthorized",
     },
-    403: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Forbidden",
-    },
     404: {
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Not found",
@@ -56,7 +51,6 @@ function normalizeCid(value: string): string {
 }
 
 function buildAttachmentUrl(input: {
-  orgId: string;
   gmailMessageId: string;
   attachmentId: string;
   filename?: string | null;
@@ -64,7 +58,6 @@ function buildAttachmentUrl(input: {
   inline?: boolean;
 }): string {
   const params = new URLSearchParams({
-    orgId: input.orgId,
     gmailMessageId: input.gmailMessageId,
     attachmentId: input.attachmentId,
   });
@@ -84,7 +77,6 @@ function buildAttachmentUrl(input: {
 
 function resolveInlineCidImages(
   html: string,
-  orgId: string,
   gmailMessageId: string,
   attachments: GmailAttachmentMeta[],
 ): string {
@@ -111,7 +103,6 @@ function resolveInlineCidImages(
       }
 
       const inlineUrl = buildAttachmentUrl({
-        orgId,
         gmailMessageId,
         attachmentId: attachment.attachmentId,
         filename: attachment.filename,
@@ -131,10 +122,7 @@ export function registerGetEmailDetail(api: OpenAPIHono<AppRouteEnv>) {
 
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-    const { orgId, emailId, skipLive } = c.req.valid("query");
-    if (!(await ensureOrgAccess(db, orgId, user.id))) {
-      return c.json({ error: "Forbidden" }, 403);
-    }
+    const { emailId, skipLive } = c.req.valid("query");
 
     const row = await db
       .select({
@@ -149,17 +137,14 @@ export function registerGetEmailDetail(api: OpenAPIHono<AppRouteEnv>) {
         bodyHtml: emails.bodyHtml,
         threadId: emails.threadId,
         date: emails.date,
+        direction: emails.direction,
         isRead: emails.isRead,
         labelIds: emails.labelIds,
-        isCustomer: emails.isCustomer,
-        classified: emails.classified,
+        personId: emails.personId,
         createdAt: emails.createdAt,
-        customerId: emails.customerId,
-        customerName: customers.name,
       })
       .from(emails)
-      .leftJoin(customers, eq(emails.customerId, customers.id))
-      .where(and(eq(emails.orgId, orgId), eq(emails.id, emailId)))
+      .where(and(eq(emails.userId, user.id), eq(emails.id, Number(emailId))))
       .limit(1);
 
     const first = row[0];
@@ -167,11 +152,7 @@ export function registerGetEmailDetail(api: OpenAPIHono<AppRouteEnv>) {
       return c.json({ error: "Email not found" }, 404);
     }
 
-    const baseEmail = toEmailListResponse({
-      ...first,
-      id: String(first.id),
-      customerId: first.customerId ? String(first.customerId) : null,
-    });
+    const baseEmail = toEmailListResponse(first);
 
     let resolvedBodyText = baseEmail.bodyText;
     let resolvedBodyHtml = baseEmail.bodyHtml;
@@ -187,17 +168,12 @@ export function registerGetEmailDetail(api: OpenAPIHono<AppRouteEnv>) {
       inlineUrl: string | null;
     }> = [];
 
-    const orgSyncState = await db.query.syncState.findFirst({
-      where: eq(syncState.orgId, orgId),
-    });
-    const gmailUserId = orgSyncState?.userId ?? user.id;
-
     if (!skipLive) {
       try {
         const message = await getGmailMessageById(
           db,
           c.env,
-          gmailUserId,
+          user.id,
           baseEmail.gmailId,
         );
 
@@ -212,7 +188,6 @@ export function registerGetEmailDetail(api: OpenAPIHono<AppRouteEnv>) {
         if (resolvedBodyHtml) {
           resolvedBodyHtml = resolveInlineCidImages(
             resolvedBodyHtml,
-            orgId,
             baseEmail.gmailId,
             messageAttachments,
           );
@@ -228,12 +203,11 @@ export function registerGetEmailDetail(api: OpenAPIHono<AppRouteEnv>) {
           await db
             .update(emails)
             .set({ labelIds: nextLabelIds })
-            .where(and(eq(emails.orgId, orgId), eq(emails.id, emailId)));
+            .where(and(eq(emails.userId, user.id), eq(emails.id, Number(emailId))));
         }
 
         attachments = messageAttachments.map((attachment) => {
           const downloadUrl = buildAttachmentUrl({
-            orgId,
             gmailMessageId: baseEmail.gmailId,
             attachmentId: attachment.attachmentId,
             filename: attachment.filename,
@@ -241,7 +215,6 @@ export function registerGetEmailDetail(api: OpenAPIHono<AppRouteEnv>) {
           });
           const inlineUrl = attachment.isInline
             ? buildAttachmentUrl({
-                orgId,
                 gmailMessageId: baseEmail.gmailId,
                 attachmentId: attachment.attachmentId,
                 filename: attachment.filename,
@@ -259,13 +232,11 @@ export function registerGetEmailDetail(api: OpenAPIHono<AppRouteEnv>) {
       } catch (error) {
         if (isGmailReconnectRequiredError(error)) {
           console.warn("Live Gmail detail skipped: reconnect required", {
-            orgId,
             emailId,
             gmailId: baseEmail.gmailId,
           });
         } else {
           console.error("Failed to fetch live Gmail detail for email", {
-            orgId,
             emailId,
             gmailId: baseEmail.gmailId,
             error,

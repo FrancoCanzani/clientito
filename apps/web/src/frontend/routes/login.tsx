@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { signIn } from "@/lib/auth-client";
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 
 export const Route = createFileRoute("/login")({
   component: LoginRoute,
@@ -17,7 +17,7 @@ function LoginRoute() {
 
     const result = await signIn.social({
       provider: "google",
-      callbackURL: "/get-started",
+      callbackURL: "/home",
     });
 
     if (result?.error) {

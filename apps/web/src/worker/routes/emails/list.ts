@@ -1,7 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { and, desc, eq, like, or, sql } from "drizzle-orm";
-import { customers, emails } from "../../db/schema";
-import { ensureOrgAccess } from "../../lib/access";
+import { emails } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 import {
   errorResponseSchema,
@@ -34,10 +33,6 @@ const listEmailsRoute = createRoute({
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Unauthorized",
     },
-    403: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Forbidden",
-    },
   },
 });
 
@@ -49,22 +44,15 @@ export function registerGetEmailList(api: OpenAPIHono<AppRouteEnv>) {
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
     const {
-      orgId,
       limit = 50,
       offset = 0,
       search,
-      customerId,
-      isCustomer,
       isRead,
       category,
       view = "inbox",
     } = c.req.valid("query");
 
-    if (!(await ensureOrgAccess(db, orgId, user.id))) {
-      return c.json({ error: "Forbidden" }, 403);
-    }
-
-    const conditions = [eq(emails.orgId, orgId)];
+    const conditions = [eq(emails.userId, user.id)];
 
     if (search) {
       const pattern = `%${search}%`;
@@ -77,23 +65,12 @@ export function registerGetEmailList(api: OpenAPIHono<AppRouteEnv>) {
       );
     }
 
-    if (customerId) {
-      conditions.push(eq(emails.customerId, customerId));
-    }
-
-    if (isCustomer === "true") {
-      conditions.push(eq(emails.isCustomer, true));
-    } else if (isCustomer === "false") {
-      conditions.push(eq(emails.isCustomer, false));
-    }
-
     if (isRead === "true") {
       conditions.push(eq(emails.isRead, true));
     } else if (isRead === "false") {
       conditions.push(eq(emails.isRead, false));
     }
 
-    // Apply view-based label filtering
     switch (view) {
       case "inbox":
         conditions.push(hasEmailLabel("INBOX"));
@@ -109,11 +86,9 @@ export function registerGetEmailList(api: OpenAPIHono<AppRouteEnv>) {
         conditions.push(hasEmailLabel("TRASH"));
         break;
       case "all":
-        // No label filter
         break;
     }
 
-    // Category filtering only applies for inbox view
     if (view === "inbox") {
       if (category === "primary") {
         conditions.push(
@@ -151,16 +126,13 @@ export function registerGetEmailList(api: OpenAPIHono<AppRouteEnv>) {
         bodyHtml: emails.bodyHtml,
         threadId: emails.threadId,
         date: emails.date,
+        direction: emails.direction,
         isRead: emails.isRead,
         labelIds: emails.labelIds,
-        isCustomer: emails.isCustomer,
-        classified: emails.classified,
+        personId: emails.personId,
         createdAt: emails.createdAt,
-        customerId: emails.customerId,
-        customerName: customers.name,
       })
       .from(emails)
-      .leftJoin(customers, eq(emails.customerId, customers.id))
       .where(whereClause)
       .orderBy(desc(emails.date))
       .limit(limit)

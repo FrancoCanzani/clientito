@@ -16,7 +16,7 @@ const FEATURE_ITEMS = [
     description: "Keep context on each customer account and shipment lane.",
   },
   {
-    title: "Set reminders",
+    title: "Set tasks",
     description: "Never miss callbacks, ETA checks, or renewal dates.",
   },
   {
@@ -36,7 +36,7 @@ const PLANS = [
     points: [
       "40 customers",
       "Gmail sync",
-      "Notes and reminders",
+      "Notes and tasks",
       "Email dispatch",
     ],
   },
@@ -55,7 +55,7 @@ const PLANS = [
 
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
-  const primaryCtaTo = isAuthenticated ? "/get-started" : "/login";
+  const primaryCtaTo = isAuthenticated ? "/home" : "/login";
   const primaryCtaLabel = isAuthenticated ? "Open workspace" : "Get started";
 
   return (
@@ -73,7 +73,10 @@ export default function LandingPage() {
           customer CRM app.
         </h1>
 
-        <Button asChild className="mt-8 h-12 rounded px-7 text-base font-semibold">
+        <Button
+          asChild
+          className="mt-8 h-12 rounded px-7 text-base font-semibold"
+        >
           <Link to={primaryCtaTo}>{primaryCtaLabel}</Link>
         </Button>
 
@@ -188,7 +191,6 @@ export default function LandingPage() {
           Made for focused transport teams.
         </p>
       </section>
-
     </main>
   );
 }

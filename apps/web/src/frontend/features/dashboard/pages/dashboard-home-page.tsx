@@ -6,12 +6,10 @@ import { formatInboxRowDate } from "@/features/emails/utils";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { format } from "date-fns";
 
-const indexRoute = getRouteApi("/_dashboard/$orgId/");
-const orgRoute = getRouteApi("/_dashboard/$orgId");
+const homeRoute = getRouteApi("/_dashboard/home");
 
 export default function DashboardHomePage() {
-  const { unreadPrimaryEmails, tasksForToday } = indexRoute.useLoaderData();
-  const { orgId } = orgRoute.useLoaderData();
+  const { unreadPrimaryEmails, tasksForToday } = homeRoute.useLoaderData();
   const { user } = useAuth();
   const firstName = user?.name?.split(" ")[0];
 
@@ -22,19 +20,13 @@ export default function DashboardHomePage() {
         {firstName ? `, ${firstName}` : ""}
       </h2>
 
-      <DashboardBriefingStream orgId={orgId} />
+      <DashboardBriefingStream />
 
       <section className="space-y-3">
         <div className="flex items-end justify-between gap-3">
           <h3 className="font-medium">Unread emails</h3>
           <Button asChild variant="ghost" size="sm">
-            <Link
-              to="/$orgId/emails"
-              params={{ orgId }}
-              search={{ tab: "primary" }}
-            >
-              Open inbox
-            </Link>
+            <Link to="/emails">Open inbox</Link>
           </Button>
         </div>
 
@@ -82,7 +74,7 @@ export default function DashboardHomePage() {
                 className="flex items-start justify-between gap-4 rounded-md px-1.5 py-1.5 hover:bg-muted/40"
               >
                 <p className="min-w-0 text-sm leading-relaxed">
-                  {task.message}
+                  {task.title}
                 </p>
                 <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
                   {format(task.dueAt, "p")}

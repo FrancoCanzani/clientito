@@ -8,12 +8,10 @@ import type { EmailListItem } from "../types";
 import { EmailDetailContent } from "./email-detail-content";
 
 export function EmailDetailDialog({
-  orgId,
   email,
   open,
   onOpenChange,
 }: {
-  orgId: string;
   email: EmailListItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -28,7 +26,7 @@ export function EmailDetailDialog({
             {email.subject ?? "(no subject)"}
           </DialogTitle>
         </DialogHeader>
-        <EmailDetailContent key={email.id} orgId={orgId} email={email} />
+        <EmailDetailContent key={email.id} email={email} />
       </DialogContent>
     </Dialog>
   );

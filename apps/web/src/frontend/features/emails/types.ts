@@ -9,9 +9,7 @@ export type EmailSearchResult = {
   date: number;
   isRead: boolean;
   labelIds: string[];
-  isCustomer: boolean;
-  customerId: string | null;
-  customerName: string | null;
+  personId: string | null;
 };
 
 export type EmailListItem = {
@@ -26,14 +24,12 @@ export type EmailListItem = {
   bodyHtml: string | null;
   threadId: string | null;
   date: number;
+  direction: "sent" | "received" | null;
   isRead: boolean;
   labelIds: string[];
   hasAttachment: boolean;
-  isCustomer: boolean;
-  classified: boolean;
+  personId: string | null;
   createdAt: number;
-  customerId: string | null;
-  customerName: string | null;
 };
 
 export type EmailAttachment = {
@@ -62,21 +58,4 @@ export type EmailListResponse = {
     offset: number;
     hasMore: boolean;
   };
-};
-
-export type EmailAnalysis = {
-  summary: string;
-  sentiment: "positive" | "neutral" | "negative" | "urgent";
-  suggestedTasks: Array<{ message: string; dueInDays: number }>;
-  language: string;
-  translation: string | null;
-};
-
-export type ActionableEmail = {
-  id: string;
-  fromAddr: string;
-  fromName: string | null;
-  subject: string | null;
-  customerId: string | null;
-  customerName: string | null;
 };

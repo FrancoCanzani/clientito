@@ -13,13 +13,10 @@ export const emailSearchItemSchema = z.object({
   date: z.number(),
   isRead: z.boolean(),
   labelIds: z.array(z.string()),
-  isCustomer: z.boolean(),
-  customerId: z.string().nullable(),
-  customerName: z.string().nullable(),
+  personId: z.string().nullable(),
 });
 
 export const searchEmailsQuerySchema = z.object({
-  orgId: z.string().trim().min(1),
   q: z.string().trim().min(1),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
@@ -29,12 +26,9 @@ export const searchEmailsResponseSchema = z.object({
 });
 
 export const listEmailsQuerySchema = z.object({
-  orgId: z.string().trim().min(1),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   offset: z.coerce.number().int().min(0).optional(),
   search: z.string().trim().optional(),
-  customerId: z.string().trim().optional(),
-  isCustomer: z.enum(["true", "false"]).optional(),
   isRead: z.enum(["true", "false"]).optional(),
   category: z
     .enum(["primary", "promotions", "social", "notifications"])
@@ -46,8 +40,8 @@ export const emailListItemSchema = emailSearchItemSchema.extend({
   bodyText: z.string().nullable(),
   bodyHtml: z.string().nullable(),
   threadId: z.string().nullable(),
+  direction: z.enum(["sent", "received"]).nullable(),
   hasAttachment: z.boolean(),
-  classified: z.boolean(),
   createdAt: z.number(),
 });
 
@@ -64,7 +58,6 @@ export const emailAttachmentSchema = z.object({
 });
 
 export const emailDetailQuerySchema = z.object({
-  orgId: z.string().trim().min(1),
   emailId: z.string().trim().min(1),
   skipLive: z.coerce.boolean().optional(),
 });
@@ -88,7 +81,6 @@ export const listEmailsResponseSchema = z.object({
 });
 
 export const emailAttachmentQuerySchema = z.object({
-  orgId: z.string().trim().min(1),
   gmailMessageId: z.string().trim().min(1),
   attachmentId: z.string().trim().min(1),
   filename: z.string().trim().optional(),
@@ -96,36 +88,37 @@ export const emailAttachmentQuerySchema = z.object({
   inline: z.coerce.boolean().optional(),
 });
 
-export const analyzeEmailQuerySchema = z.object({
-  orgId: z.string().trim().min(1),
-  emailId: z.string().trim().min(1),
+export const emailThreadParamsSchema = z.object({
+  threadId: z.string().trim().min(1),
 });
 
-export const emailAnalysisResponseSchema = z.object({
+export const emailThreadResponseSchema = z.object({
+  data: z.array(emailListItemSchema),
+});
+
+export const emailPersonParamsSchema = z.object({
+  personId: z.coerce.number().int().positive(),
+});
+
+export const emailPersonQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+export const emailPersonResponseSchema = listEmailsResponseSchema;
+
+export const sendEmailBodySchema = z.object({
+  to: z.string().email(),
+  subject: z.string().trim().min(1),
+  body: z.string().trim().min(1),
+  inReplyTo: z.string().trim().optional(),
+  references: z.string().trim().optional(),
+  threadId: z.string().trim().optional(),
+});
+
+export const sendEmailResponseSchema = z.object({
   data: z.object({
-    summary: z.string(),
-    sentiment: z.enum(["positive", "neutral", "negative", "urgent"]),
-    suggestedTasks: z.array(
-      z.object({
-        message: z.string(),
-        dueInDays: z.number(),
-      }),
-    ).max(3),
-    language: z.string(),
-    translation: z.string().nullable(),
-  }),
-});
-
-export const markAsCustomerRequestSchema = z.object({
-  orgId: z.string().trim().min(1),
-  emailAddress: z.string().trim().min(1),
-  name: z.string().trim().optional(),
-  company: z.string().trim().optional(),
-});
-
-export const markAsCustomerResponseSchema = z.object({
-  data: z.object({
-    customerId: z.string(),
-    emailsLinked: z.number(),
+    status: z.string(),
+    message: z.string(),
   }),
 });

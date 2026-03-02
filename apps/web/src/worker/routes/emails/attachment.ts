@@ -1,8 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { eq } from "drizzle-orm";
-import { ensureOrgAccess } from "../../lib/access";
 import { getGmailAttachmentBytes } from "../../lib/gmail";
-import { syncState } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 import { emailAttachmentQuerySchema, errorResponseSchema } from "./schemas";
 
@@ -20,10 +17,6 @@ const getEmailAttachmentRoute = createRoute({
     401: {
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Unauthorized",
-    },
-    403: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Forbidden",
     },
     404: {
       content: { "application/json": { schema: errorResponseSchema } },
@@ -57,22 +50,14 @@ export function registerGetEmailAttachment(api: OpenAPIHono<AppRouteEnv>) {
 
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-    const { orgId, gmailMessageId, attachmentId, filename, mimeType, inline } =
+    const { gmailMessageId, attachmentId, filename, mimeType, inline } =
       c.req.valid("query");
-    if (!(await ensureOrgAccess(db, orgId, user.id))) {
-      return c.json({ error: "Forbidden" }, 403);
-    }
-
-    const orgSyncState = await db.query.syncState.findFirst({
-      where: eq(syncState.orgId, orgId),
-    });
-    const gmailUserId = orgSyncState?.userId ?? user.id;
 
     try {
       const bytes = await getGmailAttachmentBytes(
         db,
         c.env,
-        gmailUserId,
+        user.id,
         gmailMessageId,
         attachmentId,
       );
@@ -96,7 +81,6 @@ export function registerGetEmailAttachment(api: OpenAPIHono<AppRouteEnv>) {
       });
     } catch (error) {
       console.error("Failed to download Gmail attachment", {
-        orgId,
         gmailMessageId,
         attachmentId,
         error,

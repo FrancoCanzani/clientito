@@ -1,15 +1,11 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { ensureOrgAccess } from "../../lib/access";
 import type { AppRouteEnv } from "../types";
 import {
   errorResponseSchema,
   syncAcceptedResponseSchema,
   syncRequestSchema,
 } from "./schemas";
-import {
-  isSyncInProgress,
-  runFullSyncInBackground,
-} from "./service";
+import { isSyncInProgress, runFullSyncInBackground } from "./service";
 
 const startSyncRoute = createRoute({
   method: "post",
@@ -38,10 +34,6 @@ const startSyncRoute = createRoute({
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Unauthorized",
     },
-    403: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Forbidden",
-    },
     409: {
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Conflict",
@@ -56,17 +48,20 @@ export function registerPostSyncStart(api: OpenAPIHono<AppRouteEnv>) {
 
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-    const { orgId, months, continueFullSync } = c.req.valid("json");
-    if (!(await ensureOrgAccess(db, orgId, user.id))) {
-      return c.json({ error: "Forbidden" }, 403);
-    }
+    const { months, continueFullSync } = c.req.valid("json");
 
-    if (await isSyncInProgress(db, orgId)) {
+    if (await isSyncInProgress(db, user.id)) {
       return c.json({ error: "Sync already in progress" }, 409);
     }
 
     c.executionCtx.waitUntil(
-      runFullSyncInBackground(db, c.env, orgId, user.id, months, continueFullSync),
+      runFullSyncInBackground(
+        db,
+        c.env,
+        user.id,
+        months,
+        continueFullSync,
+      ),
     );
     return c.json({ data: { status: "started" } }, 202);
   });

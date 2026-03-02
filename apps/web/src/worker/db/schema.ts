@@ -1,82 +1,114 @@
 import {
   index,
   integer,
-  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { user } from "./auth-schema";
 
-export const organizations = sqliteTable(
-  "organizations",
+export const companies = sqliteTable(
+  "companies",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
-    name: text("name").notNull(),
-    slug: text("slug").notNull().unique(),
-    createdByUserId: text("created_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    aiContext: text("ai_context"),
-    createdAt: integer("created_at").notNull(),
-    updatedAt: integer("updated_at").notNull(),
-  }
-);
-
-export const orgMembers = sqliteTable(
-  "org_members",
-  {
-    orgId: integer("org_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .$type<string>(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    role: text("role").notNull().default("member"),
+    domain: text("domain").notNull(),
+    name: text("name"),
     createdAt: integer("created_at").notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.orgId, table.userId] })]
-);
-
-export const customers = sqliteTable(
-  "customers",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
-    orgId: integer("org_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .$type<string>(),
-    name: text("name").notNull(),
-    company: text("company"),
-    email: text("email").notNull(),
-    phone: text("phone"),
-    website: text("website"),
-    vatEin: text("vat_ein"),
-    address: text("address"),
-    notes: text("notes").notNull().default(""),
-    createdAt: integer("created_at").notNull(),
-    updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
-    index("customers_org_idx").on(table.orgId),
-    uniqueIndex("customers_org_email_unique").on(table.orgId, table.email),
+    uniqueIndex("companies_user_domain_idx").on(table.userId, table.domain),
+  ],
+);
+
+export const people = sqliteTable(
+  "people",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    name: text("name"),
+    companyId: integer("company_id").references(() => companies.id, {
+      onDelete: "set null",
+    }),
+    lastContactedAt: integer("last_contacted_at"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("people_user_email_idx").on(table.userId, table.email),
+    index("people_company_idx").on(table.companyId),
+  ],
+);
+
+export const peopleAiContext = sqliteTable("people_ai_context", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  personId: integer("person_id")
+    .notNull()
+    .references(() => people.id, { onDelete: "cascade" }),
+  briefing: text("briefing"),
+  suggestedActions: text("suggested_actions"),
+  generatedAt: integer("generated_at").notNull(),
+});
+
+export const dailyBriefings = sqliteTable(
+  "daily_briefings",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    date: text("date").notNull(),
+    narrative: text("narrative"),
+    unreadCount: integer("unread_count"),
+    followUpCount: integer("follow_up_count"),
+    tasksDueCount: integer("tasks_due_count"),
+    overdueCount: integer("overdue_count"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("daily_briefings_user_date_idx").on(table.userId, table.date),
+  ],
+);
+
+export const notes = sqliteTable(
+  "notes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    personId: integer("person_id").references(() => people.id, {
+      onDelete: "cascade",
+    }),
+    companyId: integer("company_id").references(() => companies.id, {
+      onDelete: "cascade",
+    }),
+    content: text("content").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    index("notes_person_idx").on(table.personId),
+    index("notes_company_idx").on(table.companyId),
   ],
 );
 
 export const emails = sqliteTable(
   "emails",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
-    orgId: integer("org_id")
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
       .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .$type<string>(),
+      .references(() => user.id, { onDelete: "cascade" }),
     gmailId: text("gmail_id").notNull().unique(),
     threadId: text("thread_id"),
-    customerId: integer("customer_id")
-      .references(() => customers.id, { onDelete: "set null" })
-      .$type<string>(),
+    messageId: text("message_id"),
+    personId: integer("person_id").references(() => people.id, {
+      onDelete: "set null",
+    }),
     fromAddr: text("from_addr").notNull(),
     fromName: text("from_name"),
     toAddr: text("to_addr"),
@@ -85,102 +117,49 @@ export const emails = sqliteTable(
     bodyText: text("body_text"),
     bodyHtml: text("body_html"),
     date: integer("date").notNull(),
+    direction: text("direction").$type<"sent" | "received">(),
     isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
     labelIds: text("label_ids", { mode: "json" }).$type<string[] | null>(),
-    isCustomer: integer("is_customer", { mode: "boolean" }).notNull().default(false),
-    classified: integer("classified", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [
-    index("emails_org_idx").on(table.orgId),
-    index("emails_customer_idx").on(table.customerId),
-    index("emails_org_date_idx").on(table.orgId, table.date),
+    index("emails_user_idx").on(table.userId),
+    index("emails_person_idx").on(table.personId),
+    index("emails_user_date_idx").on(table.userId, table.date),
+    index("emails_thread_idx").on(table.threadId),
   ],
 );
 
-export const reminders = sqliteTable(
-  "reminders",
+export const tasks = sqliteTable(
+  "tasks",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
-    orgId: integer("org_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .$type<string>(),
-    customerId: integer("customer_id")
-      .notNull()
-      .references(() => customers.id, { onDelete: "cascade" })
-      .$type<string>(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    message: text("message").notNull(),
-    dueAt: integer("due_at").notNull(),
+    personId: integer("person_id").references(() => people.id, {
+      onDelete: "set null",
+    }),
+    companyId: integer("company_id").references(() => companies.id, {
+      onDelete: "set null",
+    }),
+    title: text("title").notNull(),
+    dueAt: integer("due_at"),
     done: integer("done", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [
-    index("reminders_customer_idx").on(table.customerId),
-    index("reminders_org_done_idx").on(table.orgId, table.done),
-  ],
-);
-
-export const contacts = sqliteTable(
-  "contacts",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
-    orgId: integer("org_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .$type<string>(),
-    email: text("email").notNull(),
-    name: text("name"),
-    domain: text("domain").notNull(),
-    emailCount: integer("email_count").notNull().default(1),
-    latestEmailDate: integer("latest_email_date"),
-    createdAt: integer("created_at").notNull(),
-    updatedAt: integer("updated_at").notNull(),
-  },
-  (table) => [
-    uniqueIndex("contacts_org_email_unique").on(table.orgId, table.email),
-    index("contacts_org_domain_idx").on(table.orgId, table.domain),
-  ],
-);
-
-export const customerSummaries = sqliteTable(
-  "customer_summaries",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
-    customerId: integer("customer_id")
-      .notNull()
-      .references(() => customers.id, { onDelete: "cascade" })
-      .$type<string>(),
-    orgId: integer("org_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .$type<string>(),
-    summary: text("summary").notNull(),
-    generatedAt: integer("generated_at").notNull(),
-    triggerReason: text("trigger_reason"),
-  },
-  (table) => [
-    index("customer_summaries_customer_idx").on(table.customerId),
-    index("customer_summaries_org_generated_idx").on(
-      table.orgId,
-      table.generatedAt,
-    ),
+    index("tasks_person_idx").on(table.personId),
+    index("tasks_user_done_idx").on(table.userId, table.done),
   ],
 );
 
 export const syncState = sqliteTable("sync_state", {
-  id: integer("id").primaryKey({ autoIncrement: true }).$type<string>(),
-  orgId: integer("org_id")
-    .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" })
-    .$type<string>()
-    .unique(),
+  id: integer("id").primaryKey({ autoIncrement: true }),
   userId: text("user_id")
     .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
+    .references(() => user.id, { onDelete: "cascade" })
+    .unique(),
   historyId: text("history_id"),
   lastSync: integer("last_sync"),
   lockUntil: integer("lock_until"),

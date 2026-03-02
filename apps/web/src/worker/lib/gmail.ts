@@ -1,8 +1,13 @@
-import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
-import { account } from "../db/auth-schema";
+import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { account, user } from "../db/auth-schema";
 import type { Database } from "../db/client";
-import { emails, syncState } from "../db/schema";
-import { parseEmailHeader, upsertContact } from "./contacts";
+import { companies, emails, people, syncState } from "../db/schema";
+import { isAutomatedSender, isPublicDomain } from "./domains";
+import {
+  extractDomain,
+  getPrimaryPerson,
+  parseParticipants,
+} from "./participants";
 
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -85,6 +90,11 @@ type GmailHistoryResponse = {
 
 type GmailProfileResponse = {
   historyId?: string;
+};
+
+type GoogleUserInfoResponse = {
+  name?: string;
+  picture?: string;
 };
 
 type GmailErrorResponse = {
@@ -444,7 +454,8 @@ export function extractMessageAttachments(
     ).toLowerCase();
     const mimeType = part.mimeType?.trim() || null;
     const isImage = mimeType?.toLowerCase().startsWith("image/") ?? false;
-    const isInline = contentDisposition.includes("inline") || Boolean(contentId);
+    const isInline =
+      contentDisposition.includes("inline") || Boolean(contentId);
     const filename = part.filename?.trim() || null;
     const size =
       typeof part.body?.size === "number" ? Math.max(0, part.body.size) : null;
@@ -613,6 +624,42 @@ async function getCurrentHistoryId(
   return profile.historyId ?? null;
 }
 
+async function syncGoogleUserProfile(
+  db: Database,
+  userId: string,
+  accessToken: string,
+): Promise<void> {
+  const response = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (!response.ok) {
+    return;
+  }
+
+  const payload = (await response
+    .json()
+    .catch(() => ({}))) as GoogleUserInfoResponse;
+  const nextName = payload.name?.trim();
+  const nextImage = payload.picture?.trim();
+
+  if (!nextName && !nextImage) {
+    return;
+  }
+
+  const updates: Partial<typeof user.$inferInsert> = {};
+  if (nextName) updates.name = nextName;
+  if (nextImage) updates.image = nextImage;
+
+  if (Object.keys(updates).length === 0) {
+    return;
+  }
+
+  await db.update(user).set(updates).where(eq(user.id, userId));
+}
+
 async function getMessage(
   accessToken: string,
   messageId: string,
@@ -708,10 +755,91 @@ async function listHistoryPage(
   return (await response.json()) as GmailHistoryResponse;
 }
 
+async function getUserEmail(db: Database, userId: string): Promise<string> {
+  const u = await db.query.user.findFirst({
+    where: eq(user.id, userId),
+    columns: { email: true },
+  });
+  return u?.email ?? "";
+}
+
+async function upsertPersonAndCompany(
+  db: Database,
+  userId: string,
+  participant: { email: string; name: string | null },
+  contactDate: number,
+): Promise<number | null> {
+  if (isAutomatedSender(participant.email)) {
+    return null;
+  }
+
+  const domain = extractDomain(participant.email);
+  let companyId: number | null = null;
+
+  if (domain && !isPublicDomain(domain)) {
+    const displayNameBase = domain.split(".")[0] ?? "";
+    const displayName = displayNameBase
+      ? `${displayNameBase.charAt(0).toUpperCase()}${displayNameBase.slice(1)}`
+      : null;
+
+    const inserted = await db
+      .insert(companies)
+      .values({
+        userId,
+        domain,
+        name: displayName,
+        createdAt: Date.now(),
+      })
+      .onConflictDoUpdate({
+        target: [companies.userId, companies.domain],
+        set: {
+          name: displayName ? sql<string>`coalesce(${companies.name}, ${displayName})` : undefined,
+        },
+      })
+      .returning({ id: companies.id });
+
+    if (inserted.length > 0) {
+      companyId = inserted[0].id;
+    } else {
+      const existing = await db.query.companies.findFirst({
+        where: and(eq(companies.userId, userId), eq(companies.domain, domain)),
+        columns: { id: true },
+      });
+      companyId = existing?.id ?? null;
+    }
+  }
+
+  const now = Date.now();
+  const inserted = await db
+    .insert(people)
+    .values({
+      userId,
+      email: participant.email,
+      name: participant.name,
+      companyId,
+      lastContactedAt: contactDate,
+      createdAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [people.userId, people.email],
+      set: {
+        name: participant.name
+          ? participant.name
+          : undefined,
+        companyId: companyId ?? undefined,
+        lastContactedAt: contactDate,
+      },
+    })
+    .returning({ id: people.id });
+
+  return inserted[0]?.id ?? null;
+}
+
 type ProcessMessagesInput = {
   db: Database;
   accessToken: string;
-  orgId: string;
+  userId: string;
+  userEmail: string;
   messageIds: string[];
   onProgress?: SyncProgressFn;
   progressOffset?: number;
@@ -721,7 +849,8 @@ type ProcessMessagesInput = {
 async function processMessageIds({
   db,
   accessToken,
-  orgId,
+  userId,
+  userEmail,
   messageIds,
   onProgress,
   progressOffset = 0,
@@ -775,9 +904,12 @@ async function processMessageIds({
       try {
         const rawFrom = getHeaderValue(message.payload?.headers, "From");
         const rawTo = getHeaderValue(message.payload?.headers, "To");
-        const parsedFrom = rawFrom ? parseEmailHeader(rawFrom) : null;
-        const fromAddr = parsedFrom?.email ?? extractAddress(rawFrom);
-        const fromName = parsedFrom?.name ?? null;
+        const rawCc = getHeaderValue(message.payload?.headers, "Cc");
+        const rawMessageId = getHeaderValue(
+          message.payload?.headers,
+          "Message-ID",
+        );
+        const fromAddr = extractAddress(rawFrom);
         const toAddr = extractAddress(rawTo);
         const subject = getHeaderValue(message.payload?.headers, "Subject");
         const bodyText = extractMessageBodyText(message);
@@ -794,13 +926,47 @@ async function processMessageIds({
             ? internalDate
             : Date.now();
 
+        // Determine direction
+        const isSent = labelIds.includes("SENT");
+        const direction: "sent" | "received" = isSent ? "sent" : "received";
+
+        // Extract participants and upsert person/company
+        const fromParticipants = parseParticipants(rawFrom);
+        const toParticipants = parseParticipants(rawTo);
+        const ccParticipants = parseParticipants(rawCc);
+        const senderParticipant =
+          fromParticipants.find(
+            (participant) => participant.email === fromAddr.toLowerCase(),
+          ) ??
+          fromParticipants[0] ??
+          null;
+        const fromName = senderParticipant?.name ?? null;
+        const primary = getPrimaryPerson(
+          fromParticipants,
+          toParticipants,
+          ccParticipants,
+          userEmail,
+          direction,
+        );
+
+        let personId: number | null = null;
+        if (primary) {
+          personId = await upsertPersonAndCompany(
+            db,
+            userId,
+            primary,
+            date,
+          );
+        }
+
         const inserted = await db
           .insert(emails)
           .values({
-            orgId,
+            userId,
             gmailId: message.id,
             threadId: message.threadId ?? null,
-            customerId: null,
+            messageId: rawMessageId ?? null,
+            personId,
             fromAddr,
             fromName,
             toAddr: toAddr || null,
@@ -809,10 +975,9 @@ async function processMessageIds({
             bodyText: bodyText || null,
             bodyHtml: bodyHtml || null,
             date,
+            direction,
             isRead,
             labelIds,
-            isCustomer: false,
-            classified: false,
             createdAt: Date.now(),
           })
           .onConflictDoNothing({ target: emails.gmailId })
@@ -820,13 +985,6 @@ async function processMessageIds({
 
         if (inserted.length > 0) {
           result.inserted += 1;
-          // Upsert contacts for sender and recipient
-          if (rawFrom) {
-            await upsertContact(db, orgId, rawFrom, date).catch(() => {});
-          }
-          if (rawTo) {
-            await upsertContact(db, orgId, rawTo, date).catch(() => {});
-          }
         } else {
           result.skipped += 1;
         }
@@ -855,36 +1013,32 @@ async function processMessageIds({
 
 type PersistSyncStateInput = {
   db: Database;
-  orgId: string;
   userId: string;
   historyId: string | null;
 };
 
 async function persistSyncState({
   db,
-  orgId,
   userId,
   historyId,
 }: PersistSyncStateInput) {
   const now = Date.now();
   const existing = await db.query.syncState.findFirst({
-    where: eq(syncState.orgId, orgId),
+    where: eq(syncState.userId, userId),
   });
 
   if (existing) {
     await db
       .update(syncState)
       .set({
-        userId,
         historyId,
         lastSync: now,
       })
-      .where(eq(syncState.orgId, orgId));
+      .where(eq(syncState.userId, userId));
     return;
   }
 
   await db.insert(syncState).values({
-    orgId,
     userId,
     historyId,
     lastSync: now,
@@ -893,7 +1047,6 @@ async function persistSyncState({
 
 async function acquireSyncLock(
   db: Database,
-  orgId: string,
   userId: string,
 ): Promise<boolean> {
   const now = Date.now();
@@ -902,23 +1055,21 @@ async function acquireSyncLock(
   await db
     .insert(syncState)
     .values({
-      orgId,
       userId,
       historyId: null,
       lastSync: null,
       lockUntil: null,
     })
-    .onConflictDoNothing({ target: syncState.orgId });
+    .onConflictDoNothing({ target: syncState.userId });
 
   const locked = await db
     .update(syncState)
     .set({
-      userId,
       lockUntil,
     })
     .where(
       and(
-        eq(syncState.orgId, orgId),
+        eq(syncState.userId, userId),
         or(isNull(syncState.lockUntil), lt(syncState.lockUntil, now)),
       ),
     )
@@ -927,27 +1078,26 @@ async function acquireSyncLock(
   return locked.length > 0;
 }
 
-async function releaseSyncLock(db: Database, orgId: string): Promise<void> {
+async function releaseSyncLock(db: Database, userId: string): Promise<void> {
   await db
     .update(syncState)
     .set({
       lockUntil: null,
     })
-    .where(eq(syncState.orgId, orgId));
+    .where(eq(syncState.userId, userId));
 }
 
 export async function startFullGmailSync(
   db: Database,
   env: Env,
-  orgId: string,
   userId: string,
   onProgress?: SyncProgressFn,
   gmailQuery?: string,
 ): Promise<GmailSyncResult> {
-  const hasLock = await acquireSyncLock(db, orgId, userId);
+  const hasLock = await acquireSyncLock(db, userId);
   if (!hasLock) {
     throw new GmailSyncStateError(
-      "Sync already in progress for this organization.",
+      "Sync already in progress.",
     );
   }
 
@@ -956,6 +1106,9 @@ export async function startFullGmailSync(
       GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
     });
+    await syncGoogleUserProfile(db, userId, accessToken).catch(() => {});
+
+    const userEmail = await getUserEmail(db, userId);
 
     // Phase 1: collect all message IDs
     await onProgress?.("listing", 0, 0);
@@ -975,7 +1128,8 @@ export async function startFullGmailSync(
     const result = await processMessageIds({
       db,
       accessToken,
-      orgId,
+      userId,
+      userEmail,
       messageIds: allMessageIds,
       onProgress,
       progressOffset: 0,
@@ -988,10 +1142,10 @@ export async function startFullGmailSync(
     );
     result.historyId = latestHistoryId;
 
-    await persistSyncState({ db, orgId, userId, historyId: latestHistoryId });
+    await persistSyncState({ db, userId, historyId: latestHistoryId });
     return result;
   } finally {
-    await releaseSyncLock(db, orgId);
+    await releaseSyncLock(db, userId);
   }
 }
 
@@ -1015,20 +1169,19 @@ function extractMessageIdsFromHistory(
 export async function runIncrementalGmailSync(
   db: Database,
   env: Env,
-  orgId: string,
   userId: string,
   startHistoryIdInput?: string | null,
 ): Promise<GmailSyncResult> {
-  const hasLock = await acquireSyncLock(db, orgId, userId);
+  const hasLock = await acquireSyncLock(db, userId);
   if (!hasLock) {
     throw new GmailSyncStateError(
-      "Sync already in progress for this organization.",
+      "Sync already in progress.",
     );
   }
 
   try {
     const state = await db.query.syncState.findFirst({
-      where: eq(syncState.orgId, orgId),
+      where: eq(syncState.userId, userId),
     });
     const startHistoryId = startHistoryIdInput ?? state?.historyId ?? null;
     if (!startHistoryId) {
@@ -1041,6 +1194,9 @@ export async function runIncrementalGmailSync(
       GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
     });
+    await syncGoogleUserProfile(db, userId, accessToken).catch(() => {});
+
+    const userEmail = await getUserEmail(db, userId);
 
     let pageToken: string | undefined;
     let latestHistoryId: string | null = startHistoryId;
@@ -1077,7 +1233,8 @@ export async function runIncrementalGmailSync(
       const pageResult = await processMessageIds({
         db,
         accessToken,
-        orgId,
+        userId,
+        userEmail,
         messageIds: pageMessageIds,
       });
 
@@ -1095,14 +1252,13 @@ export async function runIncrementalGmailSync(
     aggregate.historyId = latestHistoryId;
     await persistSyncState({
       db,
-      orgId,
       userId,
       historyId: latestHistoryId,
     });
 
     return aggregate;
   } finally {
-    await releaseSyncLock(db, orgId);
+    await releaseSyncLock(db, userId);
   }
 }
 
@@ -1112,7 +1268,6 @@ export async function runScheduledIncrementalSync(
 ): Promise<void> {
   const states = await db
     .select({
-      orgId: syncState.orgId,
       userId: syncState.userId,
       historyId: syncState.historyId,
       error: syncState.error,
@@ -1121,7 +1276,10 @@ export async function runScheduledIncrementalSync(
     .from(syncState)
     .leftJoin(
       account,
-      and(eq(account.userId, syncState.userId), eq(account.providerId, "google")),
+      and(
+        eq(account.userId, syncState.userId),
+        eq(account.providerId, "google"),
+      ),
     );
 
   for (const state of states) {
@@ -1132,7 +1290,6 @@ export async function runScheduledIncrementalSync(
     if (!state.refreshToken) {
       if (state.error !== GOOGLE_RECONNECT_REQUIRED_MESSAGE) {
         console.warn("Scheduled Gmail sync requires Google reconnect", {
-          orgId: state.orgId,
           userId: state.userId,
         });
       }
@@ -1144,7 +1301,7 @@ export async function runScheduledIncrementalSync(
           progressTotal: null,
           error: GOOGLE_RECONNECT_REQUIRED_MESSAGE,
         })
-        .where(eq(syncState.orgId, String(state.orgId)));
+        .where(eq(syncState.userId, state.userId));
       continue;
     }
 
@@ -1152,7 +1309,6 @@ export async function runScheduledIncrementalSync(
       await runIncrementalGmailSync(
         db,
         env,
-        String(state.orgId),
         state.userId,
         state.historyId,
       );
@@ -1165,18 +1321,16 @@ export async function runScheduledIncrementalSync(
             progressTotal: null,
             error: null,
           })
-          .where(eq(syncState.orgId, String(state.orgId)));
+          .where(eq(syncState.userId, state.userId));
       }
     } catch (error) {
       if (error instanceof GmailSyncStateError) {
-        // Another sync is already running for this org; skip scheduled run.
         continue;
       }
 
       if (isGmailReconnectRequiredError(error)) {
         if (state.error !== GOOGLE_RECONNECT_REQUIRED_MESSAGE) {
           console.warn("Scheduled Gmail sync requires Google reconnect", {
-            orgId: state.orgId,
             userId: state.userId,
           });
         }
@@ -1188,10 +1342,9 @@ export async function runScheduledIncrementalSync(
             progressTotal: null,
             error: GOOGLE_RECONNECT_REQUIRED_MESSAGE,
           })
-          .where(eq(syncState.orgId, String(state.orgId)));
+          .where(eq(syncState.userId, state.userId));
       } else {
         console.error("Scheduled Gmail incremental sync failed", {
-          orgId: state.orgId,
           userId: state.userId,
           error,
         });
@@ -1203,7 +1356,7 @@ export async function runScheduledIncrementalSync(
             progressTotal: null,
             error: error instanceof Error ? error.message : "Sync failed",
           })
-          .where(eq(syncState.orgId, String(state.orgId)));
+          .where(eq(syncState.userId, state.userId));
       }
     }
   }

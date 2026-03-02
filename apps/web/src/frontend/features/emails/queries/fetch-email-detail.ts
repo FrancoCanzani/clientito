@@ -1,11 +1,10 @@
 import type { EmailDetailItem } from "../types";
 
 export async function fetchEmailDetail(
-  orgId: string,
   emailId: string,
   options?: { skipLive?: boolean },
 ): Promise<EmailDetailItem> {
-  const params = new URLSearchParams({ orgId, emailId });
+  const params = new URLSearchParams({ emailId });
   if (options?.skipLive) {
     params.set("skipLive", "true");
   }

@@ -8,37 +8,56 @@ import {
 } from "../../lib/gmail";
 import { monthsToGmailQuery } from "./helpers";
 
+const SYNC_PROGRESS_LOCK_TTL_MS = 4 * 60_000;
+
 export async function updateSyncProgress(
   db: Database,
-  orgId: string,
+  userId: string,
   phase: string,
   current: number,
   total: number,
 ) {
+  const now = Date.now();
   await db
     .update(syncState)
-    .set({ phase, progressCurrent: current, progressTotal: total, error: null })
-    .where(eq(syncState.orgId, orgId));
+    .set({
+      phase,
+      progressCurrent: current,
+      progressTotal: total,
+      error: null,
+      lockUntil: now + SYNC_PROGRESS_LOCK_TTL_MS,
+    })
+    .where(eq(syncState.userId, userId));
 }
 
-export async function clearSyncProgress(db: Database, orgId: string) {
+export async function clearSyncProgress(db: Database, userId: string) {
   await db
     .update(syncState)
-    .set({ phase: null, progressCurrent: null, progressTotal: null })
-    .where(eq(syncState.orgId, orgId));
+    .set({
+      phase: null,
+      progressCurrent: null,
+      progressTotal: null,
+      lockUntil: null,
+    })
+    .where(eq(syncState.userId, userId));
 }
 
-export async function setSyncError(db: Database, orgId: string, message: string) {
+export async function setSyncError(db: Database, userId: string, message: string) {
   await db
     .update(syncState)
-    .set({ phase: "error", progressCurrent: null, progressTotal: null, error: message })
-    .where(eq(syncState.orgId, orgId));
+    .set({
+      phase: "error",
+      progressCurrent: null,
+      progressTotal: null,
+      error: message,
+      lockUntil: null,
+    })
+    .where(eq(syncState.userId, userId));
 }
 
 export function runFullSyncInBackground(
   db: Database,
   env: Env,
-  orgId: string,
   userId: string,
   months?: number,
   continueFullSync?: boolean,
@@ -50,9 +69,8 @@ export function runFullSyncInBackground(
       await startFullGmailSync(
         db,
         env,
-        orgId,
         userId,
-        (phase, current, total) => updateSyncProgress(db, orgId, phase, current, total),
+        (phase, current, total) => updateSyncProgress(db, userId, phase, current, total),
         gmailQuery,
       );
 
@@ -60,21 +78,20 @@ export function runFullSyncInBackground(
         await startFullGmailSync(
           db,
           env,
-          orgId,
           userId,
-          (phase, current, total) => updateSyncProgress(db, orgId, phase, current, total),
+          (phase, current, total) => updateSyncProgress(db, userId, phase, current, total),
         );
       }
 
-      await clearSyncProgress(db, orgId);
+      await clearSyncProgress(db, userId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Sync failed";
       if (isGmailReconnectRequiredError(error)) {
-        console.warn("Background full sync requires Google reconnect", { orgId });
+        console.warn("Background full sync requires Google reconnect", { userId });
       } else {
-        console.error("Background full sync failed", { orgId, error });
+        console.error("Background full sync failed", { userId, error });
       }
-      await setSyncError(db, orgId, message).catch(() => {});
+      await setSyncError(db, userId, message).catch(() => {});
     }
   })();
 }
@@ -82,33 +99,52 @@ export function runFullSyncInBackground(
 export function runIncrementalSyncInBackground(
   db: Database,
   env: Env,
-  orgId: string,
   userId: string,
 ) {
   return (async () => {
     try {
-      await updateSyncProgress(db, orgId, "syncing", 0, 0);
-      await runIncrementalGmailSync(db, env, orgId, userId);
+      await updateSyncProgress(db, userId, "syncing", 0, 0);
+      await runIncrementalGmailSync(db, env, userId);
 
-      await clearSyncProgress(db, orgId);
+      await clearSyncProgress(db, userId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Sync failed";
       if (isGmailReconnectRequiredError(error)) {
         console.warn("Background incremental sync requires Google reconnect", {
-          orgId,
+          userId,
         });
       } else {
-        console.error("Background incremental sync failed", { orgId, error });
+        console.error("Background incremental sync failed", { userId, error });
       }
-      await setSyncError(db, orgId, message).catch(() => {});
+      await setSyncError(db, userId, message).catch(() => {});
     }
   })();
 }
 
-export async function isSyncInProgress(db: Database, orgId: string): Promise<boolean> {
+export async function isSyncInProgress(db: Database, userId: string): Promise<boolean> {
   const state = await db.query.syncState.findFirst({
-    where: eq(syncState.orgId, orgId),
+    where: eq(syncState.userId, userId),
   });
 
-  return Boolean(state?.phase && state.phase !== "error");
+  if (!state) {
+    return false;
+  }
+
+  const now = Date.now();
+  const hasLiveLock =
+    typeof state.lockUntil === "number" && Number.isFinite(state.lockUntil) && state.lockUntil > now;
+
+  if (!hasLiveLock && state.phase && state.phase !== "error") {
+    await db
+      .update(syncState)
+      .set({
+        phase: null,
+        progressCurrent: null,
+        progressTotal: null,
+        lockUntil: null,
+      })
+      .where(eq(syncState.userId, userId));
+  }
+
+  return hasLiveLock;
 }

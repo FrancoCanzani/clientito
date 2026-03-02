@@ -1,7 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { and, desc, eq, like, or, sql } from "drizzle-orm";
-import { customers, emails } from "../../db/schema";
-import { ensureOrgAccess } from "../../lib/access";
+import { emails } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 import {
   errorResponseSchema,
@@ -30,10 +29,6 @@ const searchEmailsRoute = createRoute({
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Unauthorized",
     },
-    403: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Forbidden",
-    },
   },
 });
 
@@ -44,10 +39,7 @@ export function registerGetEmailSearch(api: OpenAPIHono<AppRouteEnv>) {
 
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-    const { orgId, q, limit = 30 } = c.req.valid("query");
-    if (!(await ensureOrgAccess(db, orgId, user.id))) {
-      return c.json({ error: "Forbidden" }, 403);
-    }
+    const { q, limit = 30 } = c.req.valid("query");
 
     const pattern = `%${q}%`;
     const rows = await db
@@ -62,15 +54,12 @@ export function registerGetEmailSearch(api: OpenAPIHono<AppRouteEnv>) {
         date: emails.date,
         isRead: emails.isRead,
         labelIds: emails.labelIds,
-        isCustomer: emails.isCustomer,
-        customerId: emails.customerId,
-        customerName: customers.name,
+        personId: emails.personId,
       })
       .from(emails)
-      .leftJoin(customers, eq(emails.customerId, customers.id))
       .where(
         and(
-          eq(emails.orgId, orgId),
+          eq(emails.userId, user.id),
           hasEmailLabel("INBOX"),
           sql<boolean>`not ${hasEmailLabel("SENT")}`,
           or(
