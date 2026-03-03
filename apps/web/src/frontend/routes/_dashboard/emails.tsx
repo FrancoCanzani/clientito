@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_dashboard/emails")({
   validateSearch: emailsSearchSchema,
   loader: async () => {
     const initialEmails = await fetchEmails({
-      limit: 50,
+      limit: 100,
       offset: 0,
     });
     return { initialEmails };

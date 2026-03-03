@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardTasksRouteImport } from './routes/_dashboard/tasks'
+import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
 import { Route as DashboardHomeRouteImport } from './routes/_dashboard/home'
 import { Route as DashboardEmailsRouteImport } from './routes/_dashboard/emails'
 import { Route as DashboardPeopleIndexRouteImport } from './routes/_dashboard/people/index'
@@ -37,6 +38,11 @@ const IndexRoute = IndexRouteImport.update({
 const DashboardTasksRoute = DashboardTasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardHomeRoute = DashboardHomeRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/emails': typeof DashboardEmailsRoute
   '/home': typeof DashboardHomeRoute
+  '/settings': typeof DashboardSettingsRoute
   '/tasks': typeof DashboardTasksRoute
   '/companies/$companyId': typeof DashboardCompaniesCompanyIdRoute
   '/people/$personId': typeof DashboardPeoplePersonIdRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/emails': typeof DashboardEmailsRoute
   '/home': typeof DashboardHomeRoute
+  '/settings': typeof DashboardSettingsRoute
   '/tasks': typeof DashboardTasksRoute
   '/companies/$companyId': typeof DashboardCompaniesCompanyIdRoute
   '/people/$personId': typeof DashboardPeoplePersonIdRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_dashboard/emails': typeof DashboardEmailsRoute
   '/_dashboard/home': typeof DashboardHomeRoute
+  '/_dashboard/settings': typeof DashboardSettingsRoute
   '/_dashboard/tasks': typeof DashboardTasksRoute
   '/_dashboard/companies/$companyId': typeof DashboardCompaniesCompanyIdRoute
   '/_dashboard/people/$personId': typeof DashboardPeoplePersonIdRoute
@@ -113,6 +122,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/emails'
     | '/home'
+    | '/settings'
     | '/tasks'
     | '/companies/$companyId'
     | '/people/$personId'
@@ -124,6 +134,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/emails'
     | '/home'
+    | '/settings'
     | '/tasks'
     | '/companies/$companyId'
     | '/people/$personId'
@@ -136,6 +147,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_dashboard/emails'
     | '/_dashboard/home'
+    | '/_dashboard/settings'
     | '/_dashboard/tasks'
     | '/_dashboard/companies/$companyId'
     | '/_dashboard/people/$personId'
@@ -177,6 +189,13 @@ declare module '@tanstack/react-router' {
       path: '/tasks'
       fullPath: '/tasks'
       preLoaderRoute: typeof DashboardTasksRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/settings': {
+      id: '/_dashboard/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof DashboardSettingsRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/home': {
@@ -227,6 +246,7 @@ declare module '@tanstack/react-router' {
 interface DashboardRouteRouteChildren {
   DashboardEmailsRoute: typeof DashboardEmailsRoute
   DashboardHomeRoute: typeof DashboardHomeRoute
+  DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardTasksRoute: typeof DashboardTasksRoute
   DashboardCompaniesCompanyIdRoute: typeof DashboardCompaniesCompanyIdRoute
   DashboardPeoplePersonIdRoute: typeof DashboardPeoplePersonIdRoute
@@ -237,6 +257,7 @@ interface DashboardRouteRouteChildren {
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardEmailsRoute: DashboardEmailsRoute,
   DashboardHomeRoute: DashboardHomeRoute,
+  DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardTasksRoute: DashboardTasksRoute,
   DashboardCompaniesCompanyIdRoute: DashboardCompaniesCompanyIdRoute,
   DashboardPeoplePersonIdRoute: DashboardPeoplePersonIdRoute,

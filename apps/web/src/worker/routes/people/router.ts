@@ -1,5 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { requireAuth } from "../../auth/middleware";
+import { requireAuth } from "../../middleware/auth";
 import type { AppRouteEnv } from "../types";
 import { registerGetPeople, registerGetPersonById } from "./get";
 import { registerPatchPeople } from "./patch";

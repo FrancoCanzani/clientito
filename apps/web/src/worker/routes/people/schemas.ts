@@ -16,6 +16,9 @@ export const personSchema = z.object({
   id: z.number(),
   email: z.string(),
   name: z.string().nullable(),
+  phone: z.string().nullable(),
+  title: z.string().nullable(),
+  linkedin: z.string().nullable(),
   companyId: z.number().nullable(),
   companyName: z.string().nullable(),
   companyDomain: z.string().nullable(),
@@ -73,6 +76,9 @@ export const getPersonResponseSchema = z.object({
 export const createPersonBodySchema = z.object({
   email: z.string().email(),
   name: z.string().trim().min(1).optional(),
+  phone: z.string().trim().optional(),
+  title: z.string().trim().optional(),
+  linkedin: z.string().trim().optional(),
   companyId: z.number().int().positive().optional(),
 });
 
@@ -83,11 +89,20 @@ export const createPersonResponseSchema = z.object({
 export const patchPersonBodySchema = z
   .object({
     name: z.string().trim().min(1).optional(),
+    phone: z.string().trim().nullable().optional(),
+    title: z.string().trim().nullable().optional(),
+    linkedin: z.string().trim().nullable().optional(),
     companyId: z.number().int().positive().nullable().optional(),
   })
-  .refine((value) => value.name !== undefined || value.companyId !== undefined, {
-    message: "At least one field must be provided",
-  });
+  .refine(
+    (value) =>
+      value.name !== undefined ||
+      value.phone !== undefined ||
+      value.title !== undefined ||
+      value.linkedin !== undefined ||
+      value.companyId !== undefined,
+    { message: "At least one field must be provided" },
+  );
 
 export const patchPersonResponseSchema = z.object({
   data: personSchema,

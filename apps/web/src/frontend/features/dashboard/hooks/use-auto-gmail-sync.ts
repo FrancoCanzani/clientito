@@ -4,6 +4,7 @@ import {
   startFullSync,
 } from "@/features/dashboard/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 const TOAST_ID = "gmail-sync-progress";
@@ -26,22 +27,17 @@ function showSyncProgressToast(status: SyncStatus) {
     });
     return;
   }
-
-  if (status.hasSynced) {
-    toast.success("Gmail sync complete", { id: TOAST_ID });
-  }
 }
 
 export function useAutoGmailSync() {
   const queryClient = useQueryClient();
+  const previousStatusRef = useRef<SyncStatus | null>(null);
 
   const syncStatusQuery = useQuery({
     queryKey: ["sync-status"],
     queryFn: async () => {
       try {
-        const status = await fetchSyncStatus();
-        showSyncProgressToast(status);
-        return status;
+        return await fetchSyncStatus();
       } catch (error) {
         const message =
           error instanceof Error
@@ -60,6 +56,25 @@ export function useAutoGmailSync() {
       return false;
     },
   });
+
+  useEffect(() => {
+    const status = syncStatusQuery.data;
+    if (!status) return;
+
+    const previous = previousStatusRef.current;
+    previousStatusRef.current = status;
+
+    showSyncProgressToast(status);
+
+    const wasSyncing = Boolean(previous?.phase);
+    const isSyncing = Boolean(status.phase);
+    const completedTransition =
+      wasSyncing && !isSyncing && !status.error && status.hasSynced;
+
+    if (completedTransition) {
+      toast.success("Gmail sync complete", { id: TOAST_ID });
+    }
+  }, [syncStatusQuery.data]);
 
   const shouldAutoStart =
     Boolean(syncStatusQuery.data) &&

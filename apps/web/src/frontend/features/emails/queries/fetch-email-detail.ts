@@ -2,16 +2,23 @@ import type { EmailDetailItem } from "../types";
 
 export async function fetchEmailDetail(
   emailId: string,
-  options?: { skipLive?: boolean },
+  options?: { refreshLive?: boolean },
 ): Promise<EmailDetailItem> {
-  const params = new URLSearchParams({ emailId });
-  if (options?.skipLive) {
-    params.set("skipLive", "true");
+  const params = new URLSearchParams();
+  if (options?.refreshLive) {
+    params.set("refreshLive", "true");
   }
 
-  const response = await fetch(`/api/emails/detail?${params}`, {
-    credentials: "include",
-  });
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+  const response = await fetch(`/api/emails/${emailId}${suffix}`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message =
+      payload && typeof payload.error === "string"
+        ? payload.error
+        : "Failed to fetch email detail";
+    throw new Error(message);
+  }
   const json = await response.json();
   return json.data;
 }

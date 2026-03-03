@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/features/auth/api";
+import { useAuth } from "@/hooks/use-auth";
 import { Link } from "@tanstack/react-router";
 
 const FEATURE_ITEMS = [

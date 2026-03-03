@@ -7,7 +7,6 @@ export async function createNote(input: {
 }): Promise<Note> {
   const response = await fetch("/api/notes", {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
@@ -19,7 +18,6 @@ export async function createNote(input: {
 export async function deleteNote(noteId: number): Promise<void> {
   const response = await fetch(`/api/notes/${noteId}`, {
     method: "DELETE",
-    credentials: "include",
   });
   if (!response.ok) throw new Error("Failed to delete note");
 }

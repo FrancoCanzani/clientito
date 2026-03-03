@@ -16,6 +16,9 @@ export const companies = sqliteTable(
       .references(() => user.id, { onDelete: "cascade" }),
     domain: text("domain").notNull(),
     name: text("name"),
+    industry: text("industry"),
+    website: text("website"),
+    description: text("description"),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [
@@ -32,6 +35,9 @@ export const people = sqliteTable(
       .references(() => user.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
     name: text("name"),
+    phone: text("phone"),
+    title: text("title"),
+    linkedin: text("linkedin"),
     companyId: integer("company_id").references(() => companies.id, {
       onDelete: "set null",
     }),

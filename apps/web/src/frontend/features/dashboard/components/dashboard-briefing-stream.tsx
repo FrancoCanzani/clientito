@@ -6,9 +6,8 @@ export function DashboardBriefingStream() {
   const { completion, complete, error, isLoading, setCompletion } =
     useCompletion({
       id: "dashboard-briefing",
-      api: "/api/dashboard/briefing/stream",
+      api: "/api/ai/briefing/stream",
       streamProtocol: "text",
-      credentials: "include",
     });
 
   useEffect(() => {

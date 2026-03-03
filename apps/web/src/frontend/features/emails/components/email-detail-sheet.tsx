@@ -5,16 +5,19 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { EmailListItem } from "../types";
+import type { ComposeInitial } from "./compose-email-dialog";
 import { EmailDetailContent } from "./email-detail-content";
 
 export function EmailDetailSheet({
   email,
   open,
   onOpenChange,
+  onForward,
 }: {
   email: EmailListItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onForward?: (initial: ComposeInitial) => void;
 }) {
   if (!email) return null;
 
@@ -26,7 +29,12 @@ export function EmailDetailSheet({
             {email.subject ?? "(no subject)"}
           </SheetTitle>
         </SheetHeader>
-        <EmailDetailContent key={email.id} email={email} />
+        <EmailDetailContent
+          key={email.id}
+          email={email}
+          onClose={() => onOpenChange(false)}
+          onForward={onForward}
+        />
       </SheetContent>
     </Sheet>
   );

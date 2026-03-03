@@ -17,7 +17,6 @@ export async function fetchTasks(params?: {
   }
 
   const response = await fetch(`/api/tasks?${query.toString()}`, {
-    credentials: "include",
   });
   if (!response.ok) throw new Error("Failed to fetch tasks");
   return response.json();
@@ -31,7 +30,6 @@ export async function createTask(input: {
 }): Promise<Task> {
   const response = await fetch("/api/tasks", {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
@@ -52,7 +50,6 @@ export async function updateTask(
 ): Promise<Task> {
   const response = await fetch(`/api/tasks/${taskId}`, {
     method: "PATCH",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
@@ -64,7 +61,6 @@ export async function updateTask(
 export async function deleteTask(taskId: number): Promise<void> {
   const response = await fetch(`/api/tasks/${taskId}`, {
     method: "DELETE",
-    credentials: "include",
   });
   if (!response.ok) throw new Error("Failed to delete task");
 }

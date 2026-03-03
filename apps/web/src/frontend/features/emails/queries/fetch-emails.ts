@@ -20,9 +20,15 @@ export async function fetchEmails(
   if (params?.limit) query.set("limit", String(params.limit));
   if (params?.offset) query.set("offset", String(params.offset));
 
-  const response = await fetch(`/api/emails?${query}`, {
-    credentials: "include",
-  });
+  const response = await fetch(`/api/emails?${query}`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message =
+      payload && typeof payload.error === "string"
+        ? payload.error
+        : "Failed to fetch emails";
+    throw new Error(message);
+  }
 
-  return response.json();
+  return response.json() as Promise<EmailListResponse>;
 }

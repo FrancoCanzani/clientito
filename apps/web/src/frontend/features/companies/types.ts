@@ -6,6 +6,9 @@ export type Company = {
   id: number;
   domain: string;
   name: string | null;
+  industry: string | null;
+  website: string | null;
+  description: string | null;
   createdAt: number;
 };
 

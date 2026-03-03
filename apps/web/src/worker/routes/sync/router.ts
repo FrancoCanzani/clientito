@@ -1,15 +1,13 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { requireAuth } from "../../auth/middleware";
+import { requireAuth } from "../../middleware/auth";
 import type { AppRouteEnv } from "../types";
-import { registerPostSyncIncremental } from "./incremental";
-import { registerPostSyncStart } from "./start";
-import { registerGetSyncStatus } from "./status";
+import { registerGetSync } from "./get";
+import { registerPostSync } from "./post";
 
 const syncRoutes = new OpenAPIHono<AppRouteEnv>();
 
 syncRoutes.use("*", requireAuth);
-registerGetSyncStatus(syncRoutes);
-registerPostSyncStart(syncRoutes);
-registerPostSyncIncremental(syncRoutes);
+registerGetSync(syncRoutes);
+registerPostSync(syncRoutes);
 
 export default syncRoutes;

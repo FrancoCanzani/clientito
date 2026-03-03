@@ -11,15 +11,13 @@ export type SyncStatus = {
 };
 
 export async function fetchBriefing(): Promise<string> {
-  const response = await fetch("/api/dashboard/briefing", {
-    credentials: "include",
-  });
+  const response = await fetch("/api/ai/briefing");
   const json = await response.json();
   return json.data.text;
 }
 
 export async function fetchSyncStatus(): Promise<SyncStatus> {
-  const response = await fetch("/api/sync/status", { credentials: "include" });
+  const response = await fetch("/api/sync/status");
   if (!response.ok) {
     throw new Error("Failed to fetch sync status.");
   }
@@ -33,7 +31,6 @@ export async function startFullSync(
 ): Promise<void> {
   const response = await fetch("/api/sync/start", {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ months, continueFullSync }),
   });
@@ -45,10 +42,14 @@ export async function startFullSync(
 }
 
 export async function runIncrementalSync(): Promise<void> {
-  await fetch("/api/sync/incremental", {
+  const response = await fetch("/api/sync/incremental", {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({}),
   });
+
+  if (response.status === 409) return;
+  if (!response.ok) {
+    throw new Error("Failed to run incremental Gmail sync.");
+  }
 }

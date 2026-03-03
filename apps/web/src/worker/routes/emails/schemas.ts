@@ -57,9 +57,12 @@ export const emailAttachmentSchema = z.object({
   inlineUrl: z.string().nullable(),
 });
 
+export const emailDetailParamsSchema = z.object({
+  emailId: z.coerce.number().int().positive(),
+});
+
 export const emailDetailQuerySchema = z.object({
-  emailId: z.string().trim().min(1),
-  skipLive: z.coerce.boolean().optional(),
+  refreshLive: z.coerce.boolean().optional(),
 });
 
 export const emailDetailResponseSchema = z.object({
@@ -107,6 +110,27 @@ export const emailPersonQuerySchema = z.object({
 
 export const emailPersonResponseSchema = listEmailsResponseSchema;
 
+export const patchEmailParamsSchema = z.object({
+  emailId: z.coerce.number().int().positive(),
+});
+
+export const patchEmailBodySchema = z.object({
+  isRead: z.boolean().optional(),
+  archived: z.boolean().optional(),
+  trashed: z.boolean().optional(),
+  starred: z.boolean().optional(),
+});
+
+export const patchEmailResponseSchema = z.object({
+  data: z.object({
+    id: z.string(),
+    isRead: z.boolean(),
+    archived: z.boolean(),
+    trashed: z.boolean(),
+    starred: z.boolean(),
+  }),
+});
+
 export const sendEmailBodySchema = z.object({
   to: z.string().email(),
   subject: z.string().trim().min(1),
@@ -118,7 +142,7 @@ export const sendEmailBodySchema = z.object({
 
 export const sendEmailResponseSchema = z.object({
   data: z.object({
-    status: z.string(),
-    message: z.string(),
+    gmailId: z.string(),
+    threadId: z.string(),
   }),
 });

@@ -1,7 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useLogout } from "@/features/auth/api";
+import { fetchCompanies } from "@/features/companies/api";
+import { fetchEmails } from "@/features/emails/queries/fetch-emails";
+import { fetchPeople } from "@/features/people/api";
 import { createTask } from "@/features/tasks/api";
+import { fetchTasks } from "@/features/tasks/api";
+import { parseTaskInput } from "@/features/tasks/parse-task-input";
+import { useLogout } from "@/hooks/use-auth";
 import {
   BuildingsIcon,
   CaretDownIcon,
@@ -31,15 +36,13 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [newTaskMode, setNewTaskMode] = useState(false);
-  const [taskTitle, setTaskTitle] = useState("");
-  const [taskDueAt, setTaskDueAt] = useState("");
+  const [taskInput, setTaskInput] = useState("");
 
   const close = useCallback(() => {
     setOpen(false);
     setQuery("");
     setNewTaskMode(false);
-    setTaskTitle("");
-    setTaskDueAt("");
+    setTaskInput("");
   }, []);
 
   useEffect(() => {
@@ -91,6 +94,13 @@ export function CommandPalette() {
     [close, navigate],
   );
 
+  const prefetchNavigationRoute = useCallback(
+    (to: "/home" | "/emails" | "/people" | "/companies" | "/tasks") => {
+      void router.preloadRoute({ to });
+    },
+    [router],
+  );
+
   const normalizedQuery = query.trim();
 
   const commands = useMemo(
@@ -99,6 +109,7 @@ export function CommandPalette() {
         id: "home",
         label: "Home",
         section: "navigation" as const,
+        to: "/home" as const,
         icon: <HouseSimpleIcon className="size-4" />,
         onSelect: () => runNavigation("/home"),
       },
@@ -106,6 +117,7 @@ export function CommandPalette() {
         id: "inbox",
         label: "Inbox",
         section: "navigation" as const,
+        to: "/emails" as const,
         icon: <TrayIcon className="size-4" />,
         onSelect: () => runNavigation("/emails"),
       },
@@ -113,6 +125,7 @@ export function CommandPalette() {
         id: "people",
         label: "People",
         section: "navigation" as const,
+        to: "/people" as const,
         icon: <UserListIcon className="size-4" />,
         onSelect: () => runNavigation("/people"),
       },
@@ -120,6 +133,7 @@ export function CommandPalette() {
         id: "companies",
         label: "Companies",
         section: "navigation" as const,
+        to: "/companies" as const,
         icon: <BuildingsIcon className="size-4" />,
         onSelect: () => runNavigation("/companies"),
       },
@@ -127,6 +141,7 @@ export function CommandPalette() {
         id: "tasks",
         label: "Tasks",
         section: "navigation" as const,
+        to: "/tasks" as const,
         icon: <CheckSquareIcon className="size-4" />,
         onSelect: () => runNavigation("/tasks"),
       },
@@ -172,11 +187,43 @@ export function CommandPalette() {
   );
 
   const submitTask = useCallback(() => {
-    const title = taskTitle.trim();
+    const parsed = parseTaskInput(taskInput);
+    const title = parsed.title.trim();
     if (!title) return;
-    const dueAt = taskDueAt ? new Date(taskDueAt).getTime() : undefined;
-    createTaskMutation.mutate({ title, dueAt });
-  }, [createTaskMutation, taskDueAt, taskTitle]);
+    createTaskMutation.mutate({ title, dueAt: parsed.dueAt });
+  }, [createTaskMutation, taskInput]);
+
+  useEffect(() => {
+    if (!open || newTaskMode) return;
+
+    // Aggressive preload: routes + first-page data for core dashboard sections.
+    for (const command of navigationCommands) {
+      prefetchNavigationRoute(command.to);
+    }
+
+    void Promise.allSettled([
+      queryClient.prefetchQuery({
+        queryKey: ["emails", "inbox", "prefetch"],
+        queryFn: () => fetchEmails({ limit: 100, offset: 0 }),
+        staleTime: 60_000,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: ["people", "prefetch"],
+        queryFn: () => fetchPeople({ limit: 50, offset: 0 }),
+        staleTime: 60_000,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: ["companies", "prefetch"],
+        queryFn: () => fetchCompanies(),
+        staleTime: 60_000,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: ["tasks", "prefetch"],
+        queryFn: () => fetchTasks({ limit: 200, offset: 0 }),
+        staleTime: 30_000,
+      }),
+    ]);
+  }, [navigationCommands, newTaskMode, open, prefetchNavigationRoute]);
 
   return (
     <div
@@ -200,14 +247,9 @@ export function CommandPalette() {
                 <div className="space-y-2 p-3">
                   <p className="text-xs text-muted-foreground">Create task</p>
                   <Input
-                    value={taskTitle}
-                    onChange={(event) => setTaskTitle(event.target.value)}
-                    placeholder="Task title"
-                  />
-                  <Input
-                    type="datetime-local"
-                    value={taskDueAt}
-                    onChange={(event) => setTaskDueAt(event.target.value)}
+                    value={taskInput}
+                    onChange={(event) => setTaskInput(event.target.value)}
+                    placeholder="e.g. Send proposal tomorrow 3pm"
                   />
                   <div className="flex justify-end gap-2">
                     <Button
@@ -222,7 +264,7 @@ export function CommandPalette() {
                       onClick={submitTask}
                       disabled={
                         createTaskMutation.isPending ||
-                        taskTitle.trim().length === 0
+                        taskInput.trim().length === 0
                       }
                     >
                       {createTaskMutation.isPending ? "Saving..." : "Save"}
@@ -245,6 +287,10 @@ export function CommandPalette() {
                           key={command.id}
                           value={command.label}
                           onSelect={command.onSelect}
+                          onMouseEnter={() =>
+                            prefetchNavigationRoute(command.to)
+                          }
+                          onFocus={() => prefetchNavigationRoute(command.to)}
                           className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
                         >
                           <span className="text-muted-foreground">

@@ -17,7 +17,11 @@ export const Route = createFileRoute("/_dashboard/home")({
       limit: 10,
       offset: 0,
     });
-    const tasksResponse = await fetchTasks({ dueToday: true, limit: 20, offset: 0 });
+    const tasksResponse = await fetchTasks({
+      dueToday: true,
+      limit: 20,
+      offset: 0,
+    });
     const tasksForToday: HomeTask[] = tasksResponse.data
       .filter((task) => task.dueAt !== null)
       .map((task) => ({

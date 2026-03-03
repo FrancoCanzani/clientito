@@ -51,7 +51,7 @@ export function registerPatchCompanies(api: OpenAPIHono<AppRouteEnv>) {
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
     const { id } = c.req.valid("param");
-    const { name } = c.req.valid("json");
+    const { name, industry, website, description } = c.req.valid("json");
 
     const existing = await db
       .select({ id: companies.id })
@@ -60,16 +60,27 @@ export function registerPatchCompanies(api: OpenAPIHono<AppRouteEnv>) {
       .limit(1);
     if (!existing[0]) return c.json({ error: "Company not found" }, 404);
 
-    await db
-      .update(companies)
-      .set({ name })
-      .where(and(eq(companies.id, id), eq(companies.userId, user.id)));
+    const updateData: Partial<typeof companies.$inferInsert> = {};
+    if (name !== undefined) updateData.name = name;
+    if (industry !== undefined) updateData.industry = industry;
+    if (website !== undefined) updateData.website = website;
+    if (description !== undefined) updateData.description = description;
+
+    if (Object.keys(updateData).length > 0) {
+      await db
+        .update(companies)
+        .set(updateData)
+        .where(and(eq(companies.id, id), eq(companies.userId, user.id)));
+    }
 
     const rows = await db
       .select({
         id: companies.id,
         domain: companies.domain,
         name: companies.name,
+        industry: companies.industry,
+        website: companies.website,
+        description: companies.description,
         createdAt: companies.createdAt,
       })
       .from(companies)

@@ -1,1 +1,0 @@
-ALTER TABLE `emails` ADD `body_html` text;

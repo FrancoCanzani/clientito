@@ -51,7 +51,7 @@ export function registerPatchPeople(api: OpenAPIHono<AppRouteEnv>) {
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
     const { id } = c.req.valid("param");
-    const { name, companyId } = c.req.valid("json");
+    const { name, phone, title, linkedin, companyId } = c.req.valid("json");
 
     const existing = await db
       .select({ id: people.id })
@@ -62,6 +62,9 @@ export function registerPatchPeople(api: OpenAPIHono<AppRouteEnv>) {
 
     const updateData: Partial<typeof people.$inferInsert> = {};
     if (name !== undefined) updateData.name = name;
+    if (phone !== undefined) updateData.phone = phone;
+    if (title !== undefined) updateData.title = title;
+    if (linkedin !== undefined) updateData.linkedin = linkedin;
     if (companyId !== undefined) updateData.companyId = companyId;
 
     if (Object.keys(updateData).length > 0) {
@@ -76,6 +79,9 @@ export function registerPatchPeople(api: OpenAPIHono<AppRouteEnv>) {
         id: people.id,
         email: people.email,
         name: people.name,
+        phone: people.phone,
+        title: people.title,
+        linkedin: people.linkedin,
         companyId: people.companyId,
         companyName: companies.name,
         companyDomain: companies.domain,

@@ -1,23 +1,19 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { requireAuth } from "../../auth/middleware";
+import { requireAuth } from "../../middleware/auth";
 import type { AppRouteEnv } from "../types";
-import { registerGetEmailAttachment } from "./attachment";
-import { registerGetEmailDetail } from "./detail";
-import { registerGetEmailList } from "./list";
-import { registerGetEmailsByPerson } from "./person";
-import { registerGetEmailSearch } from "./search";
-import { registerPostSendEmail } from "./send";
-import { registerGetEmailThread } from "./thread";
+import { registerGetAllEmails } from "./get-all";
+import { registerGetAttachment } from "./get-attachment";
+import { registerGetEmail } from "./get";
+import { registerPatchEmail } from "./patch";
+import { registerPostEmail } from "./post";
 
 const emailsRoutes = new OpenAPIHono<AppRouteEnv>();
 
 emailsRoutes.use("*", requireAuth);
-registerGetEmailList(emailsRoutes);
-registerGetEmailSearch(emailsRoutes);
-registerGetEmailDetail(emailsRoutes);
-registerGetEmailAttachment(emailsRoutes);
-registerGetEmailThread(emailsRoutes);
-registerGetEmailsByPerson(emailsRoutes);
-registerPostSendEmail(emailsRoutes);
+registerGetAllEmails(emailsRoutes);
+registerGetAttachment(emailsRoutes);
+registerGetEmail(emailsRoutes);
+registerPatchEmail(emailsRoutes);
+registerPostEmail(emailsRoutes);
 
 export default emailsRoutes;

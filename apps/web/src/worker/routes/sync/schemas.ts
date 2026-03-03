@@ -5,9 +5,6 @@ export const syncRequestSchema = z.object({
   continueFullSync: z.boolean().optional(),
 });
 
-export const syncStatusQuerySchema = z.object({
-});
-
 export const errorResponseSchema = z.object({ error: z.string() });
 
 export const syncStatusResponseSchema = z.object({

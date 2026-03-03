@@ -1,5 +1,5 @@
-import AppHeader from "@/components/app-header";
 import { CommandPalette } from "@/components/command-palette";
+import { Loading } from "@/components/loading";
 import { useAutoGmailSync } from "@/features/dashboard/hooks/use-auto-gmail-sync";
 import { authClient } from "@/lib/auth-client";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
@@ -12,6 +12,7 @@ export const Route = createFileRoute("/_dashboard")({
     }
   },
   component: DashboardLayout,
+  pendingComponent: Loading,
 });
 
 function DashboardLayout() {
@@ -19,7 +20,6 @@ function DashboardLayout() {
 
   return (
     <div className="min-h-screen">
-      <AppHeader />
       <main className="mx-auto max-w-4xl px-4 py-4 pb-24">
         <Outlet />
       </main>

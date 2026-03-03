@@ -5,6 +5,9 @@ export type Person = {
   id: number;
   email: string;
   name: string | null;
+  phone: string | null;
+  title: string | null;
+  linkedin: string | null;
   companyId: number | null;
   companyName: string | null;
   companyDomain: string | null;

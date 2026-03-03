@@ -79,6 +79,9 @@ export function registerGetCompanies(api: OpenAPIHono<AppRouteEnv>) {
         id: companies.id,
         domain: companies.domain,
         name: companies.name,
+        industry: companies.industry,
+        website: companies.website,
+        description: companies.description,
         createdAt: companies.createdAt,
         peopleCount:
           sql<number>`(select count(*) from people where people.company_id = companies.id)`,
@@ -104,6 +107,9 @@ export function registerGetCompanyById(api: OpenAPIHono<AppRouteEnv>) {
         id: companies.id,
         domain: companies.domain,
         name: companies.name,
+        industry: companies.industry,
+        website: companies.website,
+        description: companies.description,
         createdAt: companies.createdAt,
       })
       .from(companies)
@@ -118,6 +124,9 @@ export function registerGetCompanyById(api: OpenAPIHono<AppRouteEnv>) {
         id: people.id,
         email: people.email,
         name: people.name,
+        phone: people.phone,
+        title: people.title,
+        linkedin: people.linkedin,
         companyId: people.companyId,
         lastContactedAt: people.lastContactedAt,
         createdAt: people.createdAt,

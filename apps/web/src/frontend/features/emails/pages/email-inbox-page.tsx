@@ -1,4 +1,9 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { markEmailRead } from "@/features/emails/api";
+import {
+  ComposeEmailDialog,
+  type ComposeInitial,
+} from "@/features/emails/components/compose-email-dialog";
 import { EmailDetailDialog } from "@/features/emails/components/email-detail-dialog";
 import { EmailDetailSheet } from "@/features/emails/components/email-detail-sheet";
 import { fetchEmailDetail } from "@/features/emails/queries/fetch-email-detail";
@@ -10,7 +15,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { PaperclipIcon } from "@phosphor-icons/react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback, useMemo } from "react";
+import { useMemo, useState } from "react";
 
 const emailsRoute = getRouteApi("/_dashboard/emails");
 
@@ -18,35 +23,42 @@ export default function EmailInboxPage() {
   const navigate = emailsRoute.useNavigate();
   const search = emailsRoute.useSearch();
   const selectedEmailId = search.emailId ?? null;
+  const isComposing = search.compose === true;
   const { initialEmails } = emailsRoute.useLoaderData();
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
+  const [composeInitial, setComposeInitial] = useState<
+    ComposeInitial | undefined
+  >();
+  const [forwardOpen, setForwardOpen] = useState(false);
 
-  const prefetchEmail = useCallback(
-    (emailId: string) => {
+  const prefetchEmail = (email: EmailListItem) => {
+    void queryClient.prefetchQuery({
+      queryKey: ["email-detail", email.id],
+      queryFn: () => fetchEmailDetail(email.id),
+      staleTime: 60_000,
+    });
+
+    if (email.hasAttachment) {
       void queryClient.prefetchQuery({
-        queryKey: ["email-detail", emailId],
-        queryFn: () => fetchEmailDetail(emailId),
-        staleTime: 60_000,
+        queryKey: ["email-detail-live", email.id],
+        queryFn: () => fetchEmailDetail(email.id, { refreshLive: true }),
+        staleTime: 30_000,
       });
-    },
-    [queryClient],
-  );
+    }
+  };
 
-  const handleOpenChange = useCallback(
-    (open: boolean) => {
-      if (!open) {
-        navigate({
-          search: {
-            ...search,
-            emailId: undefined,
-          },
-          replace: true,
-        });
-      }
-    },
-    [navigate, search],
-  );
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      navigate({
+        search: {
+          ...search,
+          emailId: undefined,
+        },
+        replace: true,
+      });
+    }
+  };
 
   const emailsQuery = useInfiniteQuery({
     queryKey: ["emails", "inbox"],
@@ -57,7 +69,7 @@ export default function EmailInboxPage() {
       }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) =>
-      lastPage.pagination.hasMore
+      lastPage?.pagination?.hasMore
         ? lastPage.pagination.offset + lastPage.pagination.limit
         : undefined,
     initialData: {
@@ -78,6 +90,32 @@ export default function EmailInboxPage() {
     () => groupEmailsByDay(displayEmails),
     [displayEmails],
   );
+
+  const openEmail = (email: EmailListItem) => {
+    navigate({
+      search: { ...search, emailId: email.id },
+      replace: true,
+    });
+
+    if (!email.isRead) {
+      queryClient.setQueryData(
+        ["emails", "inbox"],
+        (old: typeof emailsQuery.data | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              data: page.data.map((e) =>
+                e.id === email.id ? { ...e, isRead: true } : e,
+              ),
+            })),
+          };
+        },
+      );
+      void markEmailRead(email.id);
+    }
+  };
 
   const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } =
     emailsQuery;
@@ -104,6 +142,10 @@ export default function EmailInboxPage() {
               <Skeleton key={i} className="h-10 w-full rounded" />
             ))}
           </div>
+        ) : emailsQuery.isError ? (
+          <p className="p-4 text-center text-destructive">
+            Failed to load emails.
+          </p>
         ) : displayEmails.length > 0 ? (
           <div className="space-y-6">
             {sections.map((section) => (
@@ -120,17 +162,9 @@ export default function EmailInboxPage() {
                       key={email.id}
                       type="button"
                       className="flex w-full items-center justify-between gap-3 rounded-md p-1.5 text-left hover:bg-muted/40"
-                      onMouseEnter={() => prefetchEmail(email.id)}
-                      onFocus={() => prefetchEmail(email.id)}
-                      onClick={() =>
-                        navigate({
-                          search: {
-                            ...search,
-                            emailId: email.id,
-                          },
-                          replace: true,
-                        })
-                      }
+                      onMouseEnter={() => prefetchEmail(email)}
+                      onFocus={() => prefetchEmail(email)}
+                      onClick={() => openEmail(email)}
                     >
                       <div className="min-w-0 flex items-center gap-2">
                         {!email.isRead && (
@@ -186,12 +220,42 @@ export default function EmailInboxPage() {
           email={selectedEmail}
           open={selectedEmail !== null}
           onOpenChange={handleOpenChange}
+          onForward={(initial) => {
+            handleOpenChange(false);
+            setComposeInitial(initial);
+            setForwardOpen(true);
+          }}
         />
       ) : (
         <EmailDetailDialog
           email={selectedEmail}
           open={selectedEmail !== null}
           onOpenChange={handleOpenChange}
+          onForward={(initial) => {
+            handleOpenChange(false);
+            setComposeInitial(initial);
+            setForwardOpen(true);
+          }}
+        />
+      )}
+
+      {(isComposing || forwardOpen) && (
+        <ComposeEmailDialog
+          key={forwardOpen ? "forward-compose" : "new-compose"}
+          open={isComposing || forwardOpen}
+          initial={forwardOpen ? composeInitial : undefined}
+          onOpenChange={(open) => {
+            if (!open) {
+              setForwardOpen(false);
+              setComposeInitial(undefined);
+              if (isComposing) {
+                navigate({
+                  search: { ...search, compose: undefined },
+                  replace: true,
+                });
+              }
+            }
+          }}
         />
       )}
     </div>

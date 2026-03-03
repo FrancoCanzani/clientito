@@ -44,7 +44,7 @@ export function registerPostPeople(api: OpenAPIHono<AppRouteEnv>) {
     const user = c.get("user");
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-    const { email, name, companyId } = c.req.valid("json");
+    const { email, name, phone, title, linkedin, companyId } = c.req.valid("json");
     const now = Date.now();
 
     const inserted = await db
@@ -53,6 +53,9 @@ export function registerPostPeople(api: OpenAPIHono<AppRouteEnv>) {
         userId: user.id,
         email,
         name: name ?? null,
+        phone: phone ?? null,
+        title: title ?? null,
+        linkedin: linkedin ?? null,
         companyId: companyId ?? null,
         createdAt: now,
       })
@@ -65,6 +68,9 @@ export function registerPostPeople(api: OpenAPIHono<AppRouteEnv>) {
         id: people.id,
         email: people.email,
         name: people.name,
+        phone: people.phone,
+        title: people.title,
+        linkedin: people.linkedin,
         companyId: people.companyId,
         companyName: companies.name,
         companyDomain: companies.domain,
