@@ -1,38 +1,17 @@
-import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import type { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { getGmailAttachmentBytes } from "../../lib/gmail/message";
-import { createTimer } from "../../lib/timing";
 import type { AppRouteEnv } from "../types";
 import { normalizeFilename, normalizeMimeType } from "./helpers";
-import { emailAttachmentQuerySchema, errorResponseSchema } from "./schemas";
+import { emailAttachmentQuerySchema } from "./schemas";
 
-const getEmailAttachmentRoute = createRoute({
-  method: "get",
-  path: "/attachment",
-  tags: ["emails"],
-  request: { query: emailAttachmentQuerySchema },
-  responses: {
-    200: { description: "Attachment data" },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-    404: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Not found",
-    },
-  },
-});
-
-export function registerGetAttachment(api: OpenAPIHono<AppRouteEnv>) {
-  api.openapi(getEmailAttachmentRoute, async (c) => {
+export function registerGetAttachment(api: Hono<AppRouteEnv>) {
+  api.get("/attachment", zValidator("query", emailAttachmentQuerySchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const timer = createTimer("emails-attachment", { userId: user.id });
+    const user = c.get("user")!;
 
     const { gmailMessageId, attachmentId, filename, mimeType, inline } =
       c.req.valid("query");
-    timer.mark("query-validated");
 
     try {
       const bytes = await getGmailAttachmentBytes(
@@ -42,7 +21,6 @@ export function registerGetAttachment(api: OpenAPIHono<AppRouteEnv>) {
         gmailMessageId,
         attachmentId,
       );
-      timer.mark("bytes-fetched");
 
       const safeFilename = normalizeFilename(filename);
       const headers = new Headers();
@@ -57,11 +35,6 @@ export function registerGetAttachment(api: OpenAPIHono<AppRouteEnv>) {
         );
       }
 
-      timer.end({
-        gmailMessageId,
-        attachmentId,
-        bytesLength: bytes.length,
-      });
       return new Response(bytes, { status: 200, headers });
     } catch (error) {
       console.error("Failed to download Gmail attachment", {
@@ -69,7 +42,6 @@ export function registerGetAttachment(api: OpenAPIHono<AppRouteEnv>) {
         attachmentId,
         error,
       });
-      timer.end({ gmailMessageId, attachmentId, failed: true });
       return c.json({ error: "Attachment not found" }, 404);
     }
   });

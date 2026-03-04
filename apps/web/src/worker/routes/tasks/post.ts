@@ -1,51 +1,35 @@
-import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import type { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
-import { tasks } from "../../db/schema";
+import { companies, people, tasks } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
-import {
-  errorResponseSchema,
-  postTaskBodySchema,
-  taskResponseSchema,
-} from "./schemas";
+import { postTaskBodySchema } from "./schemas";
 
-const postTaskRoute = createRoute({
-  method: "post",
-  path: "/",
-  tags: ["tasks"],
-  request: {
-    body: {
-      content: {
-        "application/json": {
-          schema: postTaskBodySchema,
-        },
-      },
-      required: true,
-    },
-  },
-  responses: {
-    201: {
-      content: {
-        "application/json": {
-          schema: taskResponseSchema,
-        },
-      },
-      description: "Created",
-    },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-  },
-});
-
-export function registerPostTasks(api: OpenAPIHono<AppRouteEnv>) {
-  return api.openapi(postTaskRoute, async (c) => {
+export function registerPostTasks(api: Hono<AppRouteEnv>) {
+  return api.post("/", zValidator("json", postTaskBodySchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const { title, dueAt, personId, companyId } = c.req.valid("json");
     const now = Date.now();
+
+    if (personId !== undefined) {
+      const person = await db
+        .select({ id: people.id })
+        .from(people)
+        .where(and(eq(people.id, personId), eq(people.userId, user.id)))
+        .limit(1);
+      if (!person[0]) return c.json({ error: "Person not found" }, 404);
+    }
+
+    if (companyId !== undefined) {
+      const company = await db
+        .select({ id: companies.id })
+        .from(companies)
+        .where(and(eq(companies.id, companyId), eq(companies.userId, user.id)))
+        .limit(1);
+      if (!company[0]) return c.json({ error: "Company not found" }, 404);
+    }
 
     const inserted = await db
       .insert(tasks)

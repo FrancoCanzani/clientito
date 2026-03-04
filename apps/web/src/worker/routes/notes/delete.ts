@@ -1,45 +1,14 @@
-import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import type { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import { notes } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
-import {
-  deleteNoteResponseSchema,
-  errorResponseSchema,
-  noteIdParamsSchema,
-} from "./schemas";
+import { noteIdParamsSchema } from "./schemas";
 
-const deleteNoteRoute = createRoute({
-  method: "delete",
-  path: "/:id",
-  tags: ["notes"],
-  request: {
-    params: noteIdParamsSchema,
-  },
-  responses: {
-    200: {
-      content: {
-        "application/json": {
-          schema: deleteNoteResponseSchema,
-        },
-      },
-      description: "Deleted",
-    },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-    404: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Not found",
-    },
-  },
-});
-
-export function registerDeleteNotes(api: OpenAPIHono<AppRouteEnv>) {
-  return api.openapi(deleteNoteRoute, async (c) => {
+export function registerDeleteNotes(api: Hono<AppRouteEnv>) {
+  return api.delete("/:id", zValidator("param", noteIdParamsSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const { id } = c.req.valid("param");
 

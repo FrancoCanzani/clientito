@@ -1,70 +1,14 @@
-import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import type { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { and, desc, eq, like, or } from "drizzle-orm";
 import { companies, emails, notes, people, tasks } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
-import {
-  errorResponseSchema,
-  getPeopleQuerySchema,
-  getPersonResponseSchema,
-  listPeopleResponseSchema,
-  personIdParamsSchema,
-} from "./schemas";
+import { getPeopleQuerySchema, personIdParamsSchema } from "./schemas";
 
-const getPeopleRoute = createRoute({
-  method: "get",
-  path: "/",
-  tags: ["people"],
-  request: {
-    query: getPeopleQuerySchema,
-  },
-  responses: {
-    200: {
-      content: {
-        "application/json": {
-          schema: listPeopleResponseSchema,
-        },
-      },
-      description: "People list",
-    },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-  },
-});
-
-const getPersonRoute = createRoute({
-  method: "get",
-  path: "/:id",
-  tags: ["people"],
-  request: {
-    params: personIdParamsSchema,
-  },
-  responses: {
-    200: {
-      content: {
-        "application/json": {
-          schema: getPersonResponseSchema,
-        },
-      },
-      description: "Person detail",
-    },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-    404: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Not found",
-    },
-  },
-});
-
-export function registerGetPeople(api: OpenAPIHono<AppRouteEnv>) {
-  return api.openapi(getPeopleRoute, async (c) => {
+export function registerGetPeople(api: Hono<AppRouteEnv>) {
+  return api.get("/", zValidator("query", getPeopleQuerySchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const { q, limit = 50, offset = 0 } = c.req.valid("query");
     const conditions = [eq(people.userId, user.id)];
@@ -102,11 +46,10 @@ export function registerGetPeople(api: OpenAPIHono<AppRouteEnv>) {
   });
 }
 
-export function registerGetPersonById(api: OpenAPIHono<AppRouteEnv>) {
-  return api.openapi(getPersonRoute, async (c) => {
+export function registerGetPersonById(api: Hono<AppRouteEnv>) {
+  return api.get("/:id", zValidator("param", personIdParamsSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const { id } = c.req.valid("param");
 

@@ -139,12 +139,7 @@ async function upsertPersonAndCompany(
         name: displayName,
         createdAt: Date.now(),
       })
-      .onConflictDoUpdate({
-        target: [companies.userId, companies.domain],
-        set: {
-          name: displayName ? sql<string>`coalesce(${companies.name}, ${displayName})` : undefined,
-        },
-      })
+      .onConflictDoNothing({ target: [companies.userId, companies.domain] })
       .returning({ id: companies.id });
 
     if (inserted.length > 0) {
@@ -152,9 +147,16 @@ async function upsertPersonAndCompany(
     } else {
       const existing = await db.query.companies.findFirst({
         where: and(eq(companies.userId, userId), eq(companies.domain, domain)),
-        columns: { id: true },
+        columns: { id: true, name: true },
       });
       companyId = existing?.id ?? null;
+
+      if (displayName && existing?.id && !existing.name) {
+        await db
+          .update(companies)
+          .set({ name: sql<string>`coalesce(${companies.name}, ${displayName})` })
+          .where(and(eq(companies.id, existing.id), eq(companies.userId, userId)));
+      }
     }
   }
 

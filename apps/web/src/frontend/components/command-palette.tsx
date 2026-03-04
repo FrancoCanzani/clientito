@@ -3,19 +3,22 @@ import { Input } from "@/components/ui/input";
 import { fetchCompanies } from "@/features/companies/api";
 import { fetchEmails } from "@/features/emails/queries/fetch-emails";
 import { fetchPeople } from "@/features/people/api";
-import { createTask } from "@/features/tasks/api";
-import { fetchTasks } from "@/features/tasks/api";
+import { createTask, fetchTasks } from "@/features/tasks/api";
 import { parseTaskInput } from "@/features/tasks/parse-task-input";
 import { useLogout } from "@/hooks/use-auth";
+import { useTheme } from "@/hooks/use-theme";
 import {
   BuildingsIcon,
   CaretDownIcon,
   CaretRightIcon,
   CheckSquareIcon,
   EnvelopeSimpleIcon,
+  GearIcon,
   HouseSimpleIcon,
+  MoonIcon,
   PlusIcon,
   SignOutIcon,
+  SunIcon,
   TrayIcon,
   UserListIcon,
 } from "@phosphor-icons/react";
@@ -26,11 +29,15 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+const commandGroupHeadingClassName =
+  "**:[[cmdk-group-heading]]:px-3 **:[[cmdk-group-heading]]:py-1 **:[[cmdk-group-heading]]:text-[10px] **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wider **:[[cmdk-group-heading]]:text-muted-foreground";
+
 export function CommandPalette() {
   const navigate = useNavigate();
   const router = useRouter();
   const queryClient = useQueryClient();
   const logout = useLogout();
+  const { resolved: resolvedTheme, toggle: toggleTheme } = useTheme();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -87,7 +94,15 @@ export function CommandPalette() {
   });
 
   const runNavigation = useCallback(
-    (to: "/home" | "/emails" | "/people" | "/companies" | "/tasks") => {
+    (
+      to:
+        | "/home"
+        | "/emails"
+        | "/people"
+        | "/companies"
+        | "/tasks"
+        | "/settings",
+    ) => {
       navigate({ to });
       close();
     },
@@ -95,7 +110,15 @@ export function CommandPalette() {
   );
 
   const prefetchNavigationRoute = useCallback(
-    (to: "/home" | "/emails" | "/people" | "/companies" | "/tasks") => {
+    (
+      to:
+        | "/home"
+        | "/emails"
+        | "/people"
+        | "/companies"
+        | "/tasks"
+        | "/settings",
+    ) => {
       void router.preloadRoute({ to });
     },
     [router],
@@ -146,6 +169,14 @@ export function CommandPalette() {
         onSelect: () => runNavigation("/tasks"),
       },
       {
+        id: "settings",
+        label: "Settings",
+        section: "navigation" as const,
+        to: "/settings" as const,
+        icon: <GearIcon className="size-4" />,
+        onSelect: () => runNavigation("/settings"),
+      },
+      {
         id: "compose",
         label: "Compose Email",
         section: "actions" as const,
@@ -166,6 +197,24 @@ export function CommandPalette() {
         onSelect: () => setNewTaskMode(true),
       },
       {
+        id: "toggle-theme",
+        label:
+          resolvedTheme === "dark"
+            ? "Switch to Light Mode"
+            : "Switch to Dark Mode",
+        section: "actions" as const,
+        icon:
+          resolvedTheme === "dark" ? (
+            <SunIcon className="size-4" />
+          ) : (
+            <MoonIcon className="size-4" />
+          ),
+        onSelect: () => {
+          toggleTheme();
+          close();
+        },
+      },
+      {
         id: "sign-out",
         label: "Sign out",
         section: "actions" as const,
@@ -176,7 +225,7 @@ export function CommandPalette() {
         },
       },
     ],
-    [close, logout, navigate, runNavigation],
+    [close, logout, navigate, resolvedTheme, runNavigation, toggleTheme],
   );
 
   const navigationCommands = commands.filter(
@@ -223,7 +272,13 @@ export function CommandPalette() {
         staleTime: 30_000,
       }),
     ]);
-  }, [navigationCommands, newTaskMode, open, prefetchNavigationRoute]);
+  }, [
+    navigationCommands,
+    newTaskMode,
+    open,
+    prefetchNavigationRoute,
+    queryClient,
+  ]);
 
   return (
     <div
@@ -280,7 +335,7 @@ export function CommandPalette() {
 
                     <Command.Group
                       heading="Navigation"
-                      className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-muted-foreground"
+                      className={commandGroupHeadingClassName}
                     >
                       {navigationCommands.map((command) => (
                         <Command.Item
@@ -303,7 +358,7 @@ export function CommandPalette() {
 
                     <Command.Group
                       heading="Actions"
-                      className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-muted-foreground"
+                      className={commandGroupHeadingClassName}
                     >
                       {actionCommands.map((command) => (
                         <Command.Item
@@ -322,7 +377,7 @@ export function CommandPalette() {
 
                     <Command.Group
                       heading="Search"
-                      className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-muted-foreground"
+                      className={commandGroupHeadingClassName}
                     >
                       <Command.Item
                         value={`Search people ${normalizedQuery}`}

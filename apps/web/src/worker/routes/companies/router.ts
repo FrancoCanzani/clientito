@@ -1,10 +1,10 @@
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { Hono } from "hono";
 import { requireAuth } from "../../middleware/auth";
 import type { AppRouteEnv } from "../types";
 import { registerGetCompanies, registerGetCompanyById } from "./get";
 import { registerPatchCompanies } from "./patch";
 
-const companiesRoutes = new OpenAPIHono<AppRouteEnv>();
+const companiesRoutes = new Hono<AppRouteEnv>();
 
 companiesRoutes.use("*", requireAuth);
 registerGetCompanies(companiesRoutes);

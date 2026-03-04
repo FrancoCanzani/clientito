@@ -1,51 +1,26 @@
-import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import type { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import { companies, people } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
-import {
-  createPersonBodySchema,
-  createPersonResponseSchema,
-  errorResponseSchema,
-} from "./schemas";
+import { createPersonBodySchema } from "./schemas";
 
-const postPersonRoute = createRoute({
-  method: "post",
-  path: "/",
-  tags: ["people"],
-  request: {
-    body: {
-      content: {
-        "application/json": {
-          schema: createPersonBodySchema,
-        },
-      },
-      required: true,
-    },
-  },
-  responses: {
-    201: {
-      content: {
-        "application/json": {
-          schema: createPersonResponseSchema,
-        },
-      },
-      description: "Created",
-    },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-  },
-});
-
-export function registerPostPeople(api: OpenAPIHono<AppRouteEnv>) {
-  return api.openapi(postPersonRoute, async (c) => {
+export function registerPostPeople(api: Hono<AppRouteEnv>) {
+  return api.post("/", zValidator("json", createPersonBodySchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const { email, name, phone, title, linkedin, companyId } = c.req.valid("json");
     const now = Date.now();
+
+    if (companyId !== undefined) {
+      const company = await db
+        .select({ id: companies.id })
+        .from(companies)
+        .where(and(eq(companies.id, companyId), eq(companies.userId, user.id)))
+        .limit(1);
+      if (!company[0]) return c.json({ error: "Company not found" }, 404);
+    }
 
     const inserted = await db
       .insert(people)

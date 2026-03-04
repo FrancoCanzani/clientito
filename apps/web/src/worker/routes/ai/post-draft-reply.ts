@@ -1,51 +1,17 @@
-import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import type { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { streamText } from "ai";
 import { and, asc, eq } from "drizzle-orm";
 import { createWorkersAI } from "workers-ai-provider";
+import { z } from "zod";
 import { emails } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 
 const MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
-const errorResponseSchema = z.object({ error: z.string() });
-
 const draftReplyBodySchema = z.object({
   emailId: z.coerce.number().int().positive(),
   instructions: z.string().trim().optional(),
-});
-
-const draftReplyResponseSchema = z.object({
-  data: z.object({
-    draft: z.string(),
-  }),
-});
-
-const postDraftReplyRoute = createRoute({
-  method: "post",
-  path: "/draft-reply",
-  tags: ["ai"],
-  request: {
-    body: {
-      content: {
-        "application/json": { schema: draftReplyBodySchema },
-      },
-      required: true,
-    },
-  },
-  responses: {
-    200: {
-      content: { "application/json": { schema: draftReplyResponseSchema } },
-      description: "Draft reply",
-    },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-    404: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Email not found",
-    },
-  },
 });
 
 function truncate(value: string, maxLength: number) {
@@ -53,11 +19,10 @@ function truncate(value: string, maxLength: number) {
   return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
 }
 
-export function registerPostDraftReply(app: OpenAPIHono<AppRouteEnv>) {
-  app.openapi(postDraftReplyRoute, async (c) => {
+export function registerPostDraftReply(app: Hono<AppRouteEnv>) {
+  app.post("/draft-reply", zValidator("json", draftReplyBodySchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const { emailId, instructions } = c.req.valid("json");
 

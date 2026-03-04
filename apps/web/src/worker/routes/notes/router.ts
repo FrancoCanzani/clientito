@@ -1,10 +1,10 @@
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { Hono } from "hono";
 import { requireAuth } from "../../middleware/auth";
 import type { AppRouteEnv } from "../types";
 import { registerDeleteNotes } from "./delete";
 import { registerPostNotes } from "./post";
 
-const notesRoutes = new OpenAPIHono<AppRouteEnv>();
+const notesRoutes = new Hono<AppRouteEnv>();
 
 notesRoutes.use("*", requireAuth);
 registerPostNotes(notesRoutes);

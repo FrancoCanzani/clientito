@@ -1,4 +1,4 @@
-import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import type { Hono } from "hono";
 import { generateText } from "ai";
 import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { createWorkersAI } from "workers-ai-provider";
@@ -6,33 +6,6 @@ import { dailyBriefings, emails, people, tasks } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 
 const MODEL = "@cf/meta/llama-3.1-8b-instruct";
-
-const errorResponseSchema = z.object({ error: z.string() });
-const briefingResponseSchema = z.object({
-  data: z.object({
-    text: z.string(),
-  }),
-});
-
-const getBriefingRoute = createRoute({
-  method: "get",
-  path: "/briefing",
-  tags: ["ai"],
-  responses: {
-    200: {
-      content: {
-        "application/json": {
-          schema: briefingResponseSchema,
-        },
-      },
-      description: "AI briefing",
-    },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-  },
-});
 
 function getTodayBounds(now: number): { day: string; start: number; end: number } {
   const day = new Date(now).toISOString().slice(0, 10);
@@ -168,22 +141,20 @@ async function buildBriefing(input: {
   return text;
 }
 
-export function registerGetBriefing(app: OpenAPIHono<AppRouteEnv>) {
-  app.openapi(getBriefingRoute, async (c) => {
+export function registerGetBriefing(app: Hono<AppRouteEnv>) {
+  app.get("/briefing", async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const text = await buildBriefing({ db, env: c.env, userId: user.id });
     return c.json({ data: { text } }, 200);
   });
 }
 
-export function registerPostBriefingStream(app: OpenAPIHono<AppRouteEnv>) {
+export function registerPostBriefingStream(app: Hono<AppRouteEnv>) {
   app.post("/briefing/stream", async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const text = await buildBriefing({ db, env: c.env, userId: user.id });
 

@@ -1,45 +1,14 @@
-import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import type { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import { tasks } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
-import {
-  deleteTaskResponseSchema,
-  errorResponseSchema,
-  taskIdParamsSchema,
-} from "./schemas";
+import { taskIdParamsSchema } from "./schemas";
 
-const deleteTaskRoute = createRoute({
-  method: "delete",
-  path: "/:id",
-  tags: ["tasks"],
-  request: {
-    params: taskIdParamsSchema,
-  },
-  responses: {
-    200: {
-      content: {
-        "application/json": {
-          schema: deleteTaskResponseSchema,
-        },
-      },
-      description: "Deleted",
-    },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-    404: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Not found",
-    },
-  },
-});
-
-export function registerDeleteTasks(api: OpenAPIHono<AppRouteEnv>) {
-  return api.openapi(deleteTaskRoute, async (c) => {
+export function registerDeleteTasks(api: Hono<AppRouteEnv>) {
+  return api.delete("/:id", zValidator("param", taskIdParamsSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const { id } = c.req.valid("param");
 

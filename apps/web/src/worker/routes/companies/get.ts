@@ -1,70 +1,14 @@
-import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import type { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
 import { companies, notes, people, tasks } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
-import {
-  companyIdParamsSchema,
-  errorResponseSchema,
-  getCompaniesQuerySchema,
-  getCompanyResponseSchema,
-  listCompaniesResponseSchema,
-} from "./schemas";
+import { companyIdParamsSchema, getCompaniesQuerySchema } from "./schemas";
 
-const getCompaniesRoute = createRoute({
-  method: "get",
-  path: "/",
-  tags: ["companies"],
-  request: {
-    query: getCompaniesQuerySchema,
-  },
-  responses: {
-    200: {
-      content: {
-        "application/json": {
-          schema: listCompaniesResponseSchema,
-        },
-      },
-      description: "Company list",
-    },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-  },
-});
-
-const getCompanyRoute = createRoute({
-  method: "get",
-  path: "/:id",
-  tags: ["companies"],
-  request: {
-    params: companyIdParamsSchema,
-  },
-  responses: {
-    200: {
-      content: {
-        "application/json": {
-          schema: getCompanyResponseSchema,
-        },
-      },
-      description: "Company detail",
-    },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-    404: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Not found",
-    },
-  },
-});
-
-export function registerGetCompanies(api: OpenAPIHono<AppRouteEnv>) {
-  return api.openapi(getCompaniesRoute, async (c) => {
+export function registerGetCompanies(api: Hono<AppRouteEnv>) {
+  return api.get("/", zValidator("query", getCompaniesQuerySchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const { q } = c.req.valid("query");
     const conditions = [eq(companies.userId, user.id)];
@@ -84,7 +28,7 @@ export function registerGetCompanies(api: OpenAPIHono<AppRouteEnv>) {
         description: companies.description,
         createdAt: companies.createdAt,
         peopleCount:
-          sql<number>`(select count(*) from people where people.company_id = companies.id)`,
+          sql<number>`(select count(*) from people where people.company_id = companies.id and people.user_id = ${user.id})`,
       })
       .from(companies)
       .where(and(...conditions))
@@ -94,11 +38,10 @@ export function registerGetCompanies(api: OpenAPIHono<AppRouteEnv>) {
   });
 }
 
-export function registerGetCompanyById(api: OpenAPIHono<AppRouteEnv>) {
-  return api.openapi(getCompanyRoute, async (c) => {
+export function registerGetCompanyById(api: Hono<AppRouteEnv>) {
+  return api.get("/:id", zValidator("param", companyIdParamsSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const { id } = c.req.valid("param");
 

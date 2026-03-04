@@ -120,8 +120,7 @@ export default function CompanyDetailPage() {
   const saveField = (field: string, currentValue: string) => {
     const trimmed = draftValue.trim();
     const normalized = trimmed.length > 0 ? trimmed : null;
-    const currentNormalized =
-      currentValue.length > 0 ? currentValue : null;
+    const currentNormalized = currentValue.length > 0 ? currentValue : null;
 
     if (normalized === currentNormalized) {
       cancelEditing();
@@ -168,7 +167,7 @@ export default function CompanyDetailPage() {
                 }
               }}
               disabled={patchMutation.isPending}
-              className="min-h-[60px] text-sm"
+              className="min-h-15 text-sm"
             />
           ) : (
             <Input
@@ -288,8 +287,7 @@ export default function CompanyDetailPage() {
             <Button
               onClick={() => createTaskMutation.mutate()}
               disabled={
-                createTaskMutation.isPending ||
-                newTaskTitle.trim().length === 0
+                createTaskMutation.isPending || newTaskTitle.trim().length === 0
               }
             >
               Add
@@ -339,7 +337,7 @@ export default function CompanyDetailPage() {
               value={newNoteContent}
               onChange={(e) => setNewNoteContent(e.target.value)}
               placeholder="Write a note..."
-              className="min-h-[60px] resize-none"
+              className="min-h-15 resize-none"
             />
             <Button
               size="sm"

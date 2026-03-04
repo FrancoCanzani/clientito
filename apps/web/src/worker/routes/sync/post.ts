@@ -1,4 +1,5 @@
-import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import type { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";
 import type { Database } from "../../db/client";
 import { syncState } from "../../db/schema";
@@ -8,81 +9,9 @@ import {
   startFullGmailSync,
 } from "../../lib/gmail/sync";
 import type { AppRouteEnv } from "../types";
-import {
-  errorResponseSchema,
-  syncAcceptedResponseSchema,
-  syncRequestSchema,
-} from "./schemas";
+import { syncRequestSchema } from "./schemas";
 
 const SYNC_PROGRESS_LOCK_TTL_MS = 4 * 60_000;
-
-const startSyncRoute = createRoute({
-  method: "post",
-  path: "/start",
-  tags: ["sync"],
-  request: {
-    body: {
-      content: {
-        "application/json": {
-          schema: syncRequestSchema,
-        },
-      },
-      required: true,
-    },
-  },
-  responses: {
-    202: {
-      content: {
-        "application/json": {
-          schema: syncAcceptedResponseSchema,
-        },
-      },
-      description: "Sync started",
-    },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-    409: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Conflict",
-    },
-  },
-});
-
-const incrementalSyncRoute = createRoute({
-  method: "post",
-  path: "/incremental",
-  tags: ["sync"],
-  request: {
-    body: {
-      content: {
-        "application/json": {
-          schema: syncRequestSchema,
-        },
-      },
-      required: true,
-    },
-  },
-  responses: {
-    202: {
-      content: {
-        "application/json": {
-          schema: syncAcceptedResponseSchema,
-        },
-      },
-      description: "Sync started",
-    },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-    409: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Conflict",
-    },
-  },
-});
 
 function monthsToGmailQuery(months?: number): string | undefined {
   if (!months) return undefined;
@@ -222,11 +151,10 @@ function runIncrementalSyncInBackground(
   })();
 }
 
-export function registerPostSync(api: OpenAPIHono<AppRouteEnv>) {
-  api.openapi(startSyncRoute, async (c) => {
+export function registerPostSync(api: Hono<AppRouteEnv>) {
+  api.post("/start", zValidator("json", syncRequestSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const { months, continueFullSync } = c.req.valid("json");
     if (await isSyncInProgress(db, user.id)) {
@@ -239,10 +167,9 @@ export function registerPostSync(api: OpenAPIHono<AppRouteEnv>) {
     return c.json({ data: { status: "started" } }, 202);
   });
 
-  api.openapi(incrementalSyncRoute, async (c) => {
+  api.post("/incremental", zValidator("json", syncRequestSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     c.req.valid("json");
     if (await isSyncInProgress(db, user.id)) {

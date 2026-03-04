@@ -1,4 +1,4 @@
-import { z } from "@hono/zod-openapi";
+import { z } from "zod";
 
 export const syncRequestSchema = z.object({
   months: z.coerce.number().int().min(1).optional(),

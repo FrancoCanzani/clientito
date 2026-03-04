@@ -1,36 +1,14 @@
-import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import type { Hono } from "hono";
 import { and, eq } from "drizzle-orm";
 import { account } from "../../db/auth-schema";
 import { syncState } from "../../db/schema";
 import { GOOGLE_RECONNECT_REQUIRED_MESSAGE } from "../../lib/gmail/errors";
 import type { AppRouteEnv } from "../types";
-import { errorResponseSchema, syncStatusResponseSchema } from "./schemas";
 
-const syncStatusRoute = createRoute({
-  method: "get",
-  path: "/status",
-  tags: ["sync"],
-  responses: {
-    200: {
-      content: {
-        "application/json": {
-          schema: syncStatusResponseSchema,
-        },
-      },
-      description: "Sync status",
-    },
-    401: {
-      content: { "application/json": { schema: errorResponseSchema } },
-      description: "Unauthorized",
-    },
-  },
-});
-
-export function registerGetSync(api: OpenAPIHono<AppRouteEnv>) {
-  api.openapi(syncStatusRoute, async (c) => {
+export function registerGetSync(api: Hono<AppRouteEnv>) {
+  api.get("/status", async (c) => {
     const db = c.get("db");
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const state = await db.query.syncState.findFirst({
       where: eq(syncState.userId, user.id),
