@@ -104,6 +104,17 @@ function getHeaderValue(
   return header?.value?.trim() ?? null;
 }
 
+function isGmailMessageNotFoundError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes("Gmail request failed (404)") &&
+    error.message.includes('"reason": "notFound"')
+  );
+}
+
 async function getUserEmail(db: Database, userId: string): Promise<string> {
   const u = await db.query.user.findFirst({
     where: eq(user.id, userId),
@@ -238,6 +249,10 @@ async function processMessageIds({
         try {
           return await fetchMessageBatch(accessToken, messageId);
         } catch (error) {
+          if (isGmailMessageNotFoundError(error)) {
+            // Gmail history can reference messages that were deleted before fetch.
+            return null;
+          }
           console.error("Failed to fetch Gmail message", { messageId, error });
           return null;
         }

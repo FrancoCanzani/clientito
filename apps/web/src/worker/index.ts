@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
-import { auth } from "../auth";
+import { auth } from "../../auth";
 import { createDb } from "./db/client";
 import { runScheduledIncrementalSync } from "./lib/gmail/sync";
 import { authMiddleware } from "./middleware/auth";

@@ -5,12 +5,18 @@ import { companies, notes, people } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 import { postNoteBodySchema } from "./schemas";
 
+function deriveTitle(inputTitle: string | undefined): string {
+  const fromInput = inputTitle?.trim();
+  if (fromInput && fromInput.length > 0) return fromInput;
+  return "Untitled note";
+}
+
 export function registerPostNotes(api: Hono<AppRouteEnv>) {
   return api.post("/", zValidator("json", postNoteBodySchema), async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
 
-    const { content, personId, companyId } = c.req.valid("json");
+    const { title, content, personId, companyId } = c.req.valid("json");
     const now = Date.now();
 
     if (personId !== undefined) {
@@ -35,10 +41,12 @@ export function registerPostNotes(api: Hono<AppRouteEnv>) {
       .insert(notes)
       .values({
         userId: user.id,
+        title: deriveTitle(title),
         content,
         personId: personId ?? null,
         companyId: companyId ?? null,
         createdAt: now,
+        updatedAt: now,
       })
       .returning({ id: notes.id });
 
@@ -47,10 +55,12 @@ export function registerPostNotes(api: Hono<AppRouteEnv>) {
     const rows = await db
       .select({
         id: notes.id,
+        title: notes.title,
         content: notes.content,
         personId: notes.personId,
         companyId: notes.companyId,
         createdAt: notes.createdAt,
+        updatedAt: notes.updatedAt,
       })
       .from(notes)
       .where(and(eq(notes.id, createdId), eq(notes.userId, user.id)))

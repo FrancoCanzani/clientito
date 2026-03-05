@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fetchCompanies } from "@/features/companies/api";
 import { fetchEmails } from "@/features/emails/queries/fetch-emails";
+import { createNote } from "@/features/notes/api";
 import { fetchPeople } from "@/features/people/api";
 import { createTask, fetchTasks } from "@/features/tasks/api";
 import { parseTaskInput } from "@/features/tasks/parse-task-input";
@@ -16,6 +17,7 @@ import {
   GearIcon,
   HouseSimpleIcon,
   MoonIcon,
+  NoteBlankIcon,
   PlusIcon,
   SignOutIcon,
   SunIcon,
@@ -92,6 +94,21 @@ export function CommandPalette() {
     },
     onError: () => toast.error("Failed to create task"),
   });
+  const createNoteMutation = useMutation({
+    mutationFn: async () =>
+      createNote({
+        title: "Untitled note",
+        content: "",
+      }),
+    onSuccess: (created) => {
+      navigate({
+        to: "/notes/$noteId",
+        params: { noteId: created.id },
+      });
+      close();
+    },
+    onError: () => toast.error("Failed to create note"),
+  });
 
   const runNavigation = useCallback(
     (
@@ -100,6 +117,7 @@ export function CommandPalette() {
         | "/emails"
         | "/people"
         | "/companies"
+        | "/notes"
         | "/tasks"
         | "/settings",
     ) => {
@@ -116,6 +134,7 @@ export function CommandPalette() {
         | "/emails"
         | "/people"
         | "/companies"
+        | "/notes"
         | "/tasks"
         | "/settings",
     ) => {
@@ -169,6 +188,14 @@ export function CommandPalette() {
         onSelect: () => runNavigation("/tasks"),
       },
       {
+        id: "notes",
+        label: "Notes",
+        section: "navigation" as const,
+        to: "/notes" as const,
+        icon: <NoteBlankIcon className="size-4" />,
+        onSelect: () => runNavigation("/notes"),
+      },
+      {
         id: "settings",
         label: "Settings",
         section: "navigation" as const,
@@ -195,6 +222,13 @@ export function CommandPalette() {
         section: "actions" as const,
         icon: <PlusIcon className="size-4" />,
         onSelect: () => setNewTaskMode(true),
+      },
+      {
+        id: "new-note",
+        label: "New Note",
+        section: "actions" as const,
+        icon: <NoteBlankIcon className="size-4" />,
+        onSelect: () => createNoteMutation.mutate(),
       },
       {
         id: "toggle-theme",
@@ -225,7 +259,15 @@ export function CommandPalette() {
         },
       },
     ],
-    [close, logout, navigate, resolvedTheme, runNavigation, toggleTheme],
+    [
+      close,
+      createNoteMutation,
+      logout,
+      navigate,
+      resolvedTheme,
+      runNavigation,
+      toggleTheme,
+    ],
   );
 
   const navigationCommands = commands.filter(

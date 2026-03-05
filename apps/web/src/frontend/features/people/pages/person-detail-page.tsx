@@ -152,8 +152,7 @@ export default function PersonDetailPage() {
   const saveField = (field: string, currentValue: string) => {
     const trimmed = draftValue.trim();
     const normalized = trimmed.length > 0 ? trimmed : null;
-    const currentNormalized =
-      currentValue.length > 0 ? currentValue : null;
+    const currentNormalized = currentValue.length > 0 ? currentValue : null;
 
     if (normalized === currentNormalized) {
       cancelEditing();
@@ -168,11 +167,7 @@ export default function PersonDetailPage() {
     patchMutation.mutate({ [field]: field === "name" ? trimmed : normalized });
   };
 
-  const renderField = (
-    label: string,
-    field: string,
-    value: string | null,
-  ) => {
+  const renderField = (label: string, field: string, value: string | null) => {
     const display = value ?? "";
     const isEditing = editingField === field;
 
@@ -251,7 +246,9 @@ export default function PersonDetailPage() {
           <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             AI Context
           </h2>
-          <p className="text-sm leading-relaxed">{contextQuery.data.briefing}</p>
+          <p className="text-sm leading-relaxed">
+            {contextQuery.data.briefing}
+          </p>
           {contextQuery.data.suggestedActions.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {contextQuery.data.suggestedActions.map((action) => (
@@ -339,8 +336,7 @@ export default function PersonDetailPage() {
             <Button
               onClick={() => createTaskMutation.mutate()}
               disabled={
-                createTaskMutation.isPending ||
-                newTaskTitle.trim().length === 0
+                createTaskMutation.isPending || newTaskTitle.trim().length === 0
               }
             >
               Add

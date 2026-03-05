@@ -93,12 +93,15 @@ export const notes = sqliteTable(
     companyId: integer("company_id").references(() => companies.id, {
       onDelete: "cascade",
     }),
+    title: text("title").notNull().default("Untitled note"),
     content: text("content").notNull(),
     createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull().default(0),
   },
   (table) => [
     index("notes_person_idx").on(table.personId),
     index("notes_company_idx").on(table.companyId),
+    index("notes_user_updated_idx").on(table.userId, table.updatedAt),
   ],
 );
 

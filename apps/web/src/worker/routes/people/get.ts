@@ -118,10 +118,12 @@ export function registerGetPersonById(api: Hono<AppRouteEnv>) {
     const personNotes = await db
       .select({
         id: notes.id,
+        title: notes.title,
         content: notes.content,
         personId: notes.personId,
         companyId: notes.companyId,
         createdAt: notes.createdAt,
+        updatedAt: notes.updatedAt,
       })
       .from(notes)
       .where(and(eq(notes.personId, id), eq(notes.userId, user.id)))

@@ -17,8 +17,10 @@ import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/setti
 import { Route as DashboardHomeRouteImport } from './routes/_dashboard/home'
 import { Route as DashboardEmailsRouteImport } from './routes/_dashboard/emails'
 import { Route as DashboardPeopleIndexRouteImport } from './routes/_dashboard/people/index'
+import { Route as DashboardNotesIndexRouteImport } from './routes/_dashboard/notes/index'
 import { Route as DashboardCompaniesIndexRouteImport } from './routes/_dashboard/companies/index'
 import { Route as DashboardPeoplePersonIdRouteImport } from './routes/_dashboard/people/$personId'
+import { Route as DashboardNotesNoteIdRouteImport } from './routes/_dashboard/notes/$noteId'
 import { Route as DashboardCompaniesCompanyIdRouteImport } from './routes/_dashboard/companies/$companyId'
 
 const LoginRoute = LoginRouteImport.update({
@@ -60,6 +62,11 @@ const DashboardPeopleIndexRoute = DashboardPeopleIndexRouteImport.update({
   path: '/people/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardNotesIndexRoute = DashboardNotesIndexRouteImport.update({
+  id: '/notes/',
+  path: '/notes/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const DashboardCompaniesIndexRoute = DashboardCompaniesIndexRouteImport.update({
   id: '/companies/',
   path: '/companies/',
@@ -68,6 +75,11 @@ const DashboardCompaniesIndexRoute = DashboardCompaniesIndexRouteImport.update({
 const DashboardPeoplePersonIdRoute = DashboardPeoplePersonIdRouteImport.update({
   id: '/people/$personId',
   path: '/people/$personId',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardNotesNoteIdRoute = DashboardNotesNoteIdRouteImport.update({
+  id: '/notes/$noteId',
+  path: '/notes/$noteId',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardCompaniesCompanyIdRoute =
@@ -85,8 +97,10 @@ export interface FileRoutesByFullPath {
   '/settings': typeof DashboardSettingsRoute
   '/tasks': typeof DashboardTasksRoute
   '/companies/$companyId': typeof DashboardCompaniesCompanyIdRoute
+  '/notes/$noteId': typeof DashboardNotesNoteIdRoute
   '/people/$personId': typeof DashboardPeoplePersonIdRoute
   '/companies/': typeof DashboardCompaniesIndexRoute
+  '/notes/': typeof DashboardNotesIndexRoute
   '/people/': typeof DashboardPeopleIndexRoute
 }
 export interface FileRoutesByTo {
@@ -97,8 +111,10 @@ export interface FileRoutesByTo {
   '/settings': typeof DashboardSettingsRoute
   '/tasks': typeof DashboardTasksRoute
   '/companies/$companyId': typeof DashboardCompaniesCompanyIdRoute
+  '/notes/$noteId': typeof DashboardNotesNoteIdRoute
   '/people/$personId': typeof DashboardPeoplePersonIdRoute
   '/companies': typeof DashboardCompaniesIndexRoute
+  '/notes': typeof DashboardNotesIndexRoute
   '/people': typeof DashboardPeopleIndexRoute
 }
 export interface FileRoutesById {
@@ -111,8 +127,10 @@ export interface FileRoutesById {
   '/_dashboard/settings': typeof DashboardSettingsRoute
   '/_dashboard/tasks': typeof DashboardTasksRoute
   '/_dashboard/companies/$companyId': typeof DashboardCompaniesCompanyIdRoute
+  '/_dashboard/notes/$noteId': typeof DashboardNotesNoteIdRoute
   '/_dashboard/people/$personId': typeof DashboardPeoplePersonIdRoute
   '/_dashboard/companies/': typeof DashboardCompaniesIndexRoute
+  '/_dashboard/notes/': typeof DashboardNotesIndexRoute
   '/_dashboard/people/': typeof DashboardPeopleIndexRoute
 }
 export interface FileRouteTypes {
@@ -125,8 +143,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tasks'
     | '/companies/$companyId'
+    | '/notes/$noteId'
     | '/people/$personId'
     | '/companies/'
+    | '/notes/'
     | '/people/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -137,8 +157,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tasks'
     | '/companies/$companyId'
+    | '/notes/$noteId'
     | '/people/$personId'
     | '/companies'
+    | '/notes'
     | '/people'
   id:
     | '__root__'
@@ -150,8 +172,10 @@ export interface FileRouteTypes {
     | '/_dashboard/settings'
     | '/_dashboard/tasks'
     | '/_dashboard/companies/$companyId'
+    | '/_dashboard/notes/$noteId'
     | '/_dashboard/people/$personId'
     | '/_dashboard/companies/'
+    | '/_dashboard/notes/'
     | '/_dashboard/people/'
   fileRoutesById: FileRoutesById
 }
@@ -219,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardPeopleIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/notes/': {
+      id: '/_dashboard/notes/'
+      path: '/notes'
+      fullPath: '/notes/'
+      preLoaderRoute: typeof DashboardNotesIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/companies/': {
       id: '/_dashboard/companies/'
       path: '/companies'
@@ -231,6 +262,13 @@ declare module '@tanstack/react-router' {
       path: '/people/$personId'
       fullPath: '/people/$personId'
       preLoaderRoute: typeof DashboardPeoplePersonIdRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/notes/$noteId': {
+      id: '/_dashboard/notes/$noteId'
+      path: '/notes/$noteId'
+      fullPath: '/notes/$noteId'
+      preLoaderRoute: typeof DashboardNotesNoteIdRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/companies/$companyId': {
@@ -249,8 +287,10 @@ interface DashboardRouteRouteChildren {
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardTasksRoute: typeof DashboardTasksRoute
   DashboardCompaniesCompanyIdRoute: typeof DashboardCompaniesCompanyIdRoute
+  DashboardNotesNoteIdRoute: typeof DashboardNotesNoteIdRoute
   DashboardPeoplePersonIdRoute: typeof DashboardPeoplePersonIdRoute
   DashboardCompaniesIndexRoute: typeof DashboardCompaniesIndexRoute
+  DashboardNotesIndexRoute: typeof DashboardNotesIndexRoute
   DashboardPeopleIndexRoute: typeof DashboardPeopleIndexRoute
 }
 
@@ -260,8 +300,10 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardTasksRoute: DashboardTasksRoute,
   DashboardCompaniesCompanyIdRoute: DashboardCompaniesCompanyIdRoute,
+  DashboardNotesNoteIdRoute: DashboardNotesNoteIdRoute,
   DashboardPeoplePersonIdRoute: DashboardPeoplePersonIdRoute,
   DashboardCompaniesIndexRoute: DashboardCompaniesIndexRoute,
+  DashboardNotesIndexRoute: DashboardNotesIndexRoute,
   DashboardPeopleIndexRoute: DashboardPeopleIndexRoute,
 }
 

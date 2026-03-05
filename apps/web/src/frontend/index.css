@@ -124,3 +124,116 @@
     font-weight: 400;
   }
 }
+
+.tiptap h1 {
+  @apply mb-3 text-3xl font-semibold tracking-tight;
+}
+
+.tiptap h2 {
+  @apply mb-2 text-2xl font-semibold tracking-tight;
+}
+
+.tiptap h3 {
+  @apply mb-2 text-xl font-semibold tracking-tight;
+}
+
+.tiptap p {
+  @apply mb-2 leading-7;
+}
+
+.tiptap ul {
+  @apply mb-2 list-disc pl-6;
+}
+
+.tiptap ol {
+  @apply mb-2 list-decimal pl-6;
+}
+
+.tiptap img {
+  @apply my-3 max-h-[420px] w-auto max-w-full rounded-lg object-contain;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply pointer-events-none float-left h-0 text-muted-foreground;
+}
+
+.notes-bubble-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  position: relative;
+  overflow: visible;
+  border-radius: 999px;
+  border: 1px solid #1f2430;
+  background: #161a22;
+  color: #f3f4f6;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  padding: 0.28rem 0.34rem;
+}
+
+.notes-bubble-label {
+  font-size: 0.95rem;
+  line-height: 1;
+  color: #cbd5e1;
+  padding: 0 0.45rem;
+}
+
+.notes-bubble-divider {
+  width: 1px;
+  height: 1.15rem;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.notes-bubble-menu button {
+  min-width: 1.9rem;
+  height: 1.9rem;
+  border: 0;
+  border-radius: 0.5rem;
+  color: #e5e7eb;
+}
+
+.notes-bubble-menu button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.notes-bubble-menu button[data-state="on"] {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.notes-bubble-image-btn {
+  padding: 0 0.55rem;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.notes-block-picker {
+  position: relative;
+}
+
+.notes-block-picker-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 0.35rem);
+  min-width: 9rem;
+  border-radius: 0.6rem;
+  border: 1px solid #2a3140;
+  background: #10151e;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+  padding: 0.25rem;
+  z-index: 40;
+}
+
+.notes-block-picker-menu button {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  border-radius: 0.4rem;
+  padding: 0 0.5rem;
+}
+
+/* Keep tooltip title and hide shortcut/command hint line */
+[role="tooltip"] .richtext-flex.richtext-flex-col.richtext-items-center > span:last-child {
+  display: none;
+}
