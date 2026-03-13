@@ -7,7 +7,7 @@ import { z } from "zod";
 import { emails, people, peopleAiContext } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 
-const MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 const personContextParamsSchema = z.object({
   id: z.coerce.number().int().positive(),

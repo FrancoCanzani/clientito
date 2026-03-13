@@ -8,6 +8,9 @@ export const personIdParamsSchema = z.object({
 
 export const getPeopleQuerySchema = z.object({
   q: z.string().trim().optional(),
+  lastContactedAfter: z.coerce.number().int().optional(),
+  lastContactedBefore: z.coerce.number().int().optional(),
+  sort: z.enum(["lastContactedDesc", "lastContactedAsc"]).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   offset: z.coerce.number().int().min(0).optional(),
 });
@@ -59,6 +62,7 @@ export const personNoteSchema = z.object({
 export const listPeopleResponseSchema = z.object({
   data: z.array(personSchema),
   pagination: z.object({
+    total: z.number(),
     limit: z.number(),
     offset: z.number(),
   }),

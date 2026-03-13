@@ -4,7 +4,6 @@ import type { Hono } from "hono";
 import { emails } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 import {
-  hasAnyEmailCategoryLabel,
   hasEmailLabel,
   toEmailListResponse,
 } from "./helpers";
@@ -59,9 +58,7 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
 
     if (view === "inbox") {
       if (category === "primary") {
-        conditions.push(
-          sql<boolean>`(${hasEmailLabel("CATEGORY_PERSONAL")} or not ${hasAnyEmailCategoryLabel()})`,
-        );
+        conditions.push(hasEmailLabel("CATEGORY_PERSONAL"));
       } else if (category === "promotions") {
         conditions.push(hasEmailLabel("CATEGORY_PROMOTIONS"));
       } else if (category === "social") {

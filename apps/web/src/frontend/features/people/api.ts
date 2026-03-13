@@ -7,11 +7,21 @@ import type {
 
 export async function fetchPeople(params?: {
   q?: string;
+  lastContactedAfter?: number;
+  lastContactedBefore?: number;
+  sort?: "lastContactedDesc" | "lastContactedAsc";
   limit?: number;
   offset?: number;
 }): Promise<PeopleListResponse> {
   const query = new URLSearchParams();
   if (params?.q) query.set("q", params.q);
+  if (params?.lastContactedAfter !== undefined) {
+    query.set("lastContactedAfter", String(params.lastContactedAfter));
+  }
+  if (params?.lastContactedBefore !== undefined) {
+    query.set("lastContactedBefore", String(params.lastContactedBefore));
+  }
+  if (params?.sort) query.set("sort", params.sort);
   if (params?.limit !== undefined) query.set("limit", String(params.limit));
   if (params?.offset !== undefined) query.set("offset", String(params.offset));
 

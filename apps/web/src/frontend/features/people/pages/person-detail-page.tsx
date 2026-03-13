@@ -20,6 +20,7 @@ import {
 } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { format, formatDistanceToNowStrict } from "date-fns";
+import { useRouteContext } from "@/hooks/use-page-context";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -43,6 +44,14 @@ export default function PersonDetailPage() {
 
   const personDetail = detailQuery.data.data;
   const person = personDetail.person;
+
+  useRouteContext(`/people/${personId}`, {
+    type: "person",
+    id: personId,
+    name: person.name,
+    email: person.email,
+    companyName: personDetail.company?.name ?? null,
+  });
 
   const [openTasks, setOpenTasks] = useState(personDetail.openTasks);
   const [notes, setNotes] = useState(personDetail.notes);

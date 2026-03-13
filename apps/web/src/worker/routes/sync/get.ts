@@ -48,8 +48,9 @@ export function registerGetSync(api: Hono<AppRouteEnv>) {
 
     const hasSynced = Boolean(state?.historyId);
     const needsGoogleReconnect =
-      !googleAccount?.refreshToken ||
-      state?.error === GOOGLE_RECONNECT_REQUIRED_MESSAGE;
+      googleAccount && !googleAccount.refreshToken
+        ? true
+        : state?.error === GOOGLE_RECONNECT_REQUIRED_MESSAGE;
 
     return c.json(
       {

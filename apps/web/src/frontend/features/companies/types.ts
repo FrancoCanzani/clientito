@@ -9,6 +9,7 @@ export type Company = {
   industry: string | null;
   website: string | null;
   description: string | null;
+  logoUrl: string | null;
   createdAt: number;
 };
 

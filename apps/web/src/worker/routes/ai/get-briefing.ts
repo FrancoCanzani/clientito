@@ -5,7 +5,7 @@ import { createWorkersAI } from "workers-ai-provider";
 import { dailyBriefings, emails, people, tasks } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 
-const MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 function getTodayBounds(now: number): { day: string; start: number; end: number } {
   const day = new Date(now).toISOString().slice(0, 10);
@@ -115,28 +115,32 @@ async function buildBriefing(input: {
     });
   }
 
-  await input.db
-    .insert(dailyBriefings)
-    .values({
-      userId: input.userId,
-      date: day,
-      narrative: text,
-      unreadCount,
-      followUpCount: stalePeopleCount,
-      tasksDueCount: dueTodayCount,
-      overdueCount,
-      createdAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [dailyBriefings.userId, dailyBriefings.date],
-      set: {
+  try {
+    await input.db
+      .insert(dailyBriefings)
+      .values({
+        userId: input.userId,
+        date: day,
         narrative: text,
         unreadCount,
         followUpCount: stalePeopleCount,
         tasksDueCount: dueTodayCount,
         overdueCount,
-      },
-    });
+        createdAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [dailyBriefings.userId, dailyBriefings.date],
+        set: {
+          narrative: text,
+          unreadCount,
+          followUpCount: stalePeopleCount,
+          tasksDueCount: dueTodayCount,
+          overdueCount,
+        },
+      });
+  } catch {
+    // FK constraint can fail if user doesn't exist yet (stale session)
+  }
 
   return text;
 }

@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
 import type { EmailListItem } from "./types";
 
 export type EmailSection = {
@@ -7,7 +7,10 @@ export type EmailSection = {
 };
 
 export function formatInboxSectionDate(timestamp: number): string {
-  return format(new Date(timestamp), "EEE, MMM d");
+  const date = new Date(timestamp);
+  if (isToday(date)) return "Today";
+  if (isYesterday(date)) return "Yesterday";
+  return format(date, "EEE, MMM d");
 }
 
 export function formatInboxRowDate(timestamp: number): string {

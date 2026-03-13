@@ -6,6 +6,7 @@ import { fetchCompanyDetail, patchCompany } from "@/features/companies/api";
 import { createNote, deleteNote } from "@/features/notes/api";
 import { createTask, updateTask } from "@/features/tasks/api";
 import { parseTaskInput } from "@/features/tasks/parse-task-input";
+import { useRouteContext } from "@/hooks/use-page-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { format, formatDistanceToNowStrict } from "date-fns";
@@ -32,6 +33,13 @@ export default function CompanyDetailPage() {
 
   const detail = detailQuery.data.data;
   const company = detail.company;
+
+  useRouteContext(`/companies/${companyId}`, {
+    type: "company",
+    id: companyId,
+    name: company.name,
+    domain: company.domain,
+  });
 
   const [openTasks, setOpenTasks] = useState(
     detail.tasks.filter((t) => !t.done),

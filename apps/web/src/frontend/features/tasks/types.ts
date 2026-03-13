@@ -11,6 +11,7 @@ export type Task = {
 export type TaskListResponse = {
   data: Task[];
   pagination: {
+    total: number;
     limit: number;
     offset: number;
   };

@@ -1,10 +1,12 @@
 import { Input } from "@/components/ui/input";
+import { useRouteContext } from "@/hooks/use-page-context";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { formatDistanceToNowStrict } from "date-fns";
 
 const peopleRouteApi = getRouteApi("/_dashboard/people/");
 
 export default function PeopleListPage() {
+  useRouteContext("/people");
   const navigate = peopleRouteApi.useNavigate();
   const search = peopleRouteApi.useSearch();
   const peopleResponse = peopleRouteApi.useLoaderData();

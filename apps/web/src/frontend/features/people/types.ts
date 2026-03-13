@@ -42,6 +42,7 @@ export type PersonContext = {
 export type PeopleListResponse = {
   data: Person[];
   pagination: {
+    total: number;
     limit: number;
     offset: number;
   };

@@ -18,6 +18,9 @@ export const taskSchema = z.object({
 
 export const getTasksQuerySchema = z.object({
   dueToday: z.coerce.boolean().optional(),
+  dueAfter: z.coerce.number().int().optional(),
+  dueBefore: z.coerce.number().int().optional(),
+  done: z.coerce.boolean().optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
   offset: z.coerce.number().int().min(0).optional(),
 });
@@ -25,6 +28,7 @@ export const getTasksQuerySchema = z.object({
 export const listTasksResponseSchema = z.object({
   data: z.array(taskSchema),
   pagination: z.object({
+    total: z.number(),
     limit: z.number(),
     offset: z.number(),
   }),

@@ -19,6 +19,7 @@ export const companies = sqliteTable(
     industry: text("industry"),
     website: text("website"),
     description: text("description"),
+    logoUrl: text("logo_url"),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [
@@ -160,6 +161,33 @@ export const tasks = sqliteTable(
   (table) => [
     index("tasks_person_idx").on(table.personId),
     index("tasks_user_done_idx").on(table.userId, table.done),
+  ],
+);
+
+export const emailSuggestions = sqliteTable(
+  "email_suggestions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    emailId: integer("email_id")
+      .notNull()
+      .references(() => emails.id, { onDelete: "cascade" }),
+    actionType: text("action_type")
+      .$type<"add_task" | "draft_reply" | "archive" | "follow_up">()
+      .notNull(),
+    label: text("label").notNull(),
+    params: text("params", { mode: "json" }).$type<Record<string, unknown>>(),
+    status: text("status")
+      .$type<"pending" | "accepted" | "dismissed" | "expired">()
+      .notNull()
+      .default("pending"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    index("email_suggestions_user_status_idx").on(table.userId, table.status),
+    index("email_suggestions_email_idx").on(table.emailId),
   ],
 );
 

@@ -26,6 +26,7 @@ export function registerGetCompanies(api: Hono<AppRouteEnv>) {
         industry: companies.industry,
         website: companies.website,
         description: companies.description,
+        logoUrl: companies.logoUrl,
         createdAt: companies.createdAt,
         peopleCount:
           sql<number>`(select count(*) from people where people.company_id = companies.id and people.user_id = ${user.id})`,

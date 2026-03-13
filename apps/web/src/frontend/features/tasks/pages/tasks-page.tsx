@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { deleteTask, updateTask } from "@/features/tasks/api";
 import type { Task } from "@/features/tasks/types";
+import { useRouteContext } from "@/hooks/use-page-context";
 import { useMutation } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { format } from "date-fns";
@@ -10,6 +11,7 @@ const tasksRouteApi = getRouteApi("/_dashboard/tasks");
 
 export default function TasksPage() {
   const { tasks: loadedTasks, people, companies } = tasksRouteApi.useLoaderData();
+  useRouteContext("/tasks");
   const [tasks, setTasks] = useState<Task[]>(loadedTasks);
   const [showCompleted, setShowCompleted] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);

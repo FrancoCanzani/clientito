@@ -148,6 +148,7 @@ async function upsertPersonAndCompany(
         userId,
         domain,
         name: displayName,
+        logoUrl: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
         createdAt: Date.now(),
       })
       .onConflictDoNothing({ target: [companies.userId, companies.domain] })
@@ -646,6 +647,9 @@ export async function runScheduledIncrementalSync(
 
   for (const state of states) {
     if (!state.historyId) {
+      console.log("Scheduled Gmail sync skipped user without history state", {
+        userId: state.userId,
+      });
       continue;
     }
 
@@ -668,12 +672,19 @@ export async function runScheduledIncrementalSync(
     }
 
     try {
-      await runIncrementalGmailSync(
+      const result = await runIncrementalGmailSync(
         db,
         env,
         state.userId,
         state.historyId,
       );
+      console.log("Scheduled Gmail sync completed", {
+        userId: state.userId,
+        processed: result.processed,
+        inserted: result.inserted,
+        skipped: result.skipped,
+        historyId: result.historyId,
+      });
       if (state.error) {
         await db
           .update(syncState)
@@ -687,6 +698,10 @@ export async function runScheduledIncrementalSync(
       }
     } catch (error) {
       if (error instanceof GmailSyncStateError) {
+        console.log("Scheduled Gmail sync skipped", {
+          userId: state.userId,
+          reason: error.message,
+        });
         continue;
       }
 

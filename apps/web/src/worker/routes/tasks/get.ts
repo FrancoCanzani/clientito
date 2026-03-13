@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { tasks } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 import { getTasksQuerySchema } from "./schemas";
@@ -17,30 +17,67 @@ export function registerGetTasks(api: Hono<AppRouteEnv>) {
     const db = c.get("db");
     const user = c.get("user")!;
 
-    const { dueToday, limit = 100, offset = 0 } = c.req.valid("query");
+    const {
+      dueToday,
+      dueAfter,
+      dueBefore,
+      done,
+      limit = 100,
+      offset = 0,
+    } = c.req.valid("query");
     const conditions = [eq(tasks.userId, user.id)];
+
+    if (done !== undefined) {
+      conditions.push(eq(tasks.done, done));
+    }
 
     if (dueToday) {
       const { start, end } = getDayBoundsUtc(Date.now());
       conditions.push(gte(tasks.dueAt, start), lte(tasks.dueAt, end));
     }
 
-    const rows = await db
-      .select({
-        id: tasks.id,
-        title: tasks.title,
-        dueAt: tasks.dueAt,
-        done: tasks.done,
-        personId: tasks.personId,
-        companyId: tasks.companyId,
-        createdAt: tasks.createdAt,
-      })
-      .from(tasks)
-      .where(and(...conditions))
-      .orderBy(desc(tasks.dueAt), desc(tasks.createdAt))
-      .limit(limit)
-      .offset(offset);
+    if (dueAfter !== undefined) {
+      conditions.push(gte(tasks.dueAt, dueAfter));
+    }
 
-    return c.json({ data: rows, pagination: { limit, offset } }, 200);
+    if (dueBefore !== undefined) {
+      conditions.push(lte(tasks.dueAt, dueBefore));
+    }
+
+    const whereClause = and(...conditions);
+
+    const [rows, totalRows] = await Promise.all([
+      db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          dueAt: tasks.dueAt,
+          done: tasks.done,
+          personId: tasks.personId,
+          companyId: tasks.companyId,
+          createdAt: tasks.createdAt,
+        })
+        .from(tasks)
+        .where(whereClause)
+        .orderBy(asc(tasks.dueAt), desc(tasks.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(tasks)
+        .where(whereClause),
+    ]);
+
+    return c.json(
+      {
+        data: rows,
+        pagination: {
+          total: Number(totalRows[0]?.count ?? 0),
+          limit,
+          offset,
+        },
+      },
+      200,
+    );
   });
 }

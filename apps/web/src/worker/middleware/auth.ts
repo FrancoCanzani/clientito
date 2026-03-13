@@ -1,6 +1,8 @@
 import { type Context, type Next } from "hono";
 import { createMiddleware } from "hono/factory";
+import { eq } from "drizzle-orm";
 import { auth } from "../../../auth";
+import { user as authUser } from "../db/auth-schema";
 import { createDb } from "../db/client";
 import type { AppRouteEnv } from "../routes/types";
 
@@ -29,6 +31,18 @@ export async function requireAuth(c: Context<AppRouteEnv>, next: Next) {
   const user = c.get("user");
   if (!user) {
     return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const db = c.get("db");
+  const persistedUser = await db.query.user.findFirst({
+    where: eq(authUser.id, user.id),
+    columns: { id: true },
+  });
+
+  if (!persistedUser) {
+    c.set("user", null);
+    c.set("session", null);
+    return c.json({ error: "Unauthorized. Please sign in again." }, 401);
   }
 
   await next();

@@ -17,6 +17,7 @@ export const companySchema = z.object({
   industry: z.string().nullable(),
   website: z.string().nullable(),
   description: z.string().nullable(),
+  logoUrl: z.string().nullable(),
   createdAt: z.number(),
 });
 

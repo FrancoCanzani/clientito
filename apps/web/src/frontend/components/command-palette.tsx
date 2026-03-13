@@ -1,3 +1,8 @@
+import {
+  AgentMessage,
+  AgentThinking,
+  ToolApprovalCard,
+} from "@/components/agent-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fetchCompanies } from "@/features/companies/api";
@@ -7,6 +12,7 @@ import { fetchPeople } from "@/features/people/api";
 import { createTask, fetchTasks } from "@/features/tasks/api";
 import { parseTaskInput } from "@/features/tasks/parse-task-input";
 import { useLogout } from "@/hooks/use-auth";
+import { useAppAgent } from "@/hooks/use-agent";
 import { useTheme } from "@/hooks/use-theme";
 import {
   BuildingsIcon,
@@ -16,6 +22,7 @@ import {
   EnvelopeSimpleIcon,
   GearIcon,
   HouseSimpleIcon,
+  KeyReturnIcon,
   MoonIcon,
   NoteBlankIcon,
   PlusIcon,
@@ -26,6 +33,7 @@ import {
 } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
+import { getToolName, isToolUIPart } from "ai";
 import { Command } from "cmdk";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -41,18 +49,48 @@ export function CommandPalette() {
   const logout = useLogout();
   const { resolved: resolvedTheme, toggle: toggleTheme } = useTheme();
   const inputRef = useRef<HTMLInputElement>(null);
+  const agentInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [newTaskMode, setNewTaskMode] = useState(false);
   const [taskInput, setTaskInput] = useState("");
+  const [agentMode, setAgentMode] = useState(false);
+
+  const {
+    messages,
+    sendMessage,
+    status,
+    addToolApprovalResponse,
+    clearHistory,
+  } = useAppAgent();
+
+  const exitAgentMode = useCallback(() => {
+    setAgentMode(false);
+    clearHistory();
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [clearHistory]);
 
   const close = useCallback(() => {
     setOpen(false);
     setQuery("");
     setNewTaskMode(false);
     setTaskInput("");
-  }, []);
+    if (agentMode) {
+      setAgentMode(false);
+      clearHistory();
+    }
+  }, [agentMode, clearHistory]);
+
+  const enterAgentMode = useCallback(
+    (initialQuery: string) => {
+      setAgentMode(true);
+      setQuery("");
+      sendMessage({ text: initialQuery });
+      setTimeout(() => agentInputRef.current?.focus(), 0);
+    },
+    [sendMessage],
+  );
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -62,12 +100,16 @@ export function CommandPalette() {
         setTimeout(() => inputRef.current?.focus(), 0);
       }
       if (event.key === "Escape") {
-        close();
+        if (agentMode) {
+          exitAgentMode();
+        } else {
+          close();
+        }
       }
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [close]);
+  }, [agentMode, close, exitAgentMode]);
 
   useEffect(() => {
     if (!open) return;
@@ -285,7 +327,7 @@ export function CommandPalette() {
   }, [createTaskMutation, taskInput]);
 
   useEffect(() => {
-    if (!open || newTaskMode) return;
+    if (!open || newTaskMode || agentMode) return;
 
     // Aggressive preload: routes + first-page data for core dashboard sections.
     for (const command of navigationCommands) {
@@ -315,6 +357,7 @@ export function CommandPalette() {
       }),
     ]);
   }, [
+    agentMode,
     navigationCommands,
     newTaskMode,
     open,
@@ -322,13 +365,41 @@ export function CommandPalette() {
     queryClient,
   ]);
 
+  const [agentInput, setAgentInput] = useState("");
+
+  const handleAgentSubmit = useCallback(() => {
+    const text = agentInput.trim();
+    if (!text) return;
+    sendMessage({ text });
+    setAgentInput("");
+  }, [agentInput, sendMessage]);
+
+  const handleApprove = useCallback(
+    (toolCallId: string) => {
+      addToolApprovalResponse({ id: toolCallId, approved: true });
+      void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      void queryClient.invalidateQueries({ queryKey: ["emails"] });
+      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+    },
+    [addToolApprovalResponse, queryClient],
+  );
+
+  const handleDiscard = useCallback(
+    (toolCallId: string) => {
+      addToolApprovalResponse({ id: toolCallId, approved: false });
+    },
+    [addToolApprovalResponse],
+  );
+
+  const assistantMessages = messages.filter((m) => m.role === "assistant");
+
   return (
     <div
       ref={containerRef}
       className="fixed bottom-6 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4"
     >
       <Command
-        shouldFilter
+        shouldFilter={!agentMode}
         className="overflow-hidden rounded-2xl border border-border bg-background shadow-lg"
       >
         <AnimatePresence>
@@ -340,7 +411,41 @@ export function CommandPalette() {
               transition={{ duration: 0.15 }}
               className="overflow-hidden"
             >
-              {newTaskMode ? (
+              {agentMode ? (
+                <div className="max-h-72 overflow-y-auto py-1">
+                  {assistantMessages.map((message) => (
+                    <div key={message.id}>
+                      <AgentMessage message={message} />
+                      {message.parts
+                        .filter(
+                          (part) =>
+                            isToolUIPart(part) &&
+                            part.state === "approval-requested",
+                        )
+                        .map((part) => {
+                          return (
+                            <ToolApprovalCard
+                              key={part.toolCallId}
+                              toolCallId={part.approval.id}
+                              toolName={getToolName(part)}
+                              args={part.input as Record<string, unknown>}
+                              onApprove={handleApprove}
+                              onDiscard={handleDiscard}
+                            />
+                          );
+                        })}
+                    </div>
+                  ))}
+                  {(status === "streaming" || status === "submitted") && (
+                    <AgentThinking />
+                  )}
+                  {assistantMessages.length === 0 && status === "ready" && (
+                    <p className="px-3 py-3 text-xs text-muted-foreground">
+                      Ask anything about your emails, contacts, or tasks...
+                    </p>
+                  )}
+                </div>
+              ) : newTaskMode ? (
                 <div className="space-y-2 p-3">
                   <p className="text-xs text-muted-foreground">Create task</p>
                   <Input
@@ -417,6 +522,22 @@ export function CommandPalette() {
                       ))}
                     </Command.Group>
 
+                    {normalizedQuery && (
+                      <Command.Group
+                        heading="Agent"
+                        className={commandGroupHeadingClassName}
+                      >
+                        <Command.Item
+                          forceMount
+                          value={`Ask agent ${normalizedQuery}`}
+                          onSelect={() => enterAgentMode(normalizedQuery)}
+                          className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
+                        >
+                          Ask: &ldquo;{normalizedQuery}&rdquo;
+                        </Command.Item>
+                      </Command.Group>
+                    )}
+
                     <Command.Group
                       heading="Search"
                       className={commandGroupHeadingClassName}
@@ -460,14 +581,41 @@ export function CommandPalette() {
         </AnimatePresence>
 
         <div className="flex items-center gap-2 px-3 py-2">
-          <Command.Input
-            ref={inputRef}
-            value={query}
-            onValueChange={setQuery}
-            onFocus={() => setOpen(true)}
-            placeholder="Search or navigate..."
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
+          {agentMode ? (
+            <input
+              ref={agentInputRef}
+              value={agentInput}
+              onChange={(e) => setAgentInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAgentSubmit();
+                }
+              }}
+              placeholder="Ask the agent..."
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          ) : (
+            <Command.Input
+              ref={inputRef}
+              value={query}
+              onValueChange={setQuery}
+              onFocus={() => setOpen(true)}
+              placeholder="Search, navigate, or ask the agent..."
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          )}
+          {!agentMode && normalizedQuery ? (
+            <button
+              type="button"
+              className="flex items-center gap-1.5 px-2 text-xs"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => enterAgentMode(normalizedQuery)}
+            >
+              <KeyReturnIcon className="size-4" />
+              Ask agent
+            </button>
+          ) : null}
           {open ? (
             <CaretDownIcon className="size-4 shrink-0 text-muted-foreground" />
           ) : (

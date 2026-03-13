@@ -8,10 +8,20 @@
     "enabled": true
   },
   "upload_source_maps": true,
+  "durable_objects": {
+    "bindings": [{ "name": "Agent", "class_name": "Agent" }]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["EmailAgent"] },
+    {
+      "tag": "v2",
+      "renamed_classes": [{ "from": "EmailAgent", "to": "Agent" }]
+    }
+  ],
   "assets": {
     "directory": "./dist/client",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/sdk/*"]
+    "run_worker_first": ["/api/*", "/sdk/*", "/agents/*"]
   },
   "d1_databases": [
     {
@@ -31,10 +41,11 @@
     "GOOGLE_CLIENT_ID": "",
     "GOOGLE_CLIENT_SECRET": "",
     "BETTER_AUTH_SECRET": "",
-    "BETTER_AUTH_URL": "http://localhost:5173"
+    "BETTER_AUTH_URL": "http://localhost:5173",
+    "OPENAI_API_KEY": ""
   },
   "triggers": {
-    "crons": ["*/1 * * * *", "0 * * * *"]
+    "crons": ["*/1 * * * *"]
   },
   "ai": {
     "binding": "AI"

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { createNote } from "@/features/notes/api";
+import { useRouteContext } from "@/hooks/use-page-context";
 import { useMutation } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -7,6 +8,7 @@ import { formatDistanceToNowStrict } from "date-fns";
 const notesRouteApi = getRouteApi("/_dashboard/notes/");
 
 export default function NotesListPage() {
+  useRouteContext("/notes");
   const { notes } = notesRouteApi.useLoaderData();
 
   const navigate = useNavigate();

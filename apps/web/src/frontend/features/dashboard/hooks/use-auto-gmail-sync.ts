@@ -3,6 +3,8 @@ import {
   fetchSyncStatus,
   startFullSync,
 } from "@/features/dashboard/api";
+import { useSuggestedActions } from "@/features/emails/hooks/use-suggested-actions";
+import { fetchEmails } from "@/features/emails/queries/fetch-emails";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -32,6 +34,7 @@ function showSyncProgressToast(status: SyncStatus) {
 export function useAutoGmailSync() {
   const queryClient = useQueryClient();
   const previousStatusRef = useRef<SyncStatus | null>(null);
+  const { triggerSuggestions } = useSuggestedActions();
 
   const syncStatusQuery = useQuery({
     queryKey: ["sync-status"],
@@ -73,15 +76,41 @@ export function useAutoGmailSync() {
 
     if (completedTransition) {
       toast.success("Gmail sync complete", { id: TOAST_ID });
+
+      fetchEmails({ view: "inbox", isRead: "false", limit: 10 })
+        .then((result) => {
+          const received = result.data.filter((e) => e.direction === "received");
+          if (received.length > 0) {
+            void triggerSuggestions(
+              received.map((e) => ({
+                id: Number(e.id),
+                fromName: e.fromName,
+                fromAddr: e.fromAddr,
+                subject: e.subject,
+              })),
+            );
+          }
+        })
+        .catch((err) => console.error("Failed to fetch emails for suggestions", err));
     }
   }, [syncStatusQuery.data]);
+
+  const needsReconnect = syncStatusQuery.data?.needsGoogleReconnect === true;
+
+  useEffect(() => {
+    if (needsReconnect) {
+      toast.error("Gmail disconnected — sign out and sign back in with Google.", {
+        id: TOAST_ID,
+      });
+    }
+  }, [needsReconnect]);
 
   const shouldAutoStart =
     Boolean(syncStatusQuery.data) &&
     !syncStatusQuery.data?.hasSynced &&
     !syncStatusQuery.data?.phase &&
     !syncStatusQuery.data?.error &&
-    !syncStatusQuery.data?.needsGoogleReconnect;
+    !needsReconnect;
 
   useQuery({
     queryKey: AUTO_START_QUERY_KEY,

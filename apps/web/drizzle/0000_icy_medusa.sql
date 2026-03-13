@@ -59,6 +59,7 @@ CREATE TABLE `companies` (
 	`industry` text,
 	`website` text,
 	`description` text,
+	`logo_url` text,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade
 );
@@ -111,8 +112,10 @@ CREATE TABLE `notes` (
 	`user_id` text NOT NULL,
 	`person_id` integer,
 	`company_id` integer,
+	`title` text DEFAULT 'Untitled note' NOT NULL,
 	`content` text NOT NULL,
 	`created_at` integer NOT NULL,
+	`updated_at` integer DEFAULT 0 NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`person_id`) REFERENCES `people`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`company_id`) REFERENCES `companies`(`id`) ON UPDATE no action ON DELETE cascade
@@ -120,6 +123,7 @@ CREATE TABLE `notes` (
 --> statement-breakpoint
 CREATE INDEX `notes_person_idx` ON `notes` (`person_id`);--> statement-breakpoint
 CREATE INDEX `notes_company_idx` ON `notes` (`company_id`);--> statement-breakpoint
+CREATE INDEX `notes_user_updated_idx` ON `notes` (`user_id`,`updated_at`);--> statement-breakpoint
 CREATE TABLE `people` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` text NOT NULL,

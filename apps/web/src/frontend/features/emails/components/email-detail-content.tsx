@@ -46,7 +46,7 @@ export function EmailDetailContent({
   );
 
   return (
-    <div className="flex h-full w-full min-h-0 flex-col items-start space-y-3">
+    <div className="flex h-full w-full min-h-0 min-w-0 flex-col items-start overflow-hidden space-y-3">
       <div className="space-y-1 text-xs leading-relaxed">
         <div className="flex items-center justify-start space-x-2">
           <span className="font-medium">
@@ -59,7 +59,7 @@ export function EmailDetailContent({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto w-full">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto w-full">
         {detailQuery.isPending ? (
           <div className="space-y-3">
             <Skeleton className="h-10 w-full" />
@@ -114,7 +114,7 @@ export function EmailDetailContent({
               </section>
             )}
 
-            <div>
+            <div className="min-w-0">
               {preparedHtml ? (
                 <EmailHtmlRenderer html={preparedHtml} />
               ) : (
