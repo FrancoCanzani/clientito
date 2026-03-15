@@ -18,7 +18,7 @@ function LoginRoute() {
 
     const result = await signIn.social({
       provider: "google",
-      callbackURL: "/home",
+      callbackURL: "/get-started",
     });
 
     if (result?.error) {

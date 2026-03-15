@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
-import { companies, people, tasks } from "../../db/schema";
+import { tasks } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 import { postTaskBodySchema } from "./schemas";
 
@@ -10,35 +10,17 @@ export function registerPostTasks(api: Hono<AppRouteEnv>) {
     const db = c.get("db");
     const user = c.get("user")!;
 
-    const { title, dueAt, personId, companyId } = c.req.valid("json");
+    const { title, description, dueAt, priority } = c.req.valid("json");
     const now = Date.now();
-
-    if (personId !== undefined) {
-      const person = await db
-        .select({ id: people.id })
-        .from(people)
-        .where(and(eq(people.id, personId), eq(people.userId, user.id)))
-        .limit(1);
-      if (!person[0]) return c.json({ error: "Person not found" }, 404);
-    }
-
-    if (companyId !== undefined) {
-      const company = await db
-        .select({ id: companies.id })
-        .from(companies)
-        .where(and(eq(companies.id, companyId), eq(companies.userId, user.id)))
-        .limit(1);
-      if (!company[0]) return c.json({ error: "Company not found" }, 404);
-    }
 
     const inserted = await db
       .insert(tasks)
       .values({
         userId: user.id,
         title,
+        description: description ?? null,
         dueAt: dueAt ?? null,
-        personId: personId ?? null,
-        companyId: companyId ?? null,
+        priority: priority ?? "low",
         done: false,
         createdAt: now,
       })
@@ -47,15 +29,15 @@ export function registerPostTasks(api: Hono<AppRouteEnv>) {
     const createdId = inserted[0]!.id;
 
     const rows = await db
-      .select({
-        id: tasks.id,
-        title: tasks.title,
-        dueAt: tasks.dueAt,
-        done: tasks.done,
-        personId: tasks.personId,
-        companyId: tasks.companyId,
-        createdAt: tasks.createdAt,
-      })
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          description: tasks.description,
+          dueAt: tasks.dueAt,
+          priority: tasks.priority,
+          done: tasks.done,
+          createdAt: tasks.createdAt,
+        })
       .from(tasks)
       .where(and(eq(tasks.id, createdId), eq(tasks.userId, user.id)))
       .limit(1);

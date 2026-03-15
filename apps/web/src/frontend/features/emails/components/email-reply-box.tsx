@@ -1,35 +1,51 @@
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { SparkleIcon } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
-import { draftReply, sendEmail } from "../api";
+import { insertComposeContent } from "../compose-bridge";
+import { useAttachmentUpload } from "../hooks/use-attachment-upload";
+import { draftReply, sendEmail } from "../mutations";
 import type { EmailDetailItem } from "../types";
+import { AttachmentBar } from "./attachment-bar";
+import { ComposeEditor } from "./compose-editor";
+import { RecipientInput } from "./recipient-input";
 
 export function EmailReplyBox({ email }: { email: EmailDetailItem }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const [body, setBody] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [to, setTo] = useState(email.fromAddr);
+  const bodyRef = useRef(body);
+  const attachments = useAttachmentUpload();
+
+  const handleBodyChange = useCallback((html: string) => {
+    bodyRef.current = html;
+    setBody(html);
+  }, []);
 
   const sendMutation = useMutation({
     mutationFn: () =>
       sendEmail({
-        to: email.fromAddr,
+        to,
         subject: email.subject
           ? email.subject.startsWith("Re:")
             ? email.subject
             : `Re: ${email.subject}`
           : "Re:",
-        body,
+        body: bodyRef.current,
         inReplyTo: email.gmailId,
         threadId: email.threadId ?? undefined,
+        attachments:
+          attachments.files.length > 0
+            ? attachments.getAttachmentKeys()
+            : undefined,
       }),
     onSuccess: () => {
       toast.success("Reply sent");
       setBody("");
       setExpanded(false);
+      attachments.clear();
       void queryClient.invalidateQueries({ queryKey: ["emails"] });
       void queryClient.invalidateQueries({
         queryKey: ["email-detail", email.id],
@@ -41,8 +57,9 @@ export function EmailReplyBox({ email }: { email: EmailDetailItem }) {
   const draftMutation = useMutation({
     mutationFn: () => draftReply({ emailId: Number(email.id) }),
     onSuccess: (result) => {
-      setBody(result.draft);
-      textareaRef.current?.focus();
+      const html = result.draft.replace(/\n/g, "<br>");
+      setBody(html);
+      insertComposeContent(html);
     },
     onError: (error) => toast.error(error.message),
   });
@@ -50,16 +67,17 @@ export function EmailReplyBox({ email }: { email: EmailDetailItem }) {
   const handleCancel = useCallback(() => {
     setBody("");
     setExpanded(false);
-  }, []);
+    attachments.clear();
+  }, [attachments]);
+
+  const hasBody =
+    body.trim().length > 0 && body !== "<p></p>" && body !== "<p><br></p>";
 
   if (!expanded) {
     return (
       <button
         type="button"
-        onClick={() => {
-          setExpanded(true);
-          setTimeout(() => textareaRef.current?.focus(), 0);
-        }}
+        onClick={() => setExpanded(true)}
         className="w-full rounded-md border border-border px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted/40"
       >
         Write your reply...
@@ -69,20 +87,23 @@ export function EmailReplyBox({ email }: { email: EmailDetailItem }) {
 
   return (
     <div className="space-y-2">
-      <Textarea
-        ref={textareaRef}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder="Write your reply..."
-        className="min-h-[80px] resize-none text-sm"
-        onKeyDown={(e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-            e.preventDefault();
-            if (body.trim().length > 0 && !sendMutation.isPending) {
-              sendMutation.mutate();
-            }
+      <RecipientInput value={to} onChange={setTo} />
+      <ComposeEditor
+        initialContent={body}
+        onChange={handleBodyChange}
+        onSend={() => {
+          if (hasBody && !sendMutation.isPending) {
+            sendMutation.mutate();
           }
         }}
+        className="min-h-[80px] rounded-md border border-input px-3 py-2 text-sm"
+        autoFocus
+      />
+      <AttachmentBar
+        files={attachments.files}
+        uploading={attachments.uploading}
+        onAddFiles={(files) => attachments.addFiles(files)}
+        onRemoveFile={attachments.removeFile}
       />
       <div className="flex items-center justify-between">
         <Button
@@ -102,7 +123,7 @@ export function EmailReplyBox({ email }: { email: EmailDetailItem }) {
           <Button
             size="sm"
             onClick={() => sendMutation.mutate()}
-            disabled={sendMutation.isPending || body.trim().length === 0}
+            disabled={sendMutation.isPending || !hasBody}
           >
             {sendMutation.isPending ? "Sending..." : "Send"}
           </Button>

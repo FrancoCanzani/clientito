@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "48a99f23-3422-42ce-97a9-a218da618841",
+  "id": "3e51222c-bcda-421b-bd95-d46850ed7cae",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "account": {
@@ -358,102 +358,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "companies": {
-      "name": "companies",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "domain": {
-          "name": "domain",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "industry": {
-          "name": "industry",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "website": {
-          "name": "website",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "logo_url": {
-          "name": "logo_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "companies_user_domain_idx": {
-          "name": "companies_user_domain_idx",
-          "columns": [
-            "user_id",
-            "domain"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "companies_user_id_user_id_fk": {
-          "name": "companies_user_id_user_id_fk",
-          "tableFrom": "companies",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "daily_briefings": {
       "name": "daily_briefings",
       "columns": {
@@ -775,13 +679,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "company_id": {
-          "name": "company_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "title": {
           "name": "title",
           "type": "text",
@@ -821,13 +718,6 @@
           ],
           "isUnique": false
         },
-        "notes_company_idx": {
-          "name": "notes_company_idx",
-          "columns": [
-            "company_id"
-          ],
-          "isUnique": false
-        },
         "notes_user_updated_idx": {
           "name": "notes_user_updated_idx",
           "columns": [
@@ -857,19 +747,6 @@
           "tableTo": "people",
           "columnsFrom": [
             "person_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "notes_company_id_companies_id_fk": {
-          "name": "notes_company_id_companies_id_fk",
-          "tableFrom": "notes",
-          "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
           ],
           "columnsTo": [
             "id"
@@ -934,9 +811,9 @@
           "notNull": false,
           "autoincrement": false
         },
-        "company_id": {
-          "name": "company_id",
-          "type": "integer",
+        "avatar_url": {
+          "name": "avatar_url",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -964,13 +841,6 @@
             "email"
           ],
           "isUnique": true
-        },
-        "people_company_idx": {
-          "name": "people_company_idx",
-          "columns": [
-            "company_id"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -980,78 +850,6 @@
           "tableTo": "user",
           "columnsFrom": [
             "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "people_company_id_companies_id_fk": {
-          "name": "people_company_id_companies_id_fk",
-          "tableFrom": "people",
-          "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "people_ai_context": {
-      "name": "people_ai_context",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "person_id": {
-          "name": "person_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "briefing": {
-          "name": "briefing",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "suggested_actions": {
-          "name": "suggested_actions",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "generated_at": {
-          "name": "generated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "people_ai_context_person_id_people_id_fk": {
-          "name": "people_ai_context_person_id_people_id_fk",
-          "tableFrom": "people_ai_context",
-          "tableTo": "people",
-          "columnsFrom": [
-            "person_id"
           ],
           "columnsTo": [
             "id"
@@ -1183,13 +981,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "company_id": {
-          "name": "company_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "title": {
           "name": "title",
           "type": "text",
@@ -1257,19 +1048,6 @@
           "tableTo": "people",
           "columnsFrom": [
             "person_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "tasks_company_id_companies_id_fk": {
-          "name": "tasks_company_id_companies_id_fk",
-          "tableFrom": "tasks",
-          "tableTo": "companies",
-          "columnsFrom": [
-            "company_id"
           ],
           "columnsTo": [
             "id"

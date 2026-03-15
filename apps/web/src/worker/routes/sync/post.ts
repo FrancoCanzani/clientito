@@ -1,17 +1,26 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq } from "drizzle-orm";
 import type { Database } from "../../db/client";
-import { syncState } from "../../db/schema";
-import { isGmailReconnectRequiredError } from "../../lib/gmail/errors";
+import {
+  GmailSyncStateError,
+  isGmailReconnectRequiredError,
+} from "../../lib/gmail/errors";
+import {
+  acquireMailboxSyncLock,
+  createSyncJob,
+  ensureMailbox,
+  getMailboxSyncSnapshot,
+  markSyncJobFailed,
+  markSyncJobSucceeded,
+  releaseMailboxSyncLock,
+  updateSyncJobProgress,
+} from "../../lib/gmail/mailbox-state";
 import {
   runIncrementalGmailSync,
   startFullGmailSync,
 } from "../../lib/gmail/sync";
 import type { AppRouteEnv } from "../types";
 import { syncRequestSchema } from "./schemas";
-
-const SYNC_PROGRESS_LOCK_TTL_MS = 4 * 60_000;
 
 function monthsToGmailQuery(months?: number): string | undefined {
   if (!months) return undefined;
@@ -23,86 +32,60 @@ function monthsToGmailQuery(months?: number): string | undefined {
   return `after:${y}/${m}/${d}`;
 }
 
-async function updateSyncProgress(
-  db: Database,
-  userId: string,
-  phase: string,
-  current: number,
-  total: number,
-) {
-  const now = Date.now();
-  await db
-    .update(syncState)
-    .set({
-      phase,
-      progressCurrent: current,
-      progressTotal: total,
-      error: null,
-      lockUntil: now + SYNC_PROGRESS_LOCK_TTL_MS,
-    })
-    .where(eq(syncState.userId, userId));
-}
+function classifySyncError(error: unknown) {
+  if (isGmailReconnectRequiredError(error)) {
+    return "reconnect_required" as const;
+  }
 
-async function clearSyncProgress(db: Database, userId: string) {
-  await db
-    .update(syncState)
-    .set({
-      phase: null,
-      progressCurrent: null,
-      progressTotal: null,
-      lockUntil: null,
-    })
-    .where(eq(syncState.userId, userId));
-}
+  if (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("full sync again")
+  ) {
+    return "history_expired" as const;
+  }
 
-async function setSyncError(db: Database, userId: string, message: string) {
-  await db
-    .update(syncState)
-    .set({
-      phase: "error",
-      progressCurrent: null,
-      progressTotal: null,
-      error: message,
-      lockUntil: null,
-    })
-    .where(eq(syncState.userId, userId));
+  if (error instanceof GmailSyncStateError) {
+    return "state_error" as const;
+  }
+
+  return "sync_failed" as const;
 }
 
 async function isSyncInProgress(db: Database, userId: string): Promise<boolean> {
-  const state = await db.query.syncState.findFirst({
-    where: eq(syncState.userId, userId),
-  });
-
-  if (!state) return false;
-
-  const now = Date.now();
-  const hasLiveLock =
-    typeof state.lockUntil === "number" && Number.isFinite(state.lockUntil) && state.lockUntil > now;
-
-  if (!hasLiveLock && state.phase && state.phase !== "error") {
-    await clearSyncProgress(db, userId);
-  }
-
-  return hasLiveLock;
+  const snapshot = await getMailboxSyncSnapshot(db, userId);
+  return snapshot.hasLiveLock;
 }
 
 function runFullSyncInBackground(
   db: Database,
   env: Env,
   userId: string,
+  userEmail: string,
   months?: number,
   continueFullSync?: boolean,
 ) {
   return (async () => {
+    const mailbox = await ensureMailbox(db, userId, userEmail);
+    const hasLock = await acquireMailboxSyncLock(db, userId, userEmail);
+    if (!hasLock) {
+      return;
+    }
+
+    const job = await createSyncJob(db, mailbox.id, "full", "manual");
+
     try {
       const gmailQuery = monthsToGmailQuery(months);
-      const shouldRunFollowUpFullSync = continueFullSync === true && Boolean(gmailQuery);
+      const shouldRunFollowUpFullSync =
+        continueFullSync === true && Boolean(gmailQuery);
+
       await startFullGmailSync(
         db,
         env,
         userId,
-        (phase, current, total) => updateSyncProgress(db, userId, phase, current, total),
+        (phase, current, total) =>
+          updateSyncJobProgress(db, mailbox.id, job.id, phase, current, total),
         gmailQuery,
+        { skipLock: true },
       );
 
       if (shouldRunFollowUpFullSync) {
@@ -110,11 +93,21 @@ function runFullSyncInBackground(
           db,
           env,
           userId,
-          (phase, current, total) => updateSyncProgress(db, userId, phase, current, total),
+          (phase, current, total) =>
+            updateSyncJobProgress(
+              db,
+              mailbox.id,
+              job.id,
+              phase,
+              current,
+              total,
+            ),
+          undefined,
+          { skipLock: true },
         );
       }
 
-      await clearSyncProgress(db, userId);
+      await markSyncJobSucceeded(db, mailbox.id, job.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Sync failed";
       if (isGmailReconnectRequiredError(error)) {
@@ -122,7 +115,15 @@ function runFullSyncInBackground(
       } else {
         console.error("Background full sync failed", { userId, error });
       }
-      await setSyncError(db, userId, message).catch(() => {});
+      await markSyncJobFailed(
+        db,
+        mailbox.id,
+        job.id,
+        message,
+        classifySyncError(error),
+      ).catch(() => {});
+    } finally {
+      await releaseMailboxSyncLock(db, userId).catch(() => {});
     }
   })();
 }
@@ -131,12 +132,23 @@ function runIncrementalSyncInBackground(
   db: Database,
   env: Env,
   userId: string,
+  userEmail: string,
 ) {
   return (async () => {
+    const mailbox = await ensureMailbox(db, userId, userEmail);
+    const hasLock = await acquireMailboxSyncLock(db, userId, userEmail);
+    if (!hasLock) {
+      return;
+    }
+
+    const job = await createSyncJob(db, mailbox.id, "incremental", "manual");
+
     try {
-      await updateSyncProgress(db, userId, "syncing", 0, 0);
-      await runIncrementalGmailSync(db, env, userId);
-      await clearSyncProgress(db, userId);
+      await updateSyncJobProgress(db, mailbox.id, job.id, "syncing", 0, 0);
+      await runIncrementalGmailSync(db, env, userId, undefined, {
+        skipLock: true,
+      });
+      await markSyncJobSucceeded(db, mailbox.id, job.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Sync failed";
       if (isGmailReconnectRequiredError(error)) {
@@ -146,7 +158,15 @@ function runIncrementalSyncInBackground(
       } else {
         console.error("Background incremental sync failed", { userId, error });
       }
-      await setSyncError(db, userId, message).catch(() => {});
+      await markSyncJobFailed(
+        db,
+        mailbox.id,
+        job.id,
+        message,
+        classifySyncError(error),
+      ).catch(() => {});
+    } finally {
+      await releaseMailboxSyncLock(db, userId).catch(() => {});
     }
   })();
 }
@@ -162,7 +182,14 @@ export function registerPostSync(api: Hono<AppRouteEnv>) {
     }
 
     c.executionCtx.waitUntil(
-      runFullSyncInBackground(db, c.env, user.id, months, continueFullSync),
+      runFullSyncInBackground(
+        db,
+        c.env,
+        user.id,
+        user.email,
+        months,
+        continueFullSync,
+      ),
     );
     return c.json({ data: { status: "started" } }, 202);
   });
@@ -176,7 +203,9 @@ export function registerPostSync(api: Hono<AppRouteEnv>) {
       return c.json({ error: "Sync already in progress" }, 409);
     }
 
-    c.executionCtx.waitUntil(runIncrementalSyncInBackground(db, c.env, user.id));
+    c.executionCtx.waitUntil(
+      runIncrementalSyncInBackground(db, c.env, user.id, user.email),
+    );
     return c.json({ data: { status: "started" } }, 202);
   });
 }

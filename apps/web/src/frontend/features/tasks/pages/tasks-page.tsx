@@ -1,132 +1,344 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { deleteTask, updateTask } from "@/features/tasks/api";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { TaskEditor } from "@/features/tasks/components/task-editor";
+import { createTask, deleteTask, updateTask } from "@/features/tasks/mutations";
 import type { Task } from "@/features/tasks/types";
-import { useRouteContext } from "@/hooks/use-page-context";
+import {
+  buildTaskSections,
+  fromTaskDateInputValue,
+  getPriorityClassName,
+} from "@/features/tasks/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 import { useMutation } from "@tanstack/react-query";
-import { getRouteApi } from "@tanstack/react-router";
-import { format } from "date-fns";
+import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
 const tasksRouteApi = getRouteApi("/_dashboard/tasks");
 
+type EditorState =
+  | { mode: "create"; dueAt: number | null }
+  | { mode: "edit"; taskId: number }
+  | null;
+
+function getDefaultCreateDueAt() {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  return date.getTime();
+}
+
 export default function TasksPage() {
-  const { tasks: loadedTasks, people, companies } = tasksRouteApi.useLoaderData();
-  useRouteContext("/tasks");
-  const [tasks, setTasks] = useState<Task[]>(loadedTasks);
+  const taskResponse = tasksRouteApi.useLoaderData();
+  const router = useRouter();
+  const isMobile = useIsMobile();
   const [showCompleted, setShowCompleted] = useState(false);
-  const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);
+  const [sortMode, setSortMode] = useState<"date" | "priority">("date");
+  const [editor, setEditor] = useState<EditorState>(null);
 
-  const peopleById = useMemo(
-    () => new Map(people.map((person) => [person.id, person])),
-    [people],
-  );
-  const companiesById = useMemo(
-    () => new Map(companies.map((company) => [company.id, company])),
-    [companies],
-  );
-
-  const toggleTaskMutation = useMutation({
-    mutationFn: async (task: Task) => updateTask(task.id, { done: !task.done }),
-    onSuccess: (updatedTask) => {
-      setTasks((prev) =>
-        prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)),
-      );
-    },
-  });
-
-  const deleteTaskMutation = useMutation({
-    mutationFn: async (taskId: number) => deleteTask(taskId),
-    onSuccess: (_value, taskId) => {
-      setTasks((prev) => prev.filter((task) => task.id !== taskId));
-      setExpandedTaskId((prev) => (prev === taskId ? null : prev));
-    },
-  });
+  const tasks = taskResponse.data;
 
   const visibleTasks = useMemo(
     () => tasks.filter((task) => (showCompleted ? true : !task.done)),
     [showCompleted, tasks],
   );
+  const sections = useMemo(
+    () => buildTaskSections(visibleTasks, sortMode),
+    [sortMode, visibleTasks],
+  );
+  const editingTask =
+    editor?.mode === "edit"
+      ? (tasks.find((task) => task.id === editor.taskId) ?? null)
+      : null;
+
+  const closeEditor = () => setEditor(null);
+
+  const createTaskMutation = useMutation({
+    mutationFn: createTask,
+    onSuccess: () => {
+      closeEditor();
+      router.invalidate();
+    },
+  });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({
+      taskId,
+      input,
+    }: {
+      taskId: number;
+      input: Parameters<typeof updateTask>[1];
+    }) => updateTask(taskId, input),
+    onSuccess: () => {
+      closeEditor();
+      router.invalidate();
+    },
+  });
+
+  const toggleTaskMutation = useMutation({
+    mutationFn: (task: Task) => updateTask(task.id, { done: !task.done }),
+    onSuccess: () => {
+      router.invalidate();
+    },
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: deleteTask,
+    onSuccess: () => {
+      closeEditor();
+      void router.invalidate();
+    },
+  });
+
+  const openCreateEditor = (dueAt: number | null = getDefaultCreateDueAt()) => {
+    setEditor({ mode: "create", dueAt });
+  };
+
+  const openTaskEditor = (taskId: number) => {
+    setEditor((current) =>
+      current?.mode === "edit" && current.taskId === taskId
+        ? null
+        : { mode: "edit", taskId },
+    );
+  };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Tasks</h1>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={showCompleted}
-            onChange={(event) => setShowCompleted(event.target.checked)}
-          />
-          Show completed
-        </label>
+    <div className="mx-auto max-w-3xl space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <header className="space-y-1">
+          <h2 className="text-lg font-medium">Tasks</h2>
+        </header>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => setSortMode("date")}
+          >
+            Date
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => setSortMode("priority")}
+          >
+            Priority
+          </Button>
+          <div className="flex items-center justify-center gap-2">
+            <Checkbox
+              checked={showCompleted}
+              onCheckedChange={(checked) => setShowCompleted(checked === true)}
+            />
+            <Label className="text-primary">Show completed</Label>
+          </div>
+        </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-border">
-        {visibleTasks.length > 0 ? (
-          visibleTasks.map((task) => {
-            const isExpanded = expandedTaskId === task.id;
-            const person = task.personId ? peopleById.get(task.personId) : null;
-            const company = task.companyId ? companiesById.get(task.companyId) : null;
+      {!isMobile && editor?.mode === "create" ? (
+        <TaskEditor
+          key={`create-${editor.dueAt ?? "none"}`}
+          defaultDueAt={editor.dueAt}
+          submitLabel="Create task"
+          autoFocus
+          isSubmitting={createTaskMutation.isPending}
+          onCancel={closeEditor}
+          onSubmit={(value) =>
+            createTaskMutation.mutate({
+              ...value,
+              dueAt: value.dueAt ?? undefined,
+            })
+          }
+        />
+      ) : null}
 
-            return (
-              <div key={task.id} className="border-b border-border/60 last:border-b-0">
-                <button
-                  type="button"
-                  onClick={() => setExpandedTaskId((prev) => (prev === task.id ? null : task.id))}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/30"
+      <div className="space-y-5">
+        {sections.length > 0 ? (
+          sections.map((section) => (
+            <section key={section.key} className="space-y-2">
+              <div className="flex items-center justify-between py-1">
+                <h2 className="text-xs font-medium">{section.title}</h2>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  className="border-border/50"
+                  onClick={() =>
+                    openCreateEditor(
+                      section.key === "no-date"
+                        ? null
+                        : fromTaskDateInputValue(section.key),
+                    )
+                  }
                 >
-                  <input
-                    type="checkbox"
-                    checked={task.done}
-                    onChange={() => toggleTaskMutation.mutate(task)}
-                    onClick={(event) => event.stopPropagation()}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={`truncate text-sm ${task.done ? "text-muted-foreground line-through" : ""}`}
-                    >
-                      {task.title}
-                    </p>
-                  </div>
-                  {task.dueAt ? (
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {format(new Date(task.dueAt), "PPP p")}
-                    </span>
-                  ) : null}
-                </button>
-
-                {isExpanded ? (
-                  <div className="space-y-2 bg-muted/20 px-4 py-3 text-sm">
-                    <p className="text-muted-foreground">
-                      Linked person: {person?.name ?? person?.email ?? "None"}
-                    </p>
-                    <p className="text-muted-foreground">
-                      Linked company: {company?.name ?? company?.domain ?? "None"}
-                    </p>
-                    <p className="text-muted-foreground">
-                      Created: {format(new Date(task.createdAt), "PPP p")}
-                    </p>
-                    <div className="pt-1">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteTaskMutation.mutate(task.id)}
-                        disabled={deleteTaskMutation.isPending}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
+                  Add task
+                </Button>
               </div>
-            );
-          })
+
+              <div className="space-y-0.5">
+                {section.tasks.map((task) => {
+                  const isEditing =
+                    !isMobile &&
+                    editor?.mode === "edit" &&
+                    editor.taskId === task.id;
+
+                  return (
+                    <div key={task.id} className="space-y-2">
+                      <div className="flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted/35">
+                        <Checkbox
+                          checked={task.done}
+                          className="rounded-full size-3.5"
+                          onCheckedChange={() =>
+                            toggleTaskMutation.mutate(task)
+                          }
+                        />
+
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 text-left"
+                          onClick={() => openTaskEditor(task.id)}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-2 flex-1">
+                              <p
+                                className={`text-sm ${
+                                  task.done
+                                    ? "text-muted-foreground line-through"
+                                    : "text-foreground"
+                                }`}
+                              >
+                                {task.title}
+                              </p>
+                              {task.description && (
+                                <p className="text-xs text-muted-foreground">
+                                  {task.description}
+                                </p>
+                              )}
+                            </div>
+
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "capitalize text-xs",
+                                getPriorityClassName(task.priority),
+                              )}
+                            >
+                              {task.priority}
+                            </Badge>
+                          </div>
+                        </button>
+                      </div>
+
+                      {isEditing ? (
+                        <TaskEditor
+                          key={`edit-${task.id}`}
+                          task={task}
+                          submitLabel="Save changes"
+                          isSubmitting={updateTaskMutation.isPending}
+                          onCancel={closeEditor}
+                          onDelete={() => deleteTaskMutation.mutate(task.id)}
+                          onSubmit={(value) =>
+                            updateTaskMutation.mutate({
+                              taskId: task.id,
+                              input: value,
+                            })
+                          }
+                        />
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ))
         ) : (
-          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-            No tasks to show.
-          </p>
+          <Empty className="min-h-[40vh] border-0 p-0">
+            <EmptyHeader>
+              <EmptyTitle>
+                {tasks.length > 0 && !showCompleted
+                  ? "No open tasks"
+                  : "No tasks yet"}
+              </EmptyTitle>
+              <EmptyDescription className="text-xs">
+                {tasks.length > 0 && !showCompleted
+                  ? "You're all caught up. Turn on completed tasks or add a new one."
+                  : "Add your first task and it will appear in the calendar list."}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent className="pt-1">
+              <Button
+                className="border-border/50"
+                variant="outline"
+                size="xs"
+                onClick={() => openCreateEditor()}
+              >
+                Add task
+              </Button>
+            </EmptyContent>
+          </Empty>
         )}
       </div>
+
+      <Sheet open={isMobile && editor !== null} onOpenChange={closeEditor}>
+        <SheetContent
+          side="bottom"
+          className="max-h-[92vh] overflow-y-auto rounded-t-2xl border-0 border-t-0"
+        >
+          <SheetHeader className="pb-2">
+            <SheetTitle className="text-sm">
+              {editor?.mode === "edit" ? "Edit task" : "New task"}
+            </SheetTitle>
+          </SheetHeader>
+
+          {editor?.mode === "create" ? (
+            <TaskEditor
+              key={`mobile-create-${editor.dueAt ?? "none"}`}
+              defaultDueAt={editor.dueAt}
+              submitLabel="Create task"
+              variant="sheet"
+              autoFocus
+              isSubmitting={createTaskMutation.isPending}
+              onCancel={closeEditor}
+              onSubmit={(value) =>
+                createTaskMutation.mutate({
+                  ...value,
+                  dueAt: value.dueAt ?? undefined,
+                })
+              }
+            />
+          ) : editingTask ? (
+            <TaskEditor
+              key={`mobile-edit-${editingTask.id}`}
+              task={editingTask}
+              submitLabel="Save changes"
+              variant="sheet"
+              isSubmitting={updateTaskMutation.isPending}
+              onCancel={closeEditor}
+              onDelete={() => deleteTaskMutation.mutate(editingTask.id)}
+              onSubmit={(value) =>
+                updateTaskMutation.mutate({
+                  taskId: editingTask.id,
+                  input: value,
+                })
+              }
+            />
+          ) : null}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

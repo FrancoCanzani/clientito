@@ -40,6 +40,8 @@ export type GmailMessage = {
   payload?: GmailMessagePart;
 };
 
+export type GmailMessageFormat = "full" | "minimal";
+
 export type GmailAttachmentResponse = {
   data?: string;
   size?: number;
@@ -50,6 +52,17 @@ export type GmailHistoryResponse = {
     id?: string;
     messagesAdded?: Array<{
       message?: { id?: string };
+    }>;
+    messagesDeleted?: Array<{
+      message?: { id?: string };
+    }>;
+    labelsAdded?: Array<{
+      message?: { id?: string };
+      labelIds?: string[];
+    }>;
+    labelsRemoved?: Array<{
+      message?: { id?: string };
+      labelIds?: string[];
     }>;
   }>;
   nextPageToken?: string;
@@ -63,6 +76,50 @@ export type GmailProfileResponse = {
 export type GoogleUserInfoResponse = {
   name?: string;
   picture?: string;
+};
+
+export type GooglePersonFieldMetadata = {
+  primary?: boolean;
+};
+
+export type GoogleContactName = {
+  displayName?: string;
+  metadata?: GooglePersonFieldMetadata;
+};
+
+export type GoogleContactEmailAddress = {
+  value?: string;
+  metadata?: GooglePersonFieldMetadata;
+};
+
+export type GoogleContactPhoneNumber = {
+  value?: string;
+  metadata?: GooglePersonFieldMetadata;
+};
+
+export type GoogleContactPhoto = {
+  url?: string;
+  default?: boolean;
+  metadata?: GooglePersonFieldMetadata;
+};
+
+export type GoogleContactOrganization = {
+  title?: string;
+  name?: string;
+  metadata?: GooglePersonFieldMetadata;
+};
+
+export type GoogleContactPerson = {
+  names?: GoogleContactName[];
+  emailAddresses?: GoogleContactEmailAddress[];
+  phoneNumbers?: GoogleContactPhoneNumber[];
+  photos?: GoogleContactPhoto[];
+  organizations?: GoogleContactOrganization[];
+};
+
+export type GoogleConnectionsListResponse = {
+  connections?: GoogleContactPerson[];
+  nextPageToken?: string;
 };
 
 export type GmailErrorResponse = {

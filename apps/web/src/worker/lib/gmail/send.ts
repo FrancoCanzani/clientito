@@ -3,6 +3,12 @@ import { getGmailToken } from "./token";
 
 const GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 
+type AttachmentData = {
+  filename: string;
+  mimeType: string;
+  content: ArrayBuffer;
+};
+
 type SendMessageInput = {
   to: string;
   subject: string;
@@ -10,6 +16,7 @@ type SendMessageInput = {
   inReplyTo?: string;
   references?: string;
   threadId?: string;
+  attachments?: AttachmentData[];
 };
 
 type SendMessageResult = {
@@ -30,25 +37,73 @@ function encodeBase64Url(input: string): string {
     .replace(/=+$/, "");
 }
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
 function buildMimeMessage(input: SendMessageInput, fromAddr: string): string {
-  const lines: string[] = [];
-  lines.push(`From: ${fromAddr}`);
-  lines.push(`To: ${input.to}`);
-  lines.push(`Subject: ${input.subject}`);
-  lines.push("MIME-Version: 1.0");
-  lines.push('Content-Type: text/html; charset="UTF-8"');
+  const hasAttachments =
+    input.attachments && input.attachments.length > 0;
+
+  const headers: string[] = [];
+  headers.push(`From: ${fromAddr}`);
+  headers.push(`To: ${input.to}`);
+  headers.push(`Subject: ${input.subject}`);
+  headers.push("MIME-Version: 1.0");
 
   if (input.inReplyTo) {
-    lines.push(`In-Reply-To: ${input.inReplyTo}`);
+    headers.push(`In-Reply-To: ${input.inReplyTo}`);
   }
   if (input.references) {
-    lines.push(`References: ${input.references}`);
+    headers.push(`References: ${input.references}`);
   }
 
-  lines.push("");
-  lines.push(input.body);
+  if (!hasAttachments) {
+    headers.push('Content-Type: text/html; charset="UTF-8"');
+    headers.push("");
+    headers.push(input.body);
+    return headers.join("\r\n");
+  }
 
-  return lines.join("\r\n");
+  const boundary = `boundary_${crypto.randomUUID().replace(/-/g, "")}`;
+  headers.push(
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+  );
+  headers.push("");
+  headers.push(`--${boundary}`);
+  headers.push('Content-Type: text/html; charset="UTF-8"');
+  headers.push("");
+  headers.push(input.body);
+
+  for (const attachment of input.attachments!) {
+    headers.push(`--${boundary}`);
+    headers.push(
+      `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"`,
+    );
+    headers.push("Content-Transfer-Encoding: base64");
+    headers.push(
+      `Content-Disposition: attachment; filename="${attachment.filename}"`,
+    );
+    headers.push("");
+    headers.push(arrayBufferToBase64(attachment.content));
+  }
+
+  headers.push(`--${boundary}--`);
+  return headers.join("\r\n");
+}
+
+export async function fetchAttachmentFromR2(
+  env: Env,
+  key: string,
+): Promise<ArrayBuffer> {
+  const object = await env.ATTACHMENTS.get(key);
+  if (!object) throw new Error(`Attachment not found: ${key}`);
+  return object.arrayBuffer();
 }
 
 export async function sendGmailMessage(

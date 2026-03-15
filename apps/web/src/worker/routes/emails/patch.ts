@@ -1,14 +1,10 @@
-import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
+import type { Hono } from "hono";
 import { emails } from "../../db/schema";
-import {
-  archiveGmailMessage,
-  markGmailMessageRead,
-  starGmailMessage,
-  trashGmailMessage,
-} from "../../lib/gmail/modify";
+import { batchModifyGmailMessages } from "../../lib/gmail/modify";
 import type { AppRouteEnv } from "../types";
+import { applyEmailPatch } from "./mutation";
 import { patchEmailBodySchema, patchEmailParamsSchema } from "./schemas";
 
 export function registerPatchEmail(api: Hono<AppRouteEnv>) {
@@ -37,58 +33,36 @@ export function registerPatchEmail(api: Hono<AppRouteEnv>) {
       const email = row[0];
       if (!email) return c.json({ error: "Email not found" }, 404);
 
-      let labelIds = email.labelIds ?? [];
-      const dbUpdates: Partial<typeof emails.$inferInsert> = {};
+      const nextState = applyEmailPatch(email, body);
+      const { dbUpdates } = nextState;
 
-      if (body.isRead !== undefined && body.isRead !== email.isRead) {
-        dbUpdates.isRead = body.isRead;
-        if (body.isRead) {
-          c.executionCtx.waitUntil(
-            markGmailMessageRead(db, c.env, user.id, email.gmailId).catch(
-              (err) => console.warn("Gmail mark-read failed", { err }),
-            ),
+      if (
+        nextState.addLabelIds.length > 0 ||
+        nextState.removeLabelIds.length > 0
+      ) {
+        try {
+          await batchModifyGmailMessages(
+            db,
+            c.env,
+            user.id,
+            [email.gmailId],
+            nextState.addLabelIds,
+            nextState.removeLabelIds,
           );
-        }
-      }
-
-      if (body.archived === true && labelIds.includes("INBOX")) {
-        labelIds = labelIds.filter((l) => l !== "INBOX");
-        dbUpdates.labelIds = labelIds;
-        c.executionCtx.waitUntil(
-          archiveGmailMessage(db, c.env, user.id, email.gmailId).catch((err) =>
-            console.warn("Gmail archive failed", { err }),
-          ),
-        );
-      }
-
-      if (body.trashed === true && !labelIds.includes("TRASH")) {
-        labelIds = [...labelIds.filter((l) => l !== "INBOX"), "TRASH"];
-        dbUpdates.labelIds = labelIds;
-        c.executionCtx.waitUntil(
-          trashGmailMessage(db, c.env, user.id, email.gmailId).catch((err) =>
-            console.warn("Gmail trash failed", { err }),
-          ),
-        );
-      }
-
-      if (body.starred !== undefined) {
-        const isStarred = labelIds.includes("STARRED");
-        if (body.starred && !isStarred) {
-          labelIds = [...labelIds, "STARRED"];
-          dbUpdates.labelIds = labelIds;
-        } else if (!body.starred && isStarred) {
-          labelIds = labelIds.filter((l) => l !== "STARRED");
-          dbUpdates.labelIds = labelIds;
-        }
-        if (body.starred !== isStarred) {
-          c.executionCtx.waitUntil(
-            starGmailMessage(
-              db,
-              c.env,
-              user.id,
-              email.gmailId,
-              body.starred,
-            ).catch((err) => console.warn("Gmail star failed", { err })),
+        } catch (error) {
+          console.warn("Gmail modify failed", {
+            emailId,
+            gmailId: email.gmailId,
+            error,
+          });
+          return c.json(
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to update Gmail message",
+            },
+            502,
           );
         }
       }
@@ -104,10 +78,11 @@ export function registerPatchEmail(api: Hono<AppRouteEnv>) {
         {
           data: {
             id: String(emailId),
-            isRead: dbUpdates.isRead ?? email.isRead,
-            archived: !labelIds.includes("INBOX"),
-            trashed: labelIds.includes("TRASH"),
-            starred: labelIds.includes("STARRED"),
+            isRead: nextState.isRead,
+            archived: nextState.archived,
+            trashed: nextState.trashed,
+            spam: nextState.spam,
+            starred: nextState.starred,
           },
         },
         200,

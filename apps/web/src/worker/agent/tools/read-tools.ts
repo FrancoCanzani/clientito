@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
-import { companies, emails, people, tasks } from "../../db/schema";
+import { emails, tasks } from "../../db/schema";
 
 function formatEmailDate(dateMs: number | null) {
   if (typeof dateMs !== "number" || Number.isNaN(dateMs)) {
@@ -76,78 +76,6 @@ export function makeReadTools(db: Database, userId: string) {
         };
       },
     }),
-
-    lookupPerson: tool({
-      description:
-        "Look up CRM people records for the signed-in user by email address or person name.",
-      inputSchema: z.object({
-        email: z
-          .string()
-          .optional()
-          .describe("Full or partial email address to search for."),
-        name: z
-          .string()
-          .optional()
-          .describe("Full or partial person name to search for."),
-      }),
-      execute: async ({ email, name }) => {
-        const conditions = [eq(people.userId, userId)];
-        if (email) conditions.push(like(people.email, `%${email}%`));
-        if (name) conditions.push(like(people.name, `%${name}%`));
-
-        const rows = await db
-          .select({
-            id: people.id,
-            email: people.email,
-            name: people.name,
-            title: people.title,
-            phone: people.phone,
-            companyName: companies.name,
-            companyDomain: companies.domain,
-            lastContactedAt: people.lastContactedAt,
-          })
-          .from(people)
-          .leftJoin(companies, eq(people.companyId, companies.id))
-          .where(and(...conditions))
-          .limit(5);
-        return { people: rows, count: rows.length };
-      },
-    }),
-
-    lookupCompany: tool({
-      description:
-        "Look up CRM company records for the signed-in user by company domain or company name.",
-      inputSchema: z.object({
-        domain: z
-          .string()
-          .optional()
-          .describe("Company website domain such as stripe.com."),
-        name: z
-          .string()
-          .optional()
-          .describe("Full or partial company name."),
-      }),
-      execute: async ({ domain, name }) => {
-        const conditions = [eq(companies.userId, userId)];
-        if (domain) conditions.push(like(companies.domain, `%${domain}%`));
-        if (name) conditions.push(like(companies.name, `%${name}%`));
-
-        const rows = await db
-          .select({
-            id: companies.id,
-            name: companies.name,
-            domain: companies.domain,
-            industry: companies.industry,
-            website: companies.website,
-            description: companies.description,
-          })
-          .from(companies)
-          .where(and(...conditions))
-          .limit(5);
-        return { companies: rows, count: rows.length };
-      },
-    }),
-
     listTasks: tool({
       description:
         "List the signed-in user's CRM tasks. Use dueToday=true for tasks due today. By default only incomplete tasks are returned.",

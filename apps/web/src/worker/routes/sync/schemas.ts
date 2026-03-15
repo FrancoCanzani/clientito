@@ -9,6 +9,14 @@ export const errorResponseSchema = z.object({ error: z.string() });
 
 export const syncStatusResponseSchema = z.object({
   data: z.object({
+    state: z.enum([
+      "needs_mailbox_connect",
+      "needs_reconnect",
+      "ready_to_sync",
+      "error",
+      "syncing",
+      "ready",
+    ]),
     hasSynced: z.boolean(),
     historyId: z.string().nullable(),
     lastSync: z.number().nullable(),
@@ -16,8 +24,8 @@ export const syncStatusResponseSchema = z.object({
     progressCurrent: z.number().nullable(),
     progressTotal: z.number().nullable(),
     error: z.string().nullable(),
+    needsMailboxConnect: z.boolean(),
     needsGoogleReconnect: z.boolean(),
-    needsContactReview: z.boolean(),
   }),
 });
 

@@ -12,9 +12,10 @@ import {
 import type { AppRouteEnv } from "../types";
 import {
   buildAttachmentUrl,
+  emailSummarySelection,
   HAS_ATTACHMENT_LABEL,
   resolveInlineCidImages,
-  toEmailListResponse,
+  toEmailDetailResponse,
 } from "./helpers";
 import { emailDetailParamsSchema, emailDetailQuerySchema } from "./schemas";
 
@@ -31,7 +32,11 @@ export function registerGetEmail(api: Hono<AppRouteEnv>) {
       const { refreshLive } = c.req.valid("query");
 
       const row = await db
-        .select()
+        .select({
+          ...emailSummarySelection,
+          bodyText: emails.bodyText,
+          bodyHtml: emails.bodyHtml,
+        })
         .from(emails)
         .where(and(eq(emails.userId, user.id), eq(emails.id, emailId)))
         .limit(1);
@@ -39,7 +44,7 @@ export function registerGetEmail(api: Hono<AppRouteEnv>) {
       const first = row[0];
       if (!first) return c.json({ error: "Email not found" }, 404);
 
-      const baseEmail = toEmailListResponse(first);
+      const baseEmail = toEmailDetailResponse(first);
       let resolvedBodyText = baseEmail.bodyText;
       let resolvedBodyHtml = baseEmail.bodyHtml;
       let attachments: Array<{

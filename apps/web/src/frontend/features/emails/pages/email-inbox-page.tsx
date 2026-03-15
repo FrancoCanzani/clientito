@@ -1,365 +1,342 @@
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  ResizablePanelGroup,
-  ResizablePanel,
   ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { markEmailRead } from "@/features/emails/api";
-import {
-  ComposeEmailDialog,
-  type ComposeInitial,
-} from "@/features/emails/components/compose-email-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { type ComposeInitial } from "@/features/emails/components/compose-email-dialog";
+import { ComposePanel } from "@/features/emails/components/compose-panel";
+import { EmailBulkToolbar } from "@/features/emails/components/email-bulk-toolbar";
+import { EmailContextMenu } from "@/features/emails/components/email-context-menu";
 import { EmailDetailContent } from "@/features/emails/components/email-detail-content";
-import { fetchEmailDetail } from "@/features/emails/queries/fetch-email-detail";
-import { fetchEmails } from "@/features/emails/queries/fetch-emails";
-import type { EmailListItem } from "@/features/emails/types";
+import { EmailDetailSheet } from "@/features/emails/components/email-detail-sheet";
 import {
-  FILTER_TABS,
-  VIEW_LABELS,
-  VIEW_VALUES,
-  type EmailView,
-  type InboxFilterTab,
-  isInboxFilterTab,
-} from "@/features/emails/utils/inbox-filters";
-import {
-  formatInboxRowDate,
-  groupEmailsByDay,
-} from "@/features/emails/utils";
-import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
+  useRegisterEmailCommandHandler,
+  type EmailCommand,
+} from "@/features/emails/hooks/use-email-command-state";
+import { useEmailInboxActions } from "@/features/emails/hooks/use-email-inbox-actions";
+import { useEmailInboxData } from "@/features/emails/hooks/use-email-inbox-data";
+import { useEmailInboxKeyboard } from "@/features/emails/hooks/use-email-inbox-keyboard";
+import { useEmailSelection } from "@/features/emails/hooks/use-email-selection";
+import { formatInboxRowDate } from "@/features/emails/utils/format-inbox-row-date";
+import { VIEW_LABELS } from "@/features/emails/utils/inbox-filters";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useRouteContext } from "@/hooks/use-page-context";
+import { cn } from "@/lib/utils";
 import {
-  ArrowLeftIcon,
   CaretDownIcon,
   CaretUpIcon,
   PaperclipIcon,
+  XIcon,
 } from "@phosphor-icons/react";
-import { XIcon } from "lucide-react";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
-const emailsRoute = getRouteApi("/_dashboard/emails");
+const emailsRoute = getRouteApi("/_dashboard/inbox");
 
 export default function EmailInboxPage() {
   const navigate = emailsRoute.useNavigate();
   const search = emailsRoute.useSearch();
-  const selectedEmailId = search.id ?? null;
-  const isComposing = search.compose === true;
-  const currentView = (search.view ?? "inbox") as EmailView;
-  const currentTab: InboxFilterTab =
-    search.category && isInboxFilterTab(search.category)
-      ? search.category
-      : "all";
   const { initialEmails } = emailsRoute.useLoaderData();
   const isMobile = useIsMobile();
-  const queryClient = useQueryClient();
+
+  const view = search.view ?? "inbox";
+  const selectedEmailId = search.id ?? search.emailId ?? null;
+  const isComposing = search.compose === true;
+
   const [composeInitial, setComposeInitial] = useState<
     ComposeInitial | undefined
   >();
   const [forwardOpen, setForwardOpen] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [lastClickedId, setLastClickedId] = useState<string | null>(null);
 
-  const currentCategory =
-    currentView === "inbox" && currentTab !== "all" ? currentTab : undefined;
-  const emailsQueryKey = ["emails", currentView, currentCategory ?? "all"];
-
-  const prefetchEmail = (email: EmailListItem) => {
-    void queryClient.prefetchQuery({
-      queryKey: ["email-detail", email.id],
-      queryFn: () => fetchEmailDetail(email.id),
-      staleTime: 60_000,
-    });
-
-    if (email.hasAttachment) {
-      void queryClient.prefetchQuery({
-        queryKey: ["email-detail-live", email.id],
-        queryFn: () => fetchEmailDetail(email.id, { refreshLive: true }),
-        staleTime: 30_000,
-      });
-    }
-  };
-
-  const emailsQuery = useInfiniteQuery({
-    queryKey: emailsQueryKey,
-    queryFn: async ({ pageParam }) =>
-      fetchEmails({
-        view: currentView,
-        category: currentCategory,
-        limit: 50,
-        offset: pageParam,
-      }),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) =>
-      lastPage?.pagination?.hasMore
-        ? lastPage.pagination.offset + lastPage.pagination.limit
-        : undefined,
-    initialData: {
-      pages: [initialEmails],
-      pageParams: [0],
-    },
+  const {
+    displayRows,
+    sections,
+    selectedEmail,
+    orderedIds,
+    emailById,
+    emailsPending,
+    emailsError,
+    hasNextPage,
+    isFetchingNextPage,
+    loadMoreRef,
+  } = useEmailInboxData({
+    view,
+    initialEmails,
+    selectedEmailId,
   });
 
-  const displayEmails = useMemo(
-    () => emailsQuery.data?.pages.flatMap((page) => page.data) ?? [],
-    [emailsQuery.data],
+  const selection = useEmailSelection(displayRows);
+  const selectedIds = useMemo(
+    () => Array.from(selection.selectedIds),
+    [selection.selectedIds],
   );
-  const selectedEmail = useMemo<EmailListItem | null>(() => {
-    if (!selectedEmailId) return null;
-    return displayEmails.find((email) => email.id === selectedEmailId) ?? null;
-  }, [displayEmails, selectedEmailId]);
-  const sections = useMemo(
-    () => groupEmailsByDay(displayEmails),
-    [displayEmails],
+  const selectedEmails = useMemo(
+    () => displayRows.filter((email) => selection.selectedIds.has(email.id)),
+    [displayRows, selection.selectedIds],
+  );
+  const isSplitView = !isMobile && selectedEmail !== null;
+  const allVisibleSelected =
+    displayRows.length > 0 && selection.count === displayRows.length;
+  const pageTitle = VIEW_LABELS[view];
+
+  const clearSelection = useCallback(() => {
+    selection.deselectAll();
+    setSelectionMode(false);
+  }, [selection]);
+
+  const selectAllVisible = useCallback(() => {
+    setSelectionMode(true);
+    selection.selectAll();
+  }, [selection]);
+
+  const toggleSelection = useCallback(
+    (emailId: string, shiftKey: boolean) => {
+      setSelectionMode(true);
+      if (shiftKey && lastClickedId) {
+        selection.selectRange(lastClickedId, emailId);
+      } else {
+        selection.toggle(emailId);
+      }
+      setLastClickedId(emailId);
+    },
+    [lastClickedId, selection],
   );
 
-  useRouteContext(
-    "/emails",
-    selectedEmail
-      ? {
-          type: "email",
-          id: selectedEmail.id,
-          subject: selectedEmail.subject,
-          fromName: selectedEmail.fromName,
-          fromAddr: selectedEmail.fromAddr,
-          threadId: selectedEmail.threadId,
-        }
-      : undefined,
+  const toggleSelectionFromMenu = useCallback(
+    (emailId: string) => {
+      setSelectionMode(true);
+      selection.toggle(emailId);
+      setLastClickedId(emailId);
+    },
+    [selection],
   );
 
-  const selectEmail = useCallback(
-    (email: EmailListItem) => {
-      navigate({
-        search: { ...search, id: email.id, emailId: undefined },
-        replace: true,
-      });
+  const { openEmail, closeEmail, executeEmailAction, mutationPending } =
+    useEmailInboxActions({
+      view,
+      selectedEmailId,
+      selectedIds,
+      selection,
+      onSelectionCleared: clearSelection,
+    });
 
-      if (!email.isRead) {
-        queryClient.setQueryData(
-          emailsQueryKey,
-          (old: typeof emailsQuery.data | undefined) => {
-            if (!old) return old;
-            return {
-              ...old,
-              pages: old.pages.map((page) => ({
-                ...page,
-                data: page.data.map((e) =>
-                  e.id === email.id ? { ...e, isRead: true } : e,
-                ),
-              })),
-            };
-          },
-        );
-        void markEmailRead(email.id);
+  const handleEmailCommand = useCallback(
+    (command: EmailCommand) => {
+      switch (command.type) {
+        case "selection-mode":
+          setSelectionMode(command.enabled);
+          if (!command.enabled) {
+            selection.deselectAll();
+          }
+          break;
+        case "select-all-visible":
+          setSelectionMode(true);
+          selection.selectAll();
+          break;
+        case "clear-selection":
+          clearSelection();
+          break;
       }
     },
-    [emailsQueryKey, navigate, queryClient, search],
+    [clearSelection, selection],
   );
 
-  const selectedIndex = useMemo(() => {
-    if (!selectedEmailId) return -1;
-    return displayEmails.findIndex((e) => e.id === selectedEmailId);
-  }, [displayEmails, selectedEmailId]);
+  useRegisterEmailCommandHandler(handleEmailCommand);
 
-  const goToEmail = useCallback(
-    (direction: "prev" | "next") => {
-      const nextIndex =
-        direction === "next" ? selectedIndex + 1 : selectedIndex - 1;
-      const email = displayEmails[nextIndex];
-      if (email) selectEmail(email);
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        closeEmail();
+      }
     },
-    [displayEmails, selectEmail, selectedIndex],
+    [closeEmail],
   );
-
-  const hasPrev = selectedIndex > 0;
-  const hasNext = selectedIndex >= 0 && selectedIndex < displayEmails.length - 1;
-
-  useEffect(() => {
-    if (!search.emailId || search.id) return;
-    navigate({
-      search: {
-        ...search,
-        id: search.emailId,
-        emailId: undefined,
-      },
-      replace: true,
-    });
-  }, [navigate, search]);
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      )
-        return;
-      if (e.key === "j" && hasNext) goToEmail("next");
-      if (e.key === "k" && hasPrev) goToEmail("prev");
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [goToEmail, hasNext, hasPrev]);
-
-  const closeDetail = useCallback(() => {
-    navigate({
-      search: { ...search, id: undefined, emailId: undefined },
-      replace: true,
-    });
-  }, [navigate, search]);
 
   const handleForward = useCallback(
     (initial: ComposeInitial) => {
-      closeDetail();
+      handleOpenChange(false);
       setComposeInitial(initial);
       setForwardOpen(true);
     },
-    [closeDetail],
+    [handleOpenChange],
   );
 
-  const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } =
-    emailsQuery;
-  const loadMoreRef = useIntersectionObserver<HTMLDivElement>({
-    root: null,
-    rootMargin: "200px 0px",
-    threshold: 0.01,
-    onChange: (isIntersecting) => {
-      if (!isIntersecting) return;
-      if (!hasNextPage) return;
-      if (isFetchingNextPage || isFetching) return;
-      void fetchNextPage();
-    },
+  const { goToEmail, hasPrev, hasNext } = useEmailInboxKeyboard({
+    orderedIds,
+    selectedEmailId,
+    emailById,
+    openEmail,
+    closeEmail,
+    executeEmailAction,
   });
 
   const emailListContent = (
-    <div className="flex h-full min-w-0 flex-col overflow-hidden">
-      <header className="shrink-0 space-y-3 p-4 pb-2">
-        <h2 className="text-lg font-medium">{VIEW_LABELS[currentView]}</h2>
-        <div className="flex flex-wrap gap-1.5">
-          {VIEW_VALUES.map((view) => {
-            const active = currentView === view;
-            return (
-              <Button
-                key={view}
-                type="button"
-                variant={active ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => {
-                  navigate({
-                    search: {
-                      ...search,
-                      id: undefined,
-                      emailId: undefined,
-                      view,
-                      category: view === "inbox" ? currentTab : undefined,
-                    },
-                    replace: true,
-                  });
-                }}
-              >
-                {VIEW_LABELS[view]}
-              </Button>
-            );
-          })}
-        </div>
-        {currentView === "inbox" && (
-          <div className="flex flex-wrap gap-1.5 border-l-2 border-muted pl-2">
-            {FILTER_TABS.map((tab) => {
-              const active = currentTab === tab.key;
-              return (
-                <Button
-                  key={tab.key}
-                  type="button"
-                  variant={active ? "outline" : "ghost"}
-                  size="sm"
-                  onClick={() => {
-                    navigate({
-                      search: {
-                        ...search,
-                        id: undefined,
-                        emailId: undefined,
-                        category: tab.key,
-                      },
-                      replace: true,
-                    });
-                  }}
-                >
-                  {tab.label}
-                </Button>
-              );
-            })}
-          </div>
-        )}
+    <div
+      className={cn(
+        "flex min-w-0 flex-col gap-4",
+        isSplitView
+          ? "h-full w-full overflow-hidden px-4 py-4"
+          : "mx-auto w-full max-w-4xl",
+      )}
+    >
+      <header className="shrink-0">
+        <h2 className="text-lg font-medium">{pageTitle}</h2>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-        {emailsQuery.isPending ? (
+      {selectionMode && selection.hasSelection && (
+        <EmailBulkToolbar
+          count={selection.count}
+          allSelected={allVisibleSelected}
+          disabled={mutationPending}
+          onSelectAll={selectAllVisible}
+          onArchive={() => executeEmailAction("archive", selectedIds)}
+          onTrash={() => executeEmailAction("trash", selectedIds)}
+          onMarkRead={() => executeEmailAction("mark-read", selectedIds)}
+          onMarkUnread={() => executeEmailAction("mark-unread", selectedIds)}
+          onStarToggle={() => {
+            const allStarred = selectedEmails.every((email) =>
+              email.labelIds.includes("STARRED"),
+            );
+            executeEmailAction(allStarred ? "unstar" : "star", selectedIds);
+          }}
+          onDeselect={clearSelection}
+        />
+      )}
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {emailsPending ? (
           <div className="space-y-2">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full rounded" />
+            {Array.from({ length: 10 }).map((_, index) => (
+              <Skeleton key={index} className="h-11 w-full rounded-md" />
             ))}
           </div>
-        ) : emailsQuery.isError ? (
-          <p className="p-4 text-center text-destructive">
+        ) : emailsError ? (
+          <p className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-center text-sm text-destructive">
             Failed to load emails.
           </p>
-        ) : displayEmails.length > 0 ? (
-          <div className="space-y-6">
+        ) : displayRows.length > 0 ? (
+          <div className="space-y-5">
             {sections.map((section) => (
-              <section
-                key={section.label}
-                className="flex flex-col gap-2 text-sm"
-              >
-                <span className="text-xs font-mono text-muted-foreground">
+              <section key={section.label} className="space-y-1.5">
+                <div className="sticky top-0 z-10 bg-background/95 py-1 text-xs text-muted-foreground backdrop-blur-sm">
                   {section.label}
-                </span>
-                <div className="space-y-0.5">
-                  {section.items.map((email) => {
-                    const isSelected = email.id === selectedEmailId;
+                </div>
+                <div className="space-y-1 [&:has(>[data-email-row]:hover)>[data-email-row]:not(:hover)]:opacity-85">
+                  {section.items.map((group) => {
+                    const email = group.representative;
+                    const isSelected = selection.isSelected(email.id);
+                    const isOpen = email.id === selectedEmailId;
+                    const targetEmails =
+                      isSelected && selection.hasSelection
+                        ? selectedEmails
+                        : [email];
+                    const targetIds = targetEmails.map((item) => item.id);
+                    const participantLabel =
+                      view === "sent"
+                        ? email.toAddr
+                          ? `To: ${email.toAddr}`
+                          : "To: (unknown recipient)"
+                        : email.fromName || email.fromAddr;
+
                     return (
-                      <button
+                      <EmailContextMenu
                         key={email.id}
-                        type="button"
-                        className={`flex w-full items-center justify-between gap-3 rounded-md p-1.5 text-left text-sm transition-colors hover:bg-muted/40 ${
-                          isSelected ? "bg-muted" : ""
-                        }`}
-                        onMouseEnter={() => prefetchEmail(email)}
-                        onFocus={() => prefetchEmail(email)}
-                        onClick={() => selectEmail(email)}
+                        email={email}
+                        selected={isSelected}
+                        targetEmails={targetEmails}
+                        onArchive={() =>
+                          executeEmailAction("archive", targetIds)
+                        }
+                        onTrash={() => executeEmailAction("trash", targetIds)}
+                        onSpam={() => executeEmailAction("spam", targetIds)}
+                        onSetRead={(isRead) =>
+                          executeEmailAction(
+                            isRead ? "mark-read" : "mark-unread",
+                            targetIds,
+                          )
+                        }
+                        onSetStarred={(starred) =>
+                          executeEmailAction(
+                            starred ? "star" : "unstar",
+                            targetIds,
+                          )
+                        }
+                        onToggleSelect={() => toggleSelectionFromMenu(email.id)}
+                        onSelectAll={selectAllVisible}
                       >
-                        <div className="min-w-0 flex items-center gap-2">
-                          {!email.isRead && (
-                            <span
-                              className="size-1.5 shrink-0 rounded-full bg-blue-500"
-                              aria-label="Unread"
-                              title="Unread"
+                        <div
+                          data-email-row
+                          role="button"
+                          tabIndex={0}
+                          className={cn(
+                            "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 hover:bg-muted/40 cursor-default",
+                            isOpen && "bg-muted/50",
+                          )}
+                          onClick={() => openEmail(email)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              openEmail(email);
+                            }
+                          }}
+                        >
+                          {selectionMode ? (
+                            <Checkbox
+                              checked={isSelected}
+                              className="shrink-0"
+                              aria-label={`Select email from ${email.fromName || email.fromAddr}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggleSelection(email.id, event.shiftKey);
+                              }}
+                              onKeyDown={(event) => {
+                                event.stopPropagation();
+                              }}
                             />
-                          )}
-                          <span className="max-w-44 truncate font-medium">
-                            {email.fromName || email.fromAddr}
-                          </span>
-                          <span className="truncate text-muted-foreground">
-                            {email.subject ?? "(no subject)"}
-                          </span>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2 text-muted-foreground">
-                          {email.hasAttachment && (
-                            <span title="Has attachment">
-                              <PaperclipIcon
-                                className="size-3.5"
-                                aria-label="Has attachment"
-                              />
+                          ) : null}
+
+                          <span
+                            className={cn(
+                              "size-1.5 shrink-0 rounded-full",
+                              email.isRead ? "hidden" : "bg-blue-500",
+                            )}
+                            aria-hidden
+                          />
+
+                          <div className="min-w-0 flex-1 items-center gap-2 overflow-hidden text-sm sm:flex">
+                            <span className="shrink-0 truncate font-medium text-foreground sm:max-w-52">
+                              {participantLabel}
                             </span>
-                          )}
-                          <span className="font-mono text-xs">
-                            {formatInboxRowDate(email.date)}
-                          </span>
+                            <span className="truncate text-muted-foreground">
+                              {email.subject ?? "(no subject)"}
+                            </span>
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                            {email.hasAttachment && (
+                              <PaperclipIcon className="size-3.5" aria-hidden />
+                            )}
+                            {group.threadCount > 1 && (
+                              <span className="rounded-full border border-border/70 px-1.5 py-0.5 font-mono text-[10px] text-foreground">
+                                {group.threadCount}
+                              </span>
+                            )}
+                            <span className="font-mono">
+                              {formatInboxRowDate(email.date)}
+                            </span>
+                          </div>
                         </div>
-                      </button>
+                      </EmailContextMenu>
                     );
                   })}
                 </div>
               </section>
             ))}
+
             {hasNextPage && (
               <div
                 ref={loadMoreRef}
@@ -370,7 +347,7 @@ export default function EmailInboxPage() {
             )}
           </div>
         ) : (
-          <p className="p-4 text-center text-muted-foreground">
+          <p className="rounded-md border border-border/60 p-4 text-center text-sm text-muted-foreground">
             No emails found.
           </p>
         )}
@@ -378,81 +355,23 @@ export default function EmailInboxPage() {
     </div>
   );
 
-  const emailDetailPanel = selectedEmail ? (
+  const desktopDetailPanel = selectedEmail ? (
     <div className="flex h-full min-w-0 flex-col overflow-hidden border-l border-border">
-      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-medium">
-            {selectedEmail.subject ?? "(no subject)"}
-          </h3>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7"
-            disabled={!hasPrev}
-            onClick={() => goToEmail("prev")}
-            title="Previous (k)"
-          >
-            <CaretUpIcon className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7"
-            disabled={!hasNext}
-            onClick={() => goToEmail("next")}
-            title="Next (j)"
-          >
-            <CaretDownIcon className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7"
-            onClick={closeDetail}
-            title="Close"
-            aria-label="Close"
-          >
-            <XIcon className="size-4" />
-          </Button>
-        </div>
-      </div>
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4">
         <EmailDetailContent
           key={selectedEmail.id}
           email={selectedEmail}
-          onClose={closeDetail}
+          onClose={closeEmail}
           onForward={handleForward}
-        />
-      </div>
-    </div>
-  ) : null;
-
-  if (isMobile) {
-    if (selectedEmail) {
-      return (
-        <div className="!mx-[-1rem] !max-w-none -mt-4 -mb-24 flex h-[100dvh] min-h-0 flex-col overflow-hidden">
-          <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7"
-              onClick={closeDetail}
-            >
-              <ArrowLeftIcon className="size-4" />
-            </Button>
-            <h3 className="min-w-0 flex-1 truncate text-sm font-medium">
-              {selectedEmail.subject ?? "(no subject)"}
-            </h3>
-            <div className="flex items-center gap-1">
+          headerActions={
+            <>
               <Button
                 variant="ghost"
                 size="icon"
                 className="size-7"
                 disabled={!hasPrev}
                 onClick={() => goToEmail("prev")}
+                title="Previous"
               >
                 <CaretUpIcon className="size-4" />
               </Button>
@@ -462,71 +381,29 @@ export default function EmailInboxPage() {
                 className="size-7"
                 disabled={!hasNext}
                 onClick={() => goToEmail("next")}
+                title="Next"
               >
                 <CaretDownIcon className="size-4" />
               </Button>
-            </div>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <EmailDetailContent
-              key={selectedEmail.id}
-              email={selectedEmail}
-              onClose={closeDetail}
-              onForward={handleForward}
-            />
-          </div>
-          {(isComposing || forwardOpen) && (
-            <ComposeEmailDialog
-              key={forwardOpen ? "forward-compose" : "new-compose"}
-              open={isComposing || forwardOpen}
-              initial={forwardOpen ? composeInitial : undefined}
-              onOpenChange={(open) => {
-                if (!open) {
-                  setForwardOpen(false);
-                  setComposeInitial(undefined);
-                  if (isComposing) {
-                    navigate({
-                      search: { ...search, compose: undefined },
-                      replace: true,
-                    });
-                  }
-                }
-              }}
-            />
-          )}
-        </div>
-      );
-    }
-
-    return (
-      <div>
-        {emailListContent}
-        {(isComposing || forwardOpen) && (
-          <ComposeEmailDialog
-            key={forwardOpen ? "forward-compose" : "new-compose"}
-            open={isComposing || forwardOpen}
-            initial={forwardOpen ? composeInitial : undefined}
-            onOpenChange={(open) => {
-              if (!open) {
-                setForwardOpen(false);
-                setComposeInitial(undefined);
-                if (isComposing) {
-                  navigate({
-                    search: { ...search, compose: undefined },
-                    replace: true,
-                  });
-                }
-              }
-            }}
-          />
-        )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={closeEmail}
+                title="Close"
+                aria-label="Close"
+              >
+                <XIcon className="size-4" />
+              </Button>
+            </>
+          }
+        />
       </div>
-    );
-  }
+    </div>
+  ) : null;
 
-  const composeDialog = (isComposing || forwardOpen) && (
-    <ComposeEmailDialog
-      key={forwardOpen ? "forward-compose" : "new-compose"}
+  const composePanel = (
+    <ComposePanel
       open={isComposing || forwardOpen}
       initial={forwardOpen ? composeInitial : undefined}
       onOpenChange={(open) => {
@@ -535,7 +412,10 @@ export default function EmailInboxPage() {
           setComposeInitial(undefined);
           if (isComposing) {
             navigate({
-              search: { ...search, compose: undefined },
+              search: (prev) => ({
+                ...prev,
+                compose: undefined,
+              }),
               replace: true,
             });
           }
@@ -544,36 +424,53 @@ export default function EmailInboxPage() {
     />
   );
 
+  if (isMobile) {
+    return (
+      <>
+        {emailListContent}
+        <EmailDetailSheet
+          email={selectedEmail}
+          open={selectedEmail !== null}
+          onOpenChange={handleOpenChange}
+          onForward={handleForward}
+        />
+        {composePanel}
+      </>
+    );
+  }
+
   if (!selectedEmail) {
     return (
       <>
         {emailListContent}
-        {composeDialog}
+        {composePanel}
       </>
     );
   }
 
   return (
-    <div className="!mx-[-1rem] !max-w-none -mt-4 -mb-24 h-[100dvh] min-w-0 overflow-hidden">
-      <ResizablePanelGroup orientation="horizontal">
-        <ResizablePanel
-          defaultSize="40%"
-          minSize="25%"
-          maxSize="55%"
-          className="min-w-0 overflow-hidden"
-        >
-          {emailListContent}
-        </ResizablePanel>
-        <ResizableHandle />
-        <ResizablePanel
-          defaultSize="60%"
-          minSize="35%"
-          className="min-w-0 overflow-hidden"
-        >
-          {emailDetailPanel}
-        </ResizablePanel>
-      </ResizablePanelGroup>
-      {composeDialog}
-    </div>
+    <>
+      <div className="mx-4! max-w-none! -mt-4 -mb-24 h-dvh min-w-0 overflow-hidden">
+        <ResizablePanelGroup orientation="horizontal">
+          <ResizablePanel
+            defaultSize="50%"
+            minSize="30%"
+            maxSize="65%"
+            className="min-w-0 overflow-hidden"
+          >
+            {emailListContent}
+          </ResizablePanel>
+          <ResizableHandle />
+          <ResizablePanel
+            defaultSize="50%"
+            minSize="35%"
+            className="min-w-0 overflow-hidden"
+          >
+            {desktopDetailPanel}
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+      {composePanel}
+    </>
   );
 }

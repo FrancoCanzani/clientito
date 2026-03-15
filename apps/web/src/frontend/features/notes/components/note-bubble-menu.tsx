@@ -1,7 +1,11 @@
+import { useHotkey } from "@tanstack/react-hotkeys";
 import type { Editor } from "@tiptap/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RichTextBold } from "reactjs-tiptap-editor/bold";
-import { RichTextBubbleLink, RichTextBubbleText } from "reactjs-tiptap-editor/bubble";
+import {
+  RichTextBubbleLink,
+  RichTextBubbleText,
+} from "reactjs-tiptap-editor/bubble";
 import { RichTextBulletList } from "reactjs-tiptap-editor/bulletlist";
 import { RichTextItalic } from "reactjs-tiptap-editor/italic";
 import { RichTextLink } from "reactjs-tiptap-editor/link";
@@ -74,18 +78,17 @@ export function NoteBubbleMenu({ editor }: { editor: Editor }) {
     };
   }, [isBlockMenuOpen]);
 
-  useEffect(() => {
-    if (!isBlockMenuOpen) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsBlockMenuOpen(false);
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [isBlockMenuOpen]);
+  useHotkey(
+    "Escape",
+    () => {
+      setIsBlockMenuOpen(false);
+    },
+    {
+      enabled: isBlockMenuOpen,
+      preventDefault: false,
+      stopPropagation: false,
+    },
+  );
 
   return (
     <div>

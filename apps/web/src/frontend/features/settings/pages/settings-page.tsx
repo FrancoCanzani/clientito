@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { deleteAccount } from "@/features/settings/mutations";
 import { useAuth } from "@/hooks/use-auth";
-import { deleteAccount } from "@/features/settings/api";
 import { useTheme } from "@/hooks/use-theme";
-import { MoonIcon, SunIcon, MonitorIcon } from "@phosphor-icons/react";
+import { MonitorIcon, MoonIcon, SunIcon } from "@phosphor-icons/react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -99,9 +99,7 @@ export default function SettingsPage() {
               variant="destructive"
               size="sm"
               onClick={() => deleteMutation.mutate()}
-              disabled={
-                confirmText !== "DELETE" || deleteMutation.isPending
-              }
+              disabled={confirmText !== "DELETE" || deleteMutation.isPending}
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete account"}
             </Button>

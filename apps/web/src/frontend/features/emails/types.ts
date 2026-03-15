@@ -9,7 +9,14 @@ export type EmailSearchResult = {
   date: number;
   isRead: boolean;
   labelIds: string[];
-  personId: string | null;
+};
+
+export type ContactSuggestion = {
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+  lastInteractionAt: number | null;
+  interactionCount: number;
 };
 
 export type EmailListItem = {
@@ -20,15 +27,12 @@ export type EmailListItem = {
   toAddr: string | null;
   subject: string | null;
   snippet: string | null;
-  bodyText: string | null;
-  bodyHtml: string | null;
   threadId: string | null;
   date: number;
   direction: "sent" | "received" | null;
   isRead: boolean;
   labelIds: string[];
   hasAttachment: boolean;
-  personId: string | null;
   createdAt: number;
 };
 
@@ -45,6 +49,8 @@ export type EmailAttachment = {
 };
 
 export type EmailDetailItem = EmailListItem & {
+  bodyText: string | null;
+  bodyHtml: string | null;
   resolvedBodyText: string | null;
   resolvedBodyHtml: string | null;
   attachments: EmailAttachment[];
@@ -53,7 +59,6 @@ export type EmailDetailItem = EmailListItem & {
 export type EmailListResponse = {
   data: EmailListItem[];
   pagination: {
-    total: number;
     limit: number;
     offset: number;
     hasMore: boolean;

@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Database } from "../../db/client";
 import { emails, notes, tasks } from "../../db/schema";
 import { archiveGmailMessage } from "../../lib/gmail/modify";
+import { applyEmailPatch } from "../../routes/emails/mutation";
 
 const MODEL = "gpt-5.4";
 
@@ -70,7 +71,12 @@ export function makeWriteTools(db: Database, userId: string, env: Env) {
       needsApproval: true,
       execute: async ({ emailId }) => {
         const emailRow = await db
-          .select({ gmailId: emails.gmailId })
+          .select({
+            id: emails.id,
+            gmailId: emails.gmailId,
+            isRead: emails.isRead,
+            labelIds: emails.labelIds,
+          })
           .from(emails)
           .where(and(eq(emails.id, emailId), eq(emails.userId, userId)))
           .limit(1);
@@ -79,7 +85,30 @@ export function makeWriteTools(db: Database, userId: string, env: Env) {
         if (!email) return { error: "Email not found" };
 
         await archiveGmailMessage(db, env, userId, email.gmailId);
+        const nextState = applyEmailPatch(email, { archived: true });
+
+        if (Object.keys(nextState.dbUpdates).length > 0) {
+          await db
+            .update(emails)
+            .set(nextState.dbUpdates)
+            .where(and(eq(emails.id, emailId), eq(emails.userId, userId)));
+        }
+
         return { archived: true, emailId };
+      },
+    }),
+
+    composeEmail: tool({
+      description:
+        "Open a compose window pre-filled with the given email content. Use this when the user asks you to draft or compose a new email.",
+      inputSchema: z.object({
+        to: z.string().email().optional().describe("Recipient email address."),
+        subject: z.string().optional().describe("Email subject line."),
+        body: z.string().describe("Email body content as HTML."),
+      }),
+      needsApproval: true,
+      execute: async ({ to, subject, body }) => {
+        return { action: "composeEmail", to, subject, body };
       },
     }),
 
@@ -97,7 +126,6 @@ export function makeWriteTools(db: Database, userId: string, env: Env) {
           .optional()
           .describe("Optional extra guidance about tone, intent, or what to say."),
       }),
-      needsApproval: true,
       execute: async ({ emailId, instructions }) => {
         const emailRow = await db
           .select({

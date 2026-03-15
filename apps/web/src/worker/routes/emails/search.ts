@@ -25,7 +25,6 @@ export function registerSearchEmails(api: Hono<AppRouteEnv>) {
         date: emails.date,
         isRead: emails.isRead,
         labelIds: emails.labelIds,
-        personId: emails.personId,
       })
       .from(emails)
       .where(

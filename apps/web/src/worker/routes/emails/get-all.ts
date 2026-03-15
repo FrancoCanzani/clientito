@@ -4,6 +4,7 @@ import type { Hono } from "hono";
 import { emails } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 import {
+  emailSummarySelection,
   hasEmailLabel,
   toEmailListResponse,
 } from "./helpers";
@@ -19,7 +20,6 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
       offset = 0,
       search,
       isRead,
-      category,
       view = "inbox",
     } = c.req.valid("query");
     const conditions = [eq(emails.userId, user.id)];
@@ -52,28 +52,12 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
       case "trash":
         conditions.push(hasEmailLabel("TRASH"));
         break;
-      case "all":
-        break;
-    }
-
-    if (view === "inbox") {
-      if (category === "primary") {
-        conditions.push(hasEmailLabel("CATEGORY_PERSONAL"));
-      } else if (category === "promotions") {
-        conditions.push(hasEmailLabel("CATEGORY_PROMOTIONS"));
-      } else if (category === "social") {
-        conditions.push(hasEmailLabel("CATEGORY_SOCIAL"));
-      } else if (category === "notifications") {
-        conditions.push(
-          sql<boolean>`(${hasEmailLabel("CATEGORY_UPDATES")} or ${hasEmailLabel("CATEGORY_FORUMS")})`,
-        );
-      }
     }
 
     const whereClause = and(...conditions);
 
     const rowsWithExtra = await db
-      .select()
+      .select(emailSummarySelection)
       .from(emails)
       .where(whereClause)
       .orderBy(desc(emails.date))

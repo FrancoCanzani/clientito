@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
-import { companies, people, tasks } from "../../db/schema";
+import { tasks } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 import { patchTaskBodySchema, taskIdParamsSchema } from "./schemas";
 
@@ -15,7 +15,7 @@ export function registerPatchTasks(api: Hono<AppRouteEnv>) {
       const user = c.get("user")!;
 
       const { id } = c.req.valid("param");
-      const { title, dueAt, done, personId, companyId } = c.req.valid("json");
+      const { title, description, dueAt, priority, done } = c.req.valid("json");
 
       const existing = await db
         .select({ id: tasks.id })
@@ -24,32 +24,14 @@ export function registerPatchTasks(api: Hono<AppRouteEnv>) {
         .limit(1);
       if (!existing[0]) return c.json({ error: "Task not found" }, 404);
 
-      if (personId !== undefined && personId !== null) {
-        const person = await db
-          .select({ id: people.id })
-          .from(people)
-          .where(and(eq(people.id, personId), eq(people.userId, user.id)))
-          .limit(1);
-        if (!person[0]) return c.json({ error: "Person not found" }, 404);
-      }
-
-      if (companyId !== undefined && companyId !== null) {
-        const company = await db
-          .select({ id: companies.id })
-          .from(companies)
-          .where(and(eq(companies.id, companyId), eq(companies.userId, user.id)))
-          .limit(1);
-        if (!company[0]) return c.json({ error: "Company not found" }, 404);
-      }
-
       await db
         .update(tasks)
         .set({
           title,
+          description,
           dueAt,
+          priority,
           done,
-          personId,
-          companyId,
         })
         .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)));
 
@@ -57,10 +39,10 @@ export function registerPatchTasks(api: Hono<AppRouteEnv>) {
         .select({
           id: tasks.id,
           title: tasks.title,
+          description: tasks.description,
           dueAt: tasks.dueAt,
+          priority: tasks.priority,
           done: tasks.done,
-          personId: tasks.personId,
-          companyId: tasks.companyId,
           createdAt: tasks.createdAt,
         })
         .from(tasks)

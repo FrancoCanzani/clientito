@@ -22,7 +22,7 @@ export function registerGetTasks(api: Hono<AppRouteEnv>) {
       dueAfter,
       dueBefore,
       done,
-      limit = 100,
+      limit,
       offset = 0,
     } = c.req.valid("query");
     const conditions = [eq(tasks.userId, user.id)];
@@ -46,22 +46,27 @@ export function registerGetTasks(api: Hono<AppRouteEnv>) {
 
     const whereClause = and(...conditions);
 
+    const baseRowsQuery = db
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        description: tasks.description,
+        dueAt: tasks.dueAt,
+        priority: tasks.priority,
+        done: tasks.done,
+        createdAt: tasks.createdAt,
+      })
+      .from(tasks)
+      .where(whereClause)
+      .orderBy(asc(tasks.dueAt), desc(tasks.createdAt));
+
+    const rowsQuery =
+      limit !== undefined
+        ? baseRowsQuery.limit(limit).offset(offset)
+        : baseRowsQuery;
+
     const [rows, totalRows] = await Promise.all([
-      db
-        .select({
-          id: tasks.id,
-          title: tasks.title,
-          dueAt: tasks.dueAt,
-          done: tasks.done,
-          personId: tasks.personId,
-          companyId: tasks.companyId,
-          createdAt: tasks.createdAt,
-        })
-        .from(tasks)
-        .where(whereClause)
-        .orderBy(asc(tasks.dueAt), desc(tasks.createdAt))
-        .limit(limit)
-        .offset(offset),
+      rowsQuery,
       db
         .select({ count: sql<number>`count(*)` })
         .from(tasks)
@@ -73,7 +78,7 @@ export function registerGetTasks(api: Hono<AppRouteEnv>) {
         data: rows,
         pagination: {
           total: Number(totalRows[0]?.count ?? 0),
-          limit,
+          limit: limit ?? null,
           offset,
         },
       },

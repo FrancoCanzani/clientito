@@ -13,7 +13,6 @@ export const emailSearchItemSchema = z.object({
   date: z.number(),
   isRead: z.boolean(),
   labelIds: z.array(z.string()),
-  personId: z.string().nullable(),
 });
 
 export const searchEmailsQuerySchema = z.object({
@@ -30,15 +29,10 @@ export const listEmailsQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional(),
   search: z.string().trim().optional(),
   isRead: z.enum(["true", "false"]).optional(),
-  category: z
-    .enum(["primary", "promotions", "social", "notifications"])
-    .optional(),
-  view: z.enum(["inbox", "sent", "spam", "trash", "all"]).optional(),
+  view: z.enum(["inbox", "sent", "spam", "trash"]).optional(),
 });
 
 export const emailListItemSchema = emailSearchItemSchema.extend({
-  bodyText: z.string().nullable(),
-  bodyHtml: z.string().nullable(),
   threadId: z.string().nullable(),
   direction: z.enum(["sent", "received"]).nullable(),
   hasAttachment: z.boolean(),
@@ -67,6 +61,8 @@ export const emailDetailQuerySchema = z.object({
 
 export const emailDetailResponseSchema = z.object({
   data: emailListItemSchema.extend({
+    bodyText: z.string().nullable(),
+    bodyHtml: z.string().nullable(),
     resolvedBodyText: z.string().nullable(),
     resolvedBodyHtml: z.string().nullable(),
     attachments: z.array(emailAttachmentSchema),
@@ -76,7 +72,6 @@ export const emailDetailResponseSchema = z.object({
 export const listEmailsResponseSchema = z.object({
   data: z.array(emailListItemSchema),
   pagination: z.object({
-    total: z.number(),
     limit: z.number(),
     offset: z.number(),
     hasMore: z.boolean(),
@@ -99,17 +94,6 @@ export const emailThreadResponseSchema = z.object({
   data: z.array(emailListItemSchema),
 });
 
-export const emailPersonParamsSchema = z.object({
-  personId: z.coerce.number().int().positive(),
-});
-
-export const emailPersonQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).optional(),
-  offset: z.coerce.number().int().min(0).optional(),
-});
-
-export const emailPersonResponseSchema = listEmailsResponseSchema;
-
 export const patchEmailParamsSchema = z.object({
   emailId: z.coerce.number().int().positive(),
 });
@@ -118,6 +102,16 @@ export const patchEmailBodySchema = z.object({
   isRead: z.boolean().optional(),
   archived: z.boolean().optional(),
   trashed: z.boolean().optional(),
+  spam: z.boolean().optional(),
+  starred: z.boolean().optional(),
+});
+
+export const batchPatchEmailsBodySchema = z.object({
+  emailIds: z.array(z.coerce.number().int().positive()).min(1),
+  isRead: z.boolean().optional(),
+  archived: z.boolean().optional(),
+  trashed: z.boolean().optional(),
+  spam: z.boolean().optional(),
   starred: z.boolean().optional(),
 });
 
@@ -127,6 +121,7 @@ export const patchEmailResponseSchema = z.object({
     isRead: z.boolean(),
     archived: z.boolean(),
     trashed: z.boolean(),
+    spam: z.boolean(),
     starred: z.boolean(),
   }),
 });
@@ -138,6 +133,15 @@ export const sendEmailBodySchema = z.object({
   inReplyTo: z.string().trim().optional(),
   references: z.string().trim().optional(),
   threadId: z.string().trim().optional(),
+  attachments: z
+    .array(
+      z.object({
+        key: z.string(),
+        filename: z.string(),
+        mimeType: z.string(),
+      }),
+    )
+    .optional(),
 });
 
 export const sendEmailResponseSchema = z.object({

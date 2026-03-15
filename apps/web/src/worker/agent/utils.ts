@@ -12,7 +12,6 @@ const PSEUDO_TOOL_NAME_ALIASES: Record<string, string> = {
   draftReply: "draftReply",
   listTask: "listTasks",
   listTasks: "listTasks",
-  lookupCompany: "lookupCompany",
   lookupPerson: "lookupPerson",
   search: "searchEmails",
   searchEmail: "searchEmails",
@@ -141,7 +140,7 @@ export function formatPseudoToolSummary(toolName: string, output: unknown): stri
     return count === 0 ? "No matching tasks found." : `Found ${count ?? "some"} matching tasks.`;
   }
 
-  if ((toolName === "lookupPerson" || toolName === "lookupCompany") && typeof output === "object" && output) {
+  if (toolName === "lookupPerson" && typeof output === "object" && output) {
     const count = "count" in output && typeof output.count === "number" ? output.count : null;
     return count === 0 ? "No matching records found." : `Found ${count ?? "some"} matching records.`;
   }

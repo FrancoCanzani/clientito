@@ -6,17 +6,87 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { toast } from "sonner";
-import { sendEmail } from "../api";
+import { AttachmentBar } from "./attachment-bar";
+import { ComposeEditor } from "./compose-editor";
+import { getComposeInitialKey, useComposeEmail } from "./compose-email-state";
+import { RecipientInput } from "./recipient-input";
 
 export type ComposeInitial = {
   to?: string;
   subject?: string;
   body?: string;
 };
+
+type ComposeEmailFieldsProps = {
+  compose: ReturnType<typeof useComposeEmail>;
+  bodyClassName?: string;
+  onEscape?: () => void;
+  recipientAutoFocus?: boolean;
+  editorAutoFocus?: boolean;
+};
+
+export function ComposeEmailFields({
+  compose,
+  bodyClassName,
+  onEscape,
+  recipientAutoFocus = false,
+  editorAutoFocus = false,
+}: ComposeEmailFieldsProps) {
+  const {
+    to,
+    setTo,
+    subject,
+    setSubject,
+    body,
+    setBody,
+    canSend,
+    sendMutation,
+    attachments,
+  } = compose;
+
+  return (
+    <div
+      className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          onEscape?.();
+        }
+      }}
+    >
+      <RecipientInput
+        value={to}
+        onChange={setTo}
+        autoFocus={recipientAutoFocus}
+      />
+      <Input
+        placeholder="Subject"
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+      />
+      <ComposeEditor
+        initialContent={body}
+        onChange={setBody}
+        onSend={() => {
+          if (canSend) sendMutation.mutate();
+        }}
+        className={bodyClassName ?? "min-h-45 flex-1 overflow-y-auto text-sm"}
+        autoFocus={editorAutoFocus}
+      />
+      <AttachmentBar
+        files={attachments.files}
+        uploading={attachments.uploading}
+        onAddFiles={(files) => attachments.addFiles(files)}
+        onRemoveFile={attachments.removeFile}
+      />
+      <div className="flex justify-end">
+        <Button onClick={() => sendMutation.mutate()} disabled={!canSend}>
+          {sendMutation.isPending ? "Sending..." : "Send"}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export function ComposeEmailDialog({
   open,
@@ -27,74 +97,43 @@ export function ComposeEmailDialog({
   onOpenChange: (open: boolean) => void;
   initial?: ComposeInitial;
 }) {
-  const queryClient = useQueryClient();
-  const [to, setTo] = useState(initial?.to ?? "");
-  const [subject, setSubject] = useState(initial?.subject ?? "");
-  const [body, setBody] = useState(initial?.body ?? "");
-
-  const sendMutation = useMutation({
-    mutationFn: () => sendEmail({ to, subject, body }),
-    onSuccess: () => {
-      toast.success("Email sent");
-      setTo("");
-      setSubject("");
-      setBody("");
-      onOpenChange(false);
-      void queryClient.invalidateQueries({ queryKey: ["emails"] });
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const canSend =
-    to.trim().length > 0 &&
-    subject.trim().length > 0 &&
-    body.trim().length > 0 &&
-    !sendMutation.isPending;
+  const composeKey = getComposeInitialKey(initial);
+  const title = initial?.subject?.startsWith("Fwd:") ? "Forward" : "New Email";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>
-            {initial?.subject?.startsWith("Fwd:") ? "Forward" : "New Email"}
-          </DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <Input
-            type="email"
-            placeholder="To"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            autoFocus={!initial?.to}
-          />
-          <Input
-            placeholder="Subject"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-          />
-          <Textarea
-            placeholder="Write your message..."
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            className="min-h-[120px] resize-none text-sm"
-            autoFocus={Boolean(initial?.to)}
-            onKeyDown={(e) => {
-              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                e.preventDefault();
-                if (canSend) sendMutation.mutate();
-              }
-            }}
-          />
-          <div className="flex justify-end">
-            <Button
-              onClick={() => sendMutation.mutate()}
-              disabled={!canSend}
-            >
-              {sendMutation.isPending ? "Sending..." : "Send"}
-            </Button>
-          </div>
-        </div>
+        <ComposeEmailDialogBody
+          key={composeKey}
+          initial={initial}
+          onSent={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ComposeEmailDialogBody({
+  initial,
+  onSent,
+}: {
+  initial?: ComposeInitial;
+  onSent: () => void;
+}) {
+  const compose = useComposeEmail(initial, {
+    onSent,
+  });
+
+  const hasInitialRecipient = (initial?.to?.trim().length ?? 0) > 0;
+
+  return (
+    <ComposeEmailFields
+      compose={compose}
+      recipientAutoFocus={!hasInitialRecipient}
+      editorAutoFocus={hasInitialRecipient}
+    />
   );
 }

@@ -1,10 +1,9 @@
-import { uploadNoteImage } from "@/features/notes/api";
 import { EditorHeader } from "@/features/notes/components/editor-header";
 import { NoteBubbleMenu } from "@/features/notes/components/note-bubble-menu";
 import { useNoteAutosave } from "@/features/notes/hooks/use-note-autosave";
 import { useNoteEditor } from "@/features/notes/hooks/use-note-editor";
 import { useSlashCommands } from "@/features/notes/hooks/use-slash-commands";
-import { useRouteContext } from "@/hooks/use-page-context";
+import { uploadNoteImage } from "@/features/notes/mutations";
 import { getRouteApi } from "@tanstack/react-router";
 import { EditorContent } from "@tiptap/react";
 import { useEffect } from "react";
@@ -16,12 +15,6 @@ const noteRouteApi = getRouteApi("/_dashboard/notes/$noteId");
 
 export default function NoteEditorPage() {
   const { note } = noteRouteApi.useLoaderData();
-
-  useRouteContext(`/notes/${note.id}`, {
-    type: "note",
-    id: String(note.id),
-    title: note.title,
-  });
 
   const {
     title,

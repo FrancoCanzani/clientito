@@ -1,4 +1,4 @@
-import { updateNote, uploadNoteImage } from "@/features/notes/api";
+import { updateNote, uploadNoteImage } from "@/features/notes/mutations";
 import { useMutation } from "@tanstack/react-query";
 import type { Editor } from "@tiptap/core";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,6 +20,7 @@ export function useNoteAutosave({
 
   const titleRef = useRef(title);
   const lastContentRef = useRef(initialContent || "");
+  const currentNoteIdRef = useRef(noteId);
   const latestIssuedSaveIdRef = useRef(0);
   const savedStateTimeoutRef = useRef<number | null>(null);
   const lastSavedRef = useRef({
@@ -29,11 +30,12 @@ export function useNoteAutosave({
 
   const updateNoteMutation = useMutation({
     mutationFn: (variables: {
+      noteId: number;
       saveId: number;
       nextTitle: string;
       nextContent: string;
     }) =>
-      updateNote(noteId, {
+      updateNote(variables.noteId, {
         title: variables.nextTitle,
         content: variables.nextContent,
       }),
@@ -43,7 +45,12 @@ export function useNoteAutosave({
         window.clearTimeout(savedStateTimeoutRef.current);
     },
     onSuccess: (updated, variables) => {
-      if (variables.saveId !== latestIssuedSaveIdRef.current) return;
+      if (
+        variables.noteId !== currentNoteIdRef.current ||
+        variables.saveId !== latestIssuedSaveIdRef.current
+      ) {
+        return;
+      }
 
       lastSavedRef.current = {
         title: updated.title || "Untitled note",
@@ -56,7 +63,12 @@ export function useNoteAutosave({
       }, 1200);
     },
     onError: (_, variables) => {
-      if (variables.saveId !== latestIssuedSaveIdRef.current) return;
+      if (
+        variables.noteId !== currentNoteIdRef.current ||
+        variables.saveId !== latestIssuedSaveIdRef.current
+      ) {
+        return;
+      }
       setSaveState("error");
     },
   });
@@ -76,6 +88,7 @@ export function useNoteAutosave({
       latestIssuedSaveIdRef.current = saveId;
 
       updateNoteMutation.mutate({
+        noteId: currentNoteIdRef.current,
         saveId,
         nextTitle: normalizedTitle,
         nextContent,
@@ -149,6 +162,17 @@ export function useNoteAutosave({
       console.error("Failed to upload note image", error);
     }
   }, []);
+
+  useEffect(() => {
+    currentNoteIdRef.current = noteId;
+    latestIssuedSaveIdRef.current = 0;
+    debouncedSave.cancel();
+
+    if (savedStateTimeoutRef.current !== null) {
+      window.clearTimeout(savedStateTimeoutRef.current);
+      savedStateTimeoutRef.current = null;
+    }
+  }, [debouncedSave, noteId]);
 
   useEffect(() => {
     return () => {

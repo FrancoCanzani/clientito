@@ -4,6 +4,22 @@ import type { GmailAttachmentMeta } from "../../lib/gmail/message";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
 
+export const emailSummarySelection = {
+  id: emails.id,
+  gmailId: emails.gmailId,
+  fromAddr: emails.fromAddr,
+  fromName: emails.fromName,
+  toAddr: emails.toAddr,
+  subject: emails.subject,
+  snippet: emails.snippet,
+  threadId: emails.threadId,
+  date: emails.date,
+  direction: emails.direction,
+  isRead: emails.isRead,
+  labelIds: emails.labelIds,
+  createdAt: emails.createdAt,
+} as const;
+
 export function hasEmailLabel(label: string) {
   return sql<boolean>`exists(
     select 1
@@ -28,14 +44,11 @@ export function toEmailListResponse(row: {
   toAddr: string | null;
   subject: string | null;
   snippet: string | null;
-  bodyText: string | null;
-  bodyHtml: string | null;
   threadId: string | null;
   date: number;
   direction: "sent" | "received" | null;
   isRead: boolean;
   labelIds: string[] | null;
-  personId: number | null;
   createdAt: number;
 }) {
   const labelIds = row.labelIds ?? [];
@@ -47,16 +60,37 @@ export function toEmailListResponse(row: {
     toAddr: row.toAddr,
     subject: row.subject,
     snippet: row.snippet,
-    bodyText: row.bodyText,
-    bodyHtml: row.bodyHtml,
     threadId: row.threadId,
     date: row.date,
     direction: row.direction,
     isRead: row.isRead,
     labelIds,
     hasAttachment: labelIds.includes(HAS_ATTACHMENT_LABEL),
-    personId: row.personId ? String(row.personId) : null,
     createdAt: row.createdAt,
+  };
+}
+
+export function toEmailDetailResponse(row: {
+  id: number;
+  gmailId: string;
+  fromAddr: string;
+  fromName: string | null;
+  toAddr: string | null;
+  subject: string | null;
+  snippet: string | null;
+  bodyText: string | null;
+  bodyHtml: string | null;
+  threadId: string | null;
+  date: number;
+  direction: "sent" | "received" | null;
+  isRead: boolean;
+  labelIds: string[] | null;
+  createdAt: number;
+}) {
+  return {
+    ...toEmailListResponse(row),
+    bodyText: row.bodyText,
+    bodyHtml: row.bodyHtml,
   };
 }
 
@@ -71,7 +105,6 @@ export function toEmailSearchResponse(row: {
   date: number;
   isRead: boolean;
   labelIds: string[] | null;
-  personId: number | null;
 }) {
   return {
     id: String(row.id),
@@ -84,7 +117,6 @@ export function toEmailSearchResponse(row: {
     date: row.date,
     isRead: row.isRead,
     labelIds: row.labelIds ?? [],
-    personId: row.personId ? String(row.personId) : null,
   };
 }
 

@@ -33,14 +33,15 @@ const MAX_AGENT_STEPS = 6;
 const BASE_SYSTEM_PROMPT = `You are a CRM command assistant. Answer in 1-2 short sentences.
 Use tools to look up information or take actions. Be direct and factual.
 Prefer doing over explaining. Never ask clarifying questions.
-Use the exact runtime tool names when calling tools: searchEmails, lookupPerson, lookupCompany, listTasks, summarizeEmail, createTask, createNote, archiveEmail, draftReply.
+Use the exact runtime tool names when calling tools: searchEmails, lookupPerson, listTasks, summarizeEmail, createTask, createNote, archiveEmail, draftReply.
 After using tools, produce a final answer for the user. Do not end on a tool call unless you need approval for a write action.
+If the user asks for a draft reply or asks you to write a reply to an email, call draftReply and then return only the reply body text. Do not add an intro, explanation, quotes, or labels.
+draftReply is safe to use without approval because it only generates text and does not send or change anything.
 Never emit XML, JSON, or <tool_call> tags in plain text.`;
 
 type EntityContext =
   | { type: "email"; id: string; subject: string | null; fromName: string | null; fromAddr: string; threadId: string | null }
-  | { type: "person"; id: string; name: string | null; email: string | null; companyName: string | null }
-  | { type: "company"; id: string; name: string | null; domain: string | null }
+  | { type: "person"; id: string; name: string | null; email: string | null }
   | { type: "note"; id: string; title: string | null }
   | { type: "task"; id: string; title: string };
 
@@ -61,15 +62,8 @@ function describeEntity(entity: EntityContext): string {
     case "person": {
       const lines = [`Name: ${entity.name ?? "Unknown"}`];
       if (entity.email) lines.push(`Email: ${entity.email}`);
-      if (entity.companyName) lines.push(`Company: ${entity.companyName}`);
       lines.push(`Person ID: ${entity.id}`);
       return `a person:\n${lines.join("\n")}`;
-    }
-    case "company": {
-      const lines = [`Name: ${entity.name ?? "Unknown"}`];
-      if (entity.domain) lines.push(`Domain: ${entity.domain}`);
-      lines.push(`Company ID: ${entity.id}`);
-      return `a company:\n${lines.join("\n")}`;
     }
     case "note":
       return `a note:\nTitle: ${entity.title ?? "Untitled"}\nNote ID: ${entity.id}`;
@@ -102,6 +96,16 @@ function buildSystemPrompt(pageContext?: PageContext): string {
   }
 
   return prompt;
+}
+
+function appendCurrentUrlPrompt(prompt: string, currentUrl?: string): string {
+  if (!currentUrl) return prompt;
+
+  return `${prompt}
+Current URL: ${currentUrl}
+Inspect the current URL when the user refers to "this", "current", "here", or a page they are viewing.
+If the URL contains a relevant entity ID such as an email ID, note ID, person ID, or thread ID, use that ID in the appropriate tool call before answering.
+Do not claim page-specific context unless it is supported by the current URL or by tool results.`;
 }
 
 type AgentConnectionState = {
@@ -169,6 +173,12 @@ export class Agent extends AIChatAgent<Env> {
       options?.body && typeof options.body === "object" && "pageContext" in options.body
         ? (options.body.pageContext as PageContext | undefined)
         : undefined;
+    const currentUrl =
+      options?.body &&
+      typeof options.body === "object" &&
+      typeof options.body.currentUrl === "string"
+        ? options.body.currentUrl
+        : undefined;
 
     const db = createDb(this.env.DB);
     const openai = createOpenAI({
@@ -181,7 +191,7 @@ export class Agent extends AIChatAgent<Env> {
 
     const result = streamText({
       model: openai.responses(MODEL),
-      system: buildSystemPrompt(pageContext),
+      system: appendCurrentUrlPrompt(buildSystemPrompt(pageContext), currentUrl),
       messages: await convertToModelMessages(this.messages),
       tools,
       stopWhen: stepCountIs(MAX_AGENT_STEPS),

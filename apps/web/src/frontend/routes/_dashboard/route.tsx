@@ -1,13 +1,9 @@
 import { CommandPalette } from "@/components/command-palette";
 import { Loading } from "@/components/loading";
-import { useAutoGmailSync } from "@/features/dashboard/hooks/use-auto-gmail-sync";
-import {
-  PageContextProvider,
-  createPageContext,
-} from "@/hooks/use-page-context";
+import { EmailCommandProvider } from "@/features/emails/hooks/use-email-command-state";
+import { GmailConnectionGate } from "@/features/home/components/gmail-connection-gate";
 import { authClient } from "@/lib/auth-client";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { useMemo } from "react";
 
 export const Route = createFileRoute("/_dashboard")({
   beforeLoad: async () => {
@@ -16,22 +12,20 @@ export const Route = createFileRoute("/_dashboard")({
       throw redirect({ to: "/login" });
     }
   },
-  component: DashboardLayout,
+  component: AppShell,
   pendingComponent: Loading,
 });
 
-function DashboardLayout() {
-  useAutoGmailSync();
-  const store = useMemo(() => createPageContext(), []);
-
+function AppShell() {
   return (
-    <PageContextProvider value={store}>
+    <EmailCommandProvider>
       <div className="min-h-screen">
-        <main className="px-4 py-4 pb-24 [&>*]:mx-auto [&>*]:max-w-4xl">
+        <main className="px-4 py-4 pb-24 *:mx-auto *:max-w-4xl">
+          <GmailConnectionGate />
           <Outlet />
         </main>
         <CommandPalette />
       </div>
-    </PageContextProvider>
+    </EmailCommandProvider>
   );
 }

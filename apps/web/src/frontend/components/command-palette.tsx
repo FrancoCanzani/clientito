@@ -5,17 +5,19 @@ import {
 } from "@/components/agent-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { fetchCompanies } from "@/features/companies/api";
-import { fetchEmails } from "@/features/emails/queries/fetch-emails";
-import { createNote } from "@/features/notes/api";
-import { fetchPeople } from "@/features/people/api";
-import { createTask, fetchTasks } from "@/features/tasks/api";
-import { parseTaskInput } from "@/features/tasks/parse-task-input";
-import { useLogout } from "@/hooks/use-auth";
+import { openCompose } from "@/features/emails/compose-bridge";
+import { useEmailCommandActions } from "@/features/emails/hooks/use-email-command-state";
+import {
+  VIEW_LABELS,
+  type EmailView,
+} from "@/features/emails/utils/inbox-filters";
+import { createNote } from "@/features/notes/mutations";
+import { createTask } from "@/features/tasks/mutations";
+import { parseTaskInput } from "@/features/tasks/utils";
 import { useAppAgent } from "@/hooks/use-agent";
+import { useLogout } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import {
-  BuildingsIcon,
   CaretDownIcon,
   CaretRightIcon,
   CheckSquareIcon,
@@ -25,12 +27,15 @@ import {
   KeyReturnIcon,
   MoonIcon,
   NoteBlankIcon,
+  PaperPlaneTiltIcon,
   PlusIcon,
   SignOutIcon,
   SunIcon,
+  TrashIcon,
   TrayIcon,
-  UserListIcon,
+  WarningIcon,
 } from "@phosphor-icons/react";
+import { useHotkey } from "@tanstack/react-hotkeys";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { getToolName, isToolUIPart } from "ai";
@@ -42,20 +47,34 @@ import { toast } from "sonner";
 const commandGroupHeadingClassName =
   "**:[[cmdk-group-heading]]:px-3 **:[[cmdk-group-heading]]:py-1 **:[[cmdk-group-heading]]:text-[10px] **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wider **:[[cmdk-group-heading]]:text-muted-foreground";
 
+function getAgentStatusLabel(
+  status: "ready" | "streaming" | "submitted" | "error",
+  isConnected: boolean,
+) {
+  if (!isConnected) return "Connecting";
+  if (status === "submitted") return "Sending request";
+  if (status === "streaming") return "Working";
+  if (status === "error") return null;
+  return null;
+}
+
 export function CommandPalette() {
   const navigate = useNavigate();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const issueEmailCommand = useEmailCommandActions();
   const logout = useLogout();
   const { resolved: resolvedTheme, toggle: toggleTheme } = useTheme();
   const inputRef = useRef<HTMLInputElement>(null);
   const agentInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const messagesViewportRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [newTaskMode, setNewTaskMode] = useState(false);
   const [taskInput, setTaskInput] = useState("");
   const [agentMode, setAgentMode] = useState(false);
+  const [agentHasSubmitted, setAgentHasSubmitted] = useState(false);
 
   const {
     messages,
@@ -63,53 +82,73 @@ export function CommandPalette() {
     status,
     addToolApprovalResponse,
     clearHistory,
+    isConnected,
   } = useAppAgent();
-
-  const exitAgentMode = useCallback(() => {
-    setAgentMode(false);
-    clearHistory();
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }, [clearHistory]);
 
   const close = useCallback(() => {
     setOpen(false);
     setQuery("");
     setNewTaskMode(false);
     setTaskInput("");
+    setAgentHasSubmitted(false);
     if (agentMode) {
       setAgentMode(false);
-      clearHistory();
     }
-  }, [agentMode, clearHistory]);
+  }, [agentMode]);
 
-  const enterAgentMode = useCallback(
-    (initialQuery: string) => {
-      setAgentMode(true);
-      setQuery("");
-      sendMessage({ text: initialQuery });
-      setTimeout(() => agentInputRef.current?.focus(), 0);
+  const submitAgentMessage = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      setAgentHasSubmitted(true);
+      sendMessage({ text: trimmed });
     },
     [sendMessage],
   );
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setOpen(true);
+  const enterAgentMode = useCallback(
+    (initialQuery?: string) => {
+      const text = initialQuery?.trim();
+      setAgentMode(true);
+      setOpen(true);
+      setQuery("");
+      setAgentHasSubmitted(false);
+      setTimeout(() => agentInputRef.current?.focus(), 0);
+      if (text) {
+        submitAgentMessage(text);
+      }
+    },
+    [submitAgentMessage],
+  );
+
+  const startFreshChat = useCallback(() => {
+    setAgentHasSubmitted(false);
+    clearHistory();
+    setTimeout(() => agentInputRef.current?.focus(), 0);
+  }, [clearHistory]);
+
+  useHotkey("Mod+K", () => {
+    setOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  });
+
+  useHotkey(
+    "Escape",
+    () => {
+      if (agentMode) {
+        setAgentMode(false);
         setTimeout(() => inputRef.current?.focus(), 0);
+        return;
       }
-      if (event.key === "Escape") {
-        if (agentMode) {
-          exitAgentMode();
-        } else {
-          close();
-        }
-      }
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [agentMode, close, exitAgentMode]);
+
+      close();
+    },
+    {
+      enabled: open || agentMode,
+      preventDefault: false,
+      stopPropagation: false,
+    },
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -124,6 +163,13 @@ export function CommandPalette() {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [close, open]);
+
+  useEffect(() => {
+    if (!agentMode) return;
+    const viewport = messagesViewportRef.current;
+    if (!viewport) return;
+    viewport.scrollTop = viewport.scrollHeight;
+  }, [agentMode, messages, status]);
 
   const createTaskMutation = useMutation({
     mutationFn: async (input: { title: string; dueAt?: number }) =>
@@ -153,42 +199,85 @@ export function CommandPalette() {
   });
 
   const runNavigation = useCallback(
-    (
-      to:
-        | "/home"
-        | "/emails"
-        | "/people"
-        | "/companies"
-        | "/notes"
-        | "/tasks"
-        | "/settings",
-    ) => {
+    (to: "/home" | "/inbox" | "/notes" | "/tasks" | "/settings") => {
       navigate({ to });
       close();
     },
     [close, navigate],
   );
 
-  const prefetchNavigationRoute = useCallback(
-    (
-      to:
-        | "/home"
-        | "/emails"
-        | "/people"
-        | "/companies"
-        | "/notes"
-        | "/tasks"
-        | "/settings",
-    ) => {
-      void router.preloadRoute({ to });
-    },
-    [router],
-  );
-
   const normalizedQuery = query.trim();
+  const isEmailsRoute = router.state.location.pathname === "/inbox";
 
-  const commands = useMemo(
-    () => [
+  const commands = useMemo(() => {
+    const emailViewCommands = isEmailsRoute
+      ? (["inbox", "sent", "spam", "trash"] as EmailView[]).map((view) => ({
+          id: `email-view-${view}`,
+          label: VIEW_LABELS[view],
+          section: "email-navigation" as const,
+          icon:
+            view === "trash" ? (
+              <TrashIcon className="size-4" />
+            ) : view === "sent" ? (
+              <PaperPlaneTiltIcon className="size-4" />
+            ) : view === "spam" ? (
+              <WarningIcon className="size-4" />
+            ) : (
+              <TrayIcon className="size-4" />
+            ),
+          onSelect: () => {
+            navigate({
+              to: "/inbox",
+              search: (prev) => ({
+                ...prev,
+                view: view === "inbox" ? undefined : view,
+                id: undefined,
+              }),
+            });
+            close();
+          },
+        }))
+      : [];
+
+    const emailSelectionCommands = isEmailsRoute
+      ? [
+          {
+            id: "email-selection-mode",
+            label: "Select inbox items",
+            section: "email-selection" as const,
+            icon: <CheckSquareIcon className="size-4" />,
+            onSelect: () => {
+              issueEmailCommand({
+                type: "selection-mode",
+                enabled: true,
+              });
+              close();
+            },
+          },
+          {
+            id: "email-select-all",
+            label: "Select all visible",
+            section: "email-selection" as const,
+            icon: <CheckSquareIcon className="size-4" />,
+            onSelect: () => {
+              issueEmailCommand({ type: "select-all-visible" });
+              close();
+            },
+          },
+          {
+            id: "email-clear-selection",
+            label: "Clear selection",
+            section: "email-selection" as const,
+            icon: <CheckSquareIcon className="size-4" />,
+            onSelect: () => {
+              issueEmailCommand({ type: "clear-selection" });
+              close();
+            },
+          },
+        ]
+      : [];
+
+    return [
       {
         id: "home",
         label: "Home",
@@ -201,25 +290,9 @@ export function CommandPalette() {
         id: "inbox",
         label: "Inbox",
         section: "navigation" as const,
-        to: "/emails" as const,
+        to: "/inbox" as const,
         icon: <TrayIcon className="size-4" />,
-        onSelect: () => runNavigation("/emails"),
-      },
-      {
-        id: "people",
-        label: "People",
-        section: "navigation" as const,
-        to: "/people" as const,
-        icon: <UserListIcon className="size-4" />,
-        onSelect: () => runNavigation("/people"),
-      },
-      {
-        id: "companies",
-        label: "Companies",
-        section: "navigation" as const,
-        to: "/companies" as const,
-        icon: <BuildingsIcon className="size-4" />,
-        onSelect: () => runNavigation("/companies"),
+        onSelect: () => runNavigation("/inbox"),
       },
       {
         id: "tasks",
@@ -245,19 +318,21 @@ export function CommandPalette() {
         icon: <GearIcon className="size-4" />,
         onSelect: () => runNavigation("/settings"),
       },
+      ...emailViewCommands,
       {
         id: "compose",
-        label: "Compose Email",
+        label: "Compose Message",
         section: "actions" as const,
         icon: <EnvelopeSimpleIcon className="size-4" />,
         onSelect: () => {
           navigate({
-            to: "/emails",
-            search: (prev) => ({ ...prev, compose: true }),
+            to: "/inbox",
+            search: { compose: true },
           });
           close();
         },
       },
+      ...emailSelectionCommands,
       {
         id: "new-task",
         label: "New Task",
@@ -300,24 +375,66 @@ export function CommandPalette() {
           close();
         },
       },
-    ],
-    [
-      close,
-      createNoteMutation,
-      logout,
-      navigate,
-      resolvedTheme,
-      runNavigation,
-      toggleTheme,
-    ],
-  );
+    ];
+  }, [
+    close,
+    createNoteMutation,
+    isEmailsRoute,
+    issueEmailCommand,
+    logout,
+    navigate,
+    resolvedTheme,
+    runNavigation,
+    toggleTheme,
+  ]);
 
   const navigationCommands = commands.filter(
     (command) => command.section === "navigation",
   );
+  const visibleNavigationCommands = isEmailsRoute
+    ? navigationCommands.filter((command) => command.id !== "inbox")
+    : navigationCommands;
+  const emailNavigationCommands = commands.filter(
+    (command) => command.section === "email-navigation",
+  );
+  const emailSelectionCommands = commands.filter(
+    (command) => command.section === "email-selection",
+  );
   const actionCommands = commands.filter(
     (command) => command.section === "actions",
   );
+  const agentStatusLabel = getAgentStatusLabel(status, isConnected);
+  const agentSuggestions = useMemo(() => {
+    if (router.state.location.pathname === "/inbox") {
+      return [
+        "Summarize what I'm looking at",
+        "Draft a reply for the current email",
+        "What should I follow up on here?",
+      ];
+    }
+
+    if (router.state.location.pathname === "/notes") {
+      return [
+        "Summarize this note",
+        "Turn this note into tasks",
+        "What is missing here?",
+      ];
+    }
+
+    if (router.state.location.pathname === "/tasks") {
+      return [
+        "What should I prioritize today?",
+        "Show overdue tasks",
+        "Create a follow-up task plan",
+      ];
+    }
+
+    return [
+      "What needs my attention today?",
+      "Find emails I should reply to",
+      "Create a task from my current context",
+    ];
+  }, [router.state.location.pathname]);
 
   const submitTask = useCallback(() => {
     const parsed = parseTaskInput(taskInput);
@@ -326,62 +443,32 @@ export function CommandPalette() {
     createTaskMutation.mutate({ title, dueAt: parsed.dueAt });
   }, [createTaskMutation, taskInput]);
 
-  useEffect(() => {
-    if (!open || newTaskMode || agentMode) return;
-
-    // Aggressive preload: routes + first-page data for core dashboard sections.
-    for (const command of navigationCommands) {
-      prefetchNavigationRoute(command.to);
-    }
-
-    void Promise.allSettled([
-      queryClient.prefetchQuery({
-        queryKey: ["emails", "inbox", "prefetch"],
-        queryFn: () => fetchEmails({ limit: 100, offset: 0 }),
-        staleTime: 60_000,
-      }),
-      queryClient.prefetchQuery({
-        queryKey: ["people", "prefetch"],
-        queryFn: () => fetchPeople({ limit: 50, offset: 0 }),
-        staleTime: 60_000,
-      }),
-      queryClient.prefetchQuery({
-        queryKey: ["companies", "prefetch"],
-        queryFn: () => fetchCompanies(),
-        staleTime: 60_000,
-      }),
-      queryClient.prefetchQuery({
-        queryKey: ["tasks", "prefetch"],
-        queryFn: () => fetchTasks({ limit: 200, offset: 0 }),
-        staleTime: 30_000,
-      }),
-    ]);
-  }, [
-    agentMode,
-    navigationCommands,
-    newTaskMode,
-    open,
-    prefetchNavigationRoute,
-    queryClient,
-  ]);
-
   const [agentInput, setAgentInput] = useState("");
 
   const handleAgentSubmit = useCallback(() => {
     const text = agentInput.trim();
     if (!text) return;
-    sendMessage({ text });
+    submitAgentMessage(text);
     setAgentInput("");
-  }, [agentInput, sendMessage]);
+  }, [agentInput, submitAgentMessage]);
 
   const handleApprove = useCallback(
-    (toolCallId: string) => {
+    (toolCallId: string, toolName?: string, args?: Record<string, unknown>) => {
       addToolApprovalResponse({ id: toolCallId, approved: true });
       void queryClient.invalidateQueries({ queryKey: ["tasks"] });
       void queryClient.invalidateQueries({ queryKey: ["emails"] });
       void queryClient.invalidateQueries({ queryKey: ["notes"] });
+
+      if (toolName === "composeEmail" && args) {
+        openCompose({
+          to: args.to as string | undefined,
+          subject: args.subject as string | undefined,
+          body: args.body as string | undefined,
+        });
+        close();
+      }
     },
-    [addToolApprovalResponse, queryClient],
+    [addToolApprovalResponse, close, queryClient],
   );
 
   const handleDiscard = useCallback(
@@ -390,8 +477,6 @@ export function CommandPalette() {
     },
     [addToolApprovalResponse],
   );
-
-  const assistantMessages = messages.filter((m) => m.role === "assistant");
 
   return (
     <div
@@ -412,38 +497,107 @@ export function CommandPalette() {
               className="overflow-hidden"
             >
               {agentMode ? (
-                <div className="max-h-72 overflow-y-auto py-1">
-                  {assistantMessages.map((message) => (
-                    <div key={message.id}>
-                      <AgentMessage message={message} />
-                      {message.parts
-                        .filter(
-                          (part) =>
-                            isToolUIPart(part) &&
-                            part.state === "approval-requested",
-                        )
-                        .map((part) => {
-                          return (
-                            <ToolApprovalCard
-                              key={part.toolCallId}
-                              toolCallId={part.approval.id}
-                              toolName={getToolName(part)}
-                              args={part.input as Record<string, unknown>}
-                              onApprove={handleApprove}
-                              onDiscard={handleDiscard}
-                            />
-                          );
-                        })}
+                <div className="flex h-[24rem] flex-col md:h-[29rem]">
+                  <div className="flex items-start justify-between gap-3 border-b border-border/70 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">
+                        Agent
+                      </p>
+                      {agentStatusLabel ? (
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          {agentStatusLabel}
+                        </div>
+                      ) : null}
                     </div>
-                  ))}
-                  {(status === "streaming" || status === "submitted") && (
-                    <AgentThinking />
-                  )}
-                  {assistantMessages.length === 0 && status === "ready" && (
-                    <p className="px-3 py-3 text-xs text-muted-foreground">
-                      Ask anything about your emails, contacts, or tasks...
-                    </p>
-                  )}
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={startFreshChat}
+                      >
+                        New chat
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div
+                    ref={messagesViewportRef}
+                    className="flex-1 overflow-y-auto py-2"
+                  >
+                    {messages.length > 0 ? (
+                      messages.map((message) => (
+                        <div key={message.id}>
+                          <AgentMessage message={message} />
+                          {message.parts
+                            .filter(
+                              (part) =>
+                                isToolUIPart(part) &&
+                                part.state === "approval-requested",
+                            )
+                            .map((part) => {
+                              return (
+                                <ToolApprovalCard
+                                  key={part.toolCallId}
+                                  toolCallId={part.approval.id}
+                                  toolName={getToolName(part)}
+                                  args={part.input as Record<string, unknown>}
+                                  onApprove={(id) =>
+                                    handleApprove(
+                                      id,
+                                      getToolName(part),
+                                      part.input as Record<string, unknown>,
+                                    )
+                                  }
+                                  onDiscard={handleDiscard}
+                                />
+                              );
+                            })}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="space-y-4 px-3 py-4">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-foreground">
+                            Ask the agent
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            It can read context from your current page, search
+                            emails, and prepare actions for approval.
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {agentSuggestions.map((suggestion) => (
+                            <button
+                              key={suggestion}
+                              type="button"
+                              className="rounded-full border border-border px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
+                              onClick={() => submitAgentMessage(suggestion)}
+                            >
+                              {suggestion}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(status === "streaming" || status === "submitted") && (
+                      <AgentThinking
+                        label={
+                          status === "submitted"
+                            ? "Sending your request..."
+                            : "Working through the request..."
+                        }
+                      />
+                    )}
+                    {status === "error" &&
+                    messages.length === 0 &&
+                    agentHasSubmitted && (
+                      <p className="px-3 py-2 text-xs text-destructive">
+                        The agent hit an error. Try asking again.
+                      </p>
+                    )}
+                  </div>
                 </div>
               ) : newTaskMode ? (
                 <div className="space-y-2 p-3">
@@ -480,19 +634,36 @@ export function CommandPalette() {
                       No commands found.
                     </Command.Empty>
 
+                    {emailNavigationCommands.length > 0 && (
+                      <Command.Group
+                        heading="Mailbox"
+                        className={commandGroupHeadingClassName}
+                      >
+                        {emailNavigationCommands.map((command) => (
+                          <Command.Item
+                            key={command.id}
+                            value={command.label}
+                            onSelect={command.onSelect}
+                            className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
+                          >
+                            <span className="text-muted-foreground">
+                              {command.icon}
+                            </span>
+                            {command.label}
+                          </Command.Item>
+                        ))}
+                      </Command.Group>
+                    )}
+
                     <Command.Group
                       heading="Navigation"
                       className={commandGroupHeadingClassName}
                     >
-                      {navigationCommands.map((command) => (
+                      {visibleNavigationCommands.map((command) => (
                         <Command.Item
                           key={command.id}
                           value={command.label}
                           onSelect={command.onSelect}
-                          onMouseEnter={() =>
-                            prefetchNavigationRoute(command.to)
-                          }
-                          onFocus={() => prefetchNavigationRoute(command.to)}
                           className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
                         >
                           <span className="text-muted-foreground">
@@ -502,6 +673,27 @@ export function CommandPalette() {
                         </Command.Item>
                       ))}
                     </Command.Group>
+
+                    {emailSelectionCommands.length > 0 && (
+                      <Command.Group
+                        heading="Select"
+                        className={commandGroupHeadingClassName}
+                      >
+                        {emailSelectionCommands.map((command) => (
+                          <Command.Item
+                            key={command.id}
+                            value={command.label}
+                            onSelect={command.onSelect}
+                            className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
+                          >
+                            <span className="text-muted-foreground">
+                              {command.icon}
+                            </span>
+                            {command.label}
+                          </Command.Item>
+                        ))}
+                      </Command.Group>
+                    )}
 
                     <Command.Group
                       heading="Actions"
@@ -522,7 +714,7 @@ export function CommandPalette() {
                       ))}
                     </Command.Group>
 
-                    {normalizedQuery && (
+                    {normalizedQuery ? (
                       <Command.Group
                         heading="Agent"
                         className={commandGroupHeadingClassName}
@@ -536,43 +728,22 @@ export function CommandPalette() {
                           Ask: &ldquo;{normalizedQuery}&rdquo;
                         </Command.Item>
                       </Command.Group>
+                    ) : (
+                      <Command.Group
+                        heading="Agent"
+                        className={commandGroupHeadingClassName}
+                      >
+                        <Command.Item
+                          forceMount
+                          value="Open agent"
+                          onSelect={() => enterAgentMode()}
+                          className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
+                        >
+                          <KeyReturnIcon className="size-4 text-muted-foreground" />
+                          Open agent
+                        </Command.Item>
+                      </Command.Group>
                     )}
-
-                    <Command.Group
-                      heading="Search"
-                      className={commandGroupHeadingClassName}
-                    >
-                      <Command.Item
-                        value={`Search people ${normalizedQuery}`}
-                        onSelect={() => {
-                          navigate({
-                            to: "/people",
-                            search: { q: normalizedQuery || undefined },
-                          });
-                          close();
-                        }}
-                        className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
-                      >
-                        <UserListIcon className="size-4 text-muted-foreground" />
-                        Search people
-                        {normalizedQuery ? ` for "${normalizedQuery}"` : ""}
-                      </Command.Item>
-                      <Command.Item
-                        value={`Search companies ${normalizedQuery}`}
-                        onSelect={() => {
-                          navigate({
-                            to: "/companies",
-                            search: { q: normalizedQuery || undefined },
-                          });
-                          close();
-                        }}
-                        className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
-                      >
-                        <BuildingsIcon className="size-4 text-muted-foreground" />
-                        Search companies
-                        {normalizedQuery ? ` for "${normalizedQuery}"` : ""}
-                      </Command.Item>
-                    </Command.Group>
                   </Command.List>
                 </div>
               )}
@@ -582,26 +753,36 @@ export function CommandPalette() {
 
         <div className="flex items-center gap-2 px-3 py-2">
           {agentMode ? (
-            <input
-              ref={agentInputRef}
-              value={agentInput}
-              onChange={(e) => setAgentInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleAgentSubmit();
-                }
-              }}
-              placeholder="Ask the agent..."
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
+            <>
+              <input
+                ref={agentInputRef}
+                value={agentInput}
+                onChange={(e) => setAgentInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAgentSubmit();
+                  }
+                }}
+                placeholder="Ask the agent..."
+                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              />
+              <Button
+                size="sm"
+                className="h-8 px-3 text-xs"
+                onClick={handleAgentSubmit}
+                disabled={agentInput.trim().length === 0}
+              >
+                Send
+              </Button>
+            </>
           ) : (
             <Command.Input
               ref={inputRef}
               value={query}
               onValueChange={setQuery}
               onFocus={() => setOpen(true)}
-              placeholder="Search, navigate, or ask the agent..."
+              placeholder="Navigate or ask the agent..."
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           )}

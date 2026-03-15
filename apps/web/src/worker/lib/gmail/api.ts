@@ -1,5 +1,6 @@
 import type {
   GmailErrorResponse,
+  GmailMessageFormat,
   GmailListResponse,
   GmailHistoryResponse,
   GmailProfileResponse,
@@ -196,11 +197,10 @@ export async function listHistoryPage(
 ): Promise<GmailHistoryResponse> {
   const response = await gmailRequestRaw(accessToken, "/history", {
     startHistoryId,
-    historyTypes: "messageAdded",
     maxResults: String(GMAIL_PAGE_SIZE),
     pageToken,
     fields:
-      "history/id,history/messagesAdded/message/id,nextPageToken,historyId",
+      "history/id,history/messagesAdded/message/id,history/messagesDeleted/message/id,history/labelsAdded/message/id,history/labelsAdded/labelIds,history/labelsRemoved/message/id,history/labelsRemoved/labelIds,nextPageToken,historyId",
   });
 
   if (response.status === 404) {
@@ -219,15 +219,32 @@ export async function listHistoryPage(
   return (await response.json()) as GmailHistoryResponse;
 }
 
+export async function fetchMessage(
+  accessToken: string,
+  messageId: string,
+  format: GmailMessageFormat,
+): Promise<GmailMessage> {
+  return gmailRequest<GmailMessage>(accessToken, `/messages/${messageId}`, {
+    format,
+    fields:
+      format === "minimal"
+        ? "id,threadId,historyId,internalDate,labelIds"
+        : "id,threadId,historyId,internalDate,snippet,labelIds,payload(mimeType,headers,body/data,parts(mimeType,headers,body/data,parts))",
+  });
+}
+
 export async function fetchMessageBatch(
   accessToken: string,
   messageId: string,
 ): Promise<GmailMessage> {
-  return gmailRequest<GmailMessage>(accessToken, `/messages/${messageId}`, {
-    format: "full",
-    fields:
-      "id,threadId,historyId,internalDate,snippet,labelIds,payload(mimeType,headers,body/data,parts(mimeType,headers,body/data,parts))",
-  });
+  return fetchMessage(accessToken, messageId, "full");
+}
+
+export async function fetchMinimalMessage(
+  accessToken: string,
+  messageId: string,
+): Promise<GmailMessage> {
+  return fetchMessage(accessToken, messageId, "minimal");
 }
 
 export { sleep };

@@ -10,6 +10,26 @@ import type { GoogleOAuthConfig, GoogleTokenResponse } from "./types";
 export const TOKEN_REFRESH_BUFFER_MS = 60_000;
 export const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 
+export function hasUsableAccessToken(accountState: {
+  accessToken: string | null;
+  accessTokenExpiresAt: Date | number | string | null;
+} | null | undefined): boolean {
+  if (!accountState?.accessToken) {
+    return false;
+  }
+
+  if (accountState.accessTokenExpiresAt === null) {
+    return true;
+  }
+
+  const expiresAt = toEpochMs(accountState.accessTokenExpiresAt);
+  if (expiresAt === null) {
+    return false;
+  }
+
+  return expiresAt - TOKEN_REFRESH_BUFFER_MS > Date.now();
+}
+
 function toEpochMs(
   value: Date | number | string | null | undefined,
 ): number | null {
@@ -112,10 +132,10 @@ export async function getGmailToken(
   }
 
   const expiresAt = toEpochMs(googleAccount.accessTokenExpiresAt);
-  const now = Date.now();
-  const hasValidAccessToken =
-    Boolean(googleAccount.accessToken) &&
-    (expiresAt === null || expiresAt - TOKEN_REFRESH_BUFFER_MS > now);
+  const hasValidAccessToken = hasUsableAccessToken({
+    accessToken: googleAccount.accessToken,
+    accessTokenExpiresAt: expiresAt,
+  });
 
   if (hasValidAccessToken) {
     return googleAccount.accessToken!;

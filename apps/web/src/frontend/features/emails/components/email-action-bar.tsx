@@ -1,25 +1,27 @@
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Textarea } from "@/components/ui/textarea";
 import {
+  ArchiveIcon,
   ArrowBendUpLeftIcon,
   ArrowBendUpRightIcon,
-  ArchiveIcon,
-  SparkleIcon,
+  EnvelopeSimpleIcon,
+  EnvelopeSimpleOpenIcon,
   StarIcon,
   TrashIcon,
+  WarningIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { draftReply, patchEmail, sendEmail, summarizeEmail } from "../api";
-import type { ComposeInitial } from "./compose-email-dialog";
+import { draftReply, patchEmail, sendEmail } from "../mutations";
 import type { EmailDetailItem } from "../types";
+import type { ComposeInitial } from "./compose-email-dialog";
 
 type ActionBarProps = {
   email: EmailDetailItem;
@@ -62,7 +64,6 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
   const queryClient = useQueryClient();
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyBody, setReplyBody] = useState("");
-  const [summaryText, setSummaryText] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isStarred = email.labelIds.includes("STARRED");
@@ -94,6 +95,16 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
     onError: () => toast.error("Failed to delete"),
   });
 
+  const spamMutation = useMutation({
+    mutationFn: () => patchEmail(email.id, { spam: true }),
+    onSuccess: () => {
+      toast.success("Moved to spam");
+      invalidateEmails();
+      onClose?.();
+    },
+    onError: () => toast.error("Failed to move to spam"),
+  });
+
   const starMutation = useMutation({
     mutationFn: () => patchEmail(email.id, { starred: !isStarred }),
     onSuccess: () => {
@@ -102,10 +113,12 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
     onError: () => toast.error("Failed to update"),
   });
 
-  const summarizeMutation = useMutation({
-    mutationFn: () => summarizeEmail(Number(email.id)),
-    onSuccess: (result) => setSummaryText(result.summary),
-    onError: () => toast.error("AI service unavailable"),
+  const readMutation = useMutation({
+    mutationFn: () => patchEmail(email.id, { isRead: !email.isRead }),
+    onSuccess: () => {
+      invalidateEmails();
+    },
+    onError: () => toast.error("Failed to update"),
   });
 
   const sendMutation = useMutation({
@@ -161,16 +174,12 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
   const actionsPending =
     archiveMutation.isPending ||
     trashMutation.isPending ||
-    starMutation.isPending;
+    spamMutation.isPending ||
+    starMutation.isPending ||
+    readMutation.isPending;
 
   return (
     <div className="space-y-3">
-      {summaryText && (
-        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap">
-          {summaryText}
-        </div>
-      )}
-
       {replyOpen && (
         <div className="space-y-2">
           <Textarea
@@ -178,7 +187,7 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
             value={replyBody}
             onChange={(e) => setReplyBody(e.target.value)}
             placeholder="Write your reply..."
-            className="min-h-[80px] resize-none text-sm"
+            className="min-h-20 resize-none text-sm"
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 e.preventDefault();
@@ -201,8 +210,7 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
               disabled={draftMutation.isPending}
               className="gap-1.5 text-xs"
             >
-              <SparkleIcon className="size-3.5" />
-              {draftMutation.isPending ? "Drafting..." : "AI Draft"}
+              {draftMutation.isPending ? "Drafting..." : "Draft"}
             </Button>
             <div className="flex gap-2">
               <Button
@@ -230,7 +238,20 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
       )}
 
       <TooltipProvider>
-        <div className="flex items-center justify-between border-t border-border pt-2">
+        <div className="flex items-center justify-between gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => {
+              setReplyOpen(true);
+              setTimeout(() => textareaRef.current?.focus(), 0);
+            }}
+          >
+            <ArrowBendUpLeftIcon className="size-3.5" />
+            Reply
+          </Button>
+
           <div className="flex items-center gap-0.5">
             <ActionButton
               label="Archive"
@@ -247,6 +268,13 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
               <TrashIcon className="size-4" />
             </ActionButton>
             <ActionButton
+              label="Move to spam"
+              onClick={() => spamMutation.mutate()}
+              disabled={actionsPending}
+            >
+              <WarningIcon className="size-4" />
+            </ActionButton>
+            <ActionButton
               label={isStarred ? "Unstar" : "Star"}
               onClick={() => starMutation.mutate()}
               disabled={actionsPending}
@@ -256,32 +284,21 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
                 weight={isStarred ? "fill" : "regular"}
               />
             </ActionButton>
+            <ActionButton
+              label={email.isRead ? "Mark unread" : "Mark read"}
+              onClick={() => readMutation.mutate()}
+              disabled={actionsPending}
+            >
+              {email.isRead ? (
+                <EnvelopeSimpleIcon className="size-4" />
+              ) : (
+                <EnvelopeSimpleOpenIcon className="size-4" />
+              )}
+            </ActionButton>
             <ActionButton label="Forward" onClick={handleForward}>
               <ArrowBendUpRightIcon className="size-4" />
             </ActionButton>
-            <ActionButton
-              label={
-                summarizeMutation.isPending ? "Summarizing..." : "Summarize"
-              }
-              onClick={() => summarizeMutation.mutate()}
-              disabled={summarizeMutation.isPending}
-            >
-              <SparkleIcon className="size-4" />
-            </ActionButton>
           </div>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={() => {
-              setReplyOpen(true);
-              setTimeout(() => textareaRef.current?.focus(), 0);
-            }}
-          >
-            <ArrowBendUpLeftIcon className="size-3.5" />
-            Reply
-          </Button>
         </div>
       </TooltipProvider>
     </div>

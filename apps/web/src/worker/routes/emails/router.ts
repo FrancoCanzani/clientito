@@ -1,14 +1,15 @@
 import { Hono } from "hono";
 import { requireAuth } from "../../middleware/auth";
 import type { AppRouteEnv } from "../types";
+import { registerBatchPatchEmails } from "./batch-patch";
+import { registerGetEmail } from "./get";
 import { registerGetAllEmails } from "./get-all";
 import { registerGetAttachment } from "./get-attachment";
-import { registerGetEmail } from "./get";
-import { registerPatchEmail } from "./patch";
-import { registerPostEmail } from "./post";
-import { registerGetPersonEmails } from "./get-person";
-import { registerSearchEmails } from "./search";
 import { registerGetEmailThread } from "./get-thread";
+import { registerPatchEmail } from "./patch";
+import { registerUploadAttachments } from "./attachments";
+import { registerPostEmail } from "./post";
+import { registerSearchEmails } from "./search";
 
 const emailsRoutes = new Hono<AppRouteEnv>();
 
@@ -16,8 +17,9 @@ emailsRoutes.use("*", requireAuth);
 registerGetAllEmails(emailsRoutes);
 registerSearchEmails(emailsRoutes);
 registerGetEmailThread(emailsRoutes);
-registerGetPersonEmails(emailsRoutes);
+registerBatchPatchEmails(emailsRoutes);
 registerGetAttachment(emailsRoutes);
+registerUploadAttachments(emailsRoutes);
 registerGetEmail(emailsRoutes);
 registerPatchEmail(emailsRoutes);
 registerPostEmail(emailsRoutes);

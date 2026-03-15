@@ -11,12 +11,73 @@ const toolLabels: Record<string, string> = {
   createTask: "Create task",
   createNote: "Create note",
   archiveEmail: "Archive email",
+  composeEmail: "Compose email",
   draftReply: "Draft reply",
   searchEmails: "Search emails",
   lookupPerson: "Look up person",
-  lookupCompany: "Look up company",
   listTasks: "List tasks",
   summarizeEmail: "Summarize email",
+};
+
+const toolActivityLabels: Record<
+  string,
+  {
+    pending: string;
+    complete: string;
+    error: string;
+    denied?: string;
+  }
+> = {
+  createTask: {
+    pending: "Preparing task",
+    complete: "Prepared task",
+    error: "Couldn't prepare task",
+    denied: "Skipped task creation",
+  },
+  createNote: {
+    pending: "Preparing note",
+    complete: "Prepared note",
+    error: "Couldn't prepare note",
+    denied: "Skipped note creation",
+  },
+  archiveEmail: {
+    pending: "Preparing archive action",
+    complete: "Archived email",
+    error: "Couldn't archive email",
+    denied: "Skipped archive action",
+  },
+  composeEmail: {
+    pending: "Preparing draft",
+    complete: "Prepared draft",
+    error: "Couldn't prepare draft",
+    denied: "Skipped draft",
+  },
+  draftReply: {
+    pending: "Drafting reply",
+    complete: "Drafted reply",
+    error: "Couldn't draft reply",
+    denied: "Skipped reply draft",
+  },
+  searchEmails: {
+    pending: "Checking inbox",
+    complete: "Checked inbox",
+    error: "Couldn't check inbox",
+  },
+  lookupPerson: {
+    pending: "Looking up contact",
+    complete: "Checked contact",
+    error: "Couldn't check contact",
+  },
+  listTasks: {
+    pending: "Checking tasks",
+    complete: "Checked tasks",
+    error: "Couldn't check tasks",
+  },
+  summarizeEmail: {
+    pending: "Reading email",
+    complete: "Read email",
+    error: "Couldn't read email",
+  },
 };
 
 function formatToolArgs(args: Record<string, unknown>): string {
@@ -26,111 +87,124 @@ function formatToolArgs(args: Record<string, unknown>): string {
     .join(", ");
 }
 
-function formatUnknown(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
+function getToolActivityText(toolName: string, state: string) {
+  const labels = toolActivityLabels[toolName] ?? {
+    pending: "Working",
+    complete: "Done",
+    error: "Something went wrong",
+    denied: "Skipped",
+  };
+
+  if (state === "approval-requested") return labels.pending;
+  if (state === "output-available") return labels.complete;
+  if (state === "output-error") return labels.error;
+  if (state === "output-denied") return labels.denied ?? "Skipped";
+  return labels.pending;
+}
+
+function ToolActivity({
+  tone = "muted",
+  text,
+}: {
+  tone?: "muted" | "error";
+  text: string;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-2 text-xs ${
+        tone === "error" ? "text-destructive" : "text-muted-foreground"
+      }`}
+    >
+      <span
+        className={`size-1 rounded-full ${
+          tone === "error" ? "bg-destructive" : "bg-muted-foreground/80"
+        }`}
+      />
+      <span>{text}</span>
+    </div>
+  );
 }
 
 export function AgentMessage({ message }: { message: UIMessage }) {
+  const isUser = message.role === "user";
+
   return (
-    <div className="space-y-2 px-3 py-1.5 text-sm text-foreground">
-      {message.parts.map((part, i) => {
-        if (part.type === "text") {
-          return <p key={`${message.id}-text-${i}`}>{part.text}</p>;
-        }
-
-        if (isReasoningUIPart(part)) {
-          return (
-            <div
-              key={`${message.id}-reasoning-${i}`}
-              className="rounded-md border border-dashed border-border px-2.5 py-2 text-xs text-muted-foreground"
-            >
-              {part.text}
-            </div>
-          );
-        }
-
-        if (isToolUIPart(part)) {
-          const toolName = getToolName(part);
-          const label = toolLabels[toolName] ?? toolName;
-
-          if (part.state === "approval-requested") {
+    <div
+      className={`px-3 py-2 text-sm text-foreground ${
+        isUser ? "flex justify-end" : ""
+      }`}
+    >
+      <div
+        className={`space-y-2 ${
+          isUser ? "max-w-[85%] rounded-xl border border-border bg-muted/40 px-3 py-2" : "w-full"
+        }`}
+      >
+        {message.parts.map((part, i) => {
+          if (part.type === "text") {
             return (
-              <div
-                key={`${message.id}-tool-${part.toolCallId}`}
-                className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900"
-              >
-                <div className="font-medium">{label}</div>
-                <div className="mt-1 text-amber-800">
-                  Awaiting approval: {formatToolArgs(part.input as Record<string, unknown>)}
-                </div>
-              </div>
+              <p key={`${message.id}-text-${i}`} className="whitespace-pre-wrap">
+                {part.text}
+              </p>
             );
           }
 
-          if (part.state === "output-available") {
+          if (isReasoningUIPart(part)) {
             return (
-              <div
-                key={`${message.id}-tool-${part.toolCallId}`}
-                className="rounded-md border border-border bg-muted/40 px-2.5 py-2 text-xs"
+              <p
+                key={`${message.id}-reasoning-${i}`}
+                className="text-xs text-muted-foreground"
               >
-                <div className="font-medium text-foreground">{label}</div>
-                <div className="mt-1 text-muted-foreground">
-                  Input: {formatToolArgs(part.input as Record<string, unknown>)}
-                </div>
-                <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[11px] text-foreground">
-                  {formatUnknown(part.output)}
-                </pre>
-              </div>
+                {part.text}
+              </p>
             );
           }
 
-          if (part.state === "output-error") {
+          if (isToolUIPart(part)) {
+            const toolName = getToolName(part);
+
+            if (part.state === "approval-requested") {
+              return null;
+            }
+
+            if (part.state === "output-available") {
+              return (
+                <ToolActivity
+                  key={`${message.id}-tool-${part.toolCallId}`}
+                  text={getToolActivityText(toolName, part.state)}
+                />
+              );
+            }
+
+            if (part.state === "output-error") {
+              return (
+                <ToolActivity
+                  key={`${message.id}-tool-${part.toolCallId}`}
+                  tone="error"
+                  text={getToolActivityText(toolName, part.state)}
+                />
+              );
+            }
+
+            if (part.state === "output-denied") {
+              return (
+                <ToolActivity
+                  key={`${message.id}-tool-${part.toolCallId}`}
+                  text={getToolActivityText(toolName, part.state)}
+                />
+              );
+            }
+
             return (
-              <div
+              <ToolActivity
                 key={`${message.id}-tool-${part.toolCallId}`}
-                className="rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-xs"
-              >
-                <div className="font-medium text-destructive">{label} failed</div>
-                <div className="mt-1 text-muted-foreground">
-                  Input: {formatToolArgs((part.input ?? {}) as Record<string, unknown>)}
-                </div>
-                <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[11px] text-destructive">
-                  {part.errorText}
-                </pre>
-              </div>
+                text={getToolActivityText(toolName, part.state)}
+              />
             );
           }
 
-          if (part.state === "output-denied") {
-            return (
-              <div
-                key={`${message.id}-tool-${part.toolCallId}`}
-                className="rounded-md border border-border bg-muted/30 px-2.5 py-2 text-xs text-muted-foreground"
-              >
-                {label} denied
-              </div>
-            );
-          }
-
-          return (
-            <div
-              key={`${message.id}-tool-${part.toolCallId}`}
-              className="rounded-md border border-border bg-muted/30 px-2.5 py-2 text-xs text-muted-foreground"
-            >
-              {label}: {part.state}
-            </div>
-          );
-        }
-
-        return null;
-      })}
-      {message.parts.length === 0 ? null : null}
+          return null;
+        })}
+      </div>
     </div>
   );
 }
@@ -184,11 +258,11 @@ export function ToolApprovalCard({
   );
 }
 
-export function AgentThinking() {
+export function AgentThinking({ label = "Thinking..." }: { label?: string }) {
   return (
     <div className="flex items-center gap-1.5 px-3 py-1.5">
       <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground" />
-      <span className="text-xs text-muted-foreground">Thinking...</span>
+      <span className="text-xs text-muted-foreground">{label}</span>
     </div>
   );
 }

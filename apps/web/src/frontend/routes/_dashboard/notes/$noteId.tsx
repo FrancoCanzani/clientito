@@ -1,5 +1,5 @@
-import { fetchNoteById } from "@/features/notes/api";
 import NoteEditorPage from "@/features/notes/pages/note-editor-page";
+import { fetchNoteById } from "@/features/notes/queries";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 

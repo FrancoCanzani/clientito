@@ -2,10 +2,11 @@ import type { Hono } from "hono";
 import { generateText } from "ai";
 import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { createWorkersAI } from "workers-ai-provider";
-import { dailyBriefings, emails, people, tasks } from "../../db/schema";
+import { dailyBriefings, emails, tasks } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const BRIEFING_TTL_MS = 10 * 60 * 1000;
 
 function getTodayBounds(now: number): { day: string; start: number; end: number } {
   const day = new Date(now).toISOString().slice(0, 10);
@@ -18,33 +19,59 @@ function buildFallbackText(input: {
   unreadCount: number;
   dueTodayCount: number;
   overdueCount: number;
-  stalePeopleCount: number;
 }): string {
-  return `${input.unreadCount} unread emails, ${input.dueTodayCount} tasks due today, ${input.overdueCount} overdue tasks, and ${input.stalePeopleCount} contacts to follow up after 7+ days.`;
+  return `${input.unreadCount} unread emails, ${input.dueTodayCount} tasks due today, and ${input.overdueCount} overdue tasks.`;
 }
+
+type BriefingData = {
+  text: string;
+  generatedAt: number;
+  counts: {
+    unread: number;
+    dueToday: number;
+    overdue: number;
+    followUps: number;
+  };
+};
 
 async function buildBriefing(input: {
   db: AppRouteEnv["Variables"]["db"];
   env: Env;
   userId: string;
-}) {
+}): Promise<BriefingData> {
   const now = Date.now();
   const { day, start: dayStart, end: dayEnd } = getTodayBounds(now);
-  const staleThreshold = now - 7 * 24 * 60 * 60 * 1000;
 
   const existing = await input.db
     .select({
       narrative: dailyBriefings.narrative,
+      unreadCount: dailyBriefings.unreadCount,
+      tasksDueCount: dailyBriefings.tasksDueCount,
+      overdueCount: dailyBriefings.overdueCount,
+      followUpCount: dailyBriefings.followUpCount,
+      createdAt: dailyBriefings.createdAt,
     })
     .from(dailyBriefings)
     .where(and(eq(dailyBriefings.userId, input.userId), eq(dailyBriefings.date, day)))
     .limit(1);
 
-  if (existing[0]?.narrative) {
-    return existing[0].narrative;
+  if (
+    existing[0]?.narrative &&
+    existing[0].createdAt >= now - BRIEFING_TTL_MS
+  ) {
+    return {
+      text: existing[0].narrative,
+      generatedAt: existing[0].createdAt,
+      counts: {
+        unread: Number(existing[0].unreadCount ?? 0),
+        dueToday: Number(existing[0].tasksDueCount ?? 0),
+        overdue: Number(existing[0].overdueCount ?? 0),
+        followUps: Number(existing[0].followUpCount ?? 0),
+      },
+    };
   }
 
-  const [unreadCountRows, dueTodayRows, overdueRows, stalePeopleRows] = await Promise.all([
+  const [unreadCountRows, dueTodayRows, overdueRows] = await Promise.all([
     input.db
       .select({ count: sql<number>`count(*)` })
       .from(emails)
@@ -55,6 +82,7 @@ async function buildBriefing(input: {
       .where(
         and(
           eq(tasks.userId, input.userId),
+          eq(tasks.done, false),
           gte(tasks.dueAt, dayStart),
           lte(tasks.dueAt, dayEnd),
         ),
@@ -63,22 +91,16 @@ async function buildBriefing(input: {
       .select({ count: sql<number>`count(*)` })
       .from(tasks)
       .where(and(eq(tasks.userId, input.userId), eq(tasks.done, false), lt(tasks.dueAt, now))),
-    input.db
-      .select({ count: sql<number>`count(*)` })
-      .from(people)
-      .where(and(eq(people.userId, input.userId), lt(people.lastContactedAt, staleThreshold))),
   ]);
 
   const unreadCount = Number(unreadCountRows[0]?.count ?? 0);
   const dueTodayCount = Number(dueTodayRows[0]?.count ?? 0);
   const overdueCount = Number(overdueRows[0]?.count ?? 0);
-  const stalePeopleCount = Number(stalePeopleRows[0]?.count ?? 0);
 
   const fallbackText = buildFallbackText({
     unreadCount,
     dueTodayCount,
     overdueCount,
-    stalePeopleCount,
   });
 
   let text = fallbackText;
@@ -97,7 +119,6 @@ async function buildBriefing(input: {
         `Unread emails: ${unreadCount}`,
         `Tasks due today: ${dueTodayCount}`,
         `Overdue tasks: ${overdueCount}`,
-        `People not contacted in 7+ days: ${stalePeopleCount}`,
       ].join("\n"),
       maxOutputTokens: 100,
     });
@@ -123,7 +144,7 @@ async function buildBriefing(input: {
         date: day,
         narrative: text,
         unreadCount,
-        followUpCount: stalePeopleCount,
+        followUpCount: 0,
         tasksDueCount: dueTodayCount,
         overdueCount,
         createdAt: now,
@@ -133,16 +154,26 @@ async function buildBriefing(input: {
         set: {
           narrative: text,
           unreadCount,
-          followUpCount: stalePeopleCount,
+          followUpCount: 0,
           tasksDueCount: dueTodayCount,
           overdueCount,
+          createdAt: now,
         },
       });
   } catch {
     // FK constraint can fail if user doesn't exist yet (stale session)
   }
 
-  return text;
+  return {
+    text,
+    generatedAt: now,
+    counts: {
+      unread: unreadCount,
+      dueToday: dueTodayCount,
+      overdue: overdueCount,
+      followUps: 0,
+    },
+  };
 }
 
 export function registerGetBriefing(app: Hono<AppRouteEnv>) {
@@ -150,8 +181,8 @@ export function registerGetBriefing(app: Hono<AppRouteEnv>) {
     const db = c.get("db");
     const user = c.get("user")!;
 
-    const text = await buildBriefing({ db, env: c.env, userId: user.id });
-    return c.json({ data: { text } }, 200);
+    const briefing = await buildBriefing({ db, env: c.env, userId: user.id });
+    return c.json({ data: briefing }, 200);
   });
 }
 
@@ -160,9 +191,9 @@ export function registerPostBriefingStream(app: Hono<AppRouteEnv>) {
     const db = c.get("db");
     const user = c.get("user")!;
 
-    const text = await buildBriefing({ db, env: c.env, userId: user.id });
+    const briefing = await buildBriefing({ db, env: c.env, userId: user.id });
 
-    return new Response(text, {
+    return new Response(briefing.text, {
       status: 200,
       headers: {
         "Content-Type": "text/plain; charset=utf-8",

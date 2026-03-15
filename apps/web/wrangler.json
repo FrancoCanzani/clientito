@@ -35,6 +35,10 @@
     {
       "binding": "NOTES_IMAGES",
       "bucket_name": "releaselayer-notes-images"
+    },
+    {
+      "binding": "ATTACHMENTS",
+      "bucket_name": "releaselayer-attachments"
     }
   ],
   "vars": {

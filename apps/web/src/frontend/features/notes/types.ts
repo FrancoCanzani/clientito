@@ -2,14 +2,12 @@ export type Note = {
   id: number;
   title: string;
   content: string;
-  personId: number | null;
-  companyId: number | null;
   createdAt: number;
   updatedAt: number;
 };
 
 export type NotesListResponse = {
-  data: Note[];
+  data: NoteSummary[];
   pagination: {
     limit: number;
     offset: number;

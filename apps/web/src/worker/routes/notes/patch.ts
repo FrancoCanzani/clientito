@@ -49,8 +49,6 @@ export function registerPatchNotes(api: Hono<AppRouteEnv>) {
           id: notes.id,
           title: notes.title,
           content: notes.content,
-          personId: notes.personId,
-          companyId: notes.companyId,
           createdAt: notes.createdAt,
           updatedAt: notes.updatedAt,
         })

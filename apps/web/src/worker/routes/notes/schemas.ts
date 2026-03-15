@@ -10,20 +10,24 @@ export const noteSchema = z.object({
   id: z.number(),
   title: z.string(),
   content: z.string(),
-  personId: z.number().nullable(),
-  companyId: z.number().nullable(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
 
+export const noteSummarySchema = noteSchema.pick({
+  id: true,
+  title: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const getNotesQuerySchema = z.object({
-  scope: z.enum(["all", "canvas", "linked"]).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
   offset: z.coerce.number().int().min(0).optional(),
 });
 
 export const listNotesResponseSchema = z.object({
-  data: z.array(noteSchema),
+  data: z.array(noteSummarySchema),
   pagination: z.object({
     limit: z.number(),
     offset: z.number(),
@@ -33,8 +37,6 @@ export const listNotesResponseSchema = z.object({
 export const postNoteBodySchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   content: z.string().optional().default(""),
-  personId: z.number().int().positive().optional(),
-  companyId: z.number().int().positive().optional(),
 });
 
 export const patchNoteBodySchema = z

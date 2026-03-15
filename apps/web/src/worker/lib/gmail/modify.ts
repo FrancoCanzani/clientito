@@ -1,7 +1,42 @@
-import { GMAIL_API_BASE } from "./api";
 import type { Database } from "../../db/client";
-import type { GoogleOAuthConfig } from "./types";
+import { GMAIL_API_BASE } from "./api";
 import { getGmailToken } from "./token";
+import type { GoogleOAuthConfig } from "./types";
+
+type GmailModifyBody = {
+  ids?: string[];
+  addLabelIds?: string[];
+  removeLabelIds?: string[];
+};
+
+async function postGmailModify(
+  accessToken: string,
+  path: string,
+  body: GmailModifyBody,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  void metadata;
+
+  if (!body.addLabelIds?.length && !body.removeLabelIds?.length) {
+    return;
+  }
+
+  const response = await fetch(`${GMAIL_API_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `Gmail modify failed (${response.status}): ${text || response.statusText}`,
+    );
+  }
+}
 
 async function modifyGmailMessage(
   accessToken: string,
@@ -9,30 +44,58 @@ async function modifyGmailMessage(
   addLabelIds?: string[],
   removeLabelIds?: string[],
 ): Promise<void> {
-  const body: Record<string, string[]> = {};
-  if (addLabelIds?.length) body.addLabelIds = addLabelIds;
-  if (removeLabelIds?.length) body.removeLabelIds = removeLabelIds;
-
-  const response = await fetch(
-    `${GMAIL_API_BASE}/messages/${gmailMessageId}/modify`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    },
+  await postGmailModify(
+    accessToken,
+    `/messages/${gmailMessageId}/modify`,
+    { addLabelIds, removeLabelIds },
+    { gmailMessageId },
   );
+}
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    console.warn("Gmail modify failed", {
-      gmailMessageId,
-      status: response.status,
-      body: text,
-    });
+export async function batchModifyGmailMessages(
+  db: Database,
+  env: GoogleOAuthConfig,
+  userId: string,
+  gmailMessageIds: string[],
+  addLabelIds?: string[],
+  removeLabelIds?: string[],
+): Promise<void> {
+  const ids = Array.from(new Set(gmailMessageIds.filter(Boolean)));
+  if (ids.length === 0) {
+    return;
   }
+
+  const accessToken = await getGmailToken(db, userId, env);
+  await postGmailModify(
+    accessToken,
+    "/messages/batchModify",
+    {
+      ids,
+      addLabelIds: addLabelIds?.length ? Array.from(new Set(addLabelIds)) : [],
+      removeLabelIds: removeLabelIds?.length
+        ? Array.from(new Set(removeLabelIds))
+        : [],
+    },
+    { gmailMessageIds: ids },
+  );
+}
+
+export async function setGmailMessageReadState(
+  db: Database,
+  env: GoogleOAuthConfig,
+  userId: string,
+  gmailMessageId: string,
+  isRead: boolean,
+): Promise<void> {
+  const accessToken = await getGmailToken(db, userId, env);
+  if (isRead) {
+    await modifyGmailMessage(accessToken, gmailMessageId, undefined, [
+      "UNREAD",
+    ]);
+    return;
+  }
+
+  await modifyGmailMessage(accessToken, gmailMessageId, ["UNREAD"]);
 }
 
 export async function markGmailMessageRead(
@@ -41,8 +104,7 @@ export async function markGmailMessageRead(
   userId: string,
   gmailMessageId: string,
 ): Promise<void> {
-  const accessToken = await getGmailToken(db, userId, env);
-  await modifyGmailMessage(accessToken, gmailMessageId, undefined, ["UNREAD"]);
+  await setGmailMessageReadState(db, env, userId, gmailMessageId, true);
 }
 
 export async function archiveGmailMessage(
@@ -63,6 +125,25 @@ export async function trashGmailMessage(
 ): Promise<void> {
   const accessToken = await getGmailToken(db, userId, env);
   await modifyGmailMessage(accessToken, gmailMessageId, ["TRASH"]);
+}
+
+export async function setGmailMessageSpamState(
+  db: Database,
+  env: GoogleOAuthConfig,
+  userId: string,
+  gmailMessageId: string,
+  spam: boolean,
+): Promise<void> {
+  const accessToken = await getGmailToken(db, userId, env);
+  if (spam) {
+    await modifyGmailMessage(accessToken, gmailMessageId, ["SPAM"], [
+      "INBOX",
+      "TRASH",
+    ]);
+    return;
+  }
+
+  await modifyGmailMessage(accessToken, gmailMessageId, ["INBOX"], ["SPAM"]);
 }
 
 export async function starGmailMessage(

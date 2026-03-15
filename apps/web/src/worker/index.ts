@@ -7,11 +7,11 @@ import { createDb } from "./db/client";
 import { runScheduledIncrementalSync } from "./lib/gmail/sync";
 import { authMiddleware } from "./middleware/auth";
 import aiRoutes from "./routes/ai/router";
-import companiesRoutes from "./routes/companies/router";
+
 import emailsRoutes from "./routes/emails/router";
 import healthRoutes from "./routes/health/router";
 import notesRoutes from "./routes/notes/router";
-import peopleRoutes from "./routes/people/router";
+import searchRoutes from "./routes/search/unified";
 import settingsRoutes from "./routes/settings/router";
 import syncRoutes from "./routes/sync/router";
 import tasksRoutes from "./routes/tasks/router";
@@ -46,11 +46,11 @@ app.route("/api/health", healthRoutes);
 app.route("/api/sync", syncRoutes);
 app.route("/api/emails", emailsRoutes);
 app.route("/api/ai", aiRoutes);
-app.route("/api/people", peopleRoutes);
-app.route("/api/companies", companiesRoutes);
+
 app.route("/api/tasks", tasksRoutes);
 app.route("/api/notes", notesRoutes);
 app.route("/api/settings", settingsRoutes);
+app.route("/api/search", searchRoutes);
 
 async function handleScheduledSync(event: ScheduledEvent, env: Env) {
   const startedAt = Date.now();
