@@ -1,5 +1,4 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { account } from "../../db/auth-schema";
 import type { Database } from "../../db/client";
 import { emails, mailboxes } from "../../db/schema";
 import { isAutomatedSender } from "../domains";
@@ -12,7 +11,6 @@ import {
   fetchMinimalMessage,
   getCurrentHistoryId,
   getGmailToken,
-  hasUsableAccessToken,
   listHistoryPage,
   listMessagesPage,
   sleep,
@@ -23,11 +21,10 @@ import {
 } from "./errors";
 import {
   acquireMailboxSyncLock,
-  backfillLegacyMailboxes,
-  createSyncJob,
-  markMailboxReconnectRequired,
-  markSyncJobFailed,
-  markSyncJobSucceeded,
+  ensureMailbox,
+  getMailboxSyncSnapshot,
+  markMailboxSyncFailed,
+  markMailboxSyncSucceeded,
   persistMailboxHistoryState,
   releaseMailboxSyncLock,
   touchMailboxSyncLock,
@@ -45,6 +42,7 @@ import type {
 } from "./types";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
+const ON_DEMAND_SYNC_MIN_INTERVAL_MS = 60_000;
 
 function maxHistoryId(
   current: string | null,
@@ -639,6 +637,92 @@ export async function runIncrementalGmailSync(
   }
 }
 
+export async function catchUpMailboxOnDemand(
+  db: Database,
+  env: Env,
+  userId: string,
+  userEmail: string,
+  options?: {
+    minIntervalMs?: number;
+    force?: boolean;
+  },
+): Promise<
+  | { status: "completed"; result: GmailSyncResult }
+  | {
+      status: "skipped";
+      reason:
+        | "needs_full_sync"
+        | "reconnect_required"
+        | "sync_in_progress"
+        | "recently_synced";
+    }
+  | { status: "failed"; error: string }
+> {
+  const snapshot = await getMailboxSyncSnapshot(db, userId);
+  const mailbox = snapshot.mailbox ?? (await ensureMailbox(db, userId, userEmail));
+
+  if (!mailbox?.historyId) {
+    return { status: "skipped", reason: "needs_full_sync" };
+  }
+
+  if (mailbox.authState === "reconnect_required") {
+    return { status: "skipped", reason: "reconnect_required" };
+  }
+
+  if (snapshot.hasLiveLock) {
+    return { status: "skipped", reason: "sync_in_progress" };
+  }
+
+  const minIntervalMs =
+    options?.minIntervalMs ?? ON_DEMAND_SYNC_MIN_INTERVAL_MS;
+  if (
+    options?.force !== true &&
+    mailbox.lastSuccessfulSyncAt !== null &&
+    mailbox.lastSuccessfulSyncAt + minIntervalMs > Date.now()
+  ) {
+    return { status: "skipped", reason: "recently_synced" };
+  }
+
+  const hasLock = await acquireMailboxSyncLock(db, userId, userEmail);
+  if (!hasLock) {
+    return { status: "skipped", reason: "sync_in_progress" };
+  }
+
+  try {
+    const result = await runIncrementalGmailSync(
+      db,
+      env,
+      userId,
+      mailbox.historyId,
+      { skipLock: true },
+    );
+
+    await markMailboxSyncSucceeded(db, userId);
+    return { status: "completed", result };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Sync failed";
+
+    if (isGmailReconnectRequiredError(error)) {
+      console.warn("On-demand Gmail sync requires Google reconnect", {
+        userId,
+      });
+    } else {
+      console.error("On-demand Gmail sync failed", { userId, error });
+    }
+
+    await markMailboxSyncFailed(
+      db,
+      userId,
+      message,
+      classifySyncError(error),
+    ).catch(() => {});
+
+    return { status: "failed", error: message };
+  } finally {
+    await releaseMailboxSyncLock(db, userId).catch(() => {});
+  }
+}
+
 export async function syncGmailMessageIds(
   db: Database,
   env: Env,
@@ -668,114 +752,4 @@ export async function syncGmailMessageIds(
     messageIds: dedupedMessageIds,
     refreshExisting,
   });
-}
-
-export async function runScheduledIncrementalSync(
-  db: Database,
-  env: Env,
-): Promise<void> {
-  await backfillLegacyMailboxes(db);
-
-  const states = await db
-    .select({
-      mailboxId: mailboxes.id,
-      userId: mailboxes.userId,
-      historyId: mailboxes.historyId,
-      accessToken: account.accessToken,
-      accessTokenExpiresAt: account.accessTokenExpiresAt,
-      refreshToken: account.refreshToken,
-    })
-    .from(mailboxes)
-    .leftJoin(
-      account,
-      and(
-        eq(account.userId, mailboxes.userId),
-        eq(account.providerId, "google"),
-      ),
-    );
-
-  for (const state of states) {
-    if (!state.historyId) {
-      console.log("Scheduled Gmail sync skipped user without history state", {
-        userId: state.userId,
-      });
-      continue;
-    }
-
-    if (
-      !state.refreshToken &&
-      !hasUsableAccessToken({
-        accessToken: state.accessToken,
-        accessTokenExpiresAt: state.accessTokenExpiresAt,
-      })
-    ) {
-      console.warn("Scheduled Gmail sync requires Google reconnect", {
-        userId: state.userId,
-      });
-      await markMailboxReconnectRequired(db, state.userId);
-      continue;
-    }
-
-    const hasLock = await acquireMailboxSyncLock(db, state.userId);
-    if (!hasLock) {
-      console.log("Scheduled Gmail sync skipped", {
-        userId: state.userId,
-        reason: "Sync already in progress.",
-      });
-      continue;
-    }
-
-    const job = await createSyncJob(
-      db,
-      state.mailboxId,
-      "incremental",
-      "scheduled",
-    );
-
-    try {
-      const result = await runIncrementalGmailSync(
-        db,
-        env,
-        state.userId,
-        state.historyId,
-        { skipLock: true },
-      );
-      await markSyncJobSucceeded(db, state.mailboxId, job.id);
-      console.log("Scheduled Gmail sync completed", {
-        userId: state.userId,
-        processed: result.processed,
-        inserted: result.inserted,
-        skipped: result.skipped,
-        historyId: result.historyId,
-      });
-    } catch (error) {
-      if (error instanceof GmailSyncStateError) {
-        console.log("Scheduled Gmail sync skipped", {
-          userId: state.userId,
-          reason: error.message,
-        });
-      }
-
-      if (isGmailReconnectRequiredError(error)) {
-        console.warn("Scheduled Gmail sync requires Google reconnect", {
-          userId: state.userId,
-        });
-      } else {
-        console.error("Scheduled Gmail incremental sync failed", {
-          userId: state.userId,
-          error,
-        });
-      }
-
-      await markSyncJobFailed(
-        db,
-        state.mailboxId,
-        job.id,
-        error instanceof Error ? error.message : "Sync failed",
-        classifySyncError(error),
-      );
-    } finally {
-      await releaseMailboxSyncLock(db, state.userId);
-    }
-  }
 }

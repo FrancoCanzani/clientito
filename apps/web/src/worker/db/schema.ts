@@ -95,21 +95,6 @@ export const tasks = sqliteTable(
   ],
 );
 
-export const syncState = sqliteTable("sync_state", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" })
-    .unique(),
-  historyId: text("history_id"),
-  lastSync: integer("last_sync"),
-  lockUntil: integer("lock_until"),
-  phase: text("phase"),
-  progressCurrent: integer("progress_current"),
-  progressTotal: integer("progress_total"),
-  error: text("error"),
-});
-
 export const mailboxes = sqliteTable(
   "mailboxes",
   {

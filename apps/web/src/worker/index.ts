@@ -3,8 +3,6 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { auth } from "../../auth";
-import { createDb } from "./db/client";
-import { runScheduledIncrementalSync } from "./lib/gmail/sync";
 import { authMiddleware } from "./middleware/auth";
 import aiRoutes from "./routes/ai/router";
 
@@ -52,32 +50,6 @@ app.route("/api/notes", notesRoutes);
 app.route("/api/settings", settingsRoutes);
 app.route("/api/search", searchRoutes);
 
-async function handleScheduledSync(event: ScheduledEvent, env: Env) {
-  const startedAt = Date.now();
-  console.log("Scheduled sync started", {
-    cron: event.cron,
-    scheduledTime: event.scheduledTime,
-  });
-
-  const db = createDb(env.DB);
-  try {
-    await runScheduledIncrementalSync(db, env);
-    console.log("Scheduled sync finished", {
-      cron: event.cron,
-      scheduledTime: event.scheduledTime,
-      durationMs: Date.now() - startedAt,
-    });
-  } catch (error) {
-    console.error("Scheduled sync failed", {
-      cron: event.cron,
-      scheduledTime: event.scheduledTime,
-      durationMs: Date.now() - startedAt,
-      error,
-    });
-    throw error;
-  }
-}
-
 export { Agent } from "./agent/agent";
 
 export default {
@@ -85,9 +57,5 @@ export default {
     const agentResponse = await routeAgentRequest(request, env);
     if (agentResponse) return agentResponse;
     return app.fetch(request, env, ctx);
-  },
-
-  scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(handleScheduledSync(event, env));
   },
 };

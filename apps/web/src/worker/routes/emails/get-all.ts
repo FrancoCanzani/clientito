@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, desc, eq, like, or, sql } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emails } from "../../db/schema";
+import { catchUpMailboxOnDemand } from "../../lib/gmail/sync";
 import type { AppRouteEnv } from "../types";
 import {
   emailSummarySelection,
@@ -22,6 +23,11 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
       isRead,
       view = "inbox",
     } = c.req.valid("query");
+
+    if (offset === 0) {
+      await catchUpMailboxOnDemand(db, c.env, user.id, user.email);
+    }
+
     const conditions = [eq(emails.userId, user.id)];
 
     if (search) {

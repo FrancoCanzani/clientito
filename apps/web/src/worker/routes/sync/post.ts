@@ -16,7 +16,7 @@ import {
   updateSyncJobProgress,
 } from "../../lib/gmail/mailbox-state";
 import {
-  runIncrementalGmailSync,
+  catchUpMailboxOnDemand,
   startFullGmailSync,
 } from "../../lib/gmail/sync";
 import type { AppRouteEnv } from "../types";
@@ -128,49 +128,6 @@ function runFullSyncInBackground(
   })();
 }
 
-function runIncrementalSyncInBackground(
-  db: Database,
-  env: Env,
-  userId: string,
-  userEmail: string,
-) {
-  return (async () => {
-    const mailbox = await ensureMailbox(db, userId, userEmail);
-    const hasLock = await acquireMailboxSyncLock(db, userId, userEmail);
-    if (!hasLock) {
-      return;
-    }
-
-    const job = await createSyncJob(db, mailbox.id, "incremental", "manual");
-
-    try {
-      await updateSyncJobProgress(db, mailbox.id, job.id, "syncing", 0, 0);
-      await runIncrementalGmailSync(db, env, userId, undefined, {
-        skipLock: true,
-      });
-      await markSyncJobSucceeded(db, mailbox.id, job.id);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Sync failed";
-      if (isGmailReconnectRequiredError(error)) {
-        console.warn("Background incremental sync requires Google reconnect", {
-          userId,
-        });
-      } else {
-        console.error("Background incremental sync failed", { userId, error });
-      }
-      await markSyncJobFailed(
-        db,
-        mailbox.id,
-        job.id,
-        message,
-        classifySyncError(error),
-      ).catch(() => {});
-    } finally {
-      await releaseMailboxSyncLock(db, userId).catch(() => {});
-    }
-  })();
-}
-
 export function registerPostSync(api: Hono<AppRouteEnv>) {
   api.post("/start", zValidator("json", syncRequestSchema), async (c) => {
     const db = c.get("db");
@@ -199,13 +156,25 @@ export function registerPostSync(api: Hono<AppRouteEnv>) {
     const user = c.get("user")!;
 
     c.req.valid("json");
-    if (await isSyncInProgress(db, user.id)) {
+    const result = await catchUpMailboxOnDemand(
+      db,
+      c.env,
+      user.id,
+      user.email,
+      { force: true },
+    );
+
+    if (
+      result.status === "skipped" &&
+      result.reason === "sync_in_progress"
+    ) {
       return c.json({ error: "Sync already in progress" }, 409);
     }
 
-    c.executionCtx.waitUntil(
-      runIncrementalSyncInBackground(db, c.env, user.id, user.email),
-    );
-    return c.json({ data: { status: "started" } }, 202);
+    if (result.status === "failed") {
+      return c.json({ error: result.error }, 500);
+    }
+
+    return c.json({ data: { status: result.status } }, 200);
   });
 }

@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emails } from "../../db/schema";
 import { isGmailReconnectRequiredError } from "../../lib/gmail/errors";
+import { catchUpMailboxOnDemand } from "../../lib/gmail/sync";
 import {
   extractMessageAttachments,
   extractMessageBodyHtml,
@@ -30,6 +31,8 @@ export function registerGetEmail(api: Hono<AppRouteEnv>) {
 
       const { emailId } = c.req.valid("param");
       const { refreshLive } = c.req.valid("query");
+
+      await catchUpMailboxOnDemand(db, c.env, user.id, user.email);
 
       const row = await db
         .select({

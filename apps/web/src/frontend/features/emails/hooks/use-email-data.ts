@@ -7,7 +7,9 @@ import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-export function useEmailInboxData({
+const INBOX_POLL_INTERVAL_MS = 15_000;
+
+export function useEmailData({
   view,
   initialEmails,
   selectedEmailId,
@@ -33,6 +35,8 @@ export function useEmailInboxData({
       pages: [initialEmails],
       pageParams: [0],
     },
+    refetchInterval: INBOX_POLL_INTERVAL_MS,
+    refetchIntervalInBackground: false,
   });
 
   const displayEmails = useMemo(

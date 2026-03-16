@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, asc, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emails } from "../../db/schema";
+import { catchUpMailboxOnDemand } from "../../lib/gmail/sync";
 import type { AppRouteEnv } from "../types";
 import { emailSummarySelection, toEmailListResponse } from "./helpers";
 import { emailThreadParamsSchema } from "./schemas";
@@ -15,6 +16,8 @@ export function registerGetEmailThread(api: Hono<AppRouteEnv>) {
       const user = c.get("user")!;
 
       const { threadId } = c.req.valid("param");
+      await catchUpMailboxOnDemand(db, c.env, user.id, user.email);
+
       const rows = await db
         .select(emailSummarySelection)
         .from(emails)

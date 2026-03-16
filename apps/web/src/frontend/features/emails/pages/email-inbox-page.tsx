@@ -16,8 +16,8 @@ import {
   useRegisterEmailCommandHandler,
   type EmailCommand,
 } from "@/features/emails/hooks/use-email-command-state";
+import { useEmailData } from "@/features/emails/hooks/use-email-data";
 import { useEmailInboxActions } from "@/features/emails/hooks/use-email-inbox-actions";
-import { useEmailInboxData } from "@/features/emails/hooks/use-email-inbox-data";
 import { useEmailInboxKeyboard } from "@/features/emails/hooks/use-email-inbox-keyboard";
 import { useEmailSelection } from "@/features/emails/hooks/use-email-selection";
 import { formatInboxRowDate } from "@/features/emails/utils/format-inbox-row-date";
@@ -63,7 +63,7 @@ export default function EmailInboxPage() {
     hasNextPage,
     isFetchingNextPage,
     loadMoreRef,
-  } = useEmailInboxData({
+  } = useEmailData({
     view,
     initialEmails,
     selectedEmailId,

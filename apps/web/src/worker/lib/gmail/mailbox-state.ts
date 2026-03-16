@@ -1,7 +1,6 @@
 import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
-import { user } from "../../db/auth-schema";
 import type { Database } from "../../db/client";
-import { mailboxes, syncJobs, syncState } from "../../db/schema";
+import { mailboxes, syncJobs } from "../../db/schema";
 import { GOOGLE_RECONNECT_REQUIRED_MESSAGE } from "./errors";
 
 export const SYNC_LOCK_TTL_MS = 4 * 60_000;
@@ -24,95 +23,10 @@ function hasLiveLock(lockUntil: number | null | undefined, now = Date.now()) {
   );
 }
 
-function resolveLegacyAuthState(
-  error: string | null | undefined,
-): "unknown" | "reconnect_required" {
-  return error === GOOGLE_RECONNECT_REQUIRED_MESSAGE
-    ? "reconnect_required"
-    : "unknown";
-}
-
 async function findMailbox(db: Database, userId: string) {
-  const existing = await db.query.mailboxes.findFirst({
+  return db.query.mailboxes.findFirst({
     where: eq(mailboxes.userId, userId),
   });
-  if (existing) {
-    return existing;
-  }
-
-  const legacy = await db.query.syncState.findFirst({
-    where: eq(syncState.userId, userId),
-  });
-  if (!legacy) {
-    return null;
-  }
-
-  const owner = await db.query.user.findFirst({
-    where: eq(user.id, userId),
-    columns: { email: true },
-  });
-  const now = Date.now();
-  const inserted = await db
-    .insert(mailboxes)
-    .values({
-      userId,
-      gmailEmail: owner?.email ?? null,
-      historyId: legacy.historyId ?? null,
-      authState: resolveLegacyAuthState(legacy.error),
-      lastSuccessfulSyncAt: legacy.lastSync ?? null,
-      lastErrorAt: legacy.error ? (legacy.lastSync ?? now) : null,
-      lastErrorMessage: legacy.error ?? null,
-      lockUntil: legacy.lockUntil ?? null,
-      updatedAt: now,
-    })
-    .onConflictDoNothing({ target: mailboxes.userId })
-    .returning();
-
-  return (
-    inserted[0] ??
-    (await db.query.mailboxes.findFirst({
-      where: eq(mailboxes.userId, userId),
-    })) ??
-    null
-  );
-}
-
-export async function backfillLegacyMailboxes(db: Database): Promise<void> {
-  const legacyRows = await db
-    .select({
-      userId: syncState.userId,
-      historyId: syncState.historyId,
-      lastSync: syncState.lastSync,
-      lockUntil: syncState.lockUntil,
-      error: syncState.error,
-      email: user.email,
-    })
-    .from(syncState)
-    .leftJoin(mailboxes, eq(mailboxes.userId, syncState.userId))
-    .leftJoin(user, eq(user.id, syncState.userId))
-    .where(isNull(mailboxes.id));
-
-  if (legacyRows.length === 0) {
-    return;
-  }
-
-  const now = Date.now();
-  await db
-    .insert(mailboxes)
-    .values(
-      legacyRows.map((row) => ({
-        userId: row.userId,
-        gmailEmail: row.email ?? null,
-        historyId: row.historyId ?? null,
-        authState: resolveLegacyAuthState(row.error),
-        lastSuccessfulSyncAt: row.lastSync ?? null,
-        lastErrorAt: row.error ? (row.lastSync ?? now) : null,
-        lastErrorMessage: row.error ?? null,
-        lockUntil: row.lockUntil ?? null,
-        updatedAt: now,
-      })),
-    )
-    .onConflictDoNothing({ target: mailboxes.userId });
 }
 
 export async function ensureMailbox(
@@ -351,6 +265,44 @@ export async function markMailboxReconnectRequired(
       authState: "reconnect_required",
       lastErrorAt: Date.now(),
       lastErrorMessage: message,
+      lockUntil: null,
+      updatedAt: Date.now(),
+    })
+    .where(eq(mailboxes.userId, userId));
+}
+
+export async function markMailboxSyncSucceeded(
+  db: Database,
+  userId: string,
+): Promise<void> {
+  await ensureMailbox(db, userId);
+  await db
+    .update(mailboxes)
+    .set({
+      authState: "ok",
+      lastSuccessfulSyncAt: Date.now(),
+      lastErrorAt: null,
+      lastErrorMessage: null,
+      lockUntil: null,
+      updatedAt: Date.now(),
+    })
+    .where(eq(mailboxes.userId, userId));
+}
+
+export async function markMailboxSyncFailed(
+  db: Database,
+  userId: string,
+  message: string,
+  errorClass: SyncJobErrorClass,
+): Promise<void> {
+  await ensureMailbox(db, userId);
+  await db
+    .update(mailboxes)
+    .set({
+      authState: errorClass === "reconnect_required" ? "reconnect_required" : "ok",
+      lastErrorAt: Date.now(),
+      lastErrorMessage: message,
+      lockUntil: null,
       updatedAt: Date.now(),
     })
     .where(eq(mailboxes.userId, userId));

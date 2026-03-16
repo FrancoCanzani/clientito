@@ -27,15 +27,23 @@ export type SyncStatus = {
   needsGoogleReconnect: boolean;
 };
 
+export type HomeBriefingItem = {
+  id: string;
+  type: "reply" | "overdue_task" | "due_today_task";
+  title: string;
+  reason: string;
+  href: string;
+};
+
 export type HomeBriefing = {
   text: string;
   generatedAt: number;
   counts: {
-    unread: number;
+    needsReply: number;
     dueToday: number;
     overdue: number;
-    followUps: number;
   };
+  items: HomeBriefingItem[];
 };
 
 export async function fetchBriefing(): Promise<HomeBriefing> {

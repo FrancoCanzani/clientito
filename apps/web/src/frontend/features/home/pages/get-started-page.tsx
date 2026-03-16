@@ -1,30 +1,20 @@
 import { Button } from "@/components/ui/button";
+import { useSyncStatus } from "@/features/home/hooks/use-sync-status";
 import {
   beginGmailConnection,
   runIncrementalSync,
   startFullSync,
 } from "@/features/home/mutations";
-import { fetchSyncStatus } from "@/features/home/queries";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ShieldCheckIcon } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
 export default function GetStartedPage() {
   const queryClient = useQueryClient();
-  const syncStatusQuery = useQuery({
-    queryKey: ["sync-status"],
-    queryFn: fetchSyncStatus,
+  const syncStatusQuery = useSyncStatus({
     staleTime: 0,
     refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    refetchInterval: (query) => {
-      const status = query.state.data;
-      if (!status) return 1_000;
-      if (status.phase) return 1_000;
-      return false;
-    },
   });
 
   const reconnectMutation = useMutation({

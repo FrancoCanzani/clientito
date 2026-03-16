@@ -1,7 +1,7 @@
 import { CommandPalette } from "@/components/command-palette";
 import { Loading } from "@/components/loading";
+import { SyncStatusGate } from "@/components/sync-status-gate";
 import { EmailCommandProvider } from "@/features/emails/hooks/use-email-command-state";
-import { GmailConnectionGate } from "@/features/home/components/gmail-connection-gate";
 import { authClient } from "@/lib/auth-client";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
@@ -21,11 +21,11 @@ function AppShell() {
     <EmailCommandProvider>
       <div className="min-h-screen">
         <main className="px-4 py-4 pb-24 *:mx-auto *:max-w-3xl">
-          <GmailConnectionGate />
           <Outlet />
         </main>
         <CommandPalette />
       </div>
+      <SyncStatusGate />
     </EmailCommandProvider>
   );
 }

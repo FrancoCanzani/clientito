@@ -48,9 +48,6 @@
     "BETTER_AUTH_URL": "http://localhost:5173",
     "OPENAI_API_KEY": ""
   },
-  "triggers": {
-    "crons": ["*/1 * * * *"]
-  },
   "ai": {
     "binding": "AI"
   }

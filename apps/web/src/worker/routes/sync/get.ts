@@ -4,6 +4,7 @@ import { account } from "../../db/auth-schema";
 import { hasUsableAccessToken } from "../../lib/gmail/client";
 import { GOOGLE_RECONNECT_REQUIRED_MESSAGE } from "../../lib/gmail/errors";
 import { getMailboxSyncSnapshot } from "../../lib/gmail/mailbox-state";
+import { catchUpMailboxOnDemand } from "../../lib/gmail/sync";
 import type { AppRouteEnv } from "../types";
 
 const GOOGLE_GMAIL_SCOPES = [
@@ -36,6 +37,8 @@ export function registerGetSync(api: Hono<AppRouteEnv>) {
   api.get("/status", async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
+
+    await catchUpMailboxOnDemand(db, c.env, user.id, user.email);
 
     const snapshot = await getMailboxSyncSnapshot(db, user.id);
     const mailbox = snapshot.mailbox;
