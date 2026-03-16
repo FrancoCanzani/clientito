@@ -3,8 +3,11 @@ import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import type { Database } from "../../db/client";
 import { emails } from "../../db/schema";
-import { sleep } from "../../lib/gmail/api";
-import { sendGmailMessage, fetchAttachmentFromR2 } from "../../lib/gmail/send";
+import { sleep } from "../../lib/gmail/client";
+import {
+  fetchAttachmentFromR2,
+  sendGmailMessage,
+} from "../../lib/gmail/mailbox";
 import { syncGmailMessageIds } from "../../lib/gmail/sync";
 import type { AppRouteEnv } from "../types";
 import { sendEmailBodySchema } from "./schemas";

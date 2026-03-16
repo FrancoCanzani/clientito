@@ -1,7 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Hono } from "hono";
 import { isGmailReconnectRequiredError } from "../../lib/gmail/errors";
-import { getGmailAttachmentBytes } from "../../lib/gmail/message";
+import { getGmailAttachmentBytes } from "../../lib/gmail/mailbox";
 import type { AppRouteEnv } from "../types";
 import { normalizeFilename, normalizeMimeType } from "./helpers";
 import { emailAttachmentQuerySchema } from "./schemas";

@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emails } from "../../db/schema";
-import { batchModifyGmailMessages } from "../../lib/gmail/modify";
+import { batchModifyGmailMessages } from "../../lib/gmail/mailbox";
 import type { AppRouteEnv } from "../types";
 import { applyEmailPatch } from "./mutation";
 import { patchEmailBodySchema, patchEmailParamsSchema } from "./schemas";

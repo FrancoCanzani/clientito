@@ -20,7 +20,7 @@ function AppShell() {
   return (
     <EmailCommandProvider>
       <div className="min-h-screen">
-        <main className="px-4 py-4 pb-24 *:mx-auto *:max-w-4xl">
+        <main className="px-4 py-4 pb-24 *:mx-auto *:max-w-3xl">
           <GmailConnectionGate />
           <Outlet />
         </main>

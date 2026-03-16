@@ -32,16 +32,16 @@ export function parseTaskInput(input: string): {
   return { title, dueAt };
 }
 
-export function getPriorityClassName(priority: TaskPriority) {
+export function getPriorityFlagClassName(priority: TaskPriority) {
   switch (priority) {
     case "urgent":
-      return "bg-red-50 text-red-700";
+      return "text-red-500";
     case "high":
-      return "bg-amber-50 text-amber-700";
+      return "text-amber-500";
     case "medium":
-      return "bg-blue-50 text-blue-700";
+      return "text-blue-500";
     default:
-      return "bg-zinc-100 text-zinc-700";
+      return "text-zinc-500";
   }
 }
 

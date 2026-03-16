@@ -8,7 +8,7 @@ import {
   extractMessageBodyHtml,
   extractMessageBodyText,
   getGmailMessageById,
-} from "../../lib/gmail/message";
+} from "../../lib/gmail/mailbox";
 import type { AppRouteEnv } from "../types";
 import {
   buildAttachmentUrl,

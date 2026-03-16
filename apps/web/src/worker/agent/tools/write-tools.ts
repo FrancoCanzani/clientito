@@ -4,7 +4,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
 import { emails, notes, tasks } from "../../db/schema";
-import { archiveGmailMessage } from "../../lib/gmail/modify";
+import { archiveGmailMessage } from "../../lib/gmail/mailbox";
 import { applyEmailPatch } from "../../routes/emails/mutation";
 
 const MODEL = "gpt-5.4";

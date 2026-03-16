@@ -1,9 +1,9 @@
 import type { Hono } from "hono";
 import { and, eq } from "drizzle-orm";
 import { account } from "../../db/auth-schema";
+import { hasUsableAccessToken } from "../../lib/gmail/client";
 import { GOOGLE_RECONNECT_REQUIRED_MESSAGE } from "../../lib/gmail/errors";
 import { getMailboxSyncSnapshot } from "../../lib/gmail/mailbox-state";
-import { hasUsableAccessToken } from "../../lib/gmail/token";
 import type { AppRouteEnv } from "../types";
 
 const GOOGLE_GMAIL_SCOPES = [

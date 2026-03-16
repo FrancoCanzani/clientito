@@ -3,7 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { Hono } from "hono";
 import type { Database } from "../../db/client";
 import { emails } from "../../db/schema";
-import { batchModifyGmailMessages } from "../../lib/gmail/modify";
+import { batchModifyGmailMessages } from "../../lib/gmail/mailbox";
 import type { AppRouteEnv } from "../types";
 import { applyEmailPatch } from "./mutation";
 import { batchPatchEmailsBodySchema } from "./schemas";

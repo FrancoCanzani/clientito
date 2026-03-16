@@ -11,10 +11,12 @@ import {
   fetchMessageBatch,
   fetchMinimalMessage,
   getCurrentHistoryId,
+  getGmailToken,
+  hasUsableAccessToken,
   listHistoryPage,
   listMessagesPage,
   sleep,
-} from "./api";
+} from "./client";
 import {
   GmailSyncStateError,
   isGmailReconnectRequiredError,
@@ -35,8 +37,7 @@ import {
   extractMessageAttachments,
   extractMessageBodyHtml,
   extractMessageBodyText,
-} from "./message";
-import { getGmailToken, hasUsableAccessToken } from "./token";
+} from "./mailbox";
 import type {
   GmailHistoryResponse,
   GmailSyncResult,

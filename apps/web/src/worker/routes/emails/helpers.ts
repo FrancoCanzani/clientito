@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { emails } from "../../db/schema";
-import type { GmailAttachmentMeta } from "../../lib/gmail/message";
+import type { GmailAttachmentMeta } from "../../lib/gmail/mailbox";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
 

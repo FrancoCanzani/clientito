@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -17,14 +16,15 @@ import {
 } from "@/components/ui/sheet";
 import { TaskEditor } from "@/features/tasks/components/task-editor";
 import { createTask, deleteTask, updateTask } from "@/features/tasks/mutations";
-import type { Task } from "@/features/tasks/types";
+import type { Task, TaskSortMode } from "@/features/tasks/types";
 import {
   buildTaskSections,
   fromTaskDateInputValue,
-  getPriorityClassName,
+  getPriorityFlagClassName,
 } from "@/features/tasks/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { FlagIcon } from "@phosphor-icons/react";
 import { useMutation } from "@tanstack/react-query";
 import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -44,11 +44,13 @@ function getDefaultCreateDueAt() {
 
 export default function TasksPage() {
   const taskResponse = tasksRouteApi.useLoaderData();
+  const search = tasksRouteApi.useSearch();
+  const navigate = tasksRouteApi.useNavigate();
   const router = useRouter();
   const isMobile = useIsMobile();
   const [showCompleted, setShowCompleted] = useState(false);
-  const [sortMode, setSortMode] = useState<"date" | "priority">("date");
   const [editor, setEditor] = useState<EditorState>(null);
+  const sortMode: TaskSortMode = search.sort ?? "date";
 
   const tasks = taskResponse.data;
 
@@ -104,20 +106,8 @@ export default function TasksPage() {
     },
   });
 
-  const openCreateEditor = (dueAt: number | null = getDefaultCreateDueAt()) => {
-    setEditor({ mode: "create", dueAt });
-  };
-
-  const openTaskEditor = (taskId: number) => {
-    setEditor((current) =>
-      current?.mode === "edit" && current.taskId === taskId
-        ? null
-        : { mode: "edit", taskId },
-    );
-  };
-
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="mx-auto space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <header className="space-y-1">
           <h2 className="text-lg font-medium">Tasks</h2>
@@ -127,16 +117,24 @@ export default function TasksPage() {
           <Button
             type="button"
             variant="outline"
-            size="xs"
-            onClick={() => setSortMode("date")}
+            size="sm"
+            onClick={() =>
+              navigate({
+                search: (prev) => ({ ...prev, sort: "date" }),
+              })
+            }
           >
             Date
           </Button>
           <Button
             type="button"
             variant="outline"
-            size="xs"
-            onClick={() => setSortMode("priority")}
+            size="sm"
+            onClick={() =>
+              navigate({
+                search: (prev) => ({ ...prev, sort: "priority" }),
+              })
+            }
           >
             Priority
           </Button>
@@ -175,14 +173,16 @@ export default function TasksPage() {
                 <h2 className="text-xs font-medium">{section.title}</h2>
                 <Button
                   variant="outline"
-                  size="xs"
+                  size="sm"
                   className="border-border/50"
                   onClick={() =>
-                    openCreateEditor(
-                      section.key === "no-date"
-                        ? null
-                        : fromTaskDateInputValue(section.key),
-                    )
+                    setEditor({
+                      mode: "create",
+                      dueAt:
+                        section.key === "no-date"
+                          ? null
+                          : fromTaskDateInputValue(section.key),
+                    })
                   }
                 >
                   Add task
@@ -201,7 +201,6 @@ export default function TasksPage() {
                       <div className="flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted/35">
                         <Checkbox
                           checked={task.done}
-                          className="rounded-full size-3.5"
                           onCheckedChange={() =>
                             toggleTaskMutation.mutate(task)
                           }
@@ -210,7 +209,14 @@ export default function TasksPage() {
                         <button
                           type="button"
                           className="min-w-0 flex-1 text-left"
-                          onClick={() => openTaskEditor(task.id)}
+                          onClick={() =>
+                            setEditor((current) =>
+                              current?.mode === "edit" &&
+                              current.taskId === task.id
+                                ? null
+                                : { mode: "edit", taskId: task.id },
+                            )
+                          }
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-2 flex-1">
@@ -230,15 +236,20 @@ export default function TasksPage() {
                               )}
                             </div>
 
-                            <Badge
-                              variant="outline"
+                            <span
                               className={cn(
-                                "capitalize text-xs",
-                                getPriorityClassName(task.priority),
+                                "flex items-center gap-2 capitalize text-xs",
                               )}
                             >
+                              <FlagIcon
+                                size={12}
+                                weight="fill"
+                                className={getPriorityFlagClassName(
+                                  task.priority,
+                                )}
+                              />
                               {task.priority}
-                            </Badge>
+                            </span>
                           </div>
                         </button>
                       </div>
@@ -283,8 +294,13 @@ export default function TasksPage() {
               <Button
                 className="border-border/50"
                 variant="outline"
-                size="xs"
-                onClick={() => openCreateEditor()}
+                size="sm"
+                onClick={() =>
+                  setEditor({
+                    mode: "create",
+                    dueAt: getDefaultCreateDueAt(),
+                  })
+                }
               >
                 Add task
               </Button>
@@ -294,12 +310,9 @@ export default function TasksPage() {
       </div>
 
       <Sheet open={isMobile && editor !== null} onOpenChange={closeEditor}>
-        <SheetContent
-          side="bottom"
-          className="max-h-[92vh] overflow-y-auto rounded-t-2xl border-0 border-t-0"
-        >
-          <SheetHeader className="pb-2">
-            <SheetTitle className="text-sm">
+        <SheetContent side="bottom" className="pb-4">
+          <SheetHeader className="p-4">
+            <SheetTitle>
               {editor?.mode === "edit" ? "Edit task" : "New task"}
             </SheetTitle>
           </SheetHeader>

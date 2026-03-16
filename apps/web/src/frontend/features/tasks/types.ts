@@ -1,4 +1,5 @@
 export type TaskPriority = "urgent" | "high" | "medium" | "low";
+export type TaskSortMode = "date" | "priority";
 
 export type Task = {
   id: number;

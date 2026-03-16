@@ -1,5 +1,12 @@
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -7,22 +14,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import type { Task, TaskPriority } from "@/features/tasks/types";
-import { fromTaskDateInputValue, toTaskDateInputValue } from "@/features/tasks/utils";
-import { format } from "date-fns";
-import { useEffect, useState } from "react";
+import {
+  fromTaskDateInputValue,
+  getPriorityFlagClassName,
+  toTaskDateInputValue,
+} from "@/features/tasks/utils";
+import { cn } from "@/lib/utils";
+import { FlagIcon } from "@phosphor-icons/react";
+import { format, startOfToday } from "date-fns";
+import { useState } from "react";
 
-const PRIORITY_OPTIONS: Array<{
-  value: TaskPriority;
-  label: string;
-  description: string;
-}> = [
-  { value: "urgent", label: "urgent", description: "urgent" },
-  { value: "high", label: "high", description: "high" },
-  { value: "medium", label: "medium", description: "medium" },
-  { value: "low", label: "low", description: "low" },
-];
+const PRIORITY_OPTIONS: TaskPriority[] = ["urgent", "high", "medium", "low"];
+
+function getInitialValues(task?: Task | null, defaultDueAt?: number | null) {
+  return {
+    title: task?.title ?? "",
+    description: task?.description ?? "",
+    dueDate: toTaskDateInputValue(task?.dueAt ?? defaultDueAt ?? null),
+    priority: task?.priority ?? "low",
+  } as const;
+}
 
 type TaskEditorSubmitValue = {
   title: string;
@@ -52,42 +64,32 @@ export function TaskEditor({
   autoFocus?: boolean;
   variant?: "inline" | "sheet";
 }) {
-  const [title, setTitle] = useState(task?.title ?? "");
-  const [description, setDescription] = useState(task?.description ?? "");
-  const [dueDate, setDueDate] = useState(
-    toTaskDateInputValue(task?.dueAt ?? defaultDueAt ?? null),
-  );
+  const initialValues = getInitialValues(task, defaultDueAt);
+  const [title, setTitle] = useState(initialValues.title);
+  const [description, setDescription] = useState(initialValues.description);
+  const [dueDate, setDueDate] = useState(initialValues.dueDate);
   const [priority, setPriority] = useState<TaskPriority>(
-    task?.priority ?? "low",
+    initialValues.priority,
   );
-
-  useEffect(() => {
-    setTitle(task?.title ?? "");
-    setDescription(task?.description ?? "");
-    setDueDate(toTaskDateInputValue(task?.dueAt ?? defaultDueAt ?? null));
-    setPriority(task?.priority ?? "low");
-  }, [defaultDueAt, task]);
 
   const isSheet = variant === "sheet";
-  const contentClassName = isSheet
-    ? "space-y-3 px-4 pb-4"
-    : "space-y-2 rounded-md bg-muted/25 px-2.5 py-2.5";
-  const minDate = format(new Date(), "yyyy-MM-dd");
+
+  const selectedDate = dueDate ? new Date(`${dueDate}T12:00:00`) : undefined;
 
   return (
     <form
-      className={contentClassName}
+      className={cn(
+        "flex flex-col border border-border/50 shadow-2xs gap-4 rounded-md p-3",
+        isSheet && "border-none",
+      )}
       onSubmit={(event) => {
         event.preventDefault();
 
-        const normalizedTitle = title.trim();
-        if (!normalizedTitle) return;
-
-        const normalizedDescription = description.trim();
+        if (!title.trim()) return;
 
         onSubmit({
-          title: normalizedTitle,
-          description: normalizedDescription ? normalizedDescription : null,
+          title: title.trim(),
+          description: description.trim() ? description.trim() : null,
           dueAt: fromTaskDateInputValue(dueDate),
           priority,
         });
@@ -98,98 +100,103 @@ export function TaskEditor({
         value={title}
         onChange={(event) => setTitle(event.target.value)}
         placeholder="Task title"
-        className={`border-border/40 bg-background text-sm shadow-none ${
-          isSheet
-            ? "h-9"
-            : "h-8 border-0 bg-transparent px-0 text-sm font-medium"
-        }`}
       />
 
-      <Textarea
+      <Input
         value={description}
         onChange={(event) => setDescription(event.target.value)}
         placeholder="Description"
-        className={`resize-none border-border/40 bg-background text-xs shadow-none ${
-          isSheet
-            ? "min-h-18"
-            : "min-h-12 border-0 bg-transparent px-0 py-0.5 text-xs text-muted-foreground"
-        }`}
       />
 
-      <div
-        className={`flex flex-col gap-2 ${
-          isSheet ? "" : "border-t border-border/40 pt-2"
-        }`}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            type="date"
-            value={dueDate}
-            min={minDate}
-            onChange={(event) => setDueDate(event.target.value)}
-            className={`border-border/50 bg-background text-xs shadow-none ${
-              isSheet ? "h-9 w-full sm:w-[180px]" : "h-7 w-[150px]"
-            }`}
-          />
-
-          <Select
-            value={priority}
-            onValueChange={(value) => setPriority(value as TaskPriority)}
-          >
-            <SelectTrigger
-              className={`border-border/50 bg-background text-xs shadow-none ${
-                isSheet ? "h-9 w-full sm:w-[140px]" : "h-7 w-[110px]"
-              }`}
-            >
-              <SelectValue placeholder="Priority" className="capitalize" />
-            </SelectTrigger>
-            <SelectContent>
-              {PRIORITY_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  <span className="capitalize">{option.label}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            {onDelete ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onDelete}
-                disabled={isSubmitting}
-                className="border-border/50 text-destructive hover:bg-destructive/5 hover:text-destructive"
-              >
-                Delete
-              </Button>
-            ) : null}
+      <div className="flex items-end w-full gap-2 justify-between">
+        <div className="flex items-center gap-2">
+          <div className="gap-1 flex-col flex">
+            <Label>Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className=" justify-between data-[empty=true]:text-muted-foreground"
+                >
+                  {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) =>
+                    setDueDate(date ? format(date, "yyyy-MM-dd") : "")
+                  }
+                  disabled={(date) => date < startOfToday()}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="gap-1 flex-col flex">
+            <Label>Priority</Label>
+            <Select
+              value={priority}
+              onValueChange={(value) => setPriority(value as TaskPriority)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Priority" asChild>
+                  <span className="flex items-center gap-2 capitalize">
+                    <FlagIcon
+                      size={12}
+                      weight="fill"
+                      className={getPriorityFlagClassName(priority)}
+                    />
+                    {priority}
+                  </span>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {PRIORITY_OPTIONS.map((priorityOption) => (
+                  <SelectItem key={priorityOption} value={priorityOption}>
+                    <span className="flex items-center gap-2 capitalize">
+                      <FlagIcon
+                        size={12}
+                        weight="fill"
+                        className={getPriorityFlagClassName(priorityOption)}
+                      />
+                      {priorityOption}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2">
+          {onDelete && (
             <Button
               type="button"
-              variant="outline"
-              size="sm"
-              onClick={onCancel}
+              variant="destructive"
+              onClick={onDelete}
               disabled={isSubmitting}
-              className="border-border/50"
             >
-              Cancel
+              Delete
             </Button>
-            <Button
-              type="submit"
-              variant="outline"
-              size="sm"
-              disabled={isSubmitting || !title.trim()}
-              className="border-border/50 bg-background"
-            >
-              {submitLabel}
-            </Button>
-          </div>
+          )}
+
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="outline"
+            disabled={isSubmitting || !title.trim()}
+          >
+            {submitLabel}
+          </Button>
         </div>
       </div>
     </form>
