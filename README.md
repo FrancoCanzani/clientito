@@ -1,39 +1,31 @@
-# Clientito Monorepo
+# Clientito Web App (Starter)
 
-Starter workspace with:
-- `apps/web`: Cloudflare Worker + React app (auth + dashboard shell + health API)
-- `packages/shared`: shared validation/types
-- `packages/sdk`: browser SDK package
+`apps/web` now contains a minimal full-stack starter:
+- React frontend with landing, login/register, and an authenticated dashboard shell
+- Hono Worker backend with auth and health endpoints
+- D1 persistence for Better Auth tables
 
-## Prerequisites
-
-- Bun `1.2.x`
-- Node `20+`
-- Cloudflare account + Wrangler (for deploy/migrations)
-
-## Install
+## Scripts
 
 ```bash
-bun install
+bun run dev            # local dev server
+bun run build          # typecheck + production build
+bun run lint           # eslint
+bun run check-types    # tsc project refs
+bun run deploy         # wrangler deploy
+
+bun run db:generate    # generate Drizzle migration
+bun run db:migrate:dev # apply migration to local D1
+bun run db:reset:dev   # reset local D1 state and re-apply migrations
 ```
 
-## Local Development
+## API Surface
 
-```bash
-bun run dev
-```
+- `/api/auth/*` Better Auth endpoints
+- `/api/health` health check
 
-## Quality Commands
+## Notes
 
-```bash
-bun run check-types
-bun run test
-bun run build
-```
-
-## Database (D1 + Drizzle)
-
-```bash
-cd apps/web
-bun run db:migrate:dev
-```
+- Route files live in `src/frontend/routes`.
+- Worker routes live in `src/worker/routes`.
+- Current migration set is a single starter auth migration in `drizzle/0000_auth.sql`.
