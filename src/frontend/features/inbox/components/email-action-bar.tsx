@@ -10,15 +10,19 @@ import {
   ArchiveIcon,
   ArrowBendUpLeftIcon,
   ArrowBendUpRightIcon,
+  BellSlashIcon,
   EnvelopeSimpleIcon,
   EnvelopeSimpleOpenIcon,
   StarIcon,
   TrashIcon,
+  UsersThreeIcon,
   WarningIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { unsubscribe } from "../../subscriptions/queries";
 import { draftReply, patchEmail, sendEmail } from "../mutations";
 import type { EmailDetailItem } from "../types";
 import type { ComposeInitial } from "./compose-email-dialog";
@@ -60,8 +64,22 @@ function ActionButton({
   );
 }
 
+function extractEmailAddress(raw: string): string {
+  const match = raw.match(/<([^>]+)>/);
+  return (match?.[1] ?? raw).trim().toLowerCase();
+}
+
+function parseRecipientList(raw: string | null): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => extractEmailAddress(s))
+    .filter((s) => s.length > 0);
+}
+
 export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyBody, setReplyBody] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -121,6 +139,26 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
     onError: () => toast.error("Failed to update"),
   });
 
+  const hasUnsubscribe = !!(email.unsubscribeUrl || email.unsubscribeEmail);
+
+  const unsubscribeMutation = useMutation({
+    mutationFn: () =>
+      unsubscribe({
+        fromAddr: email.fromAddr,
+        unsubscribeUrl: email.unsubscribeUrl ?? undefined,
+        unsubscribeEmail: email.unsubscribeEmail ?? undefined,
+      }),
+    onSuccess: (result) => {
+      if (result.method === "manual" && result.url) {
+        window.open(result.url, "_blank", "noopener,noreferrer");
+        toast.info("Opened unsubscribe page in a new tab");
+      } else {
+        toast.success("Unsubscribed successfully");
+      }
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   const sendMutation = useMutation({
     mutationFn: () =>
       sendEmail({
@@ -171,12 +209,42 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
     onForward?.({ subject, body });
   };
 
+  const handleReplyAll = () => {
+    const myEmail = user?.email?.toLowerCase() ?? "";
+    const toRecipients = parseRecipientList(email.toAddr);
+    const ccRecipients = parseRecipientList(email.ccAddr);
+    const fromAddr = extractEmailAddress(email.fromAddr);
+
+    // "To" is the original sender
+    const replyTo = fromAddr;
+
+    // "CC" is everyone else from To + CC, excluding the user and the original sender
+    const allOthers = [...toRecipients, ...ccRecipients].filter(
+      (addr) => addr !== myEmail && addr !== fromAddr,
+    );
+    const uniqueCc = [...new Set(allOthers)].join(", ");
+
+    const subject = email.subject
+      ? email.subject.startsWith("Re:")
+        ? email.subject
+        : `Re: ${email.subject}`
+      : "Re:";
+
+    onForward?.({
+      to: replyTo,
+      cc: uniqueCc || undefined,
+      subject,
+      body: "",
+    });
+  };
+
   const actionsPending =
     archiveMutation.isPending ||
     trashMutation.isPending ||
     spamMutation.isPending ||
     starMutation.isPending ||
-    readMutation.isPending;
+    readMutation.isPending ||
+    unsubscribeMutation.isPending;
 
   return (
     <div className="space-y-3">
@@ -239,18 +307,29 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
 
       <TooltipProvider>
         <div className="flex items-center justify-between gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={() => {
-              setReplyOpen(true);
-              setTimeout(() => textareaRef.current?.focus(), 0);
-            }}
-          >
-            <ArrowBendUpLeftIcon className="size-3.5" />
-            Reply
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => {
+                setReplyOpen(true);
+                setTimeout(() => textareaRef.current?.focus(), 0);
+              }}
+            >
+              <ArrowBendUpLeftIcon className="size-3.5" />
+              Reply
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={handleReplyAll}
+            >
+              <UsersThreeIcon className="size-3.5" />
+              Reply All
+            </Button>
+          </div>
 
           <div className="flex items-center gap-0.5">
             <ActionButton
@@ -298,6 +377,15 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
             <ActionButton label="Forward" onClick={handleForward}>
               <ArrowBendUpRightIcon className="size-4" />
             </ActionButton>
+            {hasUnsubscribe && (
+              <ActionButton
+                label="Unsubscribe"
+                onClick={() => unsubscribeMutation.mutate()}
+                disabled={actionsPending}
+              >
+                <BellSlashIcon className="size-4" />
+              </ActionButton>
+            )}
           </div>
         </div>
       </TooltipProvider>

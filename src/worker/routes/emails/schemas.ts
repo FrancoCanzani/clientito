@@ -8,11 +8,13 @@ export const emailSearchItemSchema = z.object({
   fromAddr: z.string(),
   fromName: z.string().nullable(),
   toAddr: z.string().nullable(),
+  ccAddr: z.string().nullable(),
   subject: z.string().nullable(),
   snippet: z.string().nullable(),
   date: z.number(),
   isRead: z.boolean(),
   labelIds: z.array(z.string()),
+  snoozedUntil: z.number().nullable(),
 });
 
 export const searchEmailsQuerySchema = z.object({
@@ -29,7 +31,7 @@ export const listEmailsQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional(),
   search: z.string().trim().optional(),
   isRead: z.enum(["true", "false"]).optional(),
-  view: z.enum(["inbox", "sent", "spam", "trash"]).optional(),
+  view: z.enum(["inbox", "sent", "spam", "trash", "snoozed"]).optional(),
 });
 
 export const emailListItemSchema = emailSearchItemSchema.extend({
@@ -37,6 +39,9 @@ export const emailListItemSchema = emailSearchItemSchema.extend({
   direction: z.enum(["sent", "received"]).nullable(),
   hasAttachment: z.boolean(),
   createdAt: z.number(),
+  unsubscribeUrl: z.string().nullable(),
+  unsubscribeEmail: z.string().nullable(),
+  snoozedUntil: z.number().nullable(),
 });
 
 export const emailAttachmentSchema = z.object({
@@ -104,6 +109,7 @@ export const patchEmailBodySchema = z.object({
   trashed: z.boolean().optional(),
   spam: z.boolean().optional(),
   starred: z.boolean().optional(),
+  snoozedUntil: z.number().nullable().optional(),
 });
 
 export const batchPatchEmailsBodySchema = z.object({
@@ -113,6 +119,7 @@ export const batchPatchEmailsBodySchema = z.object({
   trashed: z.boolean().optional(),
   spam: z.boolean().optional(),
   starred: z.boolean().optional(),
+  snoozedUntil: z.number().nullable().optional(),
 });
 
 export const patchEmailResponseSchema = z.object({
@@ -123,11 +130,13 @@ export const patchEmailResponseSchema = z.object({
     trashed: z.boolean(),
     spam: z.boolean(),
     starred: z.boolean(),
+    snoozedUntil: z.number().nullable(),
   }),
 });
 
 export const sendEmailBodySchema = z.object({
   to: z.string().email(),
+  cc: z.string().optional(),
   subject: z.string().trim().min(1),
   body: z.string().trim().min(1),
   inReplyTo: z.string().trim().optional(),

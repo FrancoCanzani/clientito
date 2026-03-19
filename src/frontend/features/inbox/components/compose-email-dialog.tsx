@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useState } from "react";
 import { AttachmentBar } from "./attachment-bar";
 import { ComposeEditor } from "./compose-editor";
 import { getComposeInitialKey, useComposeEmail } from "./compose-email-state";
@@ -13,6 +14,7 @@ import { RecipientInput } from "./recipient-input";
 
 export type ComposeInitial = {
   to?: string;
+  cc?: string;
   subject?: string;
   body?: string;
 };
@@ -35,6 +37,8 @@ export function ComposeEmailFields({
   const {
     to,
     setTo,
+    cc,
+    setCc,
     subject,
     setSubject,
     body,
@@ -43,6 +47,8 @@ export function ComposeEmailFields({
     sendMutation,
     attachments,
   } = compose;
+
+  const [showCc, setShowCc] = useState(cc.length > 0);
 
   return (
     <div
@@ -54,11 +60,31 @@ export function ComposeEmailFields({
         }
       }}
     >
-      <RecipientInput
-        value={to}
-        onChange={setTo}
-        autoFocus={recipientAutoFocus}
-      />
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <RecipientInput
+            value={to}
+            onChange={setTo}
+            autoFocus={recipientAutoFocus}
+          />
+        </div>
+        {!showCc && (
+          <button
+            type="button"
+            className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => setShowCc(true)}
+          >
+            CC
+          </button>
+        )}
+      </div>
+      {showCc && (
+        <RecipientInput
+          value={cc}
+          onChange={setCc}
+          placeholder="CC"
+        />
+      )}
       <Input
         placeholder="Subject"
         value={subject}

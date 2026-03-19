@@ -4,6 +4,7 @@ export type EmailSearchResult = {
   fromAddr: string;
   fromName: string | null;
   toAddr: string | null;
+  ccAddr: string | null;
   subject: string | null;
   snippet: string | null;
   date: number;
@@ -25,6 +26,7 @@ export type EmailListItem = {
   fromAddr: string;
   fromName: string | null;
   toAddr: string | null;
+  ccAddr: string | null;
   subject: string | null;
   snippet: string | null;
   threadId: string | null;
@@ -34,6 +36,8 @@ export type EmailListItem = {
   labelIds: string[];
   hasAttachment: boolean;
   createdAt: number;
+  unsubscribeUrl: string | null;
+  unsubscribeEmail: string | null;
 };
 
 export type EmailAttachment = {

@@ -63,7 +63,7 @@ export function TaskRow({
 
         <div className="flex shrink-0 items-center gap-1.5">
           {task.dueTime && (
-            <span className="font-mono text-[10px] text-muted-foreground">
+            <span className="font-mono text-xs text-muted-foreground">
               {task.dueTime}
             </span>
           )}

@@ -26,13 +26,7 @@ import {
   VIEW_LABELS,
 } from "@/features/tasks/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
-import {
-  KanbanIcon,
-  ListIcon,
-  PlusIcon,
-  TimerIcon,
-} from "@phosphor-icons/react";
+import { KanbanIcon, ListIcon } from "@phosphor-icons/react";
 import { useMutation } from "@tanstack/react-query";
 import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
@@ -290,16 +284,10 @@ export default function TasksPage() {
                 })
               }
             >
-              <PlusIcon className="mr-1 size-3.5" />
               Add task
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => pomodoro.start()}
-              className={cn(pomodoro.state.status !== "idle" && "text-red-500")}
-            >
-              <TimerIcon className="mr-1 size-3.5" />
-              {pomodoro.state.status !== "idle" ? "Focus running" : "Focus"}
+            <Button variant="outline" onClick={() => pomodoro.start()}>
+              {pomodoro.state.status !== "idle" ? "Focusing..." : "Focus"}
             </Button>
           </div>
         </div>

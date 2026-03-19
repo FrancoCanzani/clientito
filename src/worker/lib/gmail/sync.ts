@@ -197,6 +197,7 @@ async function processMessageIds({
 
         const rawFrom = getHeaderValue(message.payload?.headers, "From");
         const rawTo = getHeaderValue(message.payload?.headers, "To");
+        const rawCc = getHeaderValue(message.payload?.headers, "Cc");
         const rawMessageId = getHeaderValue(
           message.payload?.headers,
           "Message-ID",
@@ -260,6 +261,7 @@ async function processMessageIds({
           fromAddr,
           fromName,
           toAddr: toAddr || null,
+          ccAddr: rawCc || null,
           subject,
           snippet: message.snippet ?? null,
           bodyText: bodyText || null,

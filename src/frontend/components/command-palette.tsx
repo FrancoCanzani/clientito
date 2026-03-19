@@ -217,7 +217,7 @@ export function CommandPalette() {
       ? (["inbox", "sent", "spam", "trash"] as EmailView[]).map((view) => ({
           id: `email-view-${view}`,
           label: VIEW_LABELS[view],
-          section: "email-navigation" ,
+          section: "email-navigation",
           icon:
             view === "trash" ? (
               <TrashIcon className="size-4" />
@@ -247,7 +247,7 @@ export function CommandPalette() {
           {
             id: "email-selection-mode",
             label: "Select inbox items",
-            section: "email-selection" ,
+            section: "email-selection",
             icon: <CheckSquareIcon className="size-4" />,
             onSelect: () => {
               issueEmailCommand({
@@ -260,7 +260,7 @@ export function CommandPalette() {
           {
             id: "email-select-all",
             label: "Select all visible",
-            section: "email-selection" ,
+            section: "email-selection",
             icon: <CheckSquareIcon className="size-4" />,
             onSelect: () => {
               issueEmailCommand({ type: "select-all-visible" });
@@ -270,7 +270,7 @@ export function CommandPalette() {
           {
             id: "email-clear-selection",
             label: "Clear selection",
-            section: "email-selection" ,
+            section: "email-selection",
             icon: <CheckSquareIcon className="size-4" />,
             onSelect: () => {
               issueEmailCommand({ type: "clear-selection" });
@@ -309,7 +309,7 @@ export function CommandPalette() {
       {
         id: "home",
         label: "Home",
-        section: "navigation" ,
+        section: "navigation",
         to: "/home",
         icon: <HouseSimpleIcon className="size-4" />,
         onSelect: () => runNavigation("/home"),
@@ -317,7 +317,7 @@ export function CommandPalette() {
       {
         id: "inbox",
         label: "Inbox",
-        section: "navigation" ,
+        section: "navigation",
         to: "/inbox",
         icon: <TrayIcon className="size-4" />,
         onSelect: () => runNavigation("/inbox"),
@@ -325,7 +325,7 @@ export function CommandPalette() {
       {
         id: "tasks",
         label: "Tasks",
-        section: "navigation" ,
+        section: "navigation",
         to: "/tasks",
         icon: <CheckSquareIcon className="size-4" />,
         onSelect: () => runNavigation("/tasks"),
@@ -333,7 +333,7 @@ export function CommandPalette() {
       {
         id: "notes",
         label: "Notes",
-        section: "navigation" ,
+        section: "navigation",
         to: "/notes",
         icon: <NoteBlankIcon className="size-4" />,
         onSelect: () => runNavigation("/notes"),
@@ -341,7 +341,7 @@ export function CommandPalette() {
       {
         id: "subscriptions",
         label: "Subscriptions",
-        section: "navigation" ,
+        section: "navigation",
         icon: <NewspaperIcon className="size-4" />,
         onSelect: () => {
           navigate({ to: "/inbox/subscriptions" });
@@ -351,7 +351,7 @@ export function CommandPalette() {
       {
         id: "filters",
         label: "Email Filters",
-        section: "navigation" ,
+        section: "navigation",
         icon: <FunnelIcon className="size-4" />,
         onSelect: () => {
           navigate({ to: "/inbox/filters" });
@@ -361,7 +361,7 @@ export function CommandPalette() {
       {
         id: "settings",
         label: "Settings",
-        section: "navigation" ,
+        section: "navigation",
         to: "/settings",
         icon: <GearIcon className="size-4" />,
         onSelect: () => runNavigation("/settings"),
@@ -371,7 +371,7 @@ export function CommandPalette() {
       {
         id: "compose",
         label: "Compose Message",
-        section: "actions" ,
+        section: "actions",
         icon: <EnvelopeSimpleIcon className="size-4" />,
         onSelect: () => {
           navigate({
@@ -385,14 +385,14 @@ export function CommandPalette() {
       {
         id: "new-task",
         label: "New Task",
-        section: "actions" ,
+        section: "actions",
         icon: <PlusIcon className="size-4" />,
         onSelect: () => setNewTaskMode(true),
       },
       {
         id: "new-note",
         label: "New Note",
-        section: "actions" ,
+        section: "actions",
         icon: <NoteBlankIcon className="size-4" />,
         onSelect: () => createNoteMutation.mutate(),
       },
@@ -402,7 +402,7 @@ export function CommandPalette() {
           resolvedTheme === "dark"
             ? "Switch to Light Mode"
             : "Switch to Dark Mode",
-        section: "actions" ,
+        section: "actions",
         icon:
           resolvedTheme === "dark" ? (
             <SunIcon className="size-4" />
@@ -417,7 +417,7 @@ export function CommandPalette() {
       {
         id: "sign-out",
         label: "Sign out",
-        section: "actions" ,
+        section: "actions",
         icon: <SignOutIcon className="size-4" />,
         onSelect: () => {
           logout.mutate();
@@ -535,297 +535,286 @@ export function CommandPalette() {
   return (
     <div
       ref={containerRef}
-      className="fixed bottom-6 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4"
+      className="fixed bottom-6 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-2"
     >
       <Command
         shouldFilter={!agentMode}
-        className="overflow-hidden rounded-2xl border border-border bg-background shadow-lg"
+        className="overflow-hidden rounded-xl border border-border bg-background shadow-lg"
       >
         <LazyMotion features={domAnimation}>
-        <AnimatePresence>
-          {open && (
-            <m.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="overflow-hidden"
-            >
-              {agentMode ? (
-                <div className="flex h-[24rem] flex-col md:h-[29rem]">
-                  <div className="flex items-start justify-between gap-3 border-b border-border/70 px-3 py-2.5">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">
-                        Agent
-                      </p>
-                      {agentStatusLabel ? (
-                        <div className="mt-1 text-[11px] text-muted-foreground">
-                          {agentStatusLabel}
-                        </div>
-                      ) : null}
+          <AnimatePresence>
+            {open && (
+              <m.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="overflow-hidden"
+              >
+                {agentMode ? (
+                  <div className="flex h-96 flex-col md:h-116">
+                    <div className="flex items-start justify-between gap-3 border-b border-border/70 p-2.5">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm">Agent</p>
+                        {agentStatusLabel ? (
+                          <div className="mt-1 text-[11px] text-muted-foreground">
+                            {agentStatusLabel}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button
+                          size="xs"
+                          variant={"outline"}
+                          onClick={startFreshChat}
+                        >
+                          New chat
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
+
+                    <div
+                      ref={messagesViewportRef}
+                      className="flex-1 overflow-y-auto py-2"
+                    >
+                      {messages.length > 0 ? (
+                        messages.map((message) => (
+                          <div key={message.id}>
+                            <AgentMessage message={message} />
+                            {message.parts
+                              .filter(
+                                (part) =>
+                                  isToolUIPart(part) &&
+                                  part.state === "approval-requested",
+                              )
+                              .map((part) => {
+                                return (
+                                  <ToolApprovalCard
+                                    key={part.toolCallId}
+                                    toolCallId={part.approval.id}
+                                    toolName={getToolName(part)}
+                                    args={part.input as Record<string, unknown>}
+                                    onApprove={(id) =>
+                                      handleApprove(
+                                        id,
+                                        getToolName(part),
+                                        part.input as Record<string, unknown>,
+                                      )
+                                    }
+                                    onDiscard={handleDiscard}
+                                  />
+                                );
+                              })}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="space-y-4 px-3 py-4">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Ask the agent</p>
+                            <p className="text-xs text-muted-foreground">
+                              It can read context from your current page, search
+                              emails, and prepare actions for approval.
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            {agentSuggestions.map((suggestion) => (
+                              <Button
+                                variant={"secondary"}
+                                key={suggestion}
+                                type="button"
+                                onClick={() => submitAgentMessage(suggestion)}
+                              >
+                                {suggestion}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {(status === "streaming" || status === "submitted") && (
+                        <AgentThinking label={"Working on it..."} />
+                      )}
+                      {status === "error" &&
+                        messages.length === 0 &&
+                        agentHasSubmitted && (
+                          <p className="px-3 py-2 text-xs text-destructive">
+                            The agent hit an error. Try asking again.
+                          </p>
+                        )}
+                    </div>
+                  </div>
+                ) : newTaskMode ? (
+                  <div className="space-y-2 p-3">
+                    <p className="text-xs text-muted-foreground">Create task</p>
+                    <Input
+                      value={taskInput}
+                      onChange={(event) => setTaskInput(event.target.value)}
+                      placeholder="e.g. Send proposal tomorrow 3pm"
+                    />
+                    <div className="flex justify-end gap-2">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 text-xs"
-                        onClick={startFreshChat}
+                        onClick={() => setNewTaskMode(false)}
                       >
-                        New chat
+                        Back
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={submitTask}
+                        disabled={
+                          createTaskMutation.isPending ||
+                          taskInput.trim().length === 0
+                        }
+                      >
+                        {createTaskMutation.isPending ? "Saving..." : "Save"}
                       </Button>
                     </div>
                   </div>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto py-1">
+                    <Command.List>
+                      <Command.Empty className="px-3 py-3 text-sm text-muted-foreground">
+                        No commands found.
+                      </Command.Empty>
 
-                  <div
-                    ref={messagesViewportRef}
-                    className="flex-1 overflow-y-auto py-2"
-                  >
-                    {messages.length > 0 ? (
-                      messages.map((message) => (
-                        <div key={message.id}>
-                          <AgentMessage message={message} />
-                          {message.parts
-                            .filter(
-                              (part) =>
-                                isToolUIPart(part) &&
-                                part.state === "approval-requested",
-                            )
-                            .map((part) => {
-                              return (
-                                <ToolApprovalCard
-                                  key={part.toolCallId}
-                                  toolCallId={part.approval.id}
-                                  toolName={getToolName(part)}
-                                  args={part.input as Record<string, unknown>}
-                                  onApprove={(id) =>
-                                    handleApprove(
-                                      id,
-                                      getToolName(part),
-                                      part.input as Record<string, unknown>,
-                                    )
-                                  }
-                                  onDiscard={handleDiscard}
-                                />
-                              );
-                            })}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="space-y-4 px-3 py-4">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-foreground">
-                            Ask the agent
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            It can read context from your current page, search
-                            emails, and prepare actions for approval.
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {agentSuggestions.map((suggestion) => (
-                            <button
-                              key={suggestion}
-                              type="button"
-                              className="rounded-full border border-border px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
-                              onClick={() => submitAgentMessage(suggestion)}
+                      {emailNavigationCommands.length > 0 && (
+                        <Command.Group
+                          heading="Mailbox"
+                          className={commandGroupHeadingClassName}
+                        >
+                          {emailNavigationCommands.map((command) => (
+                            <Command.Item
+                              key={command.id}
+                              value={command.label}
+                              onSelect={command.onSelect}
+                              className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
                             >
-                              {suggestion}
-                            </button>
+                              <span className="text-muted-foreground">
+                                {command.icon}
+                              </span>
+                              {command.label}
+                            </Command.Item>
                           ))}
-                        </div>
-                      </div>
-                    )}
+                        </Command.Group>
+                      )}
 
-                    {(status === "streaming" || status === "submitted") && (
-                      <AgentThinking
-                        label={
-                          status === "submitted"
-                            ? "Sending your request..."
-                            : "Working through the request..."
-                        }
-                      />
-                    )}
-                    {status === "error" &&
-                    messages.length === 0 &&
-                    agentHasSubmitted && (
-                      <p className="px-3 py-2 text-xs text-destructive">
-                        The agent hit an error. Try asking again.
-                      </p>
-                    )}
+                      {taskNavigationCommands.length > 0 && (
+                        <Command.Group
+                          heading="Task Views"
+                          className={commandGroupHeadingClassName}
+                        >
+                          {taskNavigationCommands.map((command) => (
+                            <Command.Item
+                              key={command.id}
+                              value={command.label}
+                              onSelect={command.onSelect}
+                              className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
+                            >
+                              <span className="text-muted-foreground">
+                                {command.icon}
+                              </span>
+                              {command.label}
+                            </Command.Item>
+                          ))}
+                        </Command.Group>
+                      )}
+
+                      <Command.Group
+                        heading="Navigation"
+                        className={commandGroupHeadingClassName}
+                      >
+                        {visibleNavigationCommands.map((command) => (
+                          <Command.Item
+                            key={command.id}
+                            value={command.label}
+                            onSelect={command.onSelect}
+                            className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
+                          >
+                            <span className="text-muted-foreground">
+                              {command.icon}
+                            </span>
+                            {command.label}
+                          </Command.Item>
+                        ))}
+                      </Command.Group>
+
+                      {emailSelectionCommands.length > 0 && (
+                        <Command.Group
+                          heading="Select"
+                          className={commandGroupHeadingClassName}
+                        >
+                          {emailSelectionCommands.map((command) => (
+                            <Command.Item
+                              key={command.id}
+                              value={command.label}
+                              onSelect={command.onSelect}
+                              className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
+                            >
+                              <span className="text-muted-foreground">
+                                {command.icon}
+                              </span>
+                              {command.label}
+                            </Command.Item>
+                          ))}
+                        </Command.Group>
+                      )}
+
+                      <Command.Group
+                        heading="Actions"
+                        className={commandGroupHeadingClassName}
+                      >
+                        {actionCommands.map((command) => (
+                          <Command.Item
+                            key={command.id}
+                            value={command.label}
+                            onSelect={command.onSelect}
+                            className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
+                          >
+                            <span className="text-muted-foreground">
+                              {command.icon}
+                            </span>
+                            {command.label}
+                          </Command.Item>
+                        ))}
+                      </Command.Group>
+
+                      {normalizedQuery ? (
+                        <Command.Group
+                          heading="Agent"
+                          className={commandGroupHeadingClassName}
+                        >
+                          <Command.Item
+                            forceMount
+                            value={`Ask agent ${normalizedQuery}`}
+                            onSelect={() => enterAgentMode(normalizedQuery)}
+                            className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
+                          >
+                            Ask: &ldquo;{normalizedQuery}&rdquo;
+                          </Command.Item>
+                        </Command.Group>
+                      ) : (
+                        <Command.Group
+                          heading="Agent"
+                          className={commandGroupHeadingClassName}
+                        >
+                          <Command.Item
+                            forceMount
+                            value="Open agent"
+                            onSelect={() => enterAgentMode()}
+                            className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
+                          >
+                            <KeyReturnIcon className="size-4 text-muted-foreground" />
+                            Open agent
+                          </Command.Item>
+                        </Command.Group>
+                      )}
+                    </Command.List>
                   </div>
-                </div>
-              ) : newTaskMode ? (
-                <div className="space-y-2 p-3">
-                  <p className="text-xs text-muted-foreground">Create task</p>
-                  <Input
-                    value={taskInput}
-                    onChange={(event) => setTaskInput(event.target.value)}
-                    placeholder="e.g. Send proposal tomorrow 3pm"
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setNewTaskMode(false)}
-                    >
-                      Back
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={submitTask}
-                      disabled={
-                        createTaskMutation.isPending ||
-                        taskInput.trim().length === 0
-                      }
-                    >
-                      {createTaskMutation.isPending ? "Saving..." : "Save"}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="max-h-72 overflow-y-auto py-1">
-                  <Command.List>
-                    <Command.Empty className="px-3 py-3 text-sm text-muted-foreground">
-                      No commands found.
-                    </Command.Empty>
-
-                    {emailNavigationCommands.length > 0 && (
-                      <Command.Group
-                        heading="Mailbox"
-                        className={commandGroupHeadingClassName}
-                      >
-                        {emailNavigationCommands.map((command) => (
-                          <Command.Item
-                            key={command.id}
-                            value={command.label}
-                            onSelect={command.onSelect}
-                            className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
-                          >
-                            <span className="text-muted-foreground">
-                              {command.icon}
-                            </span>
-                            {command.label}
-                          </Command.Item>
-                        ))}
-                      </Command.Group>
-                    )}
-
-                    {taskNavigationCommands.length > 0 && (
-                      <Command.Group
-                        heading="Task Views"
-                        className={commandGroupHeadingClassName}
-                      >
-                        {taskNavigationCommands.map((command) => (
-                          <Command.Item
-                            key={command.id}
-                            value={command.label}
-                            onSelect={command.onSelect}
-                            className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
-                          >
-                            <span className="text-muted-foreground">
-                              {command.icon}
-                            </span>
-                            {command.label}
-                          </Command.Item>
-                        ))}
-                      </Command.Group>
-                    )}
-
-                    <Command.Group
-                      heading="Navigation"
-                      className={commandGroupHeadingClassName}
-                    >
-                      {visibleNavigationCommands.map((command) => (
-                        <Command.Item
-                          key={command.id}
-                          value={command.label}
-                          onSelect={command.onSelect}
-                          className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
-                        >
-                          <span className="text-muted-foreground">
-                            {command.icon}
-                          </span>
-                          {command.label}
-                        </Command.Item>
-                      ))}
-                    </Command.Group>
-
-                    {emailSelectionCommands.length > 0 && (
-                      <Command.Group
-                        heading="Select"
-                        className={commandGroupHeadingClassName}
-                      >
-                        {emailSelectionCommands.map((command) => (
-                          <Command.Item
-                            key={command.id}
-                            value={command.label}
-                            onSelect={command.onSelect}
-                            className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
-                          >
-                            <span className="text-muted-foreground">
-                              {command.icon}
-                            </span>
-                            {command.label}
-                          </Command.Item>
-                        ))}
-                      </Command.Group>
-                    )}
-
-                    <Command.Group
-                      heading="Actions"
-                      className={commandGroupHeadingClassName}
-                    >
-                      {actionCommands.map((command) => (
-                        <Command.Item
-                          key={command.id}
-                          value={command.label}
-                          onSelect={command.onSelect}
-                          className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
-                        >
-                          <span className="text-muted-foreground">
-                            {command.icon}
-                          </span>
-                          {command.label}
-                        </Command.Item>
-                      ))}
-                    </Command.Group>
-
-                    {normalizedQuery ? (
-                      <Command.Group
-                        heading="Agent"
-                        className={commandGroupHeadingClassName}
-                      >
-                        <Command.Item
-                          forceMount
-                          value={`Ask agent ${normalizedQuery}`}
-                          onSelect={() => enterAgentMode(normalizedQuery)}
-                          className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
-                        >
-                          Ask: &ldquo;{normalizedQuery}&rdquo;
-                        </Command.Item>
-                      </Command.Group>
-                    ) : (
-                      <Command.Group
-                        heading="Agent"
-                        className={commandGroupHeadingClassName}
-                      >
-                        <Command.Item
-                          forceMount
-                          value="Open agent"
-                          onSelect={() => enterAgentMode()}
-                          className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
-                        >
-                          <KeyReturnIcon className="size-4 text-muted-foreground" />
-                          Open agent
-                        </Command.Item>
-                      </Command.Group>
-                    )}
-                  </Command.List>
-                </div>
-              )}
-            </m.div>
-          )}
-        </AnimatePresence>
+                )}
+              </m.div>
+            )}
+          </AnimatePresence>
         </LazyMotion>
 
         <div className="flex items-center gap-2 px-3 py-2">

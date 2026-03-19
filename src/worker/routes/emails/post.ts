@@ -76,6 +76,7 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
 
       const result = await sendGmailMessage(db, env, user.id, user.email, {
         to: input.to,
+        cc: input.cc,
         subject: input.subject,
         body: input.body,
         inReplyTo: input.inReplyTo,

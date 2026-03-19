@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, like, lte, or, sql, gt } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emails } from "../../db/schema";
 import { catchUpMailboxOnDemand } from "../../lib/gmail/sync";
@@ -23,6 +23,19 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
       isRead,
       view = "inbox",
     } = c.req.valid("query");
+
+    const now = Date.now();
+
+    // Wake up expired snoozes
+    await db
+      .update(emails)
+      .set({ snoozedUntil: null })
+      .where(
+        and(
+          eq(emails.userId, user.id),
+          lte(emails.snoozedUntil, now),
+        ),
+      );
 
     if (offset === 0) {
       await catchUpMailboxOnDemand(db, c.env, user.id, user.email);
@@ -48,6 +61,10 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
       case "inbox":
         conditions.push(hasEmailLabel("INBOX"));
         conditions.push(sql<boolean>`not ${hasEmailLabel("SENT")}`);
+        // Hide snoozed emails from inbox
+        conditions.push(
+          or(isNull(emails.snoozedUntil), lte(emails.snoozedUntil, now))!,
+        );
         break;
       case "sent":
         conditions.push(hasEmailLabel("SENT"));
@@ -57,6 +74,9 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
         break;
       case "trash":
         conditions.push(hasEmailLabel("TRASH"));
+        break;
+      case "snoozed":
+        conditions.push(gt(emails.snoozedUntil, now));
         break;
     }
 

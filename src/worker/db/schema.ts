@@ -55,6 +55,7 @@ export const emails = sqliteTable(
     fromAddr: text("from_addr").notNull(),
     fromName: text("from_name"),
     toAddr: text("to_addr"),
+    ccAddr: text("cc_addr"),
     subject: text("subject"),
     snippet: text("snippet"),
     bodyText: text("body_text"),
@@ -68,12 +69,14 @@ export const emails = sqliteTable(
     >(),
     unsubscribeUrl: text("unsubscribe_url"),
     unsubscribeEmail: text("unsubscribe_email"),
+    snoozedUntil: integer("snoozed_until"),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [
     index("emails_user_idx").on(table.userId),
     index("emails_user_date_idx").on(table.userId, table.date),
     index("emails_thread_idx").on(table.threadId),
+    index("emails_user_snoozed_idx").on(table.userId, table.snoozedUntil),
   ],
 );
 

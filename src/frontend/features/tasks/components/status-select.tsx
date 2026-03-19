@@ -54,13 +54,13 @@ export function StatusSelect({
             <StatusDot status={value} />
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-1" align="start">
+        <PopoverContent className="w-auto p-1 gap-1" align="start">
           {STATUS_ORDER.map((s) => (
             <button
               key={s}
               type="button"
               className={cn(
-                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-accent",
+                "flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-accent",
                 s === value && "bg-accent",
               )}
               onClick={() => {

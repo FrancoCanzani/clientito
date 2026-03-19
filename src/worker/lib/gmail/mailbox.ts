@@ -152,6 +152,7 @@ function modifyGmailMessage(
 function buildMimeMessage(
   input: {
     to: string;
+    cc?: string;
     subject: string;
     body: string;
     inReplyTo?: string;
@@ -170,6 +171,9 @@ function buildMimeMessage(
   const headers: string[] = [];
   headers.push(`From: ${fromAddr}`);
   headers.push(`To: ${input.to}`);
+  if (input.cc) {
+    headers.push(`Cc: ${input.cc}`);
+  }
   headers.push(`Subject: ${input.subject}`);
   headers.push("MIME-Version: 1.0");
 
@@ -335,6 +339,7 @@ export async function sendGmailMessage(
   userEmail: string,
   input: {
     to: string;
+    cc?: string;
     subject: string;
     body: string;
     inReplyTo?: string;

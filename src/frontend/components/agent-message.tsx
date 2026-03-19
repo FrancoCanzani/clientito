@@ -111,15 +111,10 @@ function ToolActivity({
 }) {
   return (
     <div
-      className={`flex items-center gap-2 text-xs ${
-        tone === "error" ? "text-destructive" : "text-muted-foreground"
+      className={`flex items-center gap-2 text-[10px] ${
+        tone === "error" ? "text-destructive" : "text-muted-foreground/50"
       }`}
     >
-      <span
-        className={`size-1 rounded-full ${
-          tone === "error" ? "bg-destructive" : "bg-muted-foreground/80"
-        }`}
-      />
       <span>{text}</span>
     </div>
   );
@@ -129,20 +124,19 @@ export function AgentMessage({ message }: { message: UIMessage }) {
   const isUser = message.role === "user";
 
   return (
-    <div
-      className={`px-3 py-2 text-sm text-foreground ${
-        isUser ? "flex justify-end" : ""
-      }`}
-    >
+    <div className={`px-3 py-2 text-xs ${isUser ? "flex justify-end" : ""}`}>
       <div
         className={`space-y-2 ${
-          isUser ? "max-w-[85%] rounded-xl border border-border bg-muted/40 px-3 py-2" : "w-full"
+          isUser ? "max-w-[85%] rounded-md bg-muted/40 px-3 py-2" : "w-full"
         }`}
       >
         {message.parts.map((part, i) => {
           if (part.type === "text") {
             return (
-              <p key={`${message.id}-text-${i}`} className="whitespace-pre-wrap">
+              <p
+                key={`${message.id}-text-${i}`}
+                className="whitespace-pre-wrap"
+              >
                 {part.text}
               </p>
             );
@@ -225,7 +219,7 @@ export function ToolApprovalCard({
   const label = toolLabels[toolName] ?? toolName;
 
   return (
-    <div className="mx-3 my-1.5 rounded-lg border border-border bg-muted/50 p-3">
+    <div className="mx-3 my-1.5 rounded-md bg-muted/50 p-3">
       <p className="text-xs font-medium text-foreground">{label}</p>
       <p className="mt-0.5 text-xs text-muted-foreground">
         {formatToolArgs(args)}
@@ -233,25 +227,23 @@ export function ToolApprovalCard({
       <div className="mt-2 flex gap-2">
         <Button
           size="sm"
-          variant="default"
-          className="h-7 text-xs"
-          onClick={() => {
-            onApprove(toolCallId);
-          }}
-        >
-          <CheckIcon className="mr-1 size-3" />
-          Approve
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 text-xs"
+          variant={"destructive"}
           onClick={() => {
             onDiscard(toolCallId);
           }}
         >
           <XIcon className="mr-1 size-3" />
           Discard
+        </Button>
+        <Button
+          size="sm"
+          variant="default"
+          onClick={() => {
+            onApprove(toolCallId);
+          }}
+        >
+          <CheckIcon className="mr-1 size-3" />
+          Approve
         </Button>
       </div>
     </div>
@@ -261,8 +253,9 @@ export function ToolApprovalCard({
 export function AgentThinking({ label = "Thinking..." }: { label?: string }) {
   return (
     <div className="flex items-center gap-1.5 px-3 py-1.5">
-      <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground" />
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-[10px] animate-pulse text-muted-foreground">
+        {label}
+      </span>
     </div>
   );
 }

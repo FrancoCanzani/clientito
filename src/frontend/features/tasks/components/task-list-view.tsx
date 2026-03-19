@@ -8,7 +8,10 @@ import {
 } from "@/components/ui/empty";
 import { TaskRow } from "@/features/tasks/components/task-row";
 import type { TaskView } from "@/features/tasks/types";
-import { fromTaskDateInputValue, type TaskSection } from "@/features/tasks/utils";
+import {
+  fromTaskDateInputValue,
+  type TaskSection,
+} from "@/features/tasks/utils";
 import { CircleDashedIcon, PlusIcon } from "@phosphor-icons/react";
 
 type EditorState =
@@ -40,9 +43,9 @@ export function TaskListView({
   if (sections.length === 0) {
     return (
       <div className="space-y-5">
-        <Empty className="min-h-[40vh] border-0 p-0">
+        <Empty className="min-h-[60vh] border-0 p-0">
           <EmptyHeader>
-            <CircleDashedIcon className="mx-auto mb-2 size-8 text-muted-foreground" />
+            <CircleDashedIcon className="mx-auto mb-2 size-5 text-muted-foreground" />
             <EmptyTitle>
               {totalTasks > 0 && !showCompleted
                 ? "No open tasks"
@@ -56,14 +59,8 @@ export function TaskListView({
                 : "Add a task to get started."}
             </EmptyDescription>
           </EmptyHeader>
-          <EmptyContent className="pt-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onCreateFromEmpty}
-            >
-              Add task
-            </Button>
+          <EmptyContent>
+            <Button onClick={onCreateFromEmpty}>Add task</Button>
           </EmptyContent>
         </Empty>
       </div>

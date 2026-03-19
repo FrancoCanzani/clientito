@@ -10,6 +10,7 @@ export const emailSummarySelection = {
   fromAddr: emails.fromAddr,
   fromName: emails.fromName,
   toAddr: emails.toAddr,
+  ccAddr: emails.ccAddr,
   subject: emails.subject,
   snippet: emails.snippet,
   threadId: emails.threadId,
@@ -18,6 +19,9 @@ export const emailSummarySelection = {
   isRead: emails.isRead,
   labelIds: emails.labelIds,
   createdAt: emails.createdAt,
+  unsubscribeUrl: emails.unsubscribeUrl,
+  unsubscribeEmail: emails.unsubscribeEmail,
+  snoozedUntil: emails.snoozedUntil,
 } as const;
 
 export function hasEmailLabel(label: string) {
@@ -42,6 +46,7 @@ export function toEmailListResponse(row: {
   fromAddr: string;
   fromName: string | null;
   toAddr: string | null;
+  ccAddr: string | null;
   subject: string | null;
   snippet: string | null;
   threadId: string | null;
@@ -50,6 +55,9 @@ export function toEmailListResponse(row: {
   isRead: boolean;
   labelIds: string[] | null;
   createdAt: number;
+  unsubscribeUrl: string | null;
+  unsubscribeEmail: string | null;
+  snoozedUntil: number | null;
 }) {
   const labelIds = row.labelIds ?? [];
   return {
@@ -58,6 +66,7 @@ export function toEmailListResponse(row: {
     fromAddr: row.fromAddr,
     fromName: row.fromName,
     toAddr: row.toAddr,
+    ccAddr: row.ccAddr,
     subject: row.subject,
     snippet: row.snippet,
     threadId: row.threadId,
@@ -67,6 +76,9 @@ export function toEmailListResponse(row: {
     labelIds,
     hasAttachment: labelIds.includes(HAS_ATTACHMENT_LABEL),
     createdAt: row.createdAt,
+    unsubscribeUrl: row.unsubscribeUrl,
+    unsubscribeEmail: row.unsubscribeEmail,
+    snoozedUntil: row.snoozedUntil,
   };
 }
 
@@ -76,6 +88,7 @@ export function toEmailDetailResponse(row: {
   fromAddr: string;
   fromName: string | null;
   toAddr: string | null;
+  ccAddr: string | null;
   subject: string | null;
   snippet: string | null;
   bodyText: string | null;
@@ -86,6 +99,9 @@ export function toEmailDetailResponse(row: {
   isRead: boolean;
   labelIds: string[] | null;
   createdAt: number;
+  unsubscribeUrl: string | null;
+  unsubscribeEmail: string | null;
+  snoozedUntil: number | null;
 }) {
   return {
     ...toEmailListResponse(row),
@@ -100,6 +116,7 @@ export function toEmailSearchResponse(row: {
   fromAddr: string;
   fromName: string | null;
   toAddr: string | null;
+  ccAddr: string | null;
   subject: string | null;
   snippet: string | null;
   date: number;
@@ -112,6 +129,7 @@ export function toEmailSearchResponse(row: {
     fromAddr: row.fromAddr,
     fromName: row.fromName,
     toAddr: row.toAddr,
+    ccAddr: row.ccAddr,
     subject: row.subject,
     snippet: row.snippet,
     date: row.date,

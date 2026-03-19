@@ -6,12 +6,14 @@ type RecipientInputProps = {
   value: string;
   onChange: (value: string) => void;
   autoFocus?: boolean;
+  placeholder?: string;
 };
 
 export function RecipientInput({
   value,
   onChange,
   autoFocus,
+  placeholder = "To",
 }: RecipientInputProps) {
   const [inputValue, setInputValue] = useState(value);
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -108,7 +110,7 @@ export function RecipientInput({
       <input
         ref={inputRef}
         type="email"
-        placeholder="To"
+        placeholder={placeholder}
         value={inputValue}
         onChange={handleInputChange}
         onFocus={() => setOpen(true)}

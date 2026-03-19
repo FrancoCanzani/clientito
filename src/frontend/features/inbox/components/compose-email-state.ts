@@ -12,13 +12,14 @@ type UseComposeEmailOptions = {
 function createComposeDraft(initial?: ComposeInitial) {
   return {
     to: initial?.to ?? "",
+    cc: initial?.cc ?? "",
     subject: initial?.subject ?? "",
     body: initial?.body ?? "",
   };
 }
 
 export function getComposeInitialKey(initial?: ComposeInitial) {
-  return [initial?.to ?? "", initial?.subject ?? "", initial?.body ?? ""].join(
+  return [initial?.to ?? "", initial?.cc ?? "", initial?.subject ?? "", initial?.body ?? ""].join(
     "\u0001",
   );
 }
@@ -32,10 +33,14 @@ export function useComposeEmail(
   const attachments = useAttachmentUpload();
   const bodyRef = useRef(draft.body);
 
-  const { to, subject, body } = draft;
+  const { to, cc, subject, body } = draft;
 
   const setTo = (value: string) => {
     setDraft((current) => ({ ...current, to: value }));
+  };
+
+  const setCc = (value: string) => {
+    setDraft((current) => ({ ...current, cc: value }));
   };
 
   const setSubject = (value: string) => {
@@ -51,6 +56,7 @@ export function useComposeEmail(
     mutationFn: () =>
       sendEmail({
         to,
+        cc: cc.trim().length > 0 ? cc.trim() : undefined,
         subject,
         body: bodyRef.current,
         attachments:
@@ -82,6 +88,8 @@ export function useComposeEmail(
   return {
     to,
     setTo,
+    cc,
+    setCc,
     subject,
     setSubject,
     body,

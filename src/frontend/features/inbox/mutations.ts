@@ -55,6 +55,7 @@ export async function markEmailRead(emailId: string): Promise<void> {
 
 type SendEmailInput = {
   to: string;
+  cc?: string;
   subject: string;
   body: string;
   inReplyTo?: string;

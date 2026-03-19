@@ -20,6 +20,7 @@ export function registerSearchEmails(api: Hono<AppRouteEnv>) {
         fromAddr: emails.fromAddr,
         fromName: emails.fromName,
         toAddr: emails.toAddr,
+        ccAddr: emails.ccAddr,
         subject: emails.subject,
         snippet: emails.snippet,
         date: emails.date,
