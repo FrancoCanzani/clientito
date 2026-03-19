@@ -1,33 +1,41 @@
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { Label } from "@/components/ui/label";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { PomodoroPill } from "@/features/tasks/components/pomodoro-pill";
+import { TaskBoard } from "@/features/tasks/components/task-board";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { TaskEditor } from "@/features/tasks/components/task-editor";
+  TaskEditor,
+  type TaskEditorSubmitValue,
+} from "@/features/tasks/components/task-editor";
+import { TaskListView } from "@/features/tasks/components/task-list-view";
+import { usePomodoro } from "@/features/tasks/hooks/use-pomodoro";
+import { TaskActionsProvider } from "@/features/tasks/hooks/use-task-actions";
 import { createTask, deleteTask, updateTask } from "@/features/tasks/mutations";
-import type { Task, TaskSortMode } from "@/features/tasks/types";
+import type {
+  TaskLayout,
+  TaskPriority,
+  TaskSortMode,
+  TaskStatus,
+  TaskView,
+} from "@/features/tasks/types";
 import {
   buildTaskSections,
-  fromTaskDateInputValue,
-  getPriorityFlagClassName,
+  getDefaultCreateDueAt,
+  VIEW_LABELS,
 } from "@/features/tasks/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { FlagIcon } from "@phosphor-icons/react";
+import {
+  KanbanIcon,
+  ListIcon,
+  PlusIcon,
+  TimerIcon,
+} from "@phosphor-icons/react";
 import { useMutation } from "@tanstack/react-query";
 import { getRouteApi, useRouter } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 const tasksRouteApi = getRouteApi("/_dashboard/tasks");
 
@@ -36,26 +44,41 @@ type EditorState =
   | { mode: "edit"; taskId: number }
   | null;
 
-function getDefaultCreateDueAt() {
-  const date = new Date();
-  date.setHours(12, 0, 0, 0);
-  return date.getTime();
-}
-
 export default function TasksPage() {
   const taskResponse = tasksRouteApi.useLoaderData();
   const search = tasksRouteApi.useSearch();
   const navigate = tasksRouteApi.useNavigate();
   const router = useRouter();
   const isMobile = useIsMobile();
-  const [showCompleted, setShowCompleted] = useState(false);
   const [editor, setEditor] = useState<EditorState>(null);
+
   const sortMode: TaskSortMode = search.sort ?? "date";
+  const view: TaskView = search.view ?? "all";
+  const showCompleted = search.completed ?? false;
+  const layoutPref: TaskLayout = search.layout ?? "list";
+  const layout: TaskLayout = isMobile ? "list" : layoutPref;
+
+  const setLayout = useCallback(
+    (l: TaskLayout) =>
+      navigate({
+        search: (prev) => ({ ...prev, layout: l === "list" ? undefined : l }),
+      }),
+    [navigate],
+  );
+
+  const setShowCompleted = useCallback(
+    (v: boolean) =>
+      navigate({ search: (prev) => ({ ...prev, completed: v || undefined }) }),
+    [navigate],
+  );
+
+  const pomodoro = usePomodoro();
 
   const tasks = taskResponse.data;
 
   const visibleTasks = useMemo(
-    () => tasks.filter((task) => (showCompleted ? true : !task.done)),
+    () =>
+      tasks.filter((task) => (showCompleted ? true : task.status !== "done")),
     [showCompleted, tasks],
   );
   const sections = useMemo(
@@ -67,13 +90,16 @@ export default function TasksPage() {
       ? (tasks.find((task) => task.id === editor.taskId) ?? null)
       : null;
 
-  const closeEditor = () => setEditor(null);
+  const closeEditor = useCallback(() => setEditor(null), []);
+  const invalidateTasks = () => {
+    void router.invalidate();
+  };
 
   const createTaskMutation = useMutation({
     mutationFn: createTask,
     onSuccess: () => {
       closeEditor();
-      router.invalidate();
+      invalidateTasks();
     },
   });
 
@@ -87,271 +113,289 @@ export default function TasksPage() {
     }) => updateTask(taskId, input),
     onSuccess: () => {
       closeEditor();
-      router.invalidate();
+      invalidateTasks();
     },
   });
 
-  const toggleTaskMutation = useMutation({
-    mutationFn: (task: Task) => updateTask(task.id, { done: !task.done }),
-    onSuccess: () => {
-      router.invalidate();
-    },
+  const statusMutation = useMutation({
+    mutationFn: ({ taskId, status }: { taskId: number; status: TaskStatus }) =>
+      updateTask(taskId, { status }),
+    onSuccess: invalidateTasks,
+  });
+
+  const priorityMutation = useMutation({
+    mutationFn: ({
+      taskId,
+      priority,
+    }: {
+      taskId: number;
+      priority: TaskPriority;
+    }) => updateTask(taskId, { priority }),
+    onSuccess: invalidateTasks,
   });
 
   const deleteTaskMutation = useMutation({
     mutationFn: deleteTask,
     onSuccess: () => {
       closeEditor();
-      void router.invalidate();
+      invalidateTasks();
     },
   });
 
-  return (
-    <div className="mx-auto space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <header className="space-y-1">
-          <h2 className="text-lg font-medium">Tasks</h2>
-        </header>
+  const setView = useCallback(
+    (v: TaskView) => {
+      navigate({
+        search: (prev) => ({
+          ...prev,
+          view: v === "all" ? undefined : v,
+        }),
+      });
+    },
+    [navigate],
+  );
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              navigate({
-                search: (prev) => ({ ...prev, sort: "date" }),
-              })
-            }
-          >
-            Date
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              navigate({
-                search: (prev) => ({ ...prev, sort: "priority" }),
-              })
-            }
-          >
-            Priority
-          </Button>
-          <div className="flex items-center justify-center gap-2">
-            <Checkbox
-              checked={showCompleted}
-              onCheckedChange={(checked) => setShowCompleted(checked === true)}
-            />
-            <Label className="text-primary">Show completed</Label>
+  const handleStatusChange = useCallback(
+    (taskId: number, status: TaskStatus) => {
+      statusMutation.mutate({ taskId, status });
+    },
+    [statusMutation],
+  );
+
+  const handlePriorityChange = useCallback(
+    (taskId: number, priority: TaskPriority) => {
+      priorityMutation.mutate({ taskId, priority });
+    },
+    [priorityMutation],
+  );
+
+  const handleToggleEdit = useCallback((taskId: number) => {
+    setEditor((current) =>
+      current?.mode === "edit" && current.taskId === taskId
+        ? null
+        : { mode: "edit", taskId },
+    );
+  }, []);
+
+  const handleDeleteTask = useCallback(
+    (taskId: number) => {
+      deleteTaskMutation.mutate(taskId);
+    },
+    [deleteTaskMutation],
+  );
+
+  const handleSubmitEdit = useCallback(
+    (taskId: number, value: TaskEditorSubmitValue) => {
+      updateTaskMutation.mutate({ taskId, input: value });
+    },
+    [updateTaskMutation],
+  );
+
+  const taskActions = useMemo(
+    () => ({
+      isUpdateSubmitting: updateTaskMutation.isPending,
+      onStatusChange: handleStatusChange,
+      onPriorityChange: handlePriorityChange,
+      onToggleEdit: handleToggleEdit,
+      onCancelEdit: closeEditor,
+      onDelete: handleDeleteTask,
+      onSubmitEdit: handleSubmitEdit,
+    }),
+    [
+      updateTaskMutation.isPending,
+      handleStatusChange,
+      handlePriorityChange,
+      handleToggleEdit,
+      closeEditor,
+      handleDeleteTask,
+      handleSubmitEdit,
+    ],
+  );
+
+  return (
+    <TaskActionsProvider value={taskActions}>
+      <div className="mx-auto space-y-5">
+        <div className="flex items-center justify-between">
+          <h2 className="font-medium">{VIEW_LABELS[view]}</h2>
+          <div className="flex items-center gap-2">
+            <ButtonGroup>
+              {(["all", "today", "upcoming"] as TaskView[]).map((v) => (
+                <Button
+                  key={v}
+                  variant={view === v ? "default" : "outline"}
+                  onClick={() => setView(v)}
+                >
+                  {VIEW_LABELS[v]}
+                </Button>
+              ))}
+            </ButtonGroup>
+            {!isMobile && (
+              <ButtonGroup>
+                <Button
+                  variant={layout === "list" ? "default" : "outline"}
+                  onClick={() => setLayout("list")}
+                >
+                  <ListIcon />
+                </Button>
+                <Button
+                  variant={layout === "board" ? "default" : "outline"}
+                  onClick={() => setLayout("board")}
+                >
+                  <KanbanIcon />
+                </Button>
+              </ButtonGroup>
+            )}
           </div>
         </div>
-      </div>
 
-      {!isMobile && editor?.mode === "create" ? (
-        <TaskEditor
-          key={`create-${editor.dueAt ?? "none"}`}
-          defaultDueAt={editor.dueAt}
-          submitLabel="Create task"
-          autoFocus
-          isSubmitting={createTaskMutation.isPending}
-          onCancel={closeEditor}
-          onSubmit={(value) =>
-            createTaskMutation.mutate({
-              ...value,
-              dueAt: value.dueAt ?? undefined,
-            })
-          }
-        />
-      ) : null}
-
-      <div className="space-y-5">
-        {sections.length > 0 ? (
-          sections.map((section) => (
-            <section key={section.key} className="space-y-2">
-              <div className="flex items-center justify-between py-1">
-                <h2 className="text-xs font-medium">{section.title}</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          {layout === "list" && (
+            <>
+              <ButtonGroup>
                 <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-border/50"
+                  variant={sortMode === "date" ? "default" : "outline"}
                   onClick={() =>
-                    setEditor({
-                      mode: "create",
-                      dueAt:
-                        section.key === "no-date"
-                          ? null
-                          : fromTaskDateInputValue(section.key),
+                    navigate({ search: (prev) => ({ ...prev, sort: "date" }) })
+                  }
+                >
+                  Date
+                </Button>
+                <Button
+                  variant={sortMode === "priority" ? "default" : "outline"}
+                  onClick={() =>
+                    navigate({
+                      search: (prev) => ({ ...prev, sort: "priority" }),
                     })
                   }
                 >
-                  Add task
+                  Priority
                 </Button>
+              </ButtonGroup>
+
+              <div className="flex items-center justify-center gap-2">
+                <Checkbox
+                  checked={showCompleted}
+                  onCheckedChange={(v) => setShowCompleted(v === true)}
+                />
+                <Label className="text-primary">Show completed</Label>
               </div>
+            </>
+          )}
 
-              <div className="space-y-0.5">
-                {section.tasks.map((task) => {
-                  const isEditing =
-                    !isMobile &&
-                    editor?.mode === "edit" &&
-                    editor.taskId === task.id;
+          <div className="ml-auto flex gap-2">
+            <Button
+              onClick={() =>
+                setEditor({
+                  mode: "create",
+                  dueAt: view === "today" ? getDefaultCreateDueAt() : null,
+                })
+              }
+            >
+              <PlusIcon className="mr-1 size-3.5" />
+              Add task
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => pomodoro.start()}
+              className={cn(pomodoro.state.status !== "idle" && "text-red-500")}
+            >
+              <TimerIcon className="mr-1 size-3.5" />
+              {pomodoro.state.status !== "idle" ? "Focus running" : "Focus"}
+            </Button>
+          </div>
+        </div>
 
-                  return (
-                    <div key={task.id} className="space-y-2">
-                      <div className="flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted/35">
-                        <Checkbox
-                          checked={task.done}
-                          onCheckedChange={() =>
-                            toggleTaskMutation.mutate(task)
-                          }
-                        />
+        {!isMobile && editor?.mode === "create" ? (
+          <TaskEditor
+            key={`create-${editor.dueAt ?? "none"}`}
+            defaultDueAt={editor.dueAt}
+            submitLabel="Create task"
+            autoFocus
+            isSubmitting={createTaskMutation.isPending}
+            onCancel={closeEditor}
+            onSubmit={(value) =>
+              createTaskMutation.mutate({
+                ...value,
+                dueAt: value.dueAt ?? undefined,
+                dueTime: value.dueTime ?? undefined,
+              })
+            }
+          />
+        ) : null}
 
-                        <button
-                          type="button"
-                          className="min-w-0 flex-1 text-left"
-                          onClick={() =>
-                            setEditor((current) =>
-                              current?.mode === "edit" &&
-                              current.taskId === task.id
-                                ? null
-                                : { mode: "edit", taskId: task.id },
-                            )
-                          }
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-center gap-2 flex-1">
-                              <p
-                                className={`text-sm ${
-                                  task.done
-                                    ? "text-muted-foreground line-through"
-                                    : "text-foreground"
-                                }`}
-                              >
-                                {task.title}
-                              </p>
-                              {task.description && (
-                                <p className="text-xs text-muted-foreground">
-                                  {task.description}
-                                </p>
-                              )}
-                            </div>
-
-                            <span
-                              className={cn(
-                                "flex items-center gap-2 capitalize text-xs",
-                              )}
-                            >
-                              <FlagIcon
-                                size={12}
-                                weight="fill"
-                                className={getPriorityFlagClassName(
-                                  task.priority,
-                                )}
-                              />
-                              {task.priority}
-                            </span>
-                          </div>
-                        </button>
-                      </div>
-
-                      {isEditing ? (
-                        <TaskEditor
-                          key={`edit-${task.id}`}
-                          task={task}
-                          submitLabel="Save changes"
-                          isSubmitting={updateTaskMutation.isPending}
-                          onCancel={closeEditor}
-                          onDelete={() => deleteTaskMutation.mutate(task.id)}
-                          onSubmit={(value) =>
-                            updateTaskMutation.mutate({
-                              taskId: task.id,
-                              input: value,
-                            })
-                          }
-                        />
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          ))
+        {layout === "board" ? (
+          <TaskBoard
+            tasks={tasks}
+            onEdit={(taskId) => setEditor({ mode: "edit", taskId })}
+            onPomodoro={(taskId, title) => pomodoro.start(taskId, title)}
+          />
         ) : (
-          <Empty className="min-h-[40vh] border-0 p-0">
-            <EmptyHeader>
-              <EmptyTitle>
-                {tasks.length > 0 && !showCompleted
-                  ? "No open tasks"
-                  : "No tasks yet"}
-              </EmptyTitle>
-              <EmptyDescription className="text-xs">
-                {tasks.length > 0 && !showCompleted
-                  ? "You're all caught up. Turn on completed tasks or add a new one."
-                  : "Add your first task and it will appear in the calendar list."}
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent className="pt-1">
-              <Button
-                className="border-border/50"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setEditor({
-                    mode: "create",
-                    dueAt: getDefaultCreateDueAt(),
+          <TaskListView
+            sections={sections}
+            totalTasks={tasks.length}
+            editor={editor}
+            isMobile={isMobile}
+            showCompleted={showCompleted}
+            view={view}
+            onSetEditor={setEditor}
+            onCreateFromEmpty={() =>
+              setEditor({
+                mode: "create",
+                dueAt: getDefaultCreateDueAt(),
+              })
+            }
+          />
+        )}
+
+        <Sheet
+          open={(isMobile || layout === "board") && editor !== null}
+          onOpenChange={closeEditor}
+        >
+          <SheetContent showCloseButton={false} side="bottom" className="pb-4">
+            {editor?.mode === "create" ? (
+              <TaskEditor
+                key={`mobile-create-${editor.dueAt ?? "none"}`}
+                defaultDueAt={editor.dueAt}
+                submitLabel="Create task"
+                variant="sheet"
+                autoFocus
+                isSubmitting={createTaskMutation.isPending}
+                onCancel={closeEditor}
+                onSubmit={(value) =>
+                  createTaskMutation.mutate({
+                    ...value,
+                    dueAt: value.dueAt ?? undefined,
+                    dueTime: value.dueTime ?? undefined,
                   })
                 }
-              >
-                Add task
-              </Button>
-            </EmptyContent>
-          </Empty>
-        )}
+              />
+            ) : editingTask ? (
+              <TaskEditor
+                key={editingTask.id}
+                task={editingTask}
+                submitLabel="Save changes"
+                variant="sheet"
+                isSubmitting={updateTaskMutation.isPending}
+                onCancel={closeEditor}
+                onDelete={() => deleteTaskMutation.mutate(editingTask.id)}
+                onSubmit={(value) =>
+                  updateTaskMutation.mutate({
+                    taskId: editingTask.id,
+                    input: value,
+                  })
+                }
+              />
+            ) : null}
+          </SheetContent>
+        </Sheet>
+
+        <PomodoroPill
+          state={pomodoro.state}
+          onStart={() => pomodoro.start()}
+          onPause={pomodoro.pause}
+          onStop={pomodoro.stop}
+          onSkip={pomodoro.skip}
+        />
       </div>
-
-      <Sheet open={isMobile && editor !== null} onOpenChange={closeEditor}>
-        <SheetContent side="bottom" className="pb-4">
-          <SheetHeader className="p-4">
-            <SheetTitle>
-              {editor?.mode === "edit" ? "Edit task" : "New task"}
-            </SheetTitle>
-          </SheetHeader>
-
-          {editor?.mode === "create" ? (
-            <TaskEditor
-              key={`mobile-create-${editor.dueAt ?? "none"}`}
-              defaultDueAt={editor.dueAt}
-              submitLabel="Create task"
-              variant="sheet"
-              autoFocus
-              isSubmitting={createTaskMutation.isPending}
-              onCancel={closeEditor}
-              onSubmit={(value) =>
-                createTaskMutation.mutate({
-                  ...value,
-                  dueAt: value.dueAt ?? undefined,
-                })
-              }
-            />
-          ) : editingTask ? (
-            <TaskEditor
-              key={`mobile-edit-${editingTask.id}`}
-              task={editingTask}
-              submitLabel="Save changes"
-              variant="sheet"
-              isSubmitting={updateTaskMutation.isPending}
-              onCancel={closeEditor}
-              onDelete={() => deleteTaskMutation.mutate(editingTask.id)}
-              onSubmit={(value) =>
-                updateTaskMutation.mutate({
-                  taskId: editingTask.id,
-                  input: value,
-                })
-              }
-            />
-          ) : null}
-        </SheetContent>
-      </Sheet>
-    </div>
+    </TaskActionsProvider>
   );
 }

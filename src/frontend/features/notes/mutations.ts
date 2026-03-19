@@ -42,10 +42,3 @@ export async function uploadNoteImage(
   const json = await response.json();
   return json.data;
 }
-
-export async function deleteNote(noteId: number): Promise<void> {
-  const response = await fetch(`/api/notes/${noteId}`, {
-    method: "DELETE",
-  });
-  if (!response.ok) throw new Error("Failed to delete note");
-}

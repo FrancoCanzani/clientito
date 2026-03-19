@@ -1,0 +1,96 @@
+import type {
+  ContactSuggestion,
+  EmailDetailItem,
+  EmailListItem,
+  EmailListResponse,
+} from "./types";
+
+type FetchEmailsParams = {
+  search?: string;
+  isRead?: "true" | "false";
+  view?: "inbox" | "sent" | "spam" | "trash";
+  limit?: number;
+  offset?: number;
+};
+
+export async function fetchEmails(
+  params?: FetchEmailsParams,
+): Promise<EmailListResponse> {
+  const query = new URLSearchParams();
+  if (params?.search) query.set("search", params.search);
+  if (params?.isRead) query.set("isRead", params.isRead);
+  if (params?.view) query.set("view", params.view);
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.offset) query.set("offset", String(params.offset));
+
+  const response = await fetch(`/api/emails?${query}`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message =
+      payload && typeof payload.error === "string"
+        ? payload.error
+        : "Failed to fetch emails";
+    throw new Error(message);
+  }
+
+  return response.json() as Promise<EmailListResponse>;
+}
+
+export async function fetchEmailDetail(
+  emailId: string,
+  options?: { refreshLive?: boolean },
+): Promise<EmailDetailItem> {
+  const params = new URLSearchParams();
+  if (options?.refreshLive) {
+    params.set("refreshLive", "true");
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+  const response = await fetch(`/api/emails/${emailId}${suffix}`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message =
+      payload && typeof payload.error === "string"
+        ? payload.error
+        : "Failed to fetch email detail";
+    throw new Error(message);
+  }
+
+  const json = await response.json();
+  return json.data;
+}
+
+export async function fetchEmailThread(
+  threadId: string,
+): Promise<EmailListItem[]> {
+  const response = await fetch(`/api/emails/thread/${threadId}`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message =
+      payload && typeof payload.error === "string"
+        ? payload.error
+        : "Failed to fetch email thread";
+    throw new Error(message);
+  }
+
+  const json = (await response.json()) as { data: EmailListItem[] };
+  return json.data;
+}
+
+export async function fetchContactSuggestions(
+  q: string,
+  limit = 8,
+): Promise<{ data: ContactSuggestion[] }> {
+  const params = new URLSearchParams({ q, limit: String(limit) });
+  const response = await fetch(`/api/search/contacts?${params}`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message =
+      payload && typeof payload.error === "string"
+        ? payload.error
+        : "Failed to fetch contact suggestions";
+    throw new Error(message);
+  }
+
+  return response.json() as Promise<{ data: ContactSuggestion[] }>;
+}

@@ -7,7 +7,7 @@ import {
   gte,
   isNotNull,
   lt,
-  lte,
+  ne,
   not,
   sql,
 } from "drizzle-orm";
@@ -17,15 +17,15 @@ import { dailyBriefings, emails, tasks } from "../../db/schema";
 import { isAutomatedSender, isPublicDomain } from "../../lib/domains";
 import type { AppRouteEnv } from "../types";
 import { hasEmailLabel } from "../emails/helpers";
+import { getDayBoundsUtc } from "../../lib/utils";
 
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 const BRIEFING_TTL_MS = 10 * 60 * 1000;
 const ACTIONABLE_REPLY_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
 function getTodayBounds(now: number): { day: string; start: number; end: number } {
+  const { start, end } = getDayBoundsUtc(now);
   const day = new Date(now).toISOString().slice(0, 10);
-  const start = new Date(`${day}T00:00:00.000Z`).getTime();
-  const end = start + 24 * 60 * 60 * 1000 - 1;
   return { day, start, end };
 }
 
@@ -55,7 +55,7 @@ function buildFallbackText(input: {
 
 type BriefingItem = {
   id: string;
-  type: "reply" | "overdue_task" | "due_today_task";
+  type: "reply" | "fyi" | "overdue_task" | "due_today_task";
   title: string;
   reason: string;
   href: string;
@@ -361,15 +361,15 @@ async function buildBriefing(input: {
       .where(
         and(
           eq(tasks.userId, input.userId),
-          eq(tasks.done, false),
+          ne(tasks.status, "done"),
           gte(tasks.dueAt, dayStart),
-          lte(tasks.dueAt, dayEnd),
+          lt(tasks.dueAt, dayEnd),
         ),
       ),
     input.db
       .select({ count: sql<number>`count(*)` })
       .from(tasks)
-      .where(and(eq(tasks.userId, input.userId), eq(tasks.done, false), lt(tasks.dueAt, now))),
+      .where(and(eq(tasks.userId, input.userId), ne(tasks.status, "done"), lt(tasks.dueAt, now))),
     input.db
       .select({
         id: tasks.id,
@@ -381,9 +381,9 @@ async function buildBriefing(input: {
       .where(
         and(
           eq(tasks.userId, input.userId),
-          eq(tasks.done, false),
+          ne(tasks.status, "done"),
           gte(tasks.dueAt, dayStart),
-          lte(tasks.dueAt, dayEnd),
+          lt(tasks.dueAt, dayEnd),
         ),
       )
       .orderBy(tasks.dueAt)
@@ -396,7 +396,7 @@ async function buildBriefing(input: {
         priority: tasks.priority,
       })
       .from(tasks)
-      .where(and(eq(tasks.userId, input.userId), eq(tasks.done, false), lt(tasks.dueAt, now)))
+      .where(and(eq(tasks.userId, input.userId), ne(tasks.status, "done"), lt(tasks.dueAt, now)))
       .orderBy(tasks.dueAt)
       .limit(3),
   ]);
@@ -408,13 +408,17 @@ async function buildBriefing(input: {
     latestByThread.set(threadId, row);
   }
 
-  const replyNeededThreads = [...latestByThread.values()]
+  const candidateThreads = [...latestByThread.values()]
     .filter((row) => row.direction === "received")
     .filter((row) => !isAutomatedSender(row.fromAddr, row.fromName))
     .filter((row) => !isLikelyBulkMessage(row))
     .filter((row) => now - row.date <= ACTIONABLE_REPLY_WINDOW_MS)
-    .filter((row) => isImportantReply(row, now))
     .sort((left, right) => scoreReplyRow(right, now) - scoreReplyRow(left, now));
+
+  const replyNeededThreads = candidateThreads.filter((row) => isImportantReply(row, now));
+  const fyiThreads = candidateThreads.filter(
+    (row) => !isImportantReply(row, now) && scoreImportantReply(row, now) >= 15,
+  );
 
   const dueTodayCount = Number(dueTodayCountRows[0]?.count ?? 0);
   const overdueCount = Number(overdueCountRows[0]?.count ?? 0);
@@ -434,6 +438,13 @@ async function buildBriefing(input: {
       reason: buildReplyReason(row),
       href: `/inbox?id=${row.id}`,
     })),
+    ...fyiThreads.slice(0, 2).map((row) => ({
+      id: `fyi-${row.id}`,
+      type: "fyi" as const,
+      title: getSenderLabel(row),
+      reason: buildReplyReason(row),
+      href: `/inbox?id=${row.id}`,
+    })),
     ...overdueTaskRows.slice(0, 2).map((task) => ({
       id: `overdue-${task.id}`,
       type: "overdue_task" as const,
@@ -448,7 +459,7 @@ async function buildBriefing(input: {
       reason: buildTaskReason(task, "due_today_task"),
       href: "/tasks",
     })),
-  ].slice(0, 5);
+  ].slice(0, 7);
 
   let text = fallbackText;
   try {

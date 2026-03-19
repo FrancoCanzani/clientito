@@ -5,12 +5,12 @@ import {
 } from "@/components/agent-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { openCompose } from "@/features/emails/compose-bridge";
-import { useEmailCommandActions } from "@/features/emails/hooks/use-email-command-state";
+import { openCompose } from "@/features/inbox/compose-bridge";
+import { useEmailCommandActions } from "@/features/inbox/hooks/use-email-command-state";
 import {
   VIEW_LABELS,
   type EmailView,
-} from "@/features/emails/utils/inbox-filters";
+} from "@/features/inbox/utils/inbox-filters";
 import { createNote } from "@/features/notes/mutations";
 import { createTask } from "@/features/tasks/mutations";
 import { parseTaskInput } from "@/features/tasks/utils";
@@ -22,10 +22,12 @@ import {
   CaretRightIcon,
   CheckSquareIcon,
   EnvelopeSimpleIcon,
+  FunnelIcon,
   GearIcon,
   HouseSimpleIcon,
   KeyReturnIcon,
   MoonIcon,
+  NewspaperIcon,
   NoteBlankIcon,
   PaperPlaneTiltIcon,
   PlusIcon,
@@ -40,7 +42,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { getToolName, isToolUIPart } from "ai";
 import { Command } from "cmdk";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, LazyMotion, domAnimation, m } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -208,13 +210,14 @@ export function CommandPalette() {
 
   const normalizedQuery = query.trim();
   const isEmailsRoute = router.state.location.pathname === "/inbox";
+  const isTasksRoute = router.state.location.pathname === "/tasks";
 
   const commands = useMemo(() => {
     const emailViewCommands = isEmailsRoute
       ? (["inbox", "sent", "spam", "trash"] as EmailView[]).map((view) => ({
           id: `email-view-${view}`,
           label: VIEW_LABELS[view],
-          section: "email-navigation" as const,
+          section: "email-navigation" ,
           icon:
             view === "trash" ? (
               <TrashIcon className="size-4" />
@@ -244,7 +247,7 @@ export function CommandPalette() {
           {
             id: "email-selection-mode",
             label: "Select inbox items",
-            section: "email-selection" as const,
+            section: "email-selection" ,
             icon: <CheckSquareIcon className="size-4" />,
             onSelect: () => {
               issueEmailCommand({
@@ -257,7 +260,7 @@ export function CommandPalette() {
           {
             id: "email-select-all",
             label: "Select all visible",
-            section: "email-selection" as const,
+            section: "email-selection" ,
             icon: <CheckSquareIcon className="size-4" />,
             onSelect: () => {
               issueEmailCommand({ type: "select-all-visible" });
@@ -267,7 +270,7 @@ export function CommandPalette() {
           {
             id: "email-clear-selection",
             label: "Clear selection",
-            section: "email-selection" as const,
+            section: "email-selection" ,
             icon: <CheckSquareIcon className="size-4" />,
             onSelect: () => {
               issueEmailCommand({ type: "clear-selection" });
@@ -277,52 +280,98 @@ export function CommandPalette() {
         ]
       : [];
 
+    const taskViewCommands = isTasksRoute
+      ? (
+          [
+            { view: "all", label: "All Tasks" },
+            { view: "today", label: "Due Today" },
+            { view: "upcoming", label: "Upcoming" },
+          ] as const
+        ).map(({ view, label }) => ({
+          id: `task-view-${view}`,
+          label,
+          section: "task-navigation",
+          icon: <CheckSquareIcon className="size-4" />,
+          onSelect: () => {
+            navigate({
+              to: "/tasks",
+              search: (prev) => ({
+                ...prev,
+                view: view === "all" ? undefined : view,
+              }),
+            });
+            close();
+          },
+        }))
+      : [];
+
     return [
       {
         id: "home",
         label: "Home",
-        section: "navigation" as const,
-        to: "/home" as const,
+        section: "navigation" ,
+        to: "/home",
         icon: <HouseSimpleIcon className="size-4" />,
         onSelect: () => runNavigation("/home"),
       },
       {
         id: "inbox",
         label: "Inbox",
-        section: "navigation" as const,
-        to: "/inbox" as const,
+        section: "navigation" ,
+        to: "/inbox",
         icon: <TrayIcon className="size-4" />,
         onSelect: () => runNavigation("/inbox"),
       },
       {
         id: "tasks",
         label: "Tasks",
-        section: "navigation" as const,
-        to: "/tasks" as const,
+        section: "navigation" ,
+        to: "/tasks",
         icon: <CheckSquareIcon className="size-4" />,
         onSelect: () => runNavigation("/tasks"),
       },
       {
         id: "notes",
         label: "Notes",
-        section: "navigation" as const,
-        to: "/notes" as const,
+        section: "navigation" ,
+        to: "/notes",
         icon: <NoteBlankIcon className="size-4" />,
         onSelect: () => runNavigation("/notes"),
       },
       {
+        id: "subscriptions",
+        label: "Subscriptions",
+        section: "navigation" ,
+        icon: <NewspaperIcon className="size-4" />,
+        onSelect: () => {
+          navigate({ to: "/inbox/subscriptions" });
+          close();
+        },
+      },
+      {
+        id: "filters",
+        label: "Email Filters",
+        section: "navigation" ,
+        icon: <FunnelIcon className="size-4" />,
+        onSelect: () => {
+          navigate({ to: "/inbox/filters" });
+          close();
+        },
+      },
+      {
         id: "settings",
         label: "Settings",
-        section: "navigation" as const,
-        to: "/settings" as const,
+        section: "navigation" ,
+        to: "/settings",
         icon: <GearIcon className="size-4" />,
         onSelect: () => runNavigation("/settings"),
       },
       ...emailViewCommands,
+      ...taskViewCommands,
       {
         id: "compose",
         label: "Compose Message",
-        section: "actions" as const,
+        section: "actions" ,
         icon: <EnvelopeSimpleIcon className="size-4" />,
         onSelect: () => {
           navigate({
@@ -336,14 +385,14 @@ export function CommandPalette() {
       {
         id: "new-task",
         label: "New Task",
-        section: "actions" as const,
+        section: "actions" ,
         icon: <PlusIcon className="size-4" />,
         onSelect: () => setNewTaskMode(true),
       },
       {
         id: "new-note",
         label: "New Note",
-        section: "actions" as const,
+        section: "actions" ,
         icon: <NoteBlankIcon className="size-4" />,
         onSelect: () => createNoteMutation.mutate(),
       },
@@ -353,7 +402,7 @@ export function CommandPalette() {
           resolvedTheme === "dark"
             ? "Switch to Light Mode"
             : "Switch to Dark Mode",
-        section: "actions" as const,
+        section: "actions" ,
         icon:
           resolvedTheme === "dark" ? (
             <SunIcon className="size-4" />
@@ -368,7 +417,7 @@ export function CommandPalette() {
       {
         id: "sign-out",
         label: "Sign out",
-        section: "actions" as const,
+        section: "actions" ,
         icon: <SignOutIcon className="size-4" />,
         onSelect: () => {
           logout.mutate();
@@ -391,11 +440,16 @@ export function CommandPalette() {
   const navigationCommands = commands.filter(
     (command) => command.section === "navigation",
   );
-  const visibleNavigationCommands = isEmailsRoute
-    ? navigationCommands.filter((command) => command.id !== "inbox")
-    : navigationCommands;
+  const visibleNavigationCommands = navigationCommands.filter((command) => {
+    if (isEmailsRoute && command.id === "inbox") return false;
+    if (isTasksRoute && command.id === "tasks") return false;
+    return true;
+  });
   const emailNavigationCommands = commands.filter(
     (command) => command.section === "email-navigation",
+  );
+  const taskNavigationCommands = commands.filter(
+    (command) => command.section === "task-navigation",
   );
   const emailSelectionCommands = commands.filter(
     (command) => command.section === "email-selection",
@@ -487,9 +541,10 @@ export function CommandPalette() {
         shouldFilter={!agentMode}
         className="overflow-hidden rounded-2xl border border-border bg-background shadow-lg"
       >
+        <LazyMotion features={domAnimation}>
         <AnimatePresence>
           {open && (
-            <motion.div
+            <m.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
@@ -655,6 +710,27 @@ export function CommandPalette() {
                       </Command.Group>
                     )}
 
+                    {taskNavigationCommands.length > 0 && (
+                      <Command.Group
+                        heading="Task Views"
+                        className={commandGroupHeadingClassName}
+                      >
+                        {taskNavigationCommands.map((command) => (
+                          <Command.Item
+                            key={command.id}
+                            value={command.label}
+                            onSelect={command.onSelect}
+                            className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
+                          >
+                            <span className="text-muted-foreground">
+                              {command.icon}
+                            </span>
+                            {command.label}
+                          </Command.Item>
+                        ))}
+                      </Command.Group>
+                    )}
+
                     <Command.Group
                       heading="Navigation"
                       className={commandGroupHeadingClassName}
@@ -747,9 +823,10 @@ export function CommandPalette() {
                   </Command.List>
                 </div>
               )}
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
+        </LazyMotion>
 
         <div className="flex items-center gap-2 px-3 py-2">
           {agentMode ? (

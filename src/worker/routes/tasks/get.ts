@@ -1,19 +1,14 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { tasks } from "../../db/schema";
+import { getDayBoundsUtc } from "../../lib/utils";
 import type { AppRouteEnv } from "../types";
+import { TASK_COLUMNS } from "./helpers";
 import { getTasksQuerySchema } from "./schemas";
 
-function getDayBoundsUtc(now: number) {
-  const date = new Date(now).toISOString().slice(0, 10);
-  const start = new Date(`${date}T00:00:00.000Z`).getTime();
-  const end = start + 24 * 60 * 60 * 1000 - 1;
-  return { start, end };
-}
-
 export function registerGetTasks(api: Hono<AppRouteEnv>) {
-  return api.get("/", zValidator("query", getTasksQuerySchema), async (c) => {
+  api.get("/", zValidator("query", getTasksQuerySchema), async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
 
@@ -21,19 +16,27 @@ export function registerGetTasks(api: Hono<AppRouteEnv>) {
       dueToday,
       dueAfter,
       dueBefore,
-      done,
+      status,
+      view,
       limit,
       offset = 0,
     } = c.req.valid("query");
     const conditions = [eq(tasks.userId, user.id)];
 
-    if (done !== undefined) {
-      conditions.push(eq(tasks.done, done));
+    if (view === "today") {
+      const { start, end } = getDayBoundsUtc(Date.now());
+      conditions.push(gte(tasks.dueAt, start), lt(tasks.dueAt, end));
+    } else if (view === "upcoming") {
+      conditions.push(gte(tasks.dueAt, Date.now()));
+    }
+
+    if (status !== undefined) {
+      conditions.push(eq(tasks.status, status));
     }
 
     if (dueToday) {
       const { start, end } = getDayBoundsUtc(Date.now());
-      conditions.push(gte(tasks.dueAt, start), lte(tasks.dueAt, end));
+      conditions.push(gte(tasks.dueAt, start), lt(tasks.dueAt, end));
     }
 
     if (dueAfter !== undefined) {
@@ -47,18 +50,10 @@ export function registerGetTasks(api: Hono<AppRouteEnv>) {
     const whereClause = and(...conditions);
 
     const baseRowsQuery = db
-      .select({
-        id: tasks.id,
-        title: tasks.title,
-        description: tasks.description,
-        dueAt: tasks.dueAt,
-        priority: tasks.priority,
-        done: tasks.done,
-        createdAt: tasks.createdAt,
-      })
+      .select(TASK_COLUMNS)
       .from(tasks)
       .where(whereClause)
-      .orderBy(asc(tasks.dueAt), desc(tasks.createdAt));
+      .orderBy(asc(tasks.position), asc(tasks.dueAt), desc(tasks.createdAt));
 
     const rowsQuery =
       limit !== undefined
@@ -85,4 +80,5 @@ export function registerGetTasks(api: Hono<AppRouteEnv>) {
       200,
     );
   });
+
 }

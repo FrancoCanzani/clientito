@@ -63,6 +63,11 @@ export const emails = sqliteTable(
     direction: text("direction").$type<"sent" | "received">(),
     isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
     labelIds: text("label_ids", { mode: "json" }).$type<string[] | null>(),
+    aiLabel: text("ai_label").$type<
+      "important" | "later" | "newsletter" | "transactional" | "notification"
+    >(),
+    unsubscribeUrl: text("unsubscribe_url"),
+    unsubscribeEmail: text("unsubscribe_email"),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [
@@ -71,6 +76,8 @@ export const emails = sqliteTable(
     index("emails_thread_idx").on(table.threadId),
   ],
 );
+
+export type TaskStatus = "backlog" | "todo" | "in_progress" | "done";
 
 export const tasks = sqliteTable(
   "tasks",
@@ -82,18 +89,69 @@ export const tasks = sqliteTable(
     title: text("title").notNull(),
     description: text("description"),
     dueAt: integer("due_at"),
+    dueTime: text("due_time"),
     priority: text("priority")
       .$type<"urgent" | "high" | "medium" | "low">()
       .notNull()
       .default("low"),
-    done: integer("done", { mode: "boolean" }).notNull().default(false),
+    status: text("status")
+      .$type<TaskStatus>()
+      .notNull()
+      .default("todo"),
+    completedAt: integer("completed_at"),
+    position: integer("position").notNull().default(0),
+    labels: text("labels", { mode: "json" }).$type<string[]>().notNull().default([]),
+    recurrence: text("recurrence", { mode: "json" }).$type<RecurrenceRule | null>(),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [
-    index("tasks_user_done_idx").on(table.userId, table.done),
+    index("tasks_user_status_idx").on(table.userId, table.status),
     index("tasks_user_due_idx").on(table.userId, table.dueAt),
   ],
 );
+
+export type RecurrenceRule = {
+  freq: "daily" | "weekly" | "monthly";
+  interval: number;
+  endAt?: number;
+};
+
+
+export const emailFilters = sqliteTable(
+  "email_filters",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    conditions: text("conditions", { mode: "json" })
+      .$type<FilterCondition[]>()
+      .notNull(),
+    actions: text("actions", { mode: "json" }).$type<FilterActions>().notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    priority: integer("priority").notNull().default(0),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    index("email_filters_user_idx").on(table.userId),
+    index("email_filters_user_priority_idx").on(table.userId, table.priority),
+  ],
+);
+
+export type FilterCondition = {
+  field: "from" | "to" | "subject" | "aiLabel";
+  operator: "contains" | "equals" | "startsWith" | "endsWith";
+  value: string;
+};
+
+export type FilterActions = {
+  archive?: boolean;
+  markRead?: boolean;
+  star?: boolean;
+  applyAiLabel?: "important" | "later" | "newsletter" | "transactional" | "notification";
+  trash?: boolean;
+};
 
 export const mailboxes = sqliteTable(
   "mailboxes",
@@ -109,8 +167,6 @@ export const mailboxes = sqliteTable(
       .$type<"unknown" | "ok" | "reconnect_required">()
       .notNull()
       .default("unknown"),
-    watchExpirationAt: integer("watch_expiration_at"),
-    lastNotificationAt: integer("last_notification_at"),
     lastSuccessfulSyncAt: integer("last_successful_sync_at"),
     lastErrorAt: integer("last_error_at"),
     lastErrorMessage: text("last_error_message"),

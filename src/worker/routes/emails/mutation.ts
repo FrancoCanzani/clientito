@@ -1,6 +1,6 @@
 import { emails } from "../../db/schema";
 
-export type EmailPatchMutation = {
+type EmailPatchMutation = {
   isRead?: boolean;
   archived?: boolean;
   trashed?: boolean;
@@ -13,7 +13,7 @@ type EmailPatchSource = {
   labelIds: string[] | null;
 };
 
-export type EmailPatchResult = {
+type EmailPatchResult = {
   isRead: boolean;
   labelIds: string[];
   archived: boolean;

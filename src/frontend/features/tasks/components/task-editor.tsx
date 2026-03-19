@@ -7,40 +7,56 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import type { Task, TaskPriority } from "@/features/tasks/types";
-import {
-  fromTaskDateInputValue,
-  getPriorityFlagClassName,
-  toTaskDateInputValue,
-} from "@/features/tasks/utils";
+import { PrioritySelect } from "@/features/tasks/components/priority-select";
+import { StatusSelect } from "@/features/tasks/components/status-select";
+import type { Task, TaskPriority, TaskStatus } from "@/features/tasks/types";
 import { cn } from "@/lib/utils";
-import { FlagIcon } from "@phosphor-icons/react";
-import { format, startOfToday } from "date-fns";
+import { CalendarIcon } from "@phosphor-icons/react";
+import { format } from "date-fns";
 import { useState } from "react";
 
-const PRIORITY_OPTIONS: TaskPriority[] = ["urgent", "high", "medium", "low"];
+type FormState = {
+  title: string;
+  description: string;
+  dueAt: Date | undefined;
+  priority: TaskPriority;
+  status: TaskStatus;
+};
 
-function getInitialValues(task?: Task | null, defaultDueAt?: number | null) {
+function toInitialDate(
+  task?: Task | null,
+  defaultDueAt?: number | null,
+): Date | undefined {
+  const ts = task?.dueAt ?? defaultDueAt;
+  if (!ts) return undefined;
+  const d = new Date(ts);
+  if (task?.dueTime) {
+    const [h, m] = task.dueTime.split(":").map(Number);
+    d.setHours(h, m, 0, 0);
+  }
+  return d;
+}
+
+function getInitialState(
+  task?: Task | null,
+  defaultDueAt?: number | null,
+): FormState {
   return {
     title: task?.title ?? "",
     description: task?.description ?? "",
-    dueDate: toTaskDateInputValue(task?.dueAt ?? defaultDueAt ?? null),
+    dueAt: toInitialDate(task, defaultDueAt),
     priority: task?.priority ?? "low",
-  } as const;
+    status: task?.status ?? ("todo" as TaskStatus),
+  };
 }
 
-type TaskEditorSubmitValue = {
+export type TaskEditorSubmitValue = {
   title: string;
   description: string | null;
   dueAt: number | null;
+  dueTime: string | null;
   priority: TaskPriority;
+  status: TaskStatus;
 };
 
 export function TaskEditor({
@@ -64,140 +80,175 @@ export function TaskEditor({
   autoFocus?: boolean;
   variant?: "inline" | "sheet";
 }) {
-  const initialValues = getInitialValues(task, defaultDueAt);
-  const [title, setTitle] = useState(initialValues.title);
-  const [description, setDescription] = useState(initialValues.description);
-  const [dueDate, setDueDate] = useState(initialValues.dueDate);
-  const [priority, setPriority] = useState<TaskPriority>(
-    initialValues.priority,
+  const [form, setForm] = useState<FormState>(() =>
+    getInitialState(task, defaultDueAt),
   );
+  const [dateOpen, setDateOpen] = useState(false);
+
+  const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
 
   const isSheet = variant === "sheet";
 
-  const selectedDate = dueDate ? new Date(`${dueDate}T12:00:00`) : undefined;
+  const timeValue = form.dueAt
+    ? `${form.dueAt.getHours().toString().padStart(2, "0")}:${form.dueAt.getMinutes().toString().padStart(2, "0")}`
+    : "";
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!date) {
+      update("dueAt", undefined);
+      return;
+    }
+    const newDate = new Date(date);
+    if (form.dueAt) {
+      newDate.setHours(form.dueAt.getHours());
+      newDate.setMinutes(form.dueAt.getMinutes());
+    } else {
+      newDate.setHours(12, 0, 0, 0);
+    }
+    update("dueAt", newDate);
+  };
+
+  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = e.target.value;
+    if (!time) return;
+    const [hours, minutes] = time.split(":").map(Number);
+    const newDate = form.dueAt ? new Date(form.dueAt) : new Date();
+    newDate.setHours(hours);
+    newDate.setMinutes(minutes);
+    update("dueAt", newDate);
+  };
+
+  const submitDueAt = form.dueAt
+    ? new Date(
+        form.dueAt.getFullYear(),
+        form.dueAt.getMonth(),
+        form.dueAt.getDate(),
+        12,
+        0,
+        0,
+        0,
+      ).getTime()
+    : null;
+
+  const submitDueTime =
+    form.dueAt &&
+    (form.dueAt.getHours() !== 12 || form.dueAt.getMinutes() !== 0)
+      ? timeValue
+      : null;
 
   return (
     <form
       className={cn(
         "flex flex-col border border-border/50 shadow-2xs gap-4 rounded-md p-3",
-        isSheet && "border-none",
+        isSheet && "border-none shadow-none",
       )}
       onSubmit={(event) => {
         event.preventDefault();
-
-        if (!title.trim()) return;
-
+        if (!form.title.trim()) return;
         onSubmit({
-          title: title.trim(),
-          description: description.trim() ? description.trim() : null,
-          dueAt: fromTaskDateInputValue(dueDate),
-          priority,
+          title: form.title.trim(),
+          description: form.description.trim() || null,
+          dueAt: submitDueAt,
+          dueTime: submitDueTime,
+          priority: form.priority,
+          status: form.status,
         });
       }}
     >
-      <Input
-        autoFocus={autoFocus}
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
-        placeholder="Task title"
-      />
+      <div className="flex flex-col gap-1">
+        <Label className="text-xs">Title</Label>
+        <Input
+          autoFocus={autoFocus}
+          value={form.title}
+          onChange={(e) => update("title", e.target.value)}
+          placeholder="What needs to be done?"
+        />
+      </div>
 
-      <Input
-        value={description}
-        onChange={(event) => setDescription(event.target.value)}
-        placeholder="Description"
-      />
+      <div className="flex flex-col gap-1">
+        <Label className="text-xs">Description</Label>
+        <Input
+          value={form.description}
+          onChange={(e) => update("description", e.target.value)}
+          placeholder="Add more details..."
+        />
+      </div>
 
-      <div className="flex items-end w-full gap-2 justify-between">
-        <div className="flex items-center gap-2">
-          <div className="gap-1 flex-col flex">
-            <Label>Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className=" justify-between data-[empty=true]:text-muted-foreground"
-                >
-                  {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) =>
-                    setDueDate(date ? format(date, "yyyy-MM-dd") : "")
-                  }
-                  disabled={(date) => date < startOfToday()}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="gap-1 flex-col flex">
-            <Label>Priority</Label>
-            <Select
-              value={priority}
-              onValueChange={(value) => setPriority(value as TaskPriority)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Priority" asChild>
-                  <span className="flex items-center gap-2 capitalize">
-                    <FlagIcon
-                      size={12}
-                      weight="fill"
-                      className={getPriorityFlagClassName(priority)}
-                    />
-                    {priority}
-                  </span>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {PRIORITY_OPTIONS.map((priorityOption) => (
-                  <SelectItem key={priorityOption} value={priorityOption}>
-                    <span className="flex items-center gap-2 capitalize">
-                      <FlagIcon
-                        size={12}
-                        weight="fill"
-                        className={getPriorityFlagClassName(priorityOption)}
-                      />
-                      {priorityOption}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs">Status</Label>
+          <StatusSelect
+            value={form.status}
+            onValueChange={(v) => update("status", v)}
+          />
         </div>
-        <div className="flex items-center justify-end gap-2">
-          {onDelete && (
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={onDelete}
-              disabled={isSubmitting}
-            >
-              Delete
-            </Button>
-          )}
 
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs">Priority</Label>
+          <PrioritySelect
+            value={form.priority}
+            onValueChange={(v) => update("priority", v)}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs">Date & Time</Label>
+          <Popover open={dateOpen} onOpenChange={setDateOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className={cn(
+                  "justify-start font-normal",
+                  !form.dueAt && "text-muted-foreground",
+                )}
+              >
+                <CalendarIcon className="size-3" />
+                {form.dueAt ? format(form.dueAt, "PPP p") : "Pick date & time"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={form.dueAt}
+                onSelect={handleDateSelect}
+              />
+              <div className="border-t p-2">
+                <Input
+                  type="time"
+                  value={timeValue}
+                  onChange={handleTimeChange}
+                  className="text-xs h-7"
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-2 pt-1">
+        {onDelete && (
           <Button
             type="button"
             variant="destructive"
-            onClick={onCancel}
+            onClick={onDelete}
             disabled={isSubmitting}
           >
-            Cancel
+            Delete
           </Button>
-          <Button
-            type="submit"
-            variant="outline"
-            disabled={isSubmitting || !title.trim()}
-          >
-            {submitLabel}
-          </Button>
-        </div>
+        )}
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onCancel}
+          disabled={isSubmitting}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={isSubmitting || !form.title.trim()}>
+          {submitLabel}
+        </Button>
       </div>
     </form>
   );

@@ -11,6 +11,8 @@ import healthRoutes from "./routes/health/router";
 import notesRoutes from "./routes/notes/router";
 import searchRoutes from "./routes/search/unified";
 import settingsRoutes from "./routes/settings/router";
+import filtersRoutes from "./routes/filters/router";
+import subscriptionsRoutes from "./routes/subscriptions/router";
 import syncRoutes from "./routes/sync/router";
 import tasksRoutes from "./routes/tasks/router";
 import type { AppRouteEnv } from "./routes/types";
@@ -49,6 +51,8 @@ app.route("/api/tasks", tasksRoutes);
 app.route("/api/notes", notesRoutes);
 app.route("/api/settings", settingsRoutes);
 app.route("/api/search", searchRoutes);
+app.route("/api/subscriptions", subscriptionsRoutes);
+app.route("/api/filters", filtersRoutes);
 
 export { Agent } from "./agent/agent";
 

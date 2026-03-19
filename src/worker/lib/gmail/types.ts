@@ -73,55 +73,6 @@ export type GmailProfileResponse = {
   historyId?: string;
 };
 
-export type GoogleUserInfoResponse = {
-  name?: string;
-  picture?: string;
-};
-
-export type GooglePersonFieldMetadata = {
-  primary?: boolean;
-};
-
-export type GoogleContactName = {
-  displayName?: string;
-  metadata?: GooglePersonFieldMetadata;
-};
-
-export type GoogleContactEmailAddress = {
-  value?: string;
-  metadata?: GooglePersonFieldMetadata;
-};
-
-export type GoogleContactPhoneNumber = {
-  value?: string;
-  metadata?: GooglePersonFieldMetadata;
-};
-
-export type GoogleContactPhoto = {
-  url?: string;
-  default?: boolean;
-  metadata?: GooglePersonFieldMetadata;
-};
-
-export type GoogleContactOrganization = {
-  title?: string;
-  name?: string;
-  metadata?: GooglePersonFieldMetadata;
-};
-
-export type GoogleContactPerson = {
-  names?: GoogleContactName[];
-  emailAddresses?: GoogleContactEmailAddress[];
-  phoneNumbers?: GoogleContactPhoneNumber[];
-  photos?: GoogleContactPhoto[];
-  organizations?: GoogleContactOrganization[];
-};
-
-export type GoogleConnectionsListResponse = {
-  connections?: GoogleContactPerson[];
-  nextPageToken?: string;
-};
-
 export type GmailErrorResponse = {
   error?: {
     status?: string;

@@ -3,29 +3,15 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { OnChatMessageOptions } from "@cloudflare/ai-chat";
 import type { Connection, ConnectionContext } from "agents";
 import { getCurrentAgent } from "agents";
-import type { StreamTextOnFinishCallback, ToolSet, UIMessageChunk } from "ai";
-import {
-  convertToModelMessages,
-  createUIMessageStream,
-  createUIMessageStreamResponse,
-  stepCountIs,
-  streamText,
-} from "ai";
+import type { StreamTextOnFinishCallback, ToolSet } from "ai";
+import { convertToModelMessages, stepCountIs, streamText } from "ai";
 import { auth } from "../../../auth";
 import { createDb } from "../db/client";
+import { AgentMemory } from "./memory";
+import { makeMemoryTools } from "./tools/memory-tools";
 import { makeReadTools } from "./tools/read-tools";
 import { makeWriteTools } from "./tools/write-tools";
-import {
-  extractTextFromUIChunks,
-  formatPseudoToolSummary,
-  hasToolChunks,
-  parsePseudoToolCall,
-  parseToolInput,
-  resolvePseudoToolName,
-  safeSerialize,
-  type AgentTools,
-  writeTextChunk,
-} from "./utils";
+import { safeSerialize, type AgentTools } from "./utils";
 
 const MODEL = "gpt-5.4";
 const MAX_AGENT_STEPS = 6;
@@ -33,11 +19,12 @@ const MAX_AGENT_STEPS = 6;
 const BASE_SYSTEM_PROMPT = `You are a CRM command assistant. Answer in 1-2 short sentences.
 Use tools to look up information or take actions. Be direct and factual.
 Prefer doing over explaining. Never ask clarifying questions.
-Use the exact runtime tool names when calling tools: searchEmails, lookupPerson, listTasks, summarizeEmail, createTask, createNote, archiveEmail, draftReply.
+Use the exact runtime tool names when calling tools: searchEmails, searchEmailsByDate, listTasks, summarizeEmail, createTask, updateTask, deleteTask, createNote, archiveEmail, trashEmail, markEmailRead, markEmailUnread, starEmail, unstarEmail, sendEmail, draftReply, composeEmail, rememberThis, forgetThis, recallMemories.
 After using tools, produce a final answer for the user. Do not end on a tool call unless you need approval for a write action.
 If the user asks for a draft reply or asks you to write a reply to an email, call draftReply and then return only the reply body text. Do not add an intro, explanation, quotes, or labels.
 draftReply is safe to use without approval because it only generates text and does not send or change anything.
-Never emit XML, JSON, or <tool_call> tags in plain text.`;
+
+You have persistent memory. When the user shares preferences, tells you about contacts, or asks you to remember something, use rememberThis to save it. Your memories are automatically included in the context so you can personalize responses. Use recallMemories if you need to check what you know.`;
 
 type EntityContext =
   | { type: "email"; id: string; subject: string | null; fromName: string | null; fromAddr: string; threadId: string | null }
@@ -110,6 +97,7 @@ Do not claim page-specific context unless it is supported by the current URL or 
 
 type AgentConnectionState = {
   userId: string | null;
+  userEmail: string | null;
 };
 
 export class Agent extends AIChatAgent<Env> {
@@ -128,6 +116,7 @@ export class Agent extends AIChatAgent<Env> {
     connection.setState({
       ...currentState,
       userId: session?.user?.id ?? null,
+      userEmail: session?.user?.email ?? null,
     } satisfies AgentConnectionState & Record<string, unknown>);
   }
 
@@ -143,29 +132,23 @@ export class Agent extends AIChatAgent<Env> {
         })
       : null;
 
+    const connState =
+      connection && typeof connection.state === "object" && connection.state
+        ? (connection.state as AgentConnectionState)
+        : null;
+
     const userId =
       session?.user.id ??
       (typeof options?.body?.userId === "string" ? options.body.userId : null) ??
       (this.name !== "anonymous" ? this.name : null) ??
-      (connection &&
-      typeof connection.state === "object" &&
-      connection.state &&
-      "userId" in connection.state
-        ? (connection.state.userId as string | null)
-        : null);
+      connState?.userId ?? null;
+
+    const userEmail =
+      session?.user.email ??
+      connState?.userEmail ?? null;
 
     if (!userId) {
-      console.warn("[Agent] Unauthorized chat request", {
-        agentName: this.name,
-        hasRequest: Boolean(request),
-        hasConnection: Boolean(connection),
-        bodyUserId:
-          typeof options?.body?.userId === "string" ? options.body.userId : null,
-        connectionState:
-          connection && typeof connection.state === "object"
-            ? safeSerialize(connection.state)
-            : null,
-      });
+      console.warn("[Agent] Unauthorized chat request");
       return new Response("Unauthorized", { status: 401 });
     }
 
@@ -184,256 +167,46 @@ export class Agent extends AIChatAgent<Env> {
     const openai = createOpenAI({
       apiKey: this.env.OPENAI_API_KEY,
     });
+    const memory = new AgentMemory(this.ctx.storage);
     const tools: AgentTools = {
       ...makeReadTools(db, userId),
-      ...makeWriteTools(db, userId, this.env),
+      ...makeWriteTools(db, userId, userEmail, this.env),
+      ...makeMemoryTools(memory),
     };
+
+    const systemPrompt = appendCurrentUrlPrompt(buildSystemPrompt(pageContext), currentUrl) + memory.formatForPrompt();
 
     const result = streamText({
       model: openai.responses(MODEL),
-      system: appendCurrentUrlPrompt(buildSystemPrompt(pageContext), currentUrl),
+      system: systemPrompt,
       messages: await convertToModelMessages(this.messages),
       tools,
       stopWhen: stepCountIs(MAX_AGENT_STEPS),
       abortSignal: options?.abortSignal,
-      experimental_onToolCallStart: async (event) => {
-        console.log("[Agent] tool start", {
-          agentName: this.name,
-          userId,
-          stepNumber: event.stepNumber,
-          toolName: event.toolCall.toolName,
-          toolCallId: event.toolCall.toolCallId,
-          input: safeSerialize(event.toolCall.input),
-        });
-      },
-      experimental_onToolCallFinish: async (event) => {
-        console.log("[Agent] tool finish", {
-          agentName: this.name,
-          userId,
-          stepNumber: event.stepNumber,
-          toolName: event.toolCall.toolName,
-          toolCallId: event.toolCall.toolCallId,
-          success: event.success,
-          durationMs: event.durationMs,
-          output: event.success ? safeSerialize(event.output) : null,
-          error: event.success ? null : safeSerialize(event.error),
-        });
-      },
       onStepFinish: async (event) => {
-        console.log("[Agent] step finish", {
-          agentName: this.name,
-          userId,
-          stepNumber: event.stepNumber,
-          finishReason: event.finishReason,
-          text: event.text,
-          toolCalls: safeSerialize(event.toolCalls),
-          toolResults: safeSerialize(event.toolResults),
-        });
+        if (event.finishReason === "error") {
+          console.error("[Agent] step error", {
+            userId,
+            step: event.stepNumber,
+            text: event.text,
+          });
+        }
       },
       onFinish: async (event) => {
-        console.log("[Agent] finish", {
-          agentName: this.name,
-          userId,
-          finishReason: event.finishReason,
-          text: event.text,
-          steps: event.steps.length,
-          toolCalls: safeSerialize(event.toolCalls),
-          toolResults: safeSerialize(event.toolResults),
-        });
+        if (event.finishReason === "error") {
+          console.error("[Agent] finish error", {
+            userId,
+            reason: event.finishReason,
+          });
+        }
         await onFinish(event as never);
       },
     });
 
-    const uiStream = result.toUIMessageStream({
+    return result.toUIMessageStreamResponse({
       originalMessages: this.messages,
-    });
-
-    return createUIMessageStreamResponse({
-      stream: createUIMessageStream({
-        originalMessages: this.messages,
-        onFinish: async (event) => {
-          await onFinish(event as never);
-        },
-        execute: async ({ writer }) => {
-          const chunks: UIMessageChunk[] = [];
-          for await (const chunk of uiStream) {
-            chunks.push(chunk);
-          }
-
-          const text = extractTextFromUIChunks(chunks).trim();
-          const pseudoToolCall = !hasToolChunks(chunks) ? parsePseudoToolCall(text) : null;
-
-          if (!pseudoToolCall) {
-            for (const chunk of chunks) {
-              writer.write(chunk);
-            }
-            return;
-          }
-
-          const requestedToolName = pseudoToolCall.toolName;
-          const resolvedToolName = resolvePseudoToolName(requestedToolName);
-          const toolDefinition = tools[resolvedToolName as keyof AgentTools];
-          const toolCallId = `pseudo-${Date.now()}-${resolvedToolName}`;
-          const textId = `${toolCallId}-text`;
-          const startChunk = chunks.find((chunk) => chunk.type === "start");
-
-          console.warn("[Agent] pseudo tool call fallback", {
-            agentName: this.name,
-            userId,
-            requestedToolName,
-            resolvedToolName,
-            input: safeSerialize(pseudoToolCall.input),
-            raw: pseudoToolCall.raw,
-          });
-
-          writer.write(startChunk ?? { type: "start" });
-          writer.write({ type: "start-step" });
-
-          if (!toolDefinition) {
-            writer.write({
-              type: "tool-input-available",
-              toolCallId,
-              toolName: resolvedToolName,
-              input: pseudoToolCall.input,
-            });
-            writer.write({
-              type: "tool-output-error",
-              toolCallId,
-              errorText: `Unknown tool "${requestedToolName}"`,
-            });
-            writeTextChunk(
-              writer,
-              `The model requested an unknown tool (${requestedToolName}).`,
-              textId,
-            );
-            writer.write({ type: "finish-step" });
-            writer.write({ type: "finish", finishReason: "error" });
-            return;
-          }
-
-          const parsedInput = await parseToolInput(toolDefinition, pseudoToolCall.input);
-
-          writer.write({
-            type: "tool-input-available",
-            toolCallId,
-            toolName: resolvedToolName,
-            input: parsedInput.success ? parsedInput.data : pseudoToolCall.input,
-          });
-
-          if (!parsedInput.success) {
-            writer.write({
-              type: "tool-output-error",
-              toolCallId,
-              errorText: parsedInput.error,
-            });
-            writeTextChunk(
-              writer,
-              `The model produced invalid arguments for ${resolvedToolName}.`,
-              textId,
-            );
-            writer.write({ type: "finish-step" });
-            writer.write({ type: "finish", finishReason: "error" });
-            return;
-          }
-
-          const executableTool = toolDefinition as AgentTools[keyof AgentTools] & {
-            execute?: (input: Record<string, unknown>, options: { toolCallId: string; messages: Awaited<ReturnType<typeof convertToModelMessages>> }) => Promise<unknown> | unknown;
-            needsApproval?: boolean | ((input: Record<string, unknown>, options: { toolCallId: string; messages: Awaited<ReturnType<typeof convertToModelMessages>> }) => Promise<boolean> | boolean);
-          };
-
-          const modelMessages = await convertToModelMessages(this.messages);
-          const needsApproval =
-            typeof executableTool.needsApproval === "function"
-              ? await executableTool.needsApproval(parsedInput.data, {
-                  toolCallId,
-                  messages: modelMessages,
-                })
-              : Boolean(executableTool.needsApproval);
-
-          if (needsApproval) {
-            writer.write({
-              type: "tool-output-error",
-              toolCallId,
-              errorText:
-                "The model emitted a pseudo tool call for a write action. Fallback execution is disabled for approval-required tools.",
-            });
-            writeTextChunk(
-              writer,
-              `The tool call for ${resolvedToolName} needs approval, so fallback execution was skipped.`,
-              textId,
-            );
-            writer.write({ type: "finish-step" });
-            writer.write({ type: "finish", finishReason: "stop" });
-            return;
-          }
-
-          try {
-            console.log("[Agent] pseudo tool start", {
-              agentName: this.name,
-              userId,
-              toolName: resolvedToolName,
-              toolCallId,
-              input: safeSerialize(parsedInput.data),
-            });
-
-            const output = await executableTool.execute?.(parsedInput.data, {
-              toolCallId,
-              messages: modelMessages,
-            });
-
-            const debugOutput = {
-              debug: {
-                rawToolCall: pseudoToolCall.raw,
-                requestedToolName,
-                resolvedToolName,
-              },
-              result: output,
-            };
-
-            console.log("[Agent] pseudo tool finish", {
-              agentName: this.name,
-              userId,
-              toolName: resolvedToolName,
-              toolCallId,
-              output: safeSerialize(debugOutput),
-            });
-
-            writer.write({
-              type: "tool-output-available",
-              toolCallId,
-              output: debugOutput,
-            });
-            writeTextChunk(
-              writer,
-              `${formatPseudoToolSummary(resolvedToolName, output)} Fallback execution was used because the model returned plain-text tool markup.`,
-              textId,
-            );
-            writer.write({ type: "finish-step" });
-            writer.write({ type: "finish", finishReason: "stop" });
-          } catch (error) {
-            console.error("[Agent] pseudo tool error", {
-              agentName: this.name,
-              userId,
-              toolName: resolvedToolName,
-              toolCallId,
-              error: safeSerialize(error),
-            });
-
-            writer.write({
-              type: "tool-output-error",
-              toolCallId,
-              errorText: error instanceof Error ? error.message : "Tool execution failed",
-            });
-            writeTextChunk(
-              writer,
-              `Fallback execution for ${resolvedToolName} failed.`,
-              textId,
-            );
-            writer.write({ type: "finish-step" });
-            writer.write({ type: "finish", finishReason: "error" });
-          }
-        },
-      }),
+      sendFinish: true,
+      onFinish,
     });
   }
 }

@@ -1,10 +1,12 @@
-import type { Task, TaskPriority } from "./types";
+import type { Task, TaskPriority, TaskStatus } from "./types";
 
 export async function createTask(input: {
   title: string;
   description?: string | null;
   dueAt?: number;
+  dueTime?: string;
   priority?: TaskPriority;
+  status?: TaskStatus;
 }): Promise<Task> {
   const response = await fetch("/api/tasks", {
     method: "POST",
@@ -22,8 +24,10 @@ export async function updateTask(
     title?: string;
     description?: string | null;
     dueAt?: number | null;
+    dueTime?: string | null;
     priority?: TaskPriority;
-    done?: boolean;
+    status?: TaskStatus;
+    position?: number;
   },
 ): Promise<Task> {
   const response = await fetch(`/api/tasks/${taskId}`, {

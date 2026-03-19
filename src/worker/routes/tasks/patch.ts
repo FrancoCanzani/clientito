@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import { tasks } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
+import { TASK_COLUMNS } from "./helpers";
 import { patchTaskBodySchema, taskIdParamsSchema } from "./schemas";
 
 export function registerPatchTasks(api: Hono<AppRouteEnv>) {
@@ -15,36 +16,31 @@ export function registerPatchTasks(api: Hono<AppRouteEnv>) {
       const user = c.get("user")!;
 
       const { id } = c.req.valid("param");
-      const { title, description, dueAt, priority, done } = c.req.valid("json");
+      const body = c.req.valid("json");
 
       const existing = await db
-        .select({ id: tasks.id })
+        .select({ id: tasks.id, status: tasks.status })
         .from(tasks)
         .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
         .limit(1);
       if (!existing[0]) return c.json({ error: "Task not found" }, 404);
 
+      const fields = { ...body };
+
+      // Track completion timestamp
+      if (fields.status === "done" && existing[0].status !== "done") {
+        (fields as Record<string, unknown>).completedAt = Date.now();
+      } else if (fields.status && fields.status !== "done") {
+        (fields as Record<string, unknown>).completedAt = null;
+      }
+
       await db
         .update(tasks)
-        .set({
-          title,
-          description,
-          dueAt,
-          priority,
-          done,
-        })
+        .set(fields)
         .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)));
 
       const rows = await db
-        .select({
-          id: tasks.id,
-          title: tasks.title,
-          description: tasks.description,
-          dueAt: tasks.dueAt,
-          priority: tasks.priority,
-          done: tasks.done,
-          createdAt: tasks.createdAt,
-        })
+        .select(TASK_COLUMNS)
         .from(tasks)
         .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
         .limit(1);

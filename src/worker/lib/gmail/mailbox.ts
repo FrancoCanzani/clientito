@@ -61,7 +61,7 @@ function htmlToPlainText(html: string): string {
     .trim();
 }
 
-function getHeaderValue(
+export function getHeaderValue(
   headers: Array<{ name?: string; value?: string }> | undefined,
   headerName: string,
 ): string | null {

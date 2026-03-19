@@ -29,7 +29,7 @@ export type SyncStatus = {
 
 export type HomeBriefingItem = {
   id: string;
-  type: "reply" | "overdue_task" | "due_today_task";
+  type: "reply" | "fyi" | "overdue_task" | "due_today_task";
   title: string;
   reason: string;
   href: string;

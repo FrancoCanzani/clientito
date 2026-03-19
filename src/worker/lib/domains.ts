@@ -1,4 +1,4 @@
-export const PUBLIC_DOMAINS = new Set([
+const PUBLIC_DOMAINS = new Set([
   "gmail.com",
   "google.com",
   "googlemail.com",

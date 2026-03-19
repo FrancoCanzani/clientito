@@ -1,19 +1,64 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  runIncrementalSync,
+  startFullSync,
+} from "@/features/home/mutations";
+import { useSyncStatus } from "@/features/home/hooks/use-sync-status";
 import { deleteAccount } from "@/features/settings/mutations";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
-import { MonitorIcon, MoonIcon, SunIcon } from "@phosphor-icons/react";
-import { useMutation } from "@tanstack/react-query";
+import {
+  ArrowClockwiseIcon,
+  MonitorIcon,
+  MoonIcon,
+  SpinnerGapIcon,
+  SunIcon,
+} from "@phosphor-icons/react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
+function formatLastSync(timestamp: number | null): string {
+  if (!timestamp) return "Never";
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return new Date(timestamp).toLocaleDateString();
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
   const [confirmText, setConfirmText] = useState("");
+
+  const syncStatus = useSyncStatus();
+  const status = syncStatus.data;
+  const isSyncing = status?.state === "syncing";
+
+  const incrementalSyncMutation = useMutation({
+    mutationFn: runIncrementalSync,
+    onSuccess: async () => {
+      toast.success("Sync started");
+      await queryClient.invalidateQueries({ queryKey: ["sync-status"] });
+    },
+    onError: () => toast.error("Failed to start sync"),
+  });
+
+  const fullSyncMutation = useMutation({
+    mutationFn: () => startFullSync(undefined, true),
+    onSuccess: async () => {
+      toast.success("Full re-import started");
+      await queryClient.invalidateQueries({ queryKey: ["sync-status"] });
+    },
+    onError: () => toast.error("Failed to start re-import"),
+  });
 
   const deleteMutation = useMutation({
     mutationFn: deleteAccount,
@@ -40,7 +85,7 @@ export default function SettingsPage() {
         <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Account
         </h2>
-        <div className="rounded-lg border border-border p-4 space-y-2">
+        <div className="space-y-2 rounded-lg border border-border p-4">
           <div className="flex items-baseline gap-2 text-sm">
             <span className="w-16 shrink-0 text-xs text-muted-foreground">
               Name
@@ -52,6 +97,57 @@ export default function SettingsPage() {
               Email
             </span>
             <span>{user?.email ?? "—"}</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Gmail Sync
+        </h2>
+        <div className="space-y-3 rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium">
+                {isSyncing ? "Syncing..." : "Last synced"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {isSyncing && status?.progressCurrent
+                  ? `${new Intl.NumberFormat().format(status.progressCurrent)} emails processed`
+                  : formatLastSync(status?.lastSync ?? null)}
+              </p>
+            </div>
+            {isSyncing ? (
+              <SpinnerGapIcon className="size-4 animate-spin text-muted-foreground" />
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => incrementalSyncMutation.mutate()}
+                disabled={incrementalSyncMutation.isPending}
+              >
+                <ArrowClockwiseIcon className="mr-1.5 size-3.5" />
+                Sync now
+              </Button>
+            )}
+          </div>
+          <div className="border-t border-border/50 pt-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <p className="text-sm">Full re-import</p>
+                <p className="text-xs text-muted-foreground">
+                  Re-download all emails from Gmail
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fullSyncMutation.mutate()}
+                disabled={fullSyncMutation.isPending || isSyncing}
+              >
+                {fullSyncMutation.isPending ? "Starting..." : "Re-import"}
+              </Button>
+            </div>
           </div>
         </div>
       </section>
@@ -83,7 +179,7 @@ export default function SettingsPage() {
         <h2 className="text-xs font-medium uppercase tracking-wide text-destructive">
           Danger zone
         </h2>
-        <div className="rounded-lg border border-destructive/30 p-4 space-y-3">
+        <div className="space-y-3 rounded-lg border border-destructive/30 p-4">
           <p className="text-sm text-muted-foreground">
             Permanently delete your account and all associated data. This action
             cannot be undone.

@@ -259,6 +259,132 @@ export async function fetchMinimalMessage(
   return fetchMessage(accessToken, messageId, "minimal");
 }
 
+const BATCH_BOUNDARY = "batch_clientito";
+const GMAIL_BATCH_URL = "https://www.googleapis.com/batch/gmail/v1";
+const GMAIL_BATCH_MAX_SIZE = 100;
+
+function buildBatchRequestBody(
+  messageIds: string[],
+  format: GmailMessageFormat,
+): string {
+  const fields =
+    format === "minimal"
+      ? "id,threadId,historyId,internalDate,labelIds"
+      : "id,threadId,historyId,internalDate,snippet,labelIds,payload(mimeType,headers,body/data,parts(mimeType,headers,body/data,parts))";
+
+  return messageIds
+    .map((id) => {
+      const path = `/gmail/v1/users/me/messages/${id}?format=${format}&fields=${encodeURIComponent(fields)}`;
+      return `--${BATCH_BOUNDARY}\r\nContent-Type: application/http\r\n\r\nGET ${path}\r\n`;
+    })
+    .join("\r\n") + `\r\n--${BATCH_BOUNDARY}--`;
+}
+
+function parseBatchResponse(
+  responseText: string,
+  boundary: string,
+): Array<{ status: number; body: string }> {
+  const parts = responseText.split(`--${boundary}`);
+  const results: Array<{ status: number; body: string }> = [];
+
+  for (const part of parts) {
+    if (part.trim() === "" || part.trim() === "--") continue;
+
+    const httpResponseStart = part.indexOf("HTTP/");
+    if (httpResponseStart === -1) continue;
+
+    const httpSection = part.slice(httpResponseStart);
+    const statusMatch = httpSection.match(/HTTP\/[\d.]+ (\d+)/);
+    const status = statusMatch ? Number(statusMatch[1]) : 0;
+
+    const bodyStart = httpSection.indexOf("\r\n\r\n");
+    const body = bodyStart !== -1 ? httpSection.slice(bodyStart + 4).trim() : "";
+
+    results.push({ status, body });
+  }
+
+  return results;
+}
+
+export async function fetchMessagesBatch(
+  accessToken: string,
+  messageIds: string[],
+  format: GmailMessageFormat = "full",
+): Promise<Map<string, GmailMessage | null>> {
+  const results = new Map<string, GmailMessage | null>();
+
+  for (let i = 0; i < messageIds.length; i += GMAIL_BATCH_MAX_SIZE) {
+    const chunk = messageIds.slice(i, i + GMAIL_BATCH_MAX_SIZE);
+    const body = buildBatchRequestBody(chunk, format);
+
+    let attempt = 0;
+    let response: Response | null = null;
+
+    while (attempt <= GMAIL_MAX_RATE_LIMIT_RETRIES) {
+      try {
+        response = await fetch(GMAIL_BATCH_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": `multipart/mixed; boundary=${BATCH_BOUNDARY}`,
+          },
+          body,
+        });
+      } catch (error) {
+        if (attempt === GMAIL_MAX_RATE_LIMIT_RETRIES) throw error;
+        await sleep(computeRetryDelayMs(attempt));
+        attempt++;
+        continue;
+      }
+
+      if (response.status === 429 || response.status === 503) {
+        if (attempt === GMAIL_MAX_RATE_LIMIT_RETRIES) break;
+        const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
+        await sleep(retryAfterMs ?? computeRetryDelayMs(attempt));
+        attempt++;
+        continue;
+      }
+
+      break;
+    }
+
+    if (!response || !response.ok) {
+      // Fallback to individual fetches if batch fails
+      for (const id of chunk) {
+        try {
+          const msg = await fetchMessage(accessToken, id, format);
+          results.set(id, msg);
+        } catch {
+          results.set(id, null);
+        }
+      }
+      continue;
+    }
+
+    const responseText = await response.text();
+    const contentType = response.headers.get("content-type") ?? "";
+    const boundaryMatch = contentType.match(/boundary=(.+)/);
+    const responseBoundary = boundaryMatch?.[1]?.replace(/^["']|["']$/g, "") ?? BATCH_BOUNDARY;
+
+    const parsed = parseBatchResponse(responseText, responseBoundary);
+
+    for (let j = 0; j < chunk.length && j < parsed.length; j++) {
+      const part = parsed[j];
+      if (part.status === 200) {
+        try {
+          results.set(chunk[j], JSON.parse(part.body) as GmailMessage);
+        } catch {
+          results.set(chunk[j], null);
+        }
+      } else {
+        results.set(chunk[j], null);
+      }
+    }
+  }
+
+  return results;
+}
+
 export function hasUsableAccessToken(accountState: {
   accessToken: string | null;
   accessTokenExpiresAt: Date | number | string | null;

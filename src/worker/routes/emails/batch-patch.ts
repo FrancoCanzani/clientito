@@ -7,6 +7,7 @@ import { batchModifyGmailMessages } from "../../lib/gmail/mailbox";
 import type { AppRouteEnv } from "../types";
 import { applyEmailPatch } from "./mutation";
 import { batchPatchEmailsBodySchema } from "./schemas";
+import { chunkArray } from "../../lib/utils";
 
 type GmailMutationGroup = {
   gmailIds: string[];
@@ -28,16 +29,6 @@ function createMutationGroupKey(
     addLabelIds: [...addLabelIds].sort(),
     removeLabelIds: [...removeLabelIds].sort(),
   });
-}
-
-function chunkArray<T>(items: T[], chunkSize: number): T[][] {
-  const chunks: T[][] = [];
-
-  for (let index = 0; index < items.length; index += chunkSize) {
-    chunks.push(items.slice(index, index + chunkSize));
-  }
-
-  return chunks;
 }
 
 async function applyDbUpdates(

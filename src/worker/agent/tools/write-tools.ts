@@ -4,103 +4,255 @@ import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
 import { emails, notes, tasks } from "../../db/schema";
-import { archiveGmailMessage } from "../../lib/gmail/mailbox";
+import {
+  archiveGmailMessage,
+  batchModifyGmailMessages,
+  sendGmailMessage,
+} from "../../lib/gmail/mailbox";
 import { applyEmailPatch } from "../../routes/emails/mutation";
 
 const MODEL = "gpt-5.4";
 
-export function makeWriteTools(db: Database, userId: string, env: Env) {
+async function getEmailForUser(db: Database, userId: string, emailId: number) {
+  const rows = await db
+    .select({
+      id: emails.id,
+      gmailId: emails.gmailId,
+      isRead: emails.isRead,
+      labelIds: emails.labelIds,
+      threadId: emails.threadId,
+      fromAddr: emails.fromAddr,
+      fromName: emails.fromName,
+      subject: emails.subject,
+      bodyText: emails.bodyText,
+      messageId: emails.messageId,
+    })
+    .from(emails)
+    .where(and(eq(emails.id, emailId), eq(emails.userId, userId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+async function patchEmailLabels(
+  db: Database,
+  env: Env,
+  userId: string,
+  emailId: number,
+  mutation: { archived?: boolean; trashed?: boolean; spam?: boolean; starred?: boolean; isRead?: boolean },
+) {
+  const email = await getEmailForUser(db, userId, emailId);
+  if (!email) return { error: "Email not found" };
+
+  const patch = applyEmailPatch(email, mutation);
+
+  if (Object.keys(patch.dbUpdates).length > 0) {
+    await db
+      .update(emails)
+      .set(patch.dbUpdates)
+      .where(and(eq(emails.id, emailId), eq(emails.userId, userId)));
+  }
+
+  if (patch.addLabelIds.length > 0 || patch.removeLabelIds.length > 0) {
+    await batchModifyGmailMessages(
+      db,
+      env,
+      userId,
+      [email.gmailId],
+      patch.addLabelIds.length > 0 ? patch.addLabelIds : undefined,
+      patch.removeLabelIds.length > 0 ? patch.removeLabelIds : undefined,
+    );
+  }
+
+  return { success: true, emailId };
+}
+
+export function makeWriteTools(
+  db: Database,
+  userId: string,
+  userEmail: string | null,
+  env: Env,
+) {
   return {
     createTask: tool({
       description:
-        "Create a new CRM task for the signed-in user. Use this for follow-ups, reminders, or action items.",
+        "Create a new task for the user.",
       inputSchema: z.object({
-        title: z
-          .string()
-          .describe("Clear task title describing the action to take."),
+        title: z.string().describe("Task title."),
         dueAt: z
           .number()
           .optional()
-          .describe("Optional due date as a Unix timestamp in milliseconds."),
+          .describe("Due date as Unix timestamp in milliseconds."),
       }),
       needsApproval: true,
       execute: async ({ title, dueAt }) => {
-        const now = Date.now();
-        const result = await db.insert(tasks).values({
-          userId,
-          title,
-          dueAt: dueAt ?? null,
-          done: false,
-          createdAt: now,
-        }).returning({ id: tasks.id });
+        const result = await db
+          .insert(tasks)
+          .values({ userId, title, dueAt: dueAt ?? null, status: "todo", createdAt: Date.now() })
+          .returning({ id: tasks.id });
         return { created: true, taskId: result[0].id, title };
       },
     }),
 
-    createNote: tool({
+    updateTask: tool({
       description:
-        "Create a new CRM note for the signed-in user.",
+        "Update an existing task. Can change status, title, due date, or priority.",
       inputSchema: z.object({
-        title: z.string().describe("Short note title."),
-        content: z.string().describe("Full note body content."),
+        taskId: z.number().int().positive().describe("Task ID to update."),
+        status: z.enum(["backlog", "todo", "in_progress", "done"]).optional().describe("New status."),
+        title: z.string().optional().describe("New task title."),
+        dueAt: z.number().nullable().optional().describe("New due date (ms timestamp) or null to clear."),
+        priority: z
+          .enum(["urgent", "high", "medium", "low"])
+          .optional()
+          .describe("New priority level."),
+      }),
+      needsApproval: true,
+      execute: async ({ taskId, status, title, dueAt, priority }) => {
+        const existing = await db
+          .select({ id: tasks.id })
+          .from(tasks)
+          .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
+          .limit(1);
+        if (!existing[0]) return { error: "Task not found" };
+
+        const updates: Record<string, unknown> = {};
+        if (status !== undefined) updates.status = status;
+        if (title !== undefined) updates.title = title;
+        if (dueAt !== undefined) updates.dueAt = dueAt;
+        if (priority !== undefined) updates.priority = priority;
+
+        if (Object.keys(updates).length === 0) return { error: "Nothing to update" };
+
+        await db
+          .update(tasks)
+          .set(updates)
+          .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
+        return { updated: true, taskId };
+      },
+    }),
+
+    deleteTask: tool({
+      description: "Delete a task permanently.",
+      inputSchema: z.object({
+        taskId: z.number().int().positive().describe("Task ID to delete."),
+      }),
+      needsApproval: true,
+      execute: async ({ taskId }) => {
+        const result = await db
+          .delete(tasks)
+          .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
+        return { deleted: true, taskId };
+      },
+    }),
+
+    createNote: tool({
+      description: "Create a new note.",
+      inputSchema: z.object({
+        title: z.string().describe("Note title."),
+        content: z.string().describe("Note body content."),
       }),
       needsApproval: true,
       execute: async ({ title, content }) => {
         const now = Date.now();
-        const result = await db.insert(notes).values({
-          userId,
-          title,
-          content,
-          createdAt: now,
-          updatedAt: now,
-        }).returning({ id: notes.id });
+        const result = await db
+          .insert(notes)
+          .values({ userId, title, content, createdAt: now, updatedAt: now })
+          .returning({ id: notes.id });
         return { created: true, noteId: result[0].id, title };
       },
     }),
 
     archiveEmail: tool({
-      description:
-        "Archive an email by removing it from the inbox.",
+      description: "Archive an email (remove from inbox).",
       inputSchema: z.object({
-        emailId: z
-          .number()
-          .int()
-          .positive()
-          .describe("Numeric internal email ID to archive."),
+        emailId: z.number().int().positive().describe("Email ID to archive."),
       }),
       needsApproval: true,
       execute: async ({ emailId }) => {
-        const emailRow = await db
-          .select({
-            id: emails.id,
-            gmailId: emails.gmailId,
-            isRead: emails.isRead,
-            labelIds: emails.labelIds,
-          })
-          .from(emails)
-          .where(and(eq(emails.id, emailId), eq(emails.userId, userId)))
-          .limit(1);
+        return patchEmailLabels(db, env, userId, emailId, { archived: true });
+      },
+    }),
 
-        const email = emailRow[0];
-        if (!email) return { error: "Email not found" };
+    trashEmail: tool({
+      description: "Move an email to trash.",
+      inputSchema: z.object({
+        emailId: z.number().int().positive().describe("Email ID to trash."),
+      }),
+      needsApproval: true,
+      execute: async ({ emailId }) => {
+        return patchEmailLabels(db, env, userId, emailId, { trashed: true });
+      },
+    }),
 
-        await archiveGmailMessage(db, env, userId, email.gmailId);
-        const nextState = applyEmailPatch(email, { archived: true });
+    markEmailRead: tool({
+      description: "Mark an email as read.",
+      inputSchema: z.object({
+        emailId: z.number().int().positive().describe("Email ID."),
+      }),
+      execute: async ({ emailId }) => {
+        return patchEmailLabels(db, env, userId, emailId, { isRead: true });
+      },
+    }),
 
-        if (Object.keys(nextState.dbUpdates).length > 0) {
-          await db
-            .update(emails)
-            .set(nextState.dbUpdates)
-            .where(and(eq(emails.id, emailId), eq(emails.userId, userId)));
-        }
+    markEmailUnread: tool({
+      description: "Mark an email as unread.",
+      inputSchema: z.object({
+        emailId: z.number().int().positive().describe("Email ID."),
+      }),
+      execute: async ({ emailId }) => {
+        return patchEmailLabels(db, env, userId, emailId, { isRead: false });
+      },
+    }),
 
-        return { archived: true, emailId };
+    starEmail: tool({
+      description: "Star an email.",
+      inputSchema: z.object({
+        emailId: z.number().int().positive().describe("Email ID."),
+      }),
+      needsApproval: true,
+      execute: async ({ emailId }) => {
+        return patchEmailLabels(db, env, userId, emailId, { starred: true });
+      },
+    }),
+
+    unstarEmail: tool({
+      description: "Remove star from an email.",
+      inputSchema: z.object({
+        emailId: z.number().int().positive().describe("Email ID."),
+      }),
+      execute: async ({ emailId }) => {
+        return patchEmailLabels(db, env, userId, emailId, { starred: false });
+      },
+    }),
+
+    sendEmail: tool({
+      description:
+        "Send an email from the user's Gmail account. Use this when the user explicitly asks to send a message.",
+      inputSchema: z.object({
+        to: z.string().email().describe("Recipient email address."),
+        subject: z.string().describe("Email subject."),
+        body: z.string().describe("Email body as plain text."),
+        inReplyTo: z.string().optional().describe("Message-ID of the email being replied to."),
+        threadId: z.string().optional().describe("Gmail thread ID if replying in a thread."),
+      }),
+      needsApproval: true,
+      execute: async ({ to, subject, body, inReplyTo, threadId }) => {
+        if (!userEmail) return { error: "User email not available" };
+
+        const result = await sendGmailMessage(db, env, userId, userEmail, {
+          to,
+          subject,
+          body,
+          inReplyTo,
+          threadId,
+        });
+        return { sent: true, gmailId: result.gmailId, threadId: result.threadId };
       },
     }),
 
     composeEmail: tool({
       description:
-        "Open a compose window pre-filled with the given email content. Use this when the user asks you to draft or compose a new email.",
+        "Open a compose window pre-filled with email content. Use when user wants to draft without sending immediately.",
       inputSchema: z.object({
         to: z.string().email().optional().describe("Recipient email address."),
         subject: z.string().optional().describe("Email subject line."),
@@ -113,34 +265,16 @@ export function makeWriteTools(db: Database, userId: string, env: Env) {
     }),
 
     draftReply: tool({
-      description:
-        "Generate a concise draft reply to an email thread.",
+      description: "Generate a draft reply to an email thread. Does not send anything.",
       inputSchema: z.object({
-        emailId: z
-          .number()
-          .int()
-          .positive()
-          .describe("Numeric internal email ID to reply to."),
+        emailId: z.number().int().positive().describe("Email ID to reply to."),
         instructions: z
           .string()
           .optional()
-          .describe("Optional extra guidance about tone, intent, or what to say."),
+          .describe("Guidance about tone, intent, or what to say."),
       }),
       execute: async ({ emailId, instructions }) => {
-        const emailRow = await db
-          .select({
-            id: emails.id,
-            threadId: emails.threadId,
-            fromAddr: emails.fromAddr,
-            fromName: emails.fromName,
-            subject: emails.subject,
-            bodyText: emails.bodyText,
-          })
-          .from(emails)
-          .where(and(eq(emails.id, emailId), eq(emails.userId, userId)))
-          .limit(1);
-
-        const email = emailRow[0];
+        const email = await getEmailForUser(db, userId, emailId);
         if (!email) return { error: "Email not found" };
 
         let threadContext = "";
@@ -153,9 +287,7 @@ export function makeWriteTools(db: Database, userId: string, env: Env) {
               date: emails.date,
             })
             .from(emails)
-            .where(
-              and(eq(emails.threadId, email.threadId), eq(emails.userId, userId)),
-            )
+            .where(and(eq(emails.threadId, email.threadId), eq(emails.userId, userId)))
             .orderBy(asc(emails.date))
             .limit(5);
 
@@ -167,17 +299,15 @@ export function makeWriteTools(db: Database, userId: string, env: Env) {
             })
             .join("\n\n");
         } else {
-          const body = (email.bodyText ?? "").replace(/\s+/g, " ").trim().slice(0, 1000);
-          threadContext = `--- Original email from ${email.fromName || email.fromAddr} ---\n${body}`;
+          threadContext = `--- Original email from ${email.fromName || email.fromAddr} ---\n${(email.bodyText ?? "").replace(/\s+/g, " ").trim().slice(0, 1000)}`;
         }
 
-        const openai = createOpenAI({
-          apiKey: env.OPENAI_API_KEY,
-        });
+        const openai = createOpenAI({ apiKey: env.OPENAI_API_KEY });
         const { streamText } = await import("ai");
         const result = streamText({
           model: openai.responses(MODEL),
-          system: "You are a helpful email assistant. Draft a concise, professional reply. Match the conversation tone. Return only the reply body text.",
+          system:
+            "You are a helpful email assistant. Draft a concise, professional reply. Match the conversation tone. Return only the reply body text.",
           prompt: [
             `Subject: ${email.subject ?? "(no subject)"}`,
             "",

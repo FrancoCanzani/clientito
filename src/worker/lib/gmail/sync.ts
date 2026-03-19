@@ -5,10 +5,8 @@ import { isAutomatedSender } from "../domains";
 import { parseParticipants } from "../participants";
 import {
   CHUNK_DELAY_MS,
-  FETCH_CONCURRENCY,
   MESSAGE_CHUNK_SIZE,
-  fetchMessageBatch,
-  fetchMinimalMessage,
+  fetchMessagesBatch,
   getCurrentHistoryId,
   getGmailToken,
   listHistoryPage,
@@ -16,15 +14,17 @@ import {
   sleep,
 } from "./client";
 import {
+  GmailHistoryExpiredError,
   GmailSyncStateError,
   isGmailReconnectRequiredError,
 } from "./errors";
 import {
   acquireMailboxSyncLock,
+  createSyncJob,
   ensureMailbox,
   getMailboxSyncSnapshot,
-  markMailboxSyncFailed,
-  markMailboxSyncSucceeded,
+  markSyncJobFailed,
+  markSyncJobSucceeded,
   persistMailboxHistoryState,
   releaseMailboxSyncLock,
   touchMailboxSyncLock,
@@ -34,12 +34,19 @@ import {
   extractMessageAttachments,
   extractMessageBodyHtml,
   extractMessageBodyText,
+  getHeaderValue,
 } from "./mailbox";
+import { chunkArray } from "../utils";
 import type {
   GmailHistoryResponse,
   GmailSyncResult,
   SyncProgressFn,
 } from "./types";
+import { classifyEmails, type AiLabel } from "../email-classifier";
+import {
+  applyFilters,
+  getUserFilters,
+} from "../email-filter-engine";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
 const ON_DEMAND_SYNC_MIN_INTERVAL_MS = 60_000;
@@ -62,37 +69,6 @@ function maxHistoryId(
   }
 }
 
-function chunkArray<T>(list: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-
-  for (let index = 0; index < list.length; index += size) {
-    chunks.push(list.slice(index, index + size));
-  }
-
-  return chunks;
-}
-
-async function runConcurrent<T, R>(
-  items: T[],
-  concurrency: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = [];
-  let index = 0;
-
-  async function worker() {
-    while (index < items.length) {
-      const i = index++;
-      results[i] = await fn(items[i]);
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
-  );
-  return results;
-}
-
 function extractAddress(headerValue: string | null): string {
   if (!headerValue) {
     return "";
@@ -102,40 +78,15 @@ function extractAddress(headerValue: string | null): string {
   return (match?.[1] ?? headerValue).trim();
 }
 
-function getHeaderValue(
-  headers: Array<{ name?: string; value?: string }> | undefined,
-  headerName: string,
-): string | null {
-  if (!headers || headers.length === 0) {
-    return null;
-  }
-
-  const header = headers.find(
-    (entry) => entry.name?.toLowerCase() === headerName.toLowerCase(),
-  );
-
-  return header?.value?.trim() ?? null;
-}
-
-function isGmailMessageNotFoundError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  return (
-    error.message.includes("Gmail request failed (404)") &&
-    error.message.includes('"reason": "notFound"')
-  );
-}
-
 type ProcessMessagesInput = {
   db: Database;
   accessToken: string;
   userId: string;
   messageIds: string[];
+  env?: Env;
   refreshExisting?: boolean;
   onProgress?: SyncProgressFn;
-  onHeartbeat?: () => Promise<void>;
+  onHeartbeat?: () => Promise<void> | Promise<boolean>;
   progressOffset?: number;
   progressTotal?: number;
 };
@@ -145,6 +96,7 @@ async function processMessageIds({
   accessToken,
   userId,
   messageIds,
+  env,
   refreshExisting = false,
   onProgress,
   onHeartbeat,
@@ -182,43 +134,31 @@ async function processMessageIds({
       result.processed += chunk.length - messageIdsToFetch.length;
     }
 
-    const messages = await runConcurrent(
-      messageIdsToFetch,
-      FETCH_CONCURRENCY,
-      async (messageId) => {
-        const existingRow = existingByGmailId.get(messageId);
-        try {
-          return {
-            messageId,
-            existingRow,
-            message:
-              refreshExisting && existingRow
-                ? await fetchMinimalMessage(accessToken, messageId)
-                : await fetchMessageBatch(accessToken, messageId),
-            notFound: false,
-          };
-        } catch (error) {
-          if (isGmailMessageNotFoundError(error)) {
-            // Gmail history can reference messages that were deleted before fetch.
-            return { messageId, existingRow, message: null, notFound: true };
-          }
-          console.error("Failed to fetch Gmail message", { messageId, error });
-          return { messageId, existingRow, message: null, notFound: false };
-        }
-      },
-    );
+    // Use Gmail batch API to fetch all messages in a single HTTP call
+    const format = refreshExisting ? "minimal" : "full";
+    const batchResults = await fetchMessagesBatch(accessToken, messageIdsToFetch, format as "full" | "minimal");
 
-    for (const fetched of messages) {
+    const pendingInserts: Array<typeof emails.$inferInsert> = [];
+    const classificationInputs: Array<{
+      gmailId: string;
+      from: string;
+      subject: string | null;
+      snippet: string | null;
+    }> = [];
+
+    for (const messageId of messageIdsToFetch) {
       result.processed += 1;
+      const message = batchResults.get(messageId) ?? null;
+      const existingRow = existingByGmailId.get(messageId);
 
-      if (!fetched.message) {
-        if (refreshExisting && fetched.notFound) {
+      if (!message) {
+        if (refreshExisting && existingRow) {
           await db
             .delete(emails)
             .where(
               and(
                 eq(emails.userId, userId),
-                eq(emails.gmailId, fetched.messageId),
+                eq(emails.gmailId, messageId),
               ),
             );
         }
@@ -226,10 +166,7 @@ async function processMessageIds({
         continue;
       }
 
-      const message = fetched.message;
-
       try {
-        const existingRow = fetched.existingRow;
         const existingEmailId = existingRow?.id ?? null;
         const existingLabelIds = existingRow?.labelIds ?? [];
         const minimalLabelIds = [...(message.labelIds ?? [])];
@@ -240,18 +177,21 @@ async function processMessageIds({
           minimalLabelIds.push(HAS_ATTACHMENT_LABEL);
         }
 
-        if (existingEmailId && refreshExisting && !message.payload) {
-          await db
-            .update(emails)
-            .set({
-              threadId: message.threadId ?? null,
-              date: Number(message.internalDate ?? "") || undefined,
-              isRead: !minimalLabelIds.includes("UNREAD"),
-              labelIds: minimalLabelIds,
-            })
-            .where(eq(emails.id, existingEmailId));
-
-          result.historyId = maxHistoryId(result.historyId, message.historyId);
+        if (!message.payload) {
+          if (existingEmailId && refreshExisting) {
+            await db
+              .update(emails)
+              .set({
+                threadId: message.threadId ?? null,
+                date: Number(message.internalDate ?? "") || undefined,
+                isRead: !minimalLabelIds.includes("UNREAD"),
+                labelIds: minimalLabelIds,
+              })
+              .where(eq(emails.id, existingEmailId));
+            result.historyId = maxHistoryId(result.historyId, message.historyId);
+          } else {
+            result.skipped += 1;
+          }
           continue;
         }
 
@@ -297,6 +237,23 @@ async function processMessageIds({
           continue;
         }
 
+        const rawUnsubscribe = getHeaderValue(
+          message.payload?.headers,
+          "List-Unsubscribe",
+        );
+        let unsubscribeUrl: string | null = null;
+        let unsubscribeEmail: string | null = null;
+        if (rawUnsubscribe) {
+          const urls =
+            rawUnsubscribe.match(/<([^>]+)>/g)?.map((m) => m.slice(1, -1)) ??
+            [];
+          unsubscribeUrl = urls.find((u) => u.startsWith("http")) ?? null;
+          unsubscribeEmail =
+            urls
+              .find((u) => u.startsWith("mailto:"))
+              ?.replace("mailto:", "") ?? null;
+        }
+
         const emailValues = {
           threadId: message.threadId ?? null,
           messageId: rawMessageId ?? null,
@@ -311,6 +268,8 @@ async function processMessageIds({
           direction,
           isRead,
           labelIds,
+          unsubscribeUrl,
+          unsubscribeEmail,
         };
 
         if (existingEmailId) {
@@ -319,12 +278,20 @@ async function processMessageIds({
             .set(emailValues)
             .where(eq(emails.id, existingEmailId));
         } else {
-          await db.insert(emails).values({
+          pendingInserts.push({
             userId,
             gmailId: message.id,
             ...emailValues,
             createdAt: Date.now(),
           });
+          if (direction === "received") {
+            classificationInputs.push({
+              gmailId: message.id!,
+              from: fromAddr,
+              subject,
+              snippet: message.snippet ?? null,
+            });
+          }
           result.inserted += 1;
         }
 
@@ -335,6 +302,94 @@ async function processMessageIds({
           messageId: message.id,
           error,
         });
+      }
+    }
+
+    // Batch insert new emails to reduce D1 round-trips
+    if (pendingInserts.length > 0) {
+      const insertChunks = chunkArray(pendingInserts, 5);
+      for (const insertChunk of insertChunks) {
+        await db.insert(emails).values(insertChunk).onConflictDoNothing({ target: emails.gmailId });
+      }
+    }
+
+    // Classify newly inserted received emails with Workers AI
+    if (env?.AI && classificationInputs.length > 0) {
+      try {
+        const batch = classificationInputs.map((e, i) => ({
+          index: i,
+          from: e.from,
+          subject: e.subject,
+          snippet: e.snippet,
+        }));
+        const labels = await classifyEmails(env.AI, batch);
+
+        for (const [idx, label] of labels) {
+          const gmailId = classificationInputs[idx]?.gmailId;
+          if (gmailId) {
+            await db
+              .update(emails)
+              .set({ aiLabel: label })
+              .where(
+                and(eq(emails.userId, userId), eq(emails.gmailId, gmailId)),
+              );
+          }
+        }
+      } catch (error) {
+        console.error("AI classification failed, skipping", error);
+      }
+      classificationInputs.length = 0;
+    }
+
+    // Apply user-defined filters to newly inserted emails
+    if (pendingInserts.length > 0) {
+      try {
+        const userFilters = await getUserFilters(db, userId);
+        if (userFilters.length > 0) {
+          for (const insert of pendingInserts) {
+            const emailFields = {
+              fromAddr: insert.fromAddr,
+              toAddr: insert.toAddr ?? null,
+              subject: insert.subject ?? null,
+              aiLabel: insert.aiLabel ?? null,
+            };
+            const actions = applyFilters(emailFields, userFilters);
+            if (actions) {
+              const updates: Record<string, unknown> = {};
+              if (actions.markRead) updates.isRead = true;
+              if (actions.applyAiLabel) updates.aiLabel = actions.applyAiLabel;
+              if (actions.archive || actions.trash || actions.star) {
+                // Modify labelIds in DB (Gmail sync happens separately)
+                const currentLabels = (insert.labelIds as string[]) ?? [];
+                const newLabels = [...currentLabels];
+                if (actions.archive) {
+                  const idx = newLabels.indexOf("INBOX");
+                  if (idx !== -1) newLabels.splice(idx, 1);
+                }
+                if (actions.trash && !newLabels.includes("TRASH")) {
+                  newLabels.push("TRASH");
+                }
+                if (actions.star && !newLabels.includes("STARRED")) {
+                  newLabels.push("STARRED");
+                }
+                updates.labelIds = newLabels;
+              }
+              if (Object.keys(updates).length > 0) {
+                await db
+                  .update(emails)
+                  .set(updates)
+                  .where(
+                    and(
+                      eq(emails.userId, userId),
+                      eq(emails.gmailId, insert.gmailId!),
+                    ),
+                  );
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Filter application failed, skipping", error);
       }
     }
 
@@ -401,6 +456,7 @@ export async function startFullGmailSync(
       accessToken,
       userId,
       messageIds: allMessageIds,
+      env,
       onProgress,
       onHeartbeat: () => touchMailboxSyncLock(db, userId),
       progressOffset: 0,
@@ -413,6 +469,7 @@ export async function startFullGmailSync(
         accessToken,
         userId,
         startHistoryId: historyIdBeforeFullSync,
+        env,
       });
 
       return {
@@ -501,6 +558,7 @@ type IncrementalSyncCoreInput = {
   accessToken: string;
   userId: string;
   startHistoryId: string;
+  env?: Env;
 };
 
 async function runIncrementalGmailSyncWithAccessToken({
@@ -508,6 +566,7 @@ async function runIncrementalGmailSyncWithAccessToken({
   accessToken,
   userId,
   startHistoryId,
+  env,
 }: IncrementalSyncCoreInput): Promise<GmailSyncResult> {
   let pageToken: string | undefined;
   let latestHistoryId: string | null = startHistoryId;
@@ -554,6 +613,7 @@ async function runIncrementalGmailSyncWithAccessToken({
       accessToken,
       userId,
       messageIds: pageChangedMessageIds,
+      env,
       refreshExisting: true,
       onHeartbeat: heartbeat,
     });
@@ -628,6 +688,7 @@ export async function runIncrementalGmailSync(
       accessToken,
       userId,
       startHistoryId,
+      env,
     });
     return result;
   } finally {
@@ -658,6 +719,22 @@ export async function catchUpMailboxOnDemand(
     }
   | { status: "failed"; error: string }
 > {
+  // One-time: clean up broken rows inserted without headers, reset historyId to re-sync
+  const brokenRows = await db
+    .select({ id: emails.id })
+    .from(emails)
+    .where(and(eq(emails.userId, userId), eq(emails.fromAddr, "")))
+    .limit(1);
+  if (brokenRows.length > 0) {
+    await db
+      .delete(emails)
+      .where(and(eq(emails.userId, userId), eq(emails.fromAddr, "")));
+    await db
+      .update(mailboxes)
+      .set({ historyId: null })
+      .where(eq(mailboxes.userId, userId));
+  }
+
   const snapshot = await getMailboxSyncSnapshot(db, userId);
   const mailbox = snapshot.mailbox ?? (await ensureMailbox(db, userId, userEmail));
 
@@ -688,16 +765,28 @@ export async function catchUpMailboxOnDemand(
     return { status: "skipped", reason: "sync_in_progress" };
   }
 
-  try {
-    const result = await runIncrementalGmailSync(
-      db,
-      env,
-      userId,
-      mailbox.historyId,
-      { skipLock: true },
-    );
+  const job = await createSyncJob(db, mailbox.id, "incremental", "system");
 
-    await markMailboxSyncSucceeded(db, userId);
+  try {
+    let result: GmailSyncResult;
+    try {
+      result = await runIncrementalGmailSync(
+        db,
+        env,
+        userId,
+        mailbox.historyId,
+        { skipLock: true },
+      );
+    } catch (error) {
+      if (error instanceof GmailHistoryExpiredError) {
+        console.warn("On-demand sync: history expired, falling back to full sync", { userId });
+        result = await startFullGmailSync(db, env, userId, undefined, undefined, { skipLock: true });
+      } else {
+        throw error;
+      }
+    }
+
+    await markSyncJobSucceeded(db, mailbox.id, job.id);
     return { status: "completed", result };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Sync failed";
@@ -710,9 +799,10 @@ export async function catchUpMailboxOnDemand(
       console.error("On-demand Gmail sync failed", { userId, error });
     }
 
-    await markMailboxSyncFailed(
+    await markSyncJobFailed(
       db,
-      userId,
+      mailbox.id,
+      job.id,
       message,
       classifySyncError(error),
     ).catch(() => {});
@@ -750,6 +840,7 @@ export async function syncGmailMessageIds(
     accessToken,
     userId,
     messageIds: dedupedMessageIds,
+    env,
     refreshExisting,
   });
 }

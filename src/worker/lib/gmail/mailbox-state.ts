@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import type { Database } from "../../db/client";
 import { mailboxes, syncJobs } from "../../db/schema";
 import { GOOGLE_RECONNECT_REQUIRED_MESSAGE } from "./errors";
@@ -102,14 +102,25 @@ export async function acquireMailboxSyncLock(
 export async function touchMailboxSyncLock(
   db: Database,
   userId: string,
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const now = Date.now();
+  const gt = (col: typeof mailboxes.lockUntil, val: number) => sql`${col} > ${val}`;
+
+  const rows = await db
     .update(mailboxes)
     .set({
-      lockUntil: Date.now() + SYNC_LOCK_TTL_MS,
-      updatedAt: Date.now(),
+      lockUntil: now + SYNC_LOCK_TTL_MS,
+      updatedAt: now,
     })
-    .where(eq(mailboxes.userId, userId));
+    .where(
+      and(
+        eq(mailboxes.userId, userId),
+        gt(mailboxes.lockUntil, now),
+      ),
+    )
+    .returning({ id: mailboxes.id });
+
+  return rows.length > 0;
 }
 
 export async function releaseMailboxSyncLock(
@@ -263,43 +274,6 @@ export async function markMailboxReconnectRequired(
     .update(mailboxes)
     .set({
       authState: "reconnect_required",
-      lastErrorAt: Date.now(),
-      lastErrorMessage: message,
-      lockUntil: null,
-      updatedAt: Date.now(),
-    })
-    .where(eq(mailboxes.userId, userId));
-}
-
-export async function markMailboxSyncSucceeded(
-  db: Database,
-  userId: string,
-): Promise<void> {
-  await ensureMailbox(db, userId);
-  await db
-    .update(mailboxes)
-    .set({
-      authState: "ok",
-      lastSuccessfulSyncAt: Date.now(),
-      lastErrorAt: null,
-      lastErrorMessage: null,
-      lockUntil: null,
-      updatedAt: Date.now(),
-    })
-    .where(eq(mailboxes.userId, userId));
-}
-
-export async function markMailboxSyncFailed(
-  db: Database,
-  userId: string,
-  message: string,
-  errorClass: SyncJobErrorClass,
-): Promise<void> {
-  await ensureMailbox(db, userId);
-  await db
-    .update(mailboxes)
-    .set({
-      authState: errorClass === "reconnect_required" ? "reconnect_required" : "ok",
       lastErrorAt: Date.now(),
       lastErrorMessage: message,
       lockUntil: null,

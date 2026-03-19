@@ -1,5 +1,5 @@
 import { tool } from "ai";
-import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, like, lte, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
 import { emails, tasks } from "../../db/schema";
@@ -92,7 +92,7 @@ export function makeReadTools(db: Database, userId: string) {
       }),
       execute: async ({ dueToday, includeCompleted }) => {
         const conditions = [eq(tasks.userId, userId)];
-        if (!includeCompleted) conditions.push(eq(tasks.done, false));
+        if (!includeCompleted) conditions.push(ne(tasks.status, "done"));
         if (dueToday) {
           const startOfDay = new Date();
           startOfDay.setHours(0, 0, 0, 0);
@@ -108,7 +108,7 @@ export function makeReadTools(db: Database, userId: string) {
             id: tasks.id,
             title: tasks.title,
             dueAt: tasks.dueAt,
-            done: tasks.done,
+            status: tasks.status,
             createdAt: tasks.createdAt,
           })
           .from(tasks)
@@ -116,6 +116,62 @@ export function makeReadTools(db: Database, userId: string) {
           .orderBy(asc(tasks.dueAt))
           .limit(20);
         return { tasks: rows, count: rows.length };
+      },
+    }),
+
+    searchEmailsByDate: tool({
+      description:
+        "Search emails within a date range. Use when user asks about emails from a specific time period like 'last week', 'yesterday', or 'in March'.",
+      inputSchema: z.object({
+        after: z
+          .number()
+          .describe("Start of date range as Unix timestamp in milliseconds."),
+        before: z
+          .number()
+          .describe("End of date range as Unix timestamp in milliseconds."),
+        query: z
+          .string()
+          .optional()
+          .describe("Optional text to filter by subject, sender, or snippet."),
+        limit: z.number().int().min(1).max(20).optional().default(10),
+      }),
+      execute: async ({ after, before, query, limit }) => {
+        const conditions = [
+          eq(emails.userId, userId),
+          gte(emails.date, after),
+          lte(emails.date, before),
+        ];
+
+        if (query) {
+          const pattern = `%${query}%`;
+          conditions.push(
+            or(
+              like(emails.subject, pattern),
+              like(emails.fromAddr, pattern),
+              like(emails.snippet, pattern),
+            )!,
+          );
+        }
+
+        const rows = await db
+          .select({
+            id: emails.id,
+            subject: emails.subject,
+            fromAddr: emails.fromAddr,
+            fromName: emails.fromName,
+            snippet: emails.snippet,
+            date: emails.date,
+            isRead: emails.isRead,
+          })
+          .from(emails)
+          .where(and(...conditions))
+          .orderBy(desc(emails.date))
+          .limit(limit);
+
+        return {
+          emails: rows.map((row) => ({ ...row, ...formatEmailDate(row.date) })),
+          count: rows.length,
+        };
       },
     }),
 
