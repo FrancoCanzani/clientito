@@ -207,7 +207,7 @@ export default function TasksPage() {
 
   return (
     <TaskActionsProvider value={taskActions}>
-      <div className="mx-auto space-y-5">
+      <div className="mx-auto w-full max-w-3xl space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="font-medium">{VIEW_LABELS[view]}</h2>
           <div className="flex items-center gap-2">

@@ -4,12 +4,6 @@ import { z } from "zod";
 import { emailFilters } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 
-const conditionSchema = z.object({
-  field: z.enum(["from", "to", "subject", "aiLabel"]),
-  operator: z.enum(["contains", "equals", "startsWith", "endsWith"]),
-  value: z.string().min(1),
-});
-
 const actionsSchema = z.object({
   archive: z.boolean().optional(),
   markRead: z.boolean().optional(),
@@ -22,7 +16,7 @@ const actionsSchema = z.object({
 
 const createSchema = z.object({
   name: z.string().min(1).max(200),
-  conditions: z.array(conditionSchema).min(1),
+  description: z.string().min(1).max(500),
   actions: actionsSchema,
   enabled: z.boolean().optional(),
   priority: z.number().int().optional(),
@@ -41,7 +35,8 @@ export function registerCreateFilter(app: Hono<AppRouteEnv>) {
       .values({
         userId: user.id,
         name: body.name,
-        conditions: body.conditions,
+        description: body.description,
+        conditions: [],
         actions: body.actions,
         enabled: body.enabled ?? true,
         priority: body.priority ?? 0,

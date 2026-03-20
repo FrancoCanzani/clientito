@@ -1,16 +1,3 @@
-export type FilterConditionField = "from" | "to" | "subject" | "aiLabel";
-export type FilterConditionOperator =
-  | "contains"
-  | "equals"
-  | "startsWith"
-  | "endsWith";
-
-export type FilterCondition = {
-  field: FilterConditionField;
-  operator: FilterConditionOperator;
-  value: string;
-};
-
 export type FilterActions = {
   archive?: boolean;
   markRead?: boolean;
@@ -28,7 +15,7 @@ export type EmailFilter = {
   id: number;
   userId: string;
   name: string;
-  conditions: FilterCondition[];
+  description: string;
   actions: FilterActions;
   enabled: boolean;
   priority: number;

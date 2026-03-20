@@ -56,7 +56,7 @@ const PLANS = [
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
   const primaryCtaTo = isAuthenticated ? "/home" : "/login";
-  const primaryCtaLabel = isAuthenticated ? "Open workspace" : "Get started";
+  const primaryCtaLabel = isAuthenticated ? "Go to app" : "Log in";
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
@@ -180,7 +180,9 @@ export default function LandingPage() {
                 className="mt-4"
               >
                 <Link to={primaryCtaTo}>
-                  {plan.name === "Pro" ? "Choose Pro" : "Get started"}
+                  {plan.name === "Pro"
+                    ? (isAuthenticated ? "Go to app" : "Log in")
+                    : primaryCtaLabel}
                 </Link>
               </Button>
             </article>

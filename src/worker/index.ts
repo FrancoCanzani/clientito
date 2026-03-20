@@ -5,8 +5,6 @@ import { HTTPException } from "hono/http-exception";
 import { auth } from "../../auth";
 import { authMiddleware } from "./middleware/auth";
 import aiRoutes from "./routes/ai/router";
-
-import draftsRoutes from "./routes/drafts/router";
 import emailsRoutes from "./routes/emails/router";
 import healthRoutes from "./routes/health/router";
 import notesRoutes from "./routes/notes/router";
@@ -54,7 +52,6 @@ app.route("/api/settings", settingsRoutes);
 app.route("/api/search", searchRoutes);
 app.route("/api/subscriptions", subscriptionsRoutes);
 app.route("/api/filters", filtersRoutes);
-app.route("/api/drafts", draftsRoutes);
 
 export { Agent } from "./agent/agent";
 

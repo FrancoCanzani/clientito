@@ -1,8 +1,7 @@
 import { z } from "zod";
 
 export const syncRequestSchema = z.object({
-  months: z.coerce.number().int().min(1).optional(),
-  continueFullSync: z.boolean().optional(),
+  months: z.union([z.literal(6), z.literal(12)]).optional(),
 });
 
 export const errorResponseSchema = z.object({ error: z.string() });

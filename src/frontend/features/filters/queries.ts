@@ -1,9 +1,4 @@
-import type {
-  EmailFilter,
-  FilterActions,
-  FilterCondition,
-  FilterTestResult,
-} from "./types";
+import type { EmailFilter, FilterActions, FilterTestResult } from "./types";
 
 export async function fetchFilters(): Promise<EmailFilter[]> {
   const res = await fetch("/api/filters");
@@ -14,7 +9,7 @@ export async function fetchFilters(): Promise<EmailFilter[]> {
 
 export async function createFilter(input: {
   name: string;
-  conditions: FilterCondition[];
+  description: string;
   actions: FilterActions;
   enabled?: boolean;
   priority?: number;
@@ -33,7 +28,7 @@ export async function updateFilter(
   id: number,
   input: Partial<{
     name: string;
-    conditions: FilterCondition[];
+    description: string;
     actions: FilterActions;
     enabled: boolean;
     priority: number;
@@ -55,8 +50,7 @@ export async function deleteFilter(id: number): Promise<void> {
 }
 
 export async function testFilter(input: {
-  conditions: FilterCondition[];
-  actions: FilterActions;
+  description: string;
 }): Promise<FilterTestResult> {
   const res = await fetch("/api/filters/test", {
     method: "POST",
@@ -65,5 +59,24 @@ export async function testFilter(input: {
   });
   if (!res.ok) throw new Error("Failed to test filter");
   const json = (await res.json()) as { data: FilterTestResult };
+  return json.data;
+}
+
+export type GeneratedFilter = {
+  name: string;
+  description: string;
+  actions: FilterActions;
+};
+
+export async function generateFilter(
+  prompt: string,
+): Promise<GeneratedFilter> {
+  const res = await fetch("/api/filters/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+  if (!res.ok) throw new Error("Failed to generate filter");
+  const json = (await res.json()) as { data: GeneratedFilter };
   return json.data;
 }

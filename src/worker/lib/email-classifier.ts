@@ -16,15 +16,6 @@ const AI_LABELS = [
 
 export type AiLabel = (typeof AI_LABELS)[number];
 
-const classificationSchema = z.object({
-  results: z.array(
-    z.object({
-      index: z.number(),
-      label: z.enum(AI_LABELS),
-    }),
-  ),
-});
-
 type EmailForClassification = {
   index: number;
   from: string;
@@ -32,14 +23,42 @@ type EmailForClassification = {
   snippet: string | null;
 };
 
+type UserFilterRule = {
+  id: number;
+  description: string;
+};
+
+type ClassificationResult = {
+  labels: Map<number, AiLabel>;
+  filterMatches: Map<number, number[]>;
+};
+
 export async function classifyEmails(
   ai: Ai,
   emailBatch: EmailForClassification[],
-): Promise<Map<number, AiLabel>> {
-  if (emailBatch.length === 0) return new Map();
+  userFilters: UserFilterRule[] = [],
+): Promise<ClassificationResult> {
+  const result: ClassificationResult = {
+    labels: new Map(),
+    filterMatches: new Map(),
+  };
 
+  if (emailBatch.length === 0) return result;
+
+  const hasFilters = userFilters.length > 0;
   const workersAI = createWorkersAI({ binding: ai });
-  const labels = new Map<number, AiLabel>();
+
+  const schema = z.object({
+    results: z.array(
+      z.object({
+        index: z.number(),
+        label: z.enum(AI_LABELS),
+        ...(hasFilters
+          ? { matchedFilters: z.array(z.number()).optional() }
+          : {}),
+      }),
+    ),
+  });
 
   for (const chunk of chunkArray(emailBatch, BATCH_SIZE)) {
     try {
@@ -50,9 +69,17 @@ export async function classifyEmails(
         )
         .join("\n");
 
+      let filterSection = "";
+      if (hasFilters) {
+        const filterList = userFilters
+          .map((f) => `  Filter #${f.id}: ${f.description}`)
+          .join("\n");
+        filterSection = `\n\nUser filter rules (return matching filter IDs in "matchedFilters" for each email):\n${filterList}`;
+      }
+
       const { object } = await generateObject({
         model: workersAI(MODEL),
-        schema: classificationSchema,
+        schema,
         prompt: `Classify each email into exactly one category.
 
 Categories:
@@ -61,16 +88,21 @@ Categories:
 - newsletter: Newsletters, digests, blog updates, marketing content from companies
 - transactional: Receipts, order confirmations, shipping notifications, password resets, verification codes
 - notification: Automated alerts from apps/services — GitHub, Slack, calendar, social media notifications
+${filterSection}
 
 Emails:
 ${emailList}
 
-Return a JSON object with a "results" array. Each item must have "index" (the number in brackets) and "label" (one of: important, later, newsletter, transactional, notification).`,
+Return a JSON object with a "results" array. Each item must have "index" (the number in brackets) and "label" (one of: important, later, newsletter, transactional, notification).${hasFilters ? ' Each item should also have "matchedFilters" — an array of filter IDs that apply to that email (empty array if none match).' : ""}`,
       });
 
       for (const r of object.results) {
         if (AI_LABELS.includes(r.label)) {
-          labels.set(r.index, r.label);
+          result.labels.set(r.index, r.label);
+        }
+        const matched = (r as { matchedFilters?: number[] }).matchedFilters;
+        if (matched && matched.length > 0) {
+          result.filterMatches.set(r.index, matched);
         }
       }
     } catch (error) {
@@ -78,5 +110,5 @@ Return a JSON object with a "results" array. Each item must have "index" (the nu
     }
   }
 
-  return labels;
+  return result;
 }

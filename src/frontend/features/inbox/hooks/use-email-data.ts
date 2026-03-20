@@ -22,7 +22,7 @@ export function useEmailData({
     queryKey: ["emails", view],
     queryFn: async ({ pageParam }) =>
       fetchEmails({
-        view: view === "drafts" ? "inbox" : view,
+        view,
         limit: 60,
         offset: pageParam,
       }),
@@ -35,7 +35,6 @@ export function useEmailData({
       pages: [initialEmails],
       pageParams: [0],
     },
-    enabled: view !== "drafts",
     refetchInterval: INBOX_POLL_INTERVAL_MS,
     refetchIntervalInBackground: false,
   });

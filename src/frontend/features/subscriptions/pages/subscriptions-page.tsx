@@ -8,10 +8,11 @@ const route = getRouteApi("/_dashboard/inbox/subscriptions");
 
 export default function SubscriptionsPage() {
   const { subscriptions } = route.useLoaderData();
+  const [items, setItems] = useState(subscriptions);
 
-  if (subscriptions.length === 0) {
+  if (items.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-4xl space-y-4 py-4">
+      <div className="mx-auto w-full max-w-3xl space-y-4 py-4">
         <h2 className="text-lg font-medium">Subscriptions</h2>
         <p className="text-sm text-muted-foreground">
           No subscriptions found. Unsubscribe data is collected as new emails
@@ -22,29 +23,43 @@ export default function SubscriptionsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-4 py-4">
+    <div className="mx-auto w-full max-w-3xl space-y-4 py-4">
       <header>
         <h2 className="text-lg font-medium">Subscriptions</h2>
         <p className="text-sm text-muted-foreground">
-          {subscriptions.length} subscription{subscriptions.length !== 1 && "s"}{" "}
+          {items.length} subscription{items.length !== 1 && "s"}{" "}
           detected
         </p>
       </header>
 
       <div className="space-y-1">
-        {subscriptions.map((sub) => (
-          <SubscriptionRow key={sub.fromAddr} subscription={sub} />
+        {items.map((sub) => (
+          <SubscriptionRow
+            key={sub.fromAddr}
+            subscription={sub}
+            onRemove={(fromAddr) =>
+              setItems((current) => current.filter((item) => item.fromAddr !== fromAddr))
+            }
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function SubscriptionRow({ subscription }: { subscription: Subscription }) {
+function SubscriptionRow({
+  subscription,
+  onRemove,
+}: {
+  subscription: Subscription;
+  onRemove: (fromAddr: string) => void;
+}) {
   const [status, setStatus] = useState<
     "idle" | "loading" | "done" | "manual"
-  >("idle");
-  const [manualUrl, setManualUrl] = useState<string | null>(null);
+  >(subscription.status === "pending_manual" ? "manual" : "idle");
+  const [manualUrl, setManualUrl] = useState<string | null>(
+    subscription.status === "pending_manual" ? subscription.unsubscribeUrl : null,
+  );
 
   const handleUnsubscribe = async () => {
     setStatus("loading");
@@ -58,6 +73,7 @@ function SubscriptionRow({ subscription }: { subscription: Subscription }) {
       if (result.success) {
         setStatus("done");
         toast("Unsubscribed from " + (subscription.fromName ?? subscription.fromAddr));
+        onRemove(subscription.fromAddr);
       } else if (result.method === "manual" && result.url) {
         setStatus("manual");
         setManualUrl(result.url);

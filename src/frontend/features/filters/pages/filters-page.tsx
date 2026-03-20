@@ -1,4 +1,7 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   FilterEditor,
   type EditingFilter,
@@ -7,19 +10,44 @@ import {
   createFilter,
   deleteFilter,
   fetchFilters,
-  testFilter,
+  generateFilter,
   updateFilter,
 } from "@/features/filters/queries";
-import type { EmailFilter, FilterTestResult } from "@/features/filters/types";
-import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import type { EmailFilter } from "@/features/filters/types";
+import {
+  ArrowRightIcon,
+  PencilSimpleIcon,
+  SparkleIcon,
+  TrashIcon,
+} from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
+const ACTION_LABELS: Record<string, string> = {
+  archive: "Archive",
+  markRead: "Mark read",
+  star: "Star",
+  trash: "Trash",
+};
+
+function formatActions(actions: Record<string, unknown>) {
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(actions)) {
+    if (!value) continue;
+    if (key === "applyAiLabel") {
+      parts.push(`Label as ${value}`);
+    } else if (ACTION_LABELS[key]) {
+      parts.push(ACTION_LABELS[key]);
+    }
+  }
+  return parts;
+}
+
 export default function FiltersPage() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<EditingFilter | null>(null);
-  const [testResult, setTestResult] = useState<FilterTestResult | null>(null);
+  const [prompt, setPrompt] = useState("");
 
   const { data: filters = [], isPending } = useQuery({
     queryKey: ["filters"],
@@ -29,24 +57,40 @@ export default function FiltersPage() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["filters"] });
 
+  const generateMutation = useMutation({
+    mutationFn: generateFilter,
+    onSuccess: (data) => {
+      setEditing({
+        id: null,
+        name: data.name,
+        description: data.description,
+        actions: data.actions,
+        enabled: true,
+      });
+      setPrompt("");
+    },
+    onError: () => toast.error("Failed to generate filter"),
+  });
+
   const createMutation = useMutation({
     mutationFn: createFilter,
     onSuccess: () => {
       invalidate();
       setEditing(null);
-      setTestResult(null);
       toast.success("Filter created");
     },
     onError: () => toast.error("Failed to create filter"),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...rest }: { id: number } & Parameters<typeof updateFilter>[1]) =>
+    mutationFn: ({
+      id,
+      ...rest
+    }: { id: number } & Parameters<typeof updateFilter>[1]) =>
       updateFilter(id, rest),
     onSuccess: () => {
       invalidate();
       setEditing(null);
-      setTestResult(null);
       toast.success("Filter updated");
     },
     onError: () => toast.error("Failed to update filter"),
@@ -67,39 +111,20 @@ export default function FiltersPage() {
     onSuccess: invalidate,
   });
 
-  const testMutation = useMutation({
-    mutationFn: testFilter,
-    onSuccess: (data) => setTestResult(data),
-    onError: () => toast.error("Test failed"),
-  });
-
-  const startNew = useCallback(() => {
-    setEditing({
-      id: null,
-      name: "",
-      conditions: [{ field: "from", operator: "contains", value: "" }],
-      actions: {},
-      enabled: true,
-    });
-    setTestResult(null);
-  }, []);
-
   const startEdit = useCallback((filter: EmailFilter) => {
     setEditing({
       id: filter.id,
       name: filter.name,
-      conditions: [...filter.conditions],
+      description: filter.description,
       actions: { ...filter.actions },
       enabled: filter.enabled,
     });
-    setTestResult(null);
   }, []);
 
   const save = useCallback(() => {
     if (!editing) return;
-    const validConditions = editing.conditions.filter((c) => c.value.trim());
-    if (validConditions.length === 0) {
-      toast.error("Add at least one condition with a value");
+    if (!editing.description.trim()) {
+      toast.error("Filter description is required");
       return;
     }
     if (!editing.name.trim()) {
@@ -109,7 +134,7 @@ export default function FiltersPage() {
 
     const payload = {
       name: editing.name,
-      conditions: validConditions,
+      description: editing.description,
       actions: editing.actions,
       enabled: editing.enabled,
     };
@@ -121,104 +146,144 @@ export default function FiltersPage() {
     }
   }, [editing, createMutation, updateMutation]);
 
-  const runTest = useCallback(() => {
-    if (!editing) return;
-    const validConditions = editing.conditions.filter((c) => c.value.trim());
-    if (validConditions.length === 0) return;
-    testMutation.mutate({ conditions: validConditions, actions: editing.actions });
-  }, [editing, testMutation]);
+  const handlePromptSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+    generateMutation.mutate(trimmed);
+  };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-xl font-medium tracking-tight">Email Filters</h1>
-        <Button size="sm" onClick={startNew} disabled={editing !== null}>
-          <PlusIcon className="mr-1.5 size-4" />
-          New filter
+    <div className="mx-auto w-full max-w-2xl space-y-8 py-2">
+      <div>
+        <h1 className="text-lg font-medium tracking-tight">Filters</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Automatically sort incoming emails with AI.
+        </p>
+      </div>
+
+      <form onSubmit={handlePromptSubmit} className="relative">
+        <SparkleIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder='Describe a filter... e.g. "Archive LinkedIn suggestions"'
+          className="pl-9 pr-20"
+          disabled={generateMutation.isPending}
+        />
+        <Button
+          type="submit"
+          size="sm"
+          variant="ghost"
+          className="absolute right-1 top-1/2 h-7 -translate-y-1/2 text-xs"
+          disabled={!prompt.trim() || generateMutation.isPending}
+        >
+          {generateMutation.isPending ? (
+            "Generating..."
+          ) : (
+            <>
+              Create
+              <ArrowRightIcon className="ml-1 size-3" />
+            </>
+          )}
         </Button>
-      </header>
+      </form>
 
       {editing && (
         <FilterEditor
           editing={editing}
           onChange={setEditing}
           onSave={save}
-          onCancel={() => {
-            setEditing(null);
-            setTestResult(null);
-          }}
-          onTest={runTest}
+          onCancel={() => setEditing(null)}
           isSaving={createMutation.isPending || updateMutation.isPending}
-          isTesting={testMutation.isPending}
-          testResult={testResult}
         />
       )}
 
       {isPending ? (
-        <p className="text-sm text-muted-foreground">Loading filters...</p>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-16 animate-pulse rounded-lg border border-border bg-muted/30"
+            />
+          ))}
+        </div>
       ) : filters.length === 0 && !editing ? (
-        <p className="rounded-md border border-border/60 p-4 text-center text-sm text-muted-foreground">
-          No filters yet. Create one to automatically sort incoming emails.
-        </p>
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border/60 py-12 text-center">
+          <p className="text-sm text-muted-foreground">
+            No filters yet. Describe what you want above or create one manually.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setEditing({
+                id: null,
+                name: "",
+                description: "",
+                actions: {},
+                enabled: true,
+              });
+            }}
+          >
+            Create manually
+          </Button>
+        </div>
       ) : (
         <div className="space-y-2">
           {filters.map((filter) => (
             <div
               key={filter.id}
-              className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
+              className={`group rounded-lg border border-border px-4 py-3 transition-colors ${
+                !filter.enabled ? "opacity-50" : ""
+              }`}
             >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
                   <span className="text-sm font-medium">{filter.name}</span>
-                  {!filter.enabled && (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-                      Disabled
-                    </span>
-                  )}
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {filter.description}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <ArrowRightIcon className="size-3 text-muted-foreground" />
+                    {formatActions(filter.actions).map((action) => (
+                      <Badge
+                        key={action}
+                        variant="outline"
+                        className="font-normal"
+                      >
+                        {action}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {filter.conditions
-                    .map((c) => `${c.field} ${c.operator} "${c.value}"`)
-                    .join(" AND ")}
-                  {" → "}
-                  {Object.entries(filter.actions)
-                    .filter(([, v]) => v)
-                    .map(([k, v]) =>
-                      k === "applyAiLabel" ? `label:${v}` : k,
-                    )
-                    .join(", ")}
-                </p>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() =>
-                    toggleMutation.mutate({
-                      id: filter.id,
-                      enabled: !filter.enabled,
-                    })
-                  }
-                >
-                  {filter.enabled ? "Disable" : "Enable"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => startEdit(filter)}
-                >
-                  Edit
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 text-destructive"
-                  onClick={() => deleteMutation.mutate(filter.id)}
-                >
-                  <TrashIcon className="size-3.5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => startEdit(filter)}
+                    >
+                      <PencilSimpleIcon className="size-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-destructive hover:text-destructive"
+                      onClick={() => deleteMutation.mutate(filter.id)}
+                    >
+                      <TrashIcon className="size-3.5" />
+                    </Button>
+                  </div>
+                  <Switch
+                    size="sm"
+                    checked={filter.enabled}
+                    onCheckedChange={(checked) =>
+                      toggleMutation.mutate({ id: filter.id, enabled: checked })
+                    }
+                  />
+                </div>
               </div>
             </div>
           ))}

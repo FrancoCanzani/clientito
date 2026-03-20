@@ -60,7 +60,6 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
     switch (view) {
       case "inbox":
         conditions.push(hasEmailLabel("INBOX"));
-        conditions.push(sql<boolean>`not ${hasEmailLabel("SENT")}`);
         // Hide snoozed emails from inbox
         conditions.push(
           or(isNull(emails.snoozedUntil), lte(emails.snoozedUntil, now))!,
@@ -77,6 +76,15 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
         break;
       case "snoozed":
         conditions.push(gt(emails.snoozedUntil, now));
+        break;
+      case "archived":
+        conditions.push(sql<boolean>`not ${hasEmailLabel("INBOX")}`);
+        conditions.push(sql<boolean>`not ${hasEmailLabel("SENT")}`);
+        conditions.push(sql<boolean>`not ${hasEmailLabel("TRASH")}`);
+        conditions.push(sql<boolean>`not ${hasEmailLabel("SPAM")}`);
+        break;
+      case "starred":
+        conditions.push(hasEmailLabel("STARRED"));
         break;
     }
 

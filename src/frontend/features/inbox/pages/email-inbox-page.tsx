@@ -1,6 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
@@ -8,7 +14,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { type ComposeInitial } from "@/features/inbox/components/compose-email-dialog";
 import { ComposePanel } from "@/features/inbox/components/compose-panel";
-import { DraftListView } from "@/features/inbox/components/draft-list-view";
 import { EmailBulkToolbar } from "@/features/inbox/components/email-bulk-toolbar";
 import { EmailContextMenu } from "@/features/inbox/components/email-context-menu";
 import { EmailDetailContent } from "@/features/inbox/components/email-detail-content";
@@ -50,7 +55,6 @@ export default function EmailInboxPage() {
   const [composeInitial, setComposeInitial] = useState<
     ComposeInitial | undefined
   >();
-  const [composeDraftId, setComposeDraftId] = useState<number | undefined>();
   const [forwardOpen, setForwardOpen] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [lastClickedId, setLastClickedId] = useState<string | null>(null);
@@ -196,58 +200,16 @@ export default function EmailInboxPage() {
     executeEmailAction,
   });
 
-  if (view === "drafts") {
-    return (
-      <>
-        <DraftListView
-          onOpenDraft={(draft) => {
-            setComposeInitial({
-              to: draft.to ?? undefined,
-              cc: draft.cc ?? undefined,
-              subject: draft.subject ?? undefined,
-              body: draft.body ?? undefined,
-            });
-            setComposeDraftId(draft.id);
-            navigate({
-              search: (prev) => ({ ...prev, compose: true }),
-              replace: true,
-            });
-          }}
-        />
-        <ComposePanel
-          open={isComposing}
-          initial={composeInitial}
-          draftId={composeDraftId}
-          onOpenChange={(open) => {
-            if (!open) {
-              setComposeInitial(undefined);
-              setComposeDraftId(undefined);
-              navigate({
-                search: (prev) => ({
-                  ...prev,
-                  compose: undefined,
-                }),
-                replace: true,
-              });
-            }
-          }}
-        />
-      </>
-    );
-  }
-
   const emailListContent = (
     <div
       className={cn(
         "flex min-w-0 flex-col",
         isSplitView
           ? "h-full w-full overflow-hidden px-4 py-4"
-          : "mx-auto w-full max-w-4xl",
+          : "mx-auto w-full max-w-3xl",
       )}
     >
-      <div
-        className={cn("min-h-0 flex-1", isSplitView && "overflow-y-auto")}
-      >
+      <div className={cn("min-h-0 flex-1", isSplitView && "overflow-y-auto")}>
         <header className="sticky top-0 z-20 bg-background pb-2">
           <h2 className="text-lg font-medium">{pageTitle}</h2>
         </header>
@@ -277,7 +239,10 @@ export default function EmailInboxPage() {
               <Skeleton
                 key={index}
                 className="h-11 w-full rounded-md animate-in fade-in-0"
-                style={{ animationDelay: `${index * 50}ms`, animationFillMode: "backwards" }}
+                style={{
+                  animationDelay: `${index * 50}ms`,
+                  animationFillMode: "backwards",
+                }}
               />
             ))}
           </div>
@@ -414,9 +379,14 @@ export default function EmailInboxPage() {
             )}
           </div>
         ) : (
-          <p className="rounded-md border border-border/60 p-4 text-center text-sm text-muted-foreground">
-            No emails found.
-          </p>
+          <Empty className="min-h-56 flex-1 justify-center">
+            <EmptyHeader>
+              <EmptyTitle>No emails in {pageTitle.toLowerCase()}</EmptyTitle>
+              <EmptyDescription>
+                Messages that belong to this view will show up here.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
       </div>
     </div>
@@ -517,7 +487,7 @@ export default function EmailInboxPage() {
 
   return (
     <>
-      <div className="mx-4! max-w-none! -mt-4 -mb-24 h-dvh min-w-0 overflow-hidden">
+      <div className="-mt-4 -mb-24 h-dvh w-full min-w-0 overflow-hidden">
         <ResizablePanelGroup orientation="horizontal">
           <ResizablePanel
             defaultSize="50%"

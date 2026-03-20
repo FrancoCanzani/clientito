@@ -2,12 +2,12 @@ import { Hono } from "hono";
 import { requireAuth } from "../../middleware/auth";
 import type { AppRouteEnv } from "../types";
 import { registerDeleteAccount } from "./delete";
-import { registerSignatureRoutes } from "./signature";
+import { registerSyncSettings } from "./sync";
 
 const settingsRoutes = new Hono<AppRouteEnv>();
 
 settingsRoutes.use("*", requireAuth);
 registerDeleteAccount(settingsRoutes);
-registerSignatureRoutes(settingsRoutes);
+registerSyncSettings(settingsRoutes);
 
 export default settingsRoutes;

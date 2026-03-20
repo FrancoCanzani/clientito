@@ -1,19 +1,16 @@
 import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import type { Database } from "../../db/client";
 import { mailboxes, syncJobs } from "../../db/schema";
-import { GOOGLE_RECONNECT_REQUIRED_MESSAGE } from "./errors";
+import { GOOGLE_RECONNECT_REQUIRED_MESSAGE, type SyncJobErrorClass } from "./errors";
+import type { SyncWindowMonths } from "./sync-preferences";
+
+export type { SyncJobErrorClass };
 
 export const SYNC_LOCK_TTL_MS = 4 * 60_000;
 const STALE_SYNC_JOB_MESSAGE = "Sync job stalled or timed out.";
 
 export type SyncJobKind = "full" | "incremental";
 export type SyncJobTrigger = "manual" | "scheduled" | "system";
-export type SyncJobErrorClass =
-  | "reconnect_required"
-  | "history_expired"
-  | "state_error"
-  | "stale_lock"
-  | "sync_failed";
 
 function hasLiveLock(lockUntil: number | null | undefined, now = Date.now()) {
   return (
@@ -40,17 +37,10 @@ export async function ensureMailbox(
     if (gmailEmail && existing.gmailEmail !== gmailEmail) {
       await db
         .update(mailboxes)
-        .set({
-          gmailEmail,
-          updatedAt: Date.now(),
-        })
+        .set({ gmailEmail, updatedAt: Date.now() })
         .where(eq(mailboxes.id, existing.id));
-      return {
-        ...existing,
-        gmailEmail,
-      };
+      return { ...existing, gmailEmail };
     }
-
     return existing;
   }
 
@@ -72,6 +62,53 @@ export async function ensureMailbox(
       where: eq(mailboxes.userId, userId),
     }))
   );
+}
+
+export async function getMailboxSyncPreferences(
+  db: Database,
+  userId: string,
+  gmailEmail?: string | null,
+): Promise<{
+  mailbox: typeof mailboxes.$inferSelect | null;
+  syncWindowMonths: SyncWindowMonths | null;
+  syncCutoffAt: number | null;
+}> {
+  const mailbox = await ensureMailbox(db, userId, gmailEmail);
+  return {
+    mailbox,
+    syncWindowMonths: (mailbox?.syncWindowMonths as SyncWindowMonths | null) ?? null,
+    syncCutoffAt: mailbox?.syncCutoffAt ?? null,
+  };
+}
+
+export async function setMailboxSyncPreferences(
+  db: Database,
+  userId: string,
+  gmailEmail: string | null | undefined,
+  input: {
+    syncWindowMonths: SyncWindowMonths | null;
+    syncCutoffAt: number | null;
+  },
+): Promise<typeof mailboxes.$inferSelect | null> {
+  const mailbox = await ensureMailbox(db, userId, gmailEmail);
+  if (!mailbox) return null;
+
+  const now = Date.now();
+  await db
+    .update(mailboxes)
+    .set({
+      syncWindowMonths: input.syncWindowMonths,
+      syncCutoffAt: input.syncCutoffAt,
+      updatedAt: now,
+    })
+    .where(eq(mailboxes.id, mailbox.id));
+
+  return {
+    ...mailbox,
+    syncWindowMonths: input.syncWindowMonths,
+    syncCutoffAt: input.syncCutoffAt,
+    updatedAt: now,
+  };
 }
 
 export async function acquireMailboxSyncLock(
@@ -129,10 +166,7 @@ export async function releaseMailboxSyncLock(
 ): Promise<void> {
   await db
     .update(mailboxes)
-    .set({
-      lockUntil: null,
-      updatedAt: Date.now(),
-    })
+    .set({ lockUntil: null, updatedAt: Date.now() })
     .where(eq(mailboxes.userId, userId));
 }
 
@@ -141,14 +175,49 @@ export async function persistMailboxHistoryState(
   userId: string,
   historyId: string | null,
 ): Promise<void> {
-  await ensureMailbox(db, userId);
+  if (!historyId) return;
+
+  const mailbox = await findMailbox(db, userId);
+  if (!mailbox) {
+    await ensureMailbox(db, userId);
+  }
+
+  if (mailbox?.historyId) {
+    try {
+      if (BigInt(historyId) <= BigInt(mailbox.historyId)) return;
+    } catch {
+      // Non-numeric historyId — overwrite unconditionally
+    }
+  }
+
+  await db
+    .update(mailboxes)
+    .set({ historyId, updatedAt: Date.now() })
+    .where(eq(mailboxes.userId, userId));
+}
+
+export async function resetMailboxSyncState(
+  db: Database,
+  userId: string,
+): Promise<void> {
   await db
     .update(mailboxes)
     .set({
-      historyId,
+      historyId: null,
+      lastErrorAt: null,
+      lastErrorMessage: null,
+      lockUntil: null,
       updatedAt: Date.now(),
     })
     .where(eq(mailboxes.userId, userId));
+
+  const mailbox = await findMailbox(db, userId);
+  if (mailbox) {
+    await db
+      .update(syncJobs)
+      .set({ status: "failed", finishedAt: Date.now(), errorMessage: "Reset by user" })
+      .where(and(eq(syncJobs.mailboxId, mailbox.id), eq(syncJobs.status, "running")));
+  }
 }
 
 export async function createSyncJob(
@@ -187,19 +256,12 @@ export async function updateSyncJobProgress(
 
   await db
     .update(syncJobs)
-    .set({
-      phase,
-      progressCurrent: current,
-      progressTotal: total,
-    })
+    .set({ phase, progressCurrent: current, progressTotal: total })
     .where(and(eq(syncJobs.id, jobId), eq(syncJobs.mailboxId, mailboxId)));
 
   await db
     .update(mailboxes)
-    .set({
-      lockUntil: now + SYNC_LOCK_TTL_MS,
-      updatedAt: now,
-    })
+    .set({ lockUntil: now + SYNC_LOCK_TTL_MS, updatedAt: now })
     .where(eq(mailboxes.id, mailboxId));
 }
 
@@ -212,10 +274,7 @@ export async function markSyncJobSucceeded(
 
   await db
     .update(syncJobs)
-    .set({
-      status: "succeeded",
-      finishedAt: now,
-    })
+    .set({ status: "succeeded", finishedAt: now })
     .where(and(eq(syncJobs.id, jobId), eq(syncJobs.mailboxId, mailboxId)));
 
   await db
@@ -244,12 +303,7 @@ export async function markSyncJobFailed(
 
   await db
     .update(syncJobs)
-    .set({
-      status: "failed",
-      finishedAt: now,
-      errorClass,
-      errorMessage: message,
-    })
+    .set({ status: "failed", finishedAt: now, errorClass, errorMessage: message })
     .where(and(eq(syncJobs.id, jobId), eq(syncJobs.mailboxId, mailboxId)));
 
   await db
@@ -298,9 +352,7 @@ export async function expireStaleSyncJobs(
     .where(and(eq(syncJobs.mailboxId, mailboxId), eq(syncJobs.status, "running")))
     .returning({ id: syncJobs.id });
 
-  if (staleJobs.length === 0) {
-    return false;
-  }
+  if (staleJobs.length === 0) return false;
 
   await db
     .update(mailboxes)
@@ -315,6 +367,25 @@ export async function expireStaleSyncJobs(
   return true;
 }
 
+export async function countConsecutiveFailedJobs(
+  db: Database,
+  mailboxId: number,
+): Promise<number> {
+  const recentJobs = await db
+    .select({ status: syncJobs.status })
+    .from(syncJobs)
+    .where(eq(syncJobs.mailboxId, mailboxId))
+    .orderBy(desc(syncJobs.createdAt))
+    .limit(10);
+
+  let count = 0;
+  for (const job of recentJobs) {
+    if (job.status !== "failed") break;
+    count++;
+  }
+  return count;
+}
+
 export async function getMailboxSyncSnapshot(
   db: Database,
   userId: string,
@@ -325,14 +396,8 @@ export async function getMailboxSyncSnapshot(
   hasLiveLock: boolean;
 }> {
   let mailbox = await findMailbox(db, userId);
-
   if (!mailbox) {
-    return {
-      mailbox: null,
-      latestJob: null,
-      activeJob: null,
-      hasLiveLock: false,
-    };
+    return { mailbox: null, latestJob: null, activeJob: null, hasLiveLock: false };
   }
 
   let liveLock = hasLiveLock(mailbox.lockUntil);
@@ -346,16 +411,7 @@ export async function getMailboxSyncSnapshot(
     }
   }
 
-  if (!mailbox) {
-    return {
-      mailbox: null,
-      latestJob: null,
-      activeJob: null,
-      hasLiveLock: false,
-    };
-  }
-
-  liveLock = hasLiveLock(mailbox?.lockUntil);
+  liveLock = hasLiveLock(mailbox.lockUntil);
 
   const latestJobRows = await db
     .select()

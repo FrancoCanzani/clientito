@@ -8,7 +8,7 @@ import type {
 type FetchEmailsParams = {
   search?: string;
   isRead?: "true" | "false";
-  view?: "inbox" | "sent" | "spam" | "trash" | "snoozed" | "drafts";
+  view?: "inbox" | "sent" | "spam" | "trash" | "snoozed" | "archived" | "starred";
   limit?: number;
   offset?: number;
 };

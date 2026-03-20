@@ -28,19 +28,22 @@ export default function HomePage() {
     }
   }, [hasItems, stream.trigger]);
 
-  const shouldShowBriefingSkeleton =
-    hasItems && !stream.text && !stream.error;
+  const shouldShowBriefingSkeleton = hasItems && !stream.text && !stream.error;
   const isAnimating = stream.isStreaming;
 
   return (
-    <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col justify-center space-y-6">
-      <header className="space-y-3">
+    <div className="mx-auto flex w-full pt-30 max-w-lg flex-1 flex-col justify-start space-y-6">
+      <div className="space-y-3">
         <h1 className="text-xl font-medium">{greeting.line}</h1>
         {shouldShowBriefingSkeleton ? (
           <div className="space-y-2 pt-1">
             <Skeleton className="h-4 w-[88%]" />
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-[76%]" />
+            <Skeleton className="h-4 w-[50%]" />
+            <Skeleton className="h-4 w-[89%]" />
+            <Skeleton className="h-4 w-[98%]" />
+            <Skeleton className="h-4 w-[72%]" />
           </div>
         ) : stream.text ? (
           <BriefingText text={stream.text} animate={isAnimating} />
@@ -49,7 +52,7 @@ export default function HomePage() {
             Today&apos;s briefing couldn&apos;t load right now.
           </p>
         ) : null}
-      </header>
+      </div>
 
       {!hasItems && !stream.isStreaming && (
         <Empty className="min-h-52 border-border/60">

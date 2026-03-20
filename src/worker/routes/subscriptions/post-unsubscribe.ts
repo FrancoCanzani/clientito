@@ -2,11 +2,16 @@ import { zValidator } from "@hono/zod-validator";
 import type { Hono } from "hono";
 import { z } from "zod";
 import { sendGmailMessage } from "../../lib/gmail/mailbox";
+import {
+  markEmailSubscriptionStatus,
+  normalizeUnsubscribeEmail,
+  normalizeUnsubscribeUrl,
+} from "../../lib/subscriptions";
 import type { AppRouteEnv } from "../types";
 
 const unsubscribeSchema = z.object({
-  unsubscribeUrl: z.string().url().optional(),
-  unsubscribeEmail: z.string().email().optional(),
+  unsubscribeUrl: z.string().optional(),
+  unsubscribeEmail: z.string().optional(),
   fromAddr: z.string(),
 });
 
@@ -17,8 +22,10 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
     async (c) => {
       const db = c.get("db");
       const user = c.get("user")!;
-      const { unsubscribeUrl, unsubscribeEmail, fromAddr } =
+      const { unsubscribeUrl: rawUnsubscribeUrl, unsubscribeEmail: rawUnsubscribeEmail, fromAddr } =
         c.req.valid("json");
+      const unsubscribeUrl = normalizeUnsubscribeUrl(rawUnsubscribeUrl);
+      const unsubscribeEmail = normalizeUnsubscribeEmail(rawUnsubscribeEmail);
 
       if (unsubscribeUrl) {
         try {
@@ -29,6 +36,13 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
           });
 
           if (res.ok || res.status === 204 || res.status === 302) {
+            await markEmailSubscriptionStatus(db, user.id, {
+              fromAddr,
+              unsubscribeUrl,
+              unsubscribeEmail,
+              status: "unsubscribed",
+              method: "one-click",
+            });
             return c.json(
               { data: { method: "one-click", fromAddr, success: true } },
               200,
@@ -38,6 +52,13 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
           // one-click failed, fall through to mailto or return the URL for manual
         }
 
+        await markEmailSubscriptionStatus(db, user.id, {
+          fromAddr,
+          unsubscribeUrl,
+          unsubscribeEmail,
+          status: "pending_manual",
+          method: "manual",
+        });
         return c.json(
           {
             data: {
@@ -59,6 +80,13 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
             body: "Unsubscribe",
           });
 
+          await markEmailSubscriptionStatus(db, user.id, {
+            fromAddr,
+            unsubscribeUrl,
+            unsubscribeEmail,
+            status: "unsubscribed",
+            method: "mailto",
+          });
           return c.json(
             { data: { method: "mailto", fromAddr, success: true } },
             200,

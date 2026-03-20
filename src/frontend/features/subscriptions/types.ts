@@ -2,9 +2,10 @@ export type Subscription = {
   fromAddr: string;
   fromName: string | null;
   emailCount: number;
-  lastReceived: number;
+  lastReceived: number | null;
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
+  status: "active" | "pending_manual";
 };
 
 export type UnsubscribeResult = {

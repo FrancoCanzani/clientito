@@ -64,7 +64,6 @@ type SendEmailInput = {
   references?: string;
   threadId?: string;
   attachments?: Array<{ key: string; filename: string; mimeType: string }>;
-  draftId?: number;
 };
 
 type SendEmailResult = {

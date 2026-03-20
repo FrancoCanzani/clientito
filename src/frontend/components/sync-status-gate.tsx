@@ -25,7 +25,6 @@ export function SyncStatusGate() {
     if (
       status.state === "needs_mailbox_connect" ||
       status.state === "needs_reconnect" ||
-      status.state === "error" ||
       status.state === "ready_to_sync"
     ) {
       if (pathname === "/get-started") return;

@@ -3,28 +3,11 @@ import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { emails } from "../../db/schema";
-import { applyFilters } from "../../lib/email-filter-engine";
+import { classifyEmails } from "../../lib/email-classifier";
 import type { AppRouteEnv } from "../types";
 
-const conditionSchema = z.object({
-  field: z.enum(["from", "to", "subject", "aiLabel"]),
-  operator: z.enum(["contains", "equals", "startsWith", "endsWith"]),
-  value: z.string().min(1),
-});
-
-const actionsSchema = z.object({
-  archive: z.boolean().optional(),
-  markRead: z.boolean().optional(),
-  star: z.boolean().optional(),
-  applyAiLabel: z
-    .enum(["important", "later", "newsletter", "transactional", "notification"])
-    .optional(),
-  trash: z.boolean().optional(),
-});
-
 const testSchema = z.object({
-  conditions: z.array(conditionSchema).min(1),
-  actions: actionsSchema,
+  description: z.string().min(1).max(500),
 });
 
 export function registerTestFilter(app: Hono<AppRouteEnv>) {
@@ -32,7 +15,7 @@ export function registerTestFilter(app: Hono<AppRouteEnv>) {
     const user = c.get("user");
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
-    const body = c.req.valid("json");
+    const { description } = c.req.valid("json");
     const db = c.get("db");
 
     const recentEmails = await db
@@ -40,9 +23,8 @@ export function registerTestFilter(app: Hono<AppRouteEnv>) {
         id: emails.id,
         fromAddr: emails.fromAddr,
         fromName: emails.fromName,
-        toAddr: emails.toAddr,
         subject: emails.subject,
-        aiLabel: emails.aiLabel,
+        snippet: emails.snippet,
         date: emails.date,
       })
       .from(emails)
@@ -50,10 +32,26 @@ export function registerTestFilter(app: Hono<AppRouteEnv>) {
       .orderBy(desc(emails.date))
       .limit(100);
 
-    const filter = { conditions: body.conditions, actions: body.actions };
-    const matches = recentEmails.filter(
-      (email) => applyFilters(email, [filter]) !== null,
+    const FAKE_FILTER_ID = -1;
+    const batch = recentEmails.map((e, i) => ({
+      index: i,
+      from: `${e.fromName ?? ""} <${e.fromAddr}>`.trim(),
+      subject: e.subject,
+      snippet: e.snippet,
+    }));
+
+    const { filterMatches } = await classifyEmails(
+      c.env.AI,
+      batch,
+      [{ id: FAKE_FILTER_ID, description }],
     );
+
+    const matchedIndices = new Set<number>();
+    for (const [idx, ids] of filterMatches) {
+      if (ids.includes(FAKE_FILTER_ID)) matchedIndices.add(idx);
+    }
+
+    const matches = recentEmails.filter((_, i) => matchedIndices.has(i));
 
     return c.json({
       data: {

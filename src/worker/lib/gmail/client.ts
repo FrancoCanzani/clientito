@@ -20,7 +20,6 @@ import type {
 export const GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 export const GMAIL_PAGE_SIZE = 500;
 export const MESSAGE_CHUNK_SIZE = 50;
-export const FETCH_CONCURRENCY = 3;
 export const CHUNK_DELAY_MS = 1_000;
 
 const GMAIL_MAX_RATE_LIMIT_RETRIES = 5;
@@ -41,9 +40,7 @@ export function sleep(ms: number): Promise<void> {
 }
 
 function parseRetryAfterMs(retryAfter: string | null): number | null {
-  if (!retryAfter) {
-    return null;
-  }
+  if (!retryAfter) return null;
 
   const seconds = Number(retryAfter);
   if (Number.isFinite(seconds) && seconds >= 0) {
@@ -68,31 +65,20 @@ function computeRetryDelayMs(attempt: number): number {
 }
 
 async function isRateLimitedResponse(response: Response): Promise<boolean> {
-  if (response.status === 429) {
-    return true;
-  }
-
-  if (response.status !== 403) {
-    return false;
-  }
+  if (response.status === 429) return true;
+  if (response.status !== 403) return false;
 
   const payload = (await response
     .clone()
     .json()
     .catch(() => null)) as GmailErrorResponse | null;
-  if (!payload?.error) {
-    return false;
-  }
+  if (!payload?.error) return false;
 
-  if (payload.error.status?.toLowerCase() === "resource_exhausted") {
-    return true;
-  }
+  if (payload.error.status?.toLowerCase() === "resource_exhausted") return true;
 
   for (const entry of payload.error.errors ?? []) {
     const reason = entry.reason?.toLowerCase();
-    if (reason && GMAIL_RATE_LIMIT_REASONS.has(reason)) {
-      return true;
-    }
+    if (reason && GMAIL_RATE_LIMIT_REASONS.has(reason)) return true;
   }
 
   const errorMessage = payload.error.message?.toLowerCase() ?? "";
@@ -119,17 +105,14 @@ export async function gmailRequestRaw(
     try {
       response = await fetch(url, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(30_000),
       });
     } catch (error) {
-      if (attempt === GMAIL_MAX_RATE_LIMIT_RETRIES) {
-        throw error;
-      }
+      if (attempt === GMAIL_MAX_RATE_LIMIT_RETRIES) throw error;
 
       const delayMs = computeRetryDelayMs(attempt);
-      console.warn("Gmail API network error. Retrying request.", {
+      console.warn("Gmail API network error, retrying", {
         path,
         attempt: attempt + 1,
         delayMs,
@@ -148,8 +131,7 @@ export async function gmailRequestRaw(
 
     const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
     const delayMs = retryAfterMs ?? computeRetryDelayMs(attempt);
-
-    console.warn("Gmail API rate-limited. Retrying request.", {
+    console.warn("Gmail API rate-limited, retrying", {
       path,
       attempt: attempt + 1,
       delayMs,
@@ -169,7 +151,11 @@ export async function gmailRequest<T>(
   query?: Record<string, string | undefined>,
 ): Promise<T> {
   const response = await gmailRequestRaw(accessToken, path, query);
+
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(GOOGLE_RECONNECT_REQUIRED_MESSAGE);
+    }
     const body = await response.text().catch(() => "");
     throw new Error(
       `Gmail request failed (${response.status}): ${body || response.statusText}`,
@@ -196,6 +182,7 @@ export async function listMessagesPage(
 ): Promise<GmailListResponse> {
   return gmailRequest<GmailListResponse>(accessToken, "/messages", {
     maxResults: String(GMAIL_PAGE_SIZE),
+    includeSpamTrash: "true",
     pageToken,
     q: query,
     fields: "messages/id,nextPageToken",
@@ -221,6 +208,10 @@ export async function listHistoryPage(
     );
   }
 
+  if (response.status === 401) {
+    throw new Error(GOOGLE_RECONNECT_REQUIRED_MESSAGE);
+  }
+
   if (!response.ok) {
     const body = await response.text().catch(() => "");
     throw new Error(
@@ -243,20 +234,6 @@ export async function fetchMessage(
         ? "id,threadId,historyId,internalDate,labelIds"
         : "id,threadId,historyId,internalDate,snippet,labelIds,payload(mimeType,headers,body/data,parts(mimeType,headers,body/data,parts))",
   });
-}
-
-export async function fetchMessageBatch(
-  accessToken: string,
-  messageId: string,
-): Promise<GmailMessage> {
-  return fetchMessage(accessToken, messageId, "full");
-}
-
-export async function fetchMinimalMessage(
-  accessToken: string,
-  messageId: string,
-): Promise<GmailMessage> {
-  return fetchMessage(accessToken, messageId, "minimal");
 }
 
 const BATCH_BOUNDARY = "batch_clientito";
@@ -329,6 +306,7 @@ export async function fetchMessagesBatch(
             "Content-Type": `multipart/mixed; boundary=${BATCH_BOUNDARY}`,
           },
           body,
+          signal: AbortSignal.timeout(60_000),
         });
       } catch (error) {
         if (attempt === GMAIL_MAX_RATE_LIMIT_RETRIES) throw error;
@@ -349,7 +327,6 @@ export async function fetchMessagesBatch(
     }
 
     if (!response || !response.ok) {
-      // Fallback to individual fetches if batch fails
       for (const id of chunk) {
         try {
           const msg = await fetchMessage(accessToken, id, format);
@@ -380,6 +357,19 @@ export async function fetchMessagesBatch(
         results.set(chunk[j], null);
       }
     }
+
+    // Batch response was shorter than request — individually fetch any
+    // messages that were dropped so they aren't silently lost.
+    for (const id of chunk) {
+      if (!results.has(id)) {
+        try {
+          const msg = await fetchMessage(accessToken, id, format);
+          results.set(id, msg);
+        } catch {
+          results.set(id, null);
+        }
+      }
+    }
   }
 
   return results;
@@ -389,18 +379,11 @@ export function hasUsableAccessToken(accountState: {
   accessToken: string | null;
   accessTokenExpiresAt: Date | number | string | null;
 } | null | undefined): boolean {
-  if (!accountState?.accessToken) {
-    return false;
-  }
-
-  if (accountState.accessTokenExpiresAt === null) {
-    return true;
-  }
+  if (!accountState?.accessToken) return false;
+  if (accountState.accessTokenExpiresAt === null) return true;
 
   const expiresAt = toEpochMs(accountState.accessTokenExpiresAt);
-  if (expiresAt === null) {
-    return false;
-  }
+  if (expiresAt === null) return false;
 
   return expiresAt - TOKEN_REFRESH_BUFFER_MS > Date.now();
 }
@@ -408,17 +391,9 @@ export function hasUsableAccessToken(accountState: {
 function toEpochMs(
   value: Date | number | string | null | undefined,
 ): number | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  if (value instanceof Date) {
-    return value.getTime();
-  }
-
-  if (typeof value === "number") {
-    return value;
-  }
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return value;
 
   const parsed = new Date(value).getTime();
   return Number.isNaN(parsed) ? null : parsed;
@@ -449,15 +424,14 @@ export async function refreshGoogleAccessToken(
 
   const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
     method: "POST",
-    headers: {
-      "content-type": "application/x-www-form-urlencoded",
-    },
+    headers: { "content-type": "application/x-www-form-urlencoded" },
     body: body.toString(),
   });
 
   const payload = (await response
     .json()
     .catch(() => ({}))) as GoogleTokenResponse;
+
   if (!response.ok || !payload.access_token) {
     if (payload.error === "invalid_grant") {
       throw new Error(GOOGLE_RECONNECT_REQUIRED_MESSAGE);
@@ -559,13 +533,10 @@ export async function syncGoogleUserProfile(
 ): Promise<void> {
   const response = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!response.ok) {
-    return;
-  }
+
+  if (!response.ok) return;
 
   const payload = (await response
     .json()
@@ -573,17 +544,13 @@ export async function syncGoogleUserProfile(
   const nextName = payload.name?.trim();
   const nextImage = payload.picture?.trim();
 
-  if (!nextName && !nextImage) {
-    return;
-  }
+  if (!nextName && !nextImage) return;
 
   const updates: Partial<typeof user.$inferInsert> = {};
   if (nextName) updates.name = nextName;
   if (nextImage) updates.image = nextImage;
 
-  if (Object.keys(updates).length === 0) {
-    return;
-  }
+  if (Object.keys(updates).length === 0) return;
 
   await db.update(user).set(updates).where(eq(user.id, userId));
 }

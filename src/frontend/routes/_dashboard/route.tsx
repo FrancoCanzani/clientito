@@ -1,8 +1,7 @@
-import { CommandPalette } from "@/components/command-palette";
+import { CommandPalette } from "@/components/command-palette/command-palette";
 import { Loading } from "@/components/loading";
+import { AppProviders } from "@/components/providers";
 import { SyncStatusGate } from "@/components/sync-status-gate";
-import { EmailCommandProvider } from "@/features/inbox/hooks/use-email-command-state";
-import { PageContextProvider } from "@/hooks/use-page-context";
 import { authClient } from "@/lib/auth-client";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
@@ -13,22 +12,22 @@ export const Route = createFileRoute("/_dashboard")({
       throw redirect({ to: "/login" });
     }
   },
-  component: AppShell,
+  component: DashboardLayout,
   pendingComponent: Loading,
 });
 
-function AppShell() {
+function DashboardLayout() {
   return (
-    <PageContextProvider>
-      <EmailCommandProvider>
-        <div className="min-h-screen antialiased">
-          <main className="px-4 py-4 pb-24 *:mx-auto *:max-w-3xl">
+    <AppProviders>
+      <div className="flex min-h-dvh flex-col antialiased">
+        <main className="flex min-h-dvh w-full flex-1 flex-col px-4 py-4 pb-24">
+          <div className="flex min-h-0 flex-1 flex-col">
             <Outlet />
-          </main>
-          <CommandPalette />
-        </div>
-        <SyncStatusGate />
-      </EmailCommandProvider>
-    </PageContextProvider>
+          </div>
+        </main>
+        <CommandPalette />
+      </div>
+      <SyncStatusGate />
+    </AppProviders>
   );
 }

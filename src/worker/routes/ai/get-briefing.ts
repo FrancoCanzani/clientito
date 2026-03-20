@@ -83,6 +83,13 @@ type LatestThreadRow = {
   snippet: string | null;
   isRead: boolean;
   labelIds: string[] | null;
+  aiLabel:
+    | "important"
+    | "later"
+    | "newsletter"
+    | "transactional"
+    | "notification"
+    | null;
 };
 
 type TaskRow = {
@@ -164,9 +171,42 @@ function isLikelyBulkMessage(row: LatestThreadRow) {
     "press release",
     "shop",
     "store",
+    "sponsored",
+    "deal",
+    "deals",
+    "book now",
+    "limited time",
+    "flight",
+    "flights",
+    "travel",
+    "trip",
+    "destination",
+    "destinations",
+    "hotel",
+    "booking",
+    "reservation",
+    "miles",
+    "rewards",
+    "reward",
+    "points",
+    "loyalty",
   ];
 
   return bulkTerms.some((term) => content.includes(term)) || content.includes("#");
+}
+
+function hasMailboxLabel(row: LatestThreadRow, label: string) {
+  return row.labelIds?.includes(label) ?? false;
+}
+
+function isNonActionableBriefingLabel(
+  label: LatestThreadRow["aiLabel"],
+) {
+  return (
+    label === "newsletter" ||
+    label === "notification" ||
+    label === "transactional"
+  );
 }
 
 function getSenderDomain(email: string) {
@@ -224,6 +264,18 @@ function getNoiseTerms() {
     "resume",
     "cv",
     "job alert",
+    "job posting",
+    "hiring",
+    "we thought you'd like",
+    "selected for you",
+    "for you",
+    "travel",
+    "flight",
+    "flights",
+    "miles",
+    "reward",
+    "rewards",
+    "points",
   ];
 }
 
@@ -345,6 +397,7 @@ async function buildBriefing(input: {
         snippet: emails.snippet,
         isRead: emails.isRead,
         labelIds: emails.labelIds,
+        aiLabel: emails.aiLabel,
       })
       .from(emails)
       .innerJoin(
@@ -411,6 +464,8 @@ async function buildBriefing(input: {
 
   const candidateThreads = [...latestByThread.values()]
     .filter((row) => row.direction === "received")
+    .filter((row) => !isNonActionableBriefingLabel(row.aiLabel))
+    .filter((row) => !hasMailboxLabel(row, "CATEGORY_PROMOTIONS"))
     .filter((row) => !isAutomatedSender(row.fromAddr, row.fromName))
     .filter((row) => !isLikelyBulkMessage(row))
     .filter((row) => now - row.date <= ACTIONABLE_REPLY_WINDOW_MS)
@@ -482,6 +537,7 @@ async function buildBriefing(input: {
             "You are a discreet, highly competent secretary writing a daily briefing.",
             "Write one or two short sentences in plain English.",
             "Only talk about recent, actually relevant conversations that need a reply.",
+            "Treat promotional mail, newsletters, notifications, receipts, travel deals, and other company-broadcast mail as irrelevant unless it is clearly part of a real human back-and-forth.",
             "Ignore stale or historical threads and never talk about unread counts.",
             "Be calm, practical, neutral, and slightly polished.",
             "Do not instruct the user, tell them what to do, or imply urgency beyond the facts.",
@@ -490,6 +546,7 @@ async function buildBriefing(input: {
           ].join(" "),
           prompt: [
             "Treat only the last 3 days as actionable for reply-needed threads.",
+            "Exclude anything that reads like marketing, a newsletter, an alert, a receipt, a generic company update, or obvious promotional clutter even if it is recent or unread.",
             `Actionable reply-needed threads: ${needsReplyCount}`,
             `Overdue tasks: ${overdueCount}`,
             `Tasks due today: ${dueTodayCount}`,
@@ -596,15 +653,17 @@ function buildStreamPrompt(items: BriefingItem[], counts: { needsReply: number; 
     "Prefer commas, semicolons, or a second sentence over repeated uses of 'and'.",
     "If several items share the same timeframe, mention that timeframe once for the group.",
     "Do not restate counts if the named items already make the point clearly.",
+    "If any listed email still looks like obvious promotional or automated clutter, omit it from the prose rather than forcing it in.",
     "",
-    "Items to mention (use the exact [[title|href]] syntax for each):",
+    "Relevant items to mention (use the exact [[title|href]] syntax for each item you keep):",
     ...itemLines,
   ].join("\n");
 }
 
 const STREAM_SYSTEM_PROMPT = [
   "You are a discreet, highly competent secretary writing a daily briefing as a single flowing paragraph.",
-  "Weave every item naturally into the text.",
+  "Weave the relevant items naturally into the text.",
+  "If an item is obviously promotional, newsletter-like, automated, or non-actionable clutter, leave it out instead of mentioning it.",
   "For each item, use the EXACT link syntax [[title|href]] provided — do not change the title or href.",
   "CRITICAL: Always keep a space before and after each [[...]] link. Never let a link touch adjacent words.",
   "Write 1-2 concise sentences whenever possible.",

@@ -5,12 +5,6 @@ import { z } from "zod";
 import { emailFilters } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 
-const conditionSchema = z.object({
-  field: z.enum(["from", "to", "subject", "aiLabel"]),
-  operator: z.enum(["contains", "equals", "startsWith", "endsWith"]),
-  value: z.string().min(1),
-});
-
 const actionsSchema = z.object({
   archive: z.boolean().optional(),
   markRead: z.boolean().optional(),
@@ -23,7 +17,7 @@ const actionsSchema = z.object({
 
 const updateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
-  conditions: z.array(conditionSchema).min(1).optional(),
+  description: z.string().min(1).max(500).optional(),
   actions: actionsSchema.optional(),
   enabled: z.boolean().optional(),
   priority: z.number().int().optional(),

@@ -199,7 +199,6 @@ export class Agent extends AIChatAgent<Env> {
             reason: event.finishReason,
           });
         }
-        await onFinish(event as never);
       },
     });
 

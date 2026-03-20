@@ -107,6 +107,20 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
+function encodeMimeHeader(value: string): string {
+  if (!/[^\x20-\x7E]/.test(value)) {
+    return value;
+  }
+
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return `=?UTF-8?B?${btoa(binary)}?=`;
+}
+
 function postGmailModify(
   accessToken: string,
   path: string,
@@ -174,7 +188,7 @@ function buildMimeMessage(
   if (input.cc) {
     headers.push(`Cc: ${input.cc}`);
   }
-  headers.push(`Subject: ${input.subject}`);
+  headers.push(`Subject: ${encodeMimeHeader(input.subject)}`);
   headers.push("MIME-Version: 1.0");
 
   if (input.inReplyTo) {

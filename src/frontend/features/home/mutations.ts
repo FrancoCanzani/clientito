@@ -8,12 +8,11 @@ const GMAIL_SCOPES = [
 
 export async function startFullSync(
   months?: number,
-  continueFullSync?: boolean,
 ): Promise<void> {
   const response = await fetch("/api/sync/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ months, continueFullSync }),
+    body: JSON.stringify({ months }),
   });
 
   if (response.status === 409) return;
@@ -44,5 +43,15 @@ export async function runIncrementalSync(): Promise<void> {
   if (response.status === 409) return;
   if (!response.ok) {
     throw new Error("Failed to run incremental Gmail sync.");
+  }
+}
+
+export async function recoverSync(): Promise<void> {
+  const response = await fetch("/api/sync/recover", {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to start recovery sync.");
   }
 }

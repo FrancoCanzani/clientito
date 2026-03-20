@@ -80,6 +80,51 @@ export const emails = sqliteTable(
   ],
 );
 
+export type EmailSubscriptionStatus =
+  | "active"
+  | "pending_manual"
+  | "unsubscribed";
+
+export type EmailSubscriptionMethod = "one-click" | "mailto" | "manual";
+
+export const emailSubscriptions = sqliteTable(
+  "email_subscriptions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    senderKey: text("sender_key").notNull(),
+    fromAddr: text("from_addr").notNull(),
+    fromName: text("from_name"),
+    unsubscribeUrl: text("unsubscribe_url"),
+    unsubscribeEmail: text("unsubscribe_email"),
+    status: text("status")
+      .$type<EmailSubscriptionStatus>()
+      .notNull()
+      .default("active"),
+    emailCount: integer("email_count").notNull().default(0),
+    lastReceivedAt: integer("last_received_at"),
+    unsubscribeMethod: text("unsubscribe_method").$type<EmailSubscriptionMethod | null>(),
+    unsubscribeRequestedAt: integer("unsubscribe_requested_at"),
+    unsubscribedAt: integer("unsubscribed_at"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("email_subscriptions_user_sender_idx").on(
+      table.userId,
+      table.senderKey,
+    ),
+    index("email_subscriptions_user_status_idx").on(table.userId, table.status),
+    index("email_subscriptions_user_updated_idx").on(table.userId, table.updatedAt),
+    index("email_subscriptions_user_last_received_idx").on(
+      table.userId,
+      table.lastReceivedAt,
+    ),
+  ],
+);
+
 export type TaskStatus = "backlog" | "todo" | "in_progress" | "done";
 
 export const tasks = sqliteTable(
@@ -128,9 +173,11 @@ export const emailFilters = sqliteTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    description: text("description").notNull().default(""),
     conditions: text("conditions", { mode: "json" })
       .$type<FilterCondition[]>()
-      .notNull(),
+      .notNull()
+      .default([]),
     actions: text("actions", { mode: "json" }).$type<FilterActions>().notNull(),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
     priority: integer("priority").notNull().default(0),
@@ -166,6 +213,8 @@ export const mailboxes = sqliteTable(
       .unique(),
     gmailEmail: text("gmail_email"),
     historyId: text("history_id"),
+    syncWindowMonths: integer("sync_window_months"),
+    syncCutoffAt: integer("sync_cutoff_at"),
     authState: text("auth_state")
       .$type<"unknown" | "ok" | "reconnect_required">()
       .notNull()
@@ -181,35 +230,6 @@ export const mailboxes = sqliteTable(
     index("mailboxes_last_success_idx").on(table.lastSuccessfulSyncAt),
   ],
 );
-
-export const drafts = sqliteTable(
-  "drafts",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    to: text("to"),
-    cc: text("cc"),
-    subject: text("subject"),
-    body: text("body"),
-    inReplyTo: text("in_reply_to"),
-    threadId: text("thread_id"),
-    updatedAt: integer("updated_at").notNull(),
-    createdAt: integer("created_at").notNull(),
-  },
-  (table) => [index("drafts_user_idx").on(table.userId)],
-);
-
-export const userSettings = sqliteTable("user_settings", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" })
-    .unique(),
-  signature: text("signature"),
-  updatedAt: integer("updated_at"),
-});
 
 export const syncJobs = sqliteTable(
   "sync_jobs",

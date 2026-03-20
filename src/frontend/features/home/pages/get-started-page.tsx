@@ -46,7 +46,7 @@ export default function GetStartedPage() {
 
   const startSyncMutation = useMutation({
     mutationFn: async () =>
-      startFullSync(selectedMonths || undefined, true),
+      startFullSync(selectedMonths || undefined),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["sync-status"] });
       await syncStatusQuery.refetch();

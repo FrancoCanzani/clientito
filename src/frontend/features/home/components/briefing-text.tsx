@@ -1,5 +1,5 @@
-import { useNavigate } from "@tanstack/react-router";
 import { parseBriefingSegments } from "@/features/home/utils";
+import { useNavigate } from "@tanstack/react-router";
 
 export function BriefingText({
   text,
@@ -45,16 +45,12 @@ export function BriefingText({
   }
 
   return (
-    <p className="text-pretty text-sm leading-relaxed text-muted-foreground">
+    <p className="text-pretty text-sm leading-loose text-muted-foreground">
       {tokens.map(({ key, node }) => (
         <span
           key={key}
           className={animate ? "animate-briefing-fade-in" : undefined}
-          style={
-            animate
-              ? { animationDelay: `${key * 30}ms` }
-              : undefined
-          }
+          style={animate ? { animationDelay: `${key * 30}ms` } : undefined}
         >
           {node}
         </span>

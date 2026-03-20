@@ -1,6 +1,6 @@
-import { sql } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import type { Hono } from "hono";
-import { emails } from "../../db/schema";
+import { emailSubscriptions } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 
 export function registerGetSubscriptions(api: Hono<AppRouteEnv>) {
@@ -10,25 +10,25 @@ export function registerGetSubscriptions(api: Hono<AppRouteEnv>) {
 
     const rows = await db
       .select({
-        fromAddr: emails.fromAddr,
-        fromName: sql<string | null>`MAX(${emails.fromName})`.as("from_name"),
-        emailCount: sql<number>`COUNT(*)`.as("email_count"),
-        lastReceived: sql<number>`MAX(${emails.date})`.as("last_received"),
-        unsubscribeUrl:
-          sql<string | null>`MAX(${emails.unsubscribeUrl})`.as(
-            "unsubscribe_url",
-          ),
-        unsubscribeEmail:
-          sql<string | null>`MAX(${emails.unsubscribeEmail})`.as(
-            "unsubscribe_email",
-          ),
+        fromAddr: emailSubscriptions.fromAddr,
+        fromName: emailSubscriptions.fromName,
+        emailCount: emailSubscriptions.emailCount,
+        lastReceived: emailSubscriptions.lastReceivedAt,
+        unsubscribeUrl: emailSubscriptions.unsubscribeUrl,
+        unsubscribeEmail: emailSubscriptions.unsubscribeEmail,
+        status: emailSubscriptions.status,
       })
-      .from(emails)
+      .from(emailSubscriptions)
       .where(
-        sql`${emails.userId} = ${user.id} AND (${emails.unsubscribeUrl} IS NOT NULL OR ${emails.unsubscribeEmail} IS NOT NULL)`,
+        and(
+          eq(emailSubscriptions.userId, user.id),
+          ne(emailSubscriptions.status, "unsubscribed"),
+        ),
       )
-      .groupBy(emails.fromAddr)
-      .orderBy(sql`last_received DESC`);
+      .orderBy(
+        desc(emailSubscriptions.lastReceivedAt),
+        desc(emailSubscriptions.emailCount),
+      );
 
     return c.json({ data: rows }, 200);
   });
