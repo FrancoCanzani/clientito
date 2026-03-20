@@ -241,3 +241,32 @@
   > span:last-child {
   display: none;
 }
+
+@keyframes briefing-fade-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(1px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+.animate-briefing-fade-in {
+  opacity: 0;
+  animation: briefing-fade-in 0.4s ease forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

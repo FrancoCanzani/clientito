@@ -26,6 +26,7 @@ async function getEmailForUser(db: Database, userId: string, emailId: number) {
       subject: emails.subject,
       bodyText: emails.bodyText,
       messageId: emails.messageId,
+      snoozedUntil: emails.snoozedUntil,
     })
     .from(emails)
     .where(and(eq(emails.id, emailId), eq(emails.userId, userId)))

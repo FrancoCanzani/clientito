@@ -1,5 +1,5 @@
 import type { Hono } from "hono";
-import { generateText } from "ai";
+import { generateText, streamText } from "ai";
 import {
   and,
   desc,
@@ -19,7 +19,7 @@ import type { AppRouteEnv } from "../types";
 import { hasEmailLabel } from "../emails/helpers";
 import { getDayBoundsUtc } from "../../lib/utils";
 
-const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
 const BRIEFING_TTL_MS = 10 * 60 * 1000;
 const ACTIONABLE_REPLY_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -292,6 +292,7 @@ async function buildBriefing(input: {
   db: AppRouteEnv["Variables"]["db"];
   env: Env;
   userId: string;
+  includeNarrative?: boolean;
 }): Promise<BriefingData> {
   const now = Date.now();
   const { day, start: dayStart, end: dayEnd } = getTodayBounds(now);
@@ -461,91 +462,94 @@ async function buildBriefing(input: {
     })),
   ].slice(0, 7);
 
-  let text = fallbackText;
-  try {
-    if (
-      existing[0]?.narrative &&
-      existing[0].createdAt >= now - BRIEFING_TTL_MS &&
-      Number(existing[0].followUpCount ?? 0) === needsReplyCount &&
-      Number(existing[0].tasksDueCount ?? 0) === dueTodayCount &&
-      Number(existing[0].overdueCount ?? 0) === overdueCount
-    ) {
-      text = existing[0].narrative;
-    } else {
-      const workersAI = createWorkersAI({ binding: input.env.AI });
-      const result = await generateText({
-        model: workersAI(MODEL),
-        system: [
-          "You are a discreet, highly competent secretary writing a daily briefing.",
-          "Write one or two short sentences in plain English.",
-          "Only talk about recent, actually relevant conversations that need a reply.",
-          "Ignore stale or historical threads and never talk about unread counts.",
-          "Be calm, practical, neutral, and slightly polished.",
-          "Do not instruct the user, tell them what to do, or imply urgency beyond the facts.",
-          "Avoid words like should, need to, please, important, urgent, and immediate attention.",
-          "No markdown.",
-        ].join(" "),
-        prompt: [
-          "Treat only the last 3 days as actionable for reply-needed threads.",
-          `Actionable reply-needed threads: ${needsReplyCount}`,
-          `Overdue tasks: ${overdueCount}`,
-          `Tasks due today: ${dueTodayCount}`,
-          "Top reply-needed threads:",
-          ...replyNeededThreads.slice(0, 3).map((row) => {
-            const sender = getSenderLabel(row);
-            const subject = row.subject?.trim() || "(no subject)";
-            const age = formatDistanceToNowStrict(new Date(row.date), {
-              addSuffix: true,
-            });
-            return `- ${sender}: ${subject}, latest inbound ${age}`;
-          }),
-          "Top tasks:",
-          ...overdueTaskRows.map((task) => `- Overdue task: ${task.title}`),
-          ...dueTodayTaskRows.map((task) => `- Due today: ${task.title}`),
-        ].join("\n"),
-        maxOutputTokens: 120,
-      });
+  let text = "";
+  if (input.includeNarrative !== false) {
+    text = fallbackText;
+    try {
+      if (
+        existing[0]?.narrative &&
+        existing[0].createdAt >= now - BRIEFING_TTL_MS &&
+        Number(existing[0].followUpCount ?? 0) === needsReplyCount &&
+        Number(existing[0].tasksDueCount ?? 0) === dueTodayCount &&
+        Number(existing[0].overdueCount ?? 0) === overdueCount
+      ) {
+        text = existing[0].narrative;
+      } else {
+        const workersAI = createWorkersAI({ binding: input.env.AI });
+        const result = await generateText({
+          model: workersAI(MODEL),
+          system: [
+            "You are a discreet, highly competent secretary writing a daily briefing.",
+            "Write one or two short sentences in plain English.",
+            "Only talk about recent, actually relevant conversations that need a reply.",
+            "Ignore stale or historical threads and never talk about unread counts.",
+            "Be calm, practical, neutral, and slightly polished.",
+            "Do not instruct the user, tell them what to do, or imply urgency beyond the facts.",
+            "Avoid words like should, need to, please, important, urgent, and immediate attention.",
+            "No markdown.",
+          ].join(" "),
+          prompt: [
+            "Treat only the last 3 days as actionable for reply-needed threads.",
+            `Actionable reply-needed threads: ${needsReplyCount}`,
+            `Overdue tasks: ${overdueCount}`,
+            `Tasks due today: ${dueTodayCount}`,
+            "Top reply-needed threads:",
+            ...replyNeededThreads.slice(0, 3).map((row) => {
+              const sender = getSenderLabel(row);
+              const subject = row.subject?.trim() || "(no subject)";
+              const age = formatDistanceToNowStrict(new Date(row.date), {
+                addSuffix: true,
+              });
+              return `- ${sender}: ${subject}, latest inbound ${age}`;
+            }),
+            "Top tasks:",
+            ...overdueTaskRows.map((task) => `- Overdue task: ${task.title}`),
+            ...dueTodayTaskRows.map((task) => `- Due today: ${task.title}`),
+          ].join("\n"),
+          maxOutputTokens: 120,
+        });
 
-      const generated = (result.text ?? "").trim();
-      if (generated) {
-        text = generated;
+        const generated = (result.text ?? "").trim();
+        if (generated) {
+          text = generated;
+        }
       }
-    }
-  } catch (error) {
-    console.error("AI briefing generation failed", {
-      userId: input.userId,
-      route: "/api/ai/briefing",
-      model: MODEL,
-      error,
-    });
-  }
-
-  try {
-    await input.db
-      .insert(dailyBriefings)
-      .values({
+    } catch (error) {
+      console.error("AI briefing generation failed", {
         userId: input.userId,
-        date: day,
-        narrative: text,
-        unreadCount: null,
-        followUpCount: needsReplyCount,
-        tasksDueCount: dueTodayCount,
-        overdueCount,
-        createdAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [dailyBriefings.userId, dailyBriefings.date],
-        set: {
+        route: "/api/ai/briefing",
+        model: MODEL,
+        error,
+      });
+    }
+
+    try {
+      await input.db
+        .insert(dailyBriefings)
+        .values({
+          userId: input.userId,
+          date: day,
           narrative: text,
           unreadCount: null,
           followUpCount: needsReplyCount,
           tasksDueCount: dueTodayCount,
           overdueCount,
           createdAt: now,
-        },
-      });
-  } catch {
-    // FK constraint can fail if user doesn't exist yet (stale session)
+        })
+        .onConflictDoUpdate({
+          target: [dailyBriefings.userId, dailyBriefings.date],
+          set: {
+            narrative: text,
+            unreadCount: null,
+            followUpCount: needsReplyCount,
+            tasksDueCount: dueTodayCount,
+            overdueCount,
+            createdAt: now,
+          },
+        });
+    } catch {
+      // FK constraint can fail if user doesn't exist yet (stale session)
+    }
   }
 
   return {
@@ -565,24 +569,79 @@ export function registerGetBriefing(app: Hono<AppRouteEnv>) {
     const db = c.get("db");
     const user = c.get("user")!;
 
-    const briefing = await buildBriefing({ db, env: c.env, userId: user.id });
+    const briefing = await buildBriefing({
+      db,
+      env: c.env,
+      userId: user.id,
+      includeNarrative: false,
+    });
     return c.json({ data: briefing }, 200);
   });
 }
+
+function buildStreamPrompt(items: BriefingItem[], counts: { needsReply: number; dueToday: number; overdue: number }) {
+  const itemLines = items.map((item) => {
+    const typeLabel =
+      item.type === "reply" ? "needs reply" :
+      item.type === "fyi" ? "FYI" :
+      item.type === "overdue_task" ? "overdue task" :
+      "due today";
+    return `- ${typeLabel}: title="${item.title}", reason="${item.reason}", link=[[${item.title}|${item.href}]]`;
+  });
+
+  return [
+    `Reply-needed: ${counts.needsReply}, Overdue tasks: ${counts.overdue}, Due today: ${counts.dueToday}`,
+    "",
+    "Keep the final paragraph compact. Group similar items together instead of repeating the same phrasing for each one.",
+    "Prefer commas, semicolons, or a second sentence over repeated uses of 'and'.",
+    "If several items share the same timeframe, mention that timeframe once for the group.",
+    "Do not restate counts if the named items already make the point clearly.",
+    "",
+    "Items to mention (use the exact [[title|href]] syntax for each):",
+    ...itemLines,
+  ].join("\n");
+}
+
+const STREAM_SYSTEM_PROMPT = [
+  "You are a discreet, highly competent secretary writing a daily briefing as a single flowing paragraph.",
+  "Weave every item naturally into the text.",
+  "For each item, use the EXACT link syntax [[title|href]] provided — do not change the title or href.",
+  "CRITICAL: Always keep a space before and after each [[...]] link. Never let a link touch adjacent words.",
+  "Write 1-2 concise sentences whenever possible.",
+  "Keep it short and smooth rather than exhaustive.",
+  "Group related items into a compact phrase instead of giving each one its own full clause.",
+  "Avoid repetitive sentence structure and avoid back-to-back uses of 'and'.",
+  "Do not instruct the user or imply urgency beyond the facts.",
+  "Avoid words like should, need to, please, important, urgent, and immediate attention.",
+  "No markdown, no bullet points, no headings. Just a natural paragraph with [[links]] inline.",
+  "If there are no items, write a short sentence saying everything looks clear.",
+].join(" ");
 
 export function registerPostBriefingStream(app: Hono<AppRouteEnv>) {
   app.post("/briefing/stream", async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
+    const env = c.env;
 
-    const briefing = await buildBriefing({ db, env: c.env, userId: user.id });
+    const briefing = await buildBriefing({ db, env, userId: user.id });
 
-    return new Response(briefing.text, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
-    });
+    try {
+      const workersAI = createWorkersAI({ binding: env.AI });
+      const result = streamText({
+        model: workersAI(MODEL),
+        system: STREAM_SYSTEM_PROMPT,
+        prompt: buildStreamPrompt(briefing.items, briefing.counts),
+        maxOutputTokens: 250,
+      });
+
+      return result.toTextStreamResponse({
+        headers: { "Cache-Control": "no-store" },
+      });
+    } catch (error) {
+      console.error("Briefing stream failed", { userId: user.id, error });
+      return new Response(briefing.text, {
+        headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+      });
+    }
   });
 }

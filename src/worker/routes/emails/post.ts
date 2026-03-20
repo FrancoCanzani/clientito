@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import type { Database } from "../../db/client";
-import { emails } from "../../db/schema";
+import { drafts, emails } from "../../db/schema";
 import { sleep } from "../../lib/gmail/client";
 import {
   fetchAttachmentFromR2,
@@ -97,6 +97,13 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
           userId: user.id,
           gmailId: result.gmailId,
         });
+      }
+
+      // Delete draft if this was sent from a draft
+      if (input.draftId) {
+        await db
+          .delete(drafts)
+          .where(and(eq(drafts.id, input.draftId), eq(drafts.userId, user.id)));
       }
 
       // Cleanup R2 objects after successful send

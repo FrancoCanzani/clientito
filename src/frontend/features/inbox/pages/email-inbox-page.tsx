@@ -8,6 +8,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { type ComposeInitial } from "@/features/inbox/components/compose-email-dialog";
 import { ComposePanel } from "@/features/inbox/components/compose-panel";
+import { DraftListView } from "@/features/inbox/components/draft-list-view";
 import { EmailBulkToolbar } from "@/features/inbox/components/email-bulk-toolbar";
 import { EmailContextMenu } from "@/features/inbox/components/email-context-menu";
 import { EmailDetailContent } from "@/features/inbox/components/email-detail-content";
@@ -49,6 +50,7 @@ export default function EmailInboxPage() {
   const [composeInitial, setComposeInitial] = useState<
     ComposeInitial | undefined
   >();
+  const [composeDraftId, setComposeDraftId] = useState<number | undefined>();
   const [forwardOpen, setForwardOpen] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [lastClickedId, setLastClickedId] = useState<string | null>(null);
@@ -194,44 +196,89 @@ export default function EmailInboxPage() {
     executeEmailAction,
   });
 
+  if (view === "drafts") {
+    return (
+      <>
+        <DraftListView
+          onOpenDraft={(draft) => {
+            setComposeInitial({
+              to: draft.to ?? undefined,
+              cc: draft.cc ?? undefined,
+              subject: draft.subject ?? undefined,
+              body: draft.body ?? undefined,
+            });
+            setComposeDraftId(draft.id);
+            navigate({
+              search: (prev) => ({ ...prev, compose: true }),
+              replace: true,
+            });
+          }}
+        />
+        <ComposePanel
+          open={isComposing}
+          initial={composeInitial}
+          draftId={composeDraftId}
+          onOpenChange={(open) => {
+            if (!open) {
+              setComposeInitial(undefined);
+              setComposeDraftId(undefined);
+              navigate({
+                search: (prev) => ({
+                  ...prev,
+                  compose: undefined,
+                }),
+                replace: true,
+              });
+            }
+          }}
+        />
+      </>
+    );
+  }
+
   const emailListContent = (
     <div
       className={cn(
-        "flex min-w-0 flex-col gap-4",
+        "flex min-w-0 flex-col",
         isSplitView
           ? "h-full w-full overflow-hidden px-4 py-4"
           : "mx-auto w-full max-w-4xl",
       )}
     >
-      <header className="shrink-0">
-        <h2 className="text-lg font-medium">{pageTitle}</h2>
-      </header>
+      <div
+        className={cn("min-h-0 flex-1", isSplitView && "overflow-y-auto")}
+      >
+        <header className="sticky top-0 z-20 bg-background pb-2">
+          <h2 className="text-lg font-medium">{pageTitle}</h2>
+        </header>
 
-      {selectionMode && selection.hasSelection && (
-        <EmailBulkToolbar
-          count={selection.count}
-          allSelected={allVisibleSelected}
-          disabled={mutationPending}
-          onSelectAll={selectAllVisible}
-          onArchive={() => executeEmailAction("archive", selectedIds)}
-          onTrash={() => executeEmailAction("trash", selectedIds)}
-          onMarkRead={() => executeEmailAction("mark-read", selectedIds)}
-          onMarkUnread={() => executeEmailAction("mark-unread", selectedIds)}
-          onStarToggle={() => {
-            const allStarred = selectedEmails.every((email) =>
-              email.labelIds.includes("STARRED"),
-            );
-            executeEmailAction(allStarred ? "unstar" : "star", selectedIds);
-          }}
-          onDeselect={clearSelection}
-        />
-      )}
-
-      <div className="min-h-0 flex-1 overflow-y-auto">
+        {selectionMode && selection.hasSelection && (
+          <EmailBulkToolbar
+            count={selection.count}
+            allSelected={allVisibleSelected}
+            disabled={mutationPending}
+            onSelectAll={selectAllVisible}
+            onArchive={() => executeEmailAction("archive", selectedIds)}
+            onTrash={() => executeEmailAction("trash", selectedIds)}
+            onMarkRead={() => executeEmailAction("mark-read", selectedIds)}
+            onMarkUnread={() => executeEmailAction("mark-unread", selectedIds)}
+            onStarToggle={() => {
+              const allStarred = selectedEmails.every((email) =>
+                email.labelIds.includes("STARRED"),
+              );
+              executeEmailAction(allStarred ? "unstar" : "star", selectedIds);
+            }}
+            onDeselect={clearSelection}
+          />
+        )}
         {emailsPending ? (
           <div className="space-y-2">
             {Array.from({ length: 10 }).map((_, index) => (
-              <Skeleton key={index} className="h-11 w-full rounded-md" />
+              <Skeleton
+                key={index}
+                className="h-11 w-full rounded-md animate-in fade-in-0"
+                style={{ animationDelay: `${index * 50}ms`, animationFillMode: "backwards" }}
+              />
             ))}
           </div>
         ) : emailsError ? (
@@ -242,7 +289,7 @@ export default function EmailInboxPage() {
           <div className="space-y-5">
             {sections.map((section) => (
               <section key={section.label} className="space-y-1.5">
-                <div className="sticky top-0 z-10 bg-background/95 py-1 text-xs text-muted-foreground backdrop-blur-sm">
+                <div className="sticky top-9 z-10 bg-background py-1 text-xs text-muted-foreground">
                   {section.label}
                 </div>
                 <div className="space-y-1 [&:has(>[data-email-row]:hover)>[data-email-row]:not(:hover)]:opacity-85">
@@ -293,7 +340,7 @@ export default function EmailInboxPage() {
                           role="button"
                           tabIndex={0}
                           className={cn(
-                            "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 hover:bg-muted/40 cursor-default",
+                            "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40 cursor-default",
                             isOpen && "bg-muted/50",
                           )}
                           onClick={() => openEmail(email)}

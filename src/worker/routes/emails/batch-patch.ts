@@ -78,6 +78,7 @@ export function registerBatchPatchEmails(api: Hono<AppRouteEnv>) {
               gmailId: emails.gmailId,
               isRead: emails.isRead,
               labelIds: emails.labelIds,
+              snoozedUntil: emails.snoozedUntil,
             })
             .from(emails)
             .where(
@@ -169,6 +170,7 @@ export function registerBatchPatchEmails(api: Hono<AppRouteEnv>) {
             trashed: state.trashed,
             spam: state.spam,
             starred: state.starred,
+            snoozedUntil: state.snoozedUntil,
           })),
         },
         200,

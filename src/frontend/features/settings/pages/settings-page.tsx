@@ -1,23 +1,30 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   runIncrementalSync,
   startFullSync,
 } from "@/features/home/mutations";
 import { useSyncStatus } from "@/features/home/hooks/use-sync-status";
 import { deleteAccount } from "@/features/settings/mutations";
+import {
+  fetchSignature,
+  updateSignature,
+} from "@/features/settings/signature-queries";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import {
   ArrowClockwiseIcon,
+  FloppyDiskIcon,
   MonitorIcon,
   MoonIcon,
+  PencilSimpleIcon,
   SpinnerGapIcon,
   SunIcon,
 } from "@phosphor-icons/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 function formatLastSync(timestamp: number | null): string {
@@ -58,6 +65,31 @@ export default function SettingsPage() {
       await queryClient.invalidateQueries({ queryKey: ["sync-status"] });
     },
     onError: () => toast.error("Failed to start re-import"),
+  });
+
+  const signatureQuery = useQuery({
+    queryKey: ["signature"],
+    queryFn: fetchSignature,
+  });
+
+  const [signatureText, setSignatureText] = useState("");
+  const [signatureDirty, setSignatureDirty] = useState(false);
+
+  useEffect(() => {
+    if (signatureQuery.data && !signatureDirty) {
+      setSignatureText(signatureQuery.data.signature ?? "");
+    }
+  }, [signatureQuery.data, signatureDirty]);
+
+  const signatureMutation = useMutation({
+    mutationFn: () =>
+      updateSignature(signatureText.trim().length > 0 ? signatureText.trim() : null),
+    onSuccess: async () => {
+      toast.success("Signature saved");
+      setSignatureDirty(false);
+      await queryClient.invalidateQueries({ queryKey: ["signature"] });
+    },
+    onError: () => toast.error("Failed to save signature"),
   });
 
   const deleteMutation = useMutation({
@@ -172,6 +204,37 @@ export default function SettingsPage() {
               {option.label}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <PencilSimpleIcon className="mr-1 inline size-3.5" />
+          Email Signature
+        </h2>
+        <div className="space-y-3 rounded-lg border border-border p-4">
+          <p className="text-xs text-muted-foreground">
+            This signature will be appended to all outgoing emails.
+          </p>
+          <Textarea
+            placeholder="Enter your email signature..."
+            value={signatureText}
+            onChange={(e) => {
+              setSignatureText(e.target.value);
+              setSignatureDirty(true);
+            }}
+            className="min-h-24"
+          />
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => signatureMutation.mutate()}
+              disabled={!signatureDirty || signatureMutation.isPending}
+            >
+              <FloppyDiskIcon className="mr-1.5 size-3.5" />
+              {signatureMutation.isPending ? "Saving..." : "Save signature"}
+            </Button>
+          </div>
         </div>
       </section>
 

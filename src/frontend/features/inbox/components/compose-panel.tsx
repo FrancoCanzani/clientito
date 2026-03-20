@@ -12,10 +12,12 @@ export function ComposePanel({
   open,
   onOpenChange,
   initial,
+  draftId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initial?: ComposeInitial;
+  draftId?: number;
 }) {
   const composeKey = getComposeInitialKey(initial);
 
@@ -28,6 +30,7 @@ export function ComposePanel({
       key={composeKey}
       onOpenChange={onOpenChange}
       initial={initial}
+      draftId={draftId}
     />
   );
 }
@@ -35,13 +38,16 @@ export function ComposePanel({
 function ComposePanelBody({
   onOpenChange,
   initial,
+  draftId,
 }: {
   onOpenChange: (open: boolean) => void;
   initial?: ComposeInitial;
+  draftId?: number;
 }) {
   const [minimized, setMinimized] = useState(false);
   const compose = useComposeEmail(initial, {
     onSent: () => onOpenChange(false),
+    draftId,
   });
   const hasInitialRecipient = (initial?.to?.trim().length ?? 0) > 0;
 

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { emails } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 
-const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
 
 const draftReplyBodySchema = z.object({
   emailId: z.coerce.number().int().positive(),

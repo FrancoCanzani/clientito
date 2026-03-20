@@ -25,6 +25,7 @@ export function registerPatchEmail(api: Hono<AppRouteEnv>) {
           gmailId: emails.gmailId,
           isRead: emails.isRead,
           labelIds: emails.labelIds,
+          snoozedUntil: emails.snoozedUntil,
         })
         .from(emails)
         .where(and(eq(emails.userId, user.id), eq(emails.id, emailId)))
@@ -83,6 +84,7 @@ export function registerPatchEmail(api: Hono<AppRouteEnv>) {
             trashed: nextState.trashed,
             spam: nextState.spam,
             starred: nextState.starred,
+            snoozedUntil: nextState.snoozedUntil,
           },
         },
         200,

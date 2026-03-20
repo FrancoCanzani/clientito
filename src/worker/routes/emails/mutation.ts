@@ -6,11 +6,13 @@ type EmailPatchMutation = {
   trashed?: boolean;
   spam?: boolean;
   starred?: boolean;
+  snoozedUntil?: number | null;
 };
 
 type EmailPatchSource = {
   isRead: boolean;
   labelIds: string[] | null;
+  snoozedUntil: number | null;
 };
 
 type EmailPatchResult = {
@@ -20,6 +22,7 @@ type EmailPatchResult = {
   trashed: boolean;
   spam: boolean;
   starred: boolean;
+  snoozedUntil: number | null;
   dbUpdates: Partial<typeof emails.$inferInsert>;
   addLabelIds: string[];
   removeLabelIds: string[];
@@ -43,6 +46,7 @@ export function applyEmailPatch(
   const removeLabelIds = new Set<string>();
   const dbUpdates: Partial<typeof emails.$inferInsert> = {};
   let isRead = email.isRead;
+  let snoozedUntil: number | null = email.snoozedUntil ?? null;
 
   const queueAdd = (labelId: string) => {
     if (nextLabelIds.has(labelId)) {
@@ -116,6 +120,11 @@ export function applyEmailPatch(
     }
   }
 
+  if (mutation.snoozedUntil !== undefined) {
+    snoozedUntil = mutation.snoozedUntil;
+    dbUpdates.snoozedUntil = mutation.snoozedUntil;
+  }
+
   const resolvedLabelIds = Array.from(nextLabelIds);
   if (!areLabelIdsEqual(currentLabelIds, resolvedLabelIds)) {
     dbUpdates.labelIds = resolvedLabelIds;
@@ -128,6 +137,7 @@ export function applyEmailPatch(
     trashed: nextLabelIds.has("TRASH"),
     spam: nextLabelIds.has("SPAM"),
     starred: nextLabelIds.has("STARRED"),
+    snoozedUntil,
     dbUpdates,
     addLabelIds: Array.from(addLabelIds),
     removeLabelIds: Array.from(removeLabelIds),

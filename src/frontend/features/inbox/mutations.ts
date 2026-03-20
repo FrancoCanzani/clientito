@@ -6,6 +6,7 @@ export async function patchEmail(
     trashed?: boolean;
     spam?: boolean;
     starred?: boolean;
+    snoozedUntil?: number | null;
   },
 ): Promise<void> {
   const response = await fetch(`/api/emails/${emailId}`, {
@@ -30,6 +31,7 @@ export async function batchPatchEmails(
     trashed?: boolean;
     spam?: boolean;
     starred?: boolean;
+    snoozedUntil?: number | null;
   },
 ): Promise<void> {
   const response = await fetch("/api/emails/batch", {
@@ -62,6 +64,7 @@ type SendEmailInput = {
   references?: string;
   threadId?: string;
   attachments?: Array<{ key: string; filename: string; mimeType: string }>;
+  draftId?: number;
 };
 
 type SendEmailResult = {

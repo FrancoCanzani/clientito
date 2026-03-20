@@ -4,10 +4,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
 const emailSearchIdSchema = z
-  .string()
-  .trim()
+  .union([z.string(), z.number()])
   .transform((value) => {
-    const normalized = value.replace(/^"+|"+$/g, "").trim();
+    const normalized = String(value).replace(/^"+|"+$/g, "").trim();
     return normalized === "" ? undefined : normalized;
   })
   .optional();
@@ -17,7 +16,7 @@ const emailsSearchSchema = z.object({
   emailId: emailSearchIdSchema,
   threadId: z.string().trim().optional(),
   compose: z.coerce.boolean().optional(),
-  view: z.enum(["inbox", "sent", "spam", "trash"]).optional(),
+  view: z.enum(["inbox", "sent", "spam", "trash", "snoozed", "drafts"]).optional(),
 });
 
 export const Route = createFileRoute("/_dashboard/inbox/")({
@@ -26,6 +25,14 @@ export const Route = createFileRoute("/_dashboard/inbox/")({
     view: search.view ?? "inbox",
   }),
   loader: async ({ deps }) => {
+    if (deps.view === "drafts") {
+      return {
+        initialEmails: {
+          data: [],
+          pagination: { limit: 60, offset: 0, hasMore: false },
+        },
+      };
+    }
     const initialEmails = await fetchEmails({
       view: deps.view,
       limit: 60,

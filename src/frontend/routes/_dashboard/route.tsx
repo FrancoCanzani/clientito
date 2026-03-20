@@ -21,7 +21,7 @@ function AppShell() {
   return (
     <PageContextProvider>
       <EmailCommandProvider>
-        <div className="min-h-screen">
+        <div className="min-h-screen antialiased">
           <main className="px-4 py-4 pb-24 *:mx-auto *:max-w-3xl">
             <Outlet />
           </main>

@@ -10,6 +10,7 @@ export type EmailSearchResult = {
   date: number;
   isRead: boolean;
   labelIds: string[];
+  snoozedUntil: number | null;
 };
 
 export type ContactSuggestion = {
@@ -38,6 +39,7 @@ export type EmailListItem = {
   createdAt: number;
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
+  snoozedUntil: number | null;
 };
 
 export type EmailAttachment = {

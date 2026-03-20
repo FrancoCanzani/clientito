@@ -151,6 +151,7 @@ export const sendEmailBodySchema = z.object({
       }),
     )
     .optional(),
+  draftId: z.number().optional(),
 });
 
 export const sendEmailResponseSchema = z.object({

@@ -3,7 +3,7 @@ import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
 import { chunkArray } from "./utils";
 
-const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
 const BATCH_SIZE = 10;
 
 const AI_LABELS = [

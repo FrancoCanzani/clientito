@@ -182,6 +182,35 @@ export const mailboxes = sqliteTable(
   ],
 );
 
+export const drafts = sqliteTable(
+  "drafts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    to: text("to"),
+    cc: text("cc"),
+    subject: text("subject"),
+    body: text("body"),
+    inReplyTo: text("in_reply_to"),
+    threadId: text("thread_id"),
+    updatedAt: integer("updated_at").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [index("drafts_user_idx").on(table.userId)],
+);
+
+export const userSettings = sqliteTable("user_settings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" })
+    .unique(),
+  signature: text("signature"),
+  updatedAt: integer("updated_at"),
+});
+
 export const syncJobs = sqliteTable(
   "sync_jobs",
   {

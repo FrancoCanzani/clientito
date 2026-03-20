@@ -11,6 +11,7 @@ import {
   ArrowBendUpLeftIcon,
   ArrowBendUpRightIcon,
   BellSlashIcon,
+  ClockIcon,
   EnvelopeSimpleIcon,
   EnvelopeSimpleOpenIcon,
   StarIcon,
@@ -26,6 +27,7 @@ import { unsubscribe } from "../../subscriptions/queries";
 import { draftReply, patchEmail, sendEmail } from "../mutations";
 import type { EmailDetailItem } from "../types";
 import type { ComposeInitial } from "./compose-email-dialog";
+import { SnoozePicker } from "./snooze-picker";
 
 type ActionBarProps = {
   email: EmailDetailItem;
@@ -51,7 +53,7 @@ function ActionButton({
           type="button"
           onClick={onClick}
           disabled={disabled}
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+          className="rounded-md p-1.5 text-muted-foreground transition-[transform,background-color,color] duration-150 ease-out hover:bg-muted/60 hover:text-foreground active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40"
           aria-label={label}
         >
           {children}
@@ -137,6 +139,18 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
       invalidateEmails();
     },
     onError: () => toast.error("Failed to update"),
+  });
+
+  const isSnoozed = email.snoozedUntil != null && email.snoozedUntil > Date.now();
+
+  const snoozeMutation = useMutation({
+    mutationFn: (timestamp: number | null) =>
+      patchEmail(email.id, { snoozedUntil: timestamp }),
+    onSuccess: (_data, timestamp) => {
+      toast.success(timestamp ? "Snoozed" : "Unsnooze");
+      invalidateEmails();
+    },
+    onError: () => toast.error("Failed to snooze"),
   });
 
   const hasUnsubscribe = !!(email.unsubscribeUrl || email.unsubscribeEmail);
@@ -244,6 +258,7 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
     spamMutation.isPending ||
     starMutation.isPending ||
     readMutation.isPending ||
+    snoozeMutation.isPending ||
     unsubscribeMutation.isPending;
 
   return (
@@ -374,6 +389,27 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
                 <EnvelopeSimpleOpenIcon className="size-4" />
               )}
             </ActionButton>
+            {isSnoozed ? (
+              <ActionButton
+                label="Unsnooze"
+                onClick={() => snoozeMutation.mutate(null)}
+                disabled={actionsPending}
+              >
+                <ClockIcon className="size-4" weight="fill" />
+              </ActionButton>
+            ) : (
+              <SnoozePicker onSnooze={(ts) => snoozeMutation.mutate(ts)}>
+                <span>
+                  <ActionButton
+                    label="Snooze"
+                    onClick={() => {}}
+                    disabled={actionsPending}
+                  >
+                    <ClockIcon className="size-4" />
+                  </ActionButton>
+                </span>
+              </SnoozePicker>
+            )}
             <ActionButton label="Forward" onClick={handleForward}>
               <ArrowBendUpRightIcon className="size-4" />
             </ActionButton>

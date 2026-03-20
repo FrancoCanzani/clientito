@@ -30,6 +30,7 @@ export const Route = createFileRoute("/_dashboard/home")({
 
     return fetchBriefing();
   },
-  staleTime: 10 * 60 * 1000,
+  staleTime: 30 * 60 * 1000,
+  gcTime: 60 * 60 * 1000,
   component: HomePage,
 });
