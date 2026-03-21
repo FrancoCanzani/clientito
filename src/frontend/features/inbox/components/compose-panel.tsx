@@ -64,7 +64,6 @@ function ComposePanelBody({
     <div
       className={cn(
         "fixed antialiased inset-x-0 bottom-0 z-50 px-0 sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-120 sm:px-0",
-
         minimized && "w-72!",
       )}
     >

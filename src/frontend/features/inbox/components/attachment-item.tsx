@@ -8,7 +8,7 @@ import {
   WarningCircleIcon,
   XIcon,
 } from "@phosphor-icons/react";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import type { EmailAttachment } from "../types";
 import { formatBytes } from "../utils/format-bytes";
 
@@ -100,7 +100,7 @@ export function AttachmentItem({
   };
 
   const previewUrl = attachment.isImage
-    ? attachment.inlineUrl ?? attachment.downloadUrl
+    ? (attachment.inlineUrl ?? attachment.downloadUrl)
     : null;
 
   return (
@@ -128,9 +128,9 @@ export function AttachmentItem({
           <div className="min-w-0 flex items-center gap-2">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted/[0.45]">
               {attachment.isImage ? (
-                <ImageIcon className="size-4 text-muted-foreground" />
+                <ImageIcon className="size-3 text-muted-foreground" />
               ) : (
-                <PaperclipIcon className="size-4 text-muted-foreground" />
+                <PaperclipIcon className="size-3 text-muted-foreground" />
               )}
             </div>
             <div className="min-w-0">

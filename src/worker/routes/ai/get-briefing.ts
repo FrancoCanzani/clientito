@@ -494,14 +494,14 @@ async function buildBriefing(input: {
       type: "reply" as const,
       title: getSenderLabel(row),
       reason: buildReplyReason(row),
-      href: `/inbox?id=${row.id}`,
+      href: `/inbox/all?id=${row.id}`,
     })),
     ...fyiThreads.slice(0, 2).map((row) => ({
       id: `fyi-${row.id}`,
       type: "fyi" as const,
       title: getSenderLabel(row),
       reason: buildReplyReason(row),
-      href: `/inbox?id=${row.id}`,
+      href: `/inbox/all?id=${row.id}`,
     })),
     ...overdueTaskRows.slice(0, 2).map((task) => ({
       id: `overdue-${task.id}`,

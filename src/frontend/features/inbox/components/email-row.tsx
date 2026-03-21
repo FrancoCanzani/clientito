@@ -91,7 +91,7 @@ export function EmailRow({
           </span>
         )}
         {email.hasAttachment && (
-          <PaperclipIcon className="size-3.5" aria-hidden />
+          <PaperclipIcon className="size-3" aria-hidden />
         )}
         {threadCount > 1 && (
           <span className="font-mono tabular-nums">[{threadCount}]</span>

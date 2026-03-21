@@ -173,7 +173,7 @@ function ThreadMessageCard({
               {showAttachments && (
                 <section className="space-y-1">
                   <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                    <PaperclipIcon className="size-3.5" />
+                    <PaperclipIcon className="size-3" />
                     Attachments
                   </div>
                   {attachmentLoading ? (
@@ -405,7 +405,7 @@ export function EmailDetailContent({
                 {hasSelectedAttachments && (
                   <section className="space-y-3 border-b border-border/70 pb-5">
                     <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                      <PaperclipIcon className="size-3.5" />
+                      <PaperclipIcon className="size-3" />
                       Attachments
                     </div>
                     {liveQuery.isPending ? (
