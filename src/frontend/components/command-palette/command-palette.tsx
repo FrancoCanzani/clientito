@@ -43,6 +43,8 @@ export function CommandPalette() {
 
       if (toolName === "composeEmail" && args) {
         openCompose({
+          mailboxId:
+            typeof args.mailboxId === "number" ? args.mailboxId : undefined,
           to: args.to as string | undefined,
           subject: args.subject as string | undefined,
           body: args.body as string | undefined,
@@ -108,7 +110,6 @@ export function CommandPalette() {
                     taskNavigationCommands={taskNavigationCommands}
                     emailSelectionCommands={emailSelectionCommands}
                     actionCommands={actionCommands}
-                    normalizedQuery={normalizedQuery}
                     enterAgentMode={state.enterAgentMode}
                   />
                 )}

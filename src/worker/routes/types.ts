@@ -3,11 +3,10 @@ import type { Database } from "../db/client";
 
 type BetterAuthSession = ReturnType<typeof auth>["$Infer"]["Session"];
 
-export type AuthUser = BetterAuthSession["user"];
-export type AuthSession = BetterAuthSession["session"];
+type AuthSession = BetterAuthSession["session"];
 
 export type AppVariables = {
-  user: AuthUser | null;
+  user: BetterAuthSession["user"] | null;
   session: AuthSession | null;
   db: Database;
 };

@@ -74,6 +74,7 @@ type MarkSubscriptionStatusInput = {
 export async function syncEmailSubscriptions(
   db: Database,
   userId: string,
+  mailboxId: number | null,
   events: SubscriptionEvent[],
 ) {
   if (events.length === 0) return;
@@ -135,6 +136,7 @@ export async function syncEmailSubscriptions(
     if (!existing) {
       await db.insert(emailSubscriptions).values({
         userId,
+        mailboxId,
         senderKey: event.senderKey,
         fromAddr: event.fromAddr,
         fromName: event.fromName,

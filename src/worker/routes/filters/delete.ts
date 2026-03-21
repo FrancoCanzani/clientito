@@ -1,15 +1,19 @@
 import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { emailFilters } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 
-export function registerDeleteFilter(app: Hono<AppRouteEnv>) {
-  app.delete("/:id", async (c) => {
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+const deleteFilterParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
 
-    const id = Number(c.req.param("id"));
-    if (!Number.isFinite(id)) return c.json({ error: "Invalid id" }, 400);
+export function registerDeleteFilter(app: Hono<AppRouteEnv>) {
+  app.delete("/:id", zValidator("param", deleteFilterParamsSchema), async (c) => {
+    const user = c.get("user")!;
+
+    const { id } = c.req.valid("param");
 
     const db = c.get("db");
     const result = await db

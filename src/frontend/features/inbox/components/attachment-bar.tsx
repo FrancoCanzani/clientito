@@ -30,7 +30,7 @@ export function AttachmentBar({
         type="button"
         variant="ghost"
         size="sm"
-        className="h-7 gap-1.5 text-xs"
+        className="h-7 gap-1.5 rounded-full px-2.5 text-xs text-muted-foreground"
         onClick={() => fileInputRef.current?.click()}
         disabled={uploading}
       >
@@ -52,16 +52,16 @@ export function AttachmentBar({
       {files.map((file) => (
         <span
           key={file.key}
-          className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-0.5 text-xs"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border/70 px-2.5 py-1 text-xs text-muted-foreground"
         >
           {file.filename}
-          <span className="text-muted-foreground">
+          <span className="text-muted-foreground/80">
             ({formatSize(file.size)})
           </span>
           <button
             type="button"
             onClick={() => onRemoveFile(file.key)}
-            className="ml-0.5 text-muted-foreground hover:text-foreground"
+            className="ml-0.5 text-muted-foreground transition-colors hover:text-foreground"
           >
             <XIcon className="size-3" />
           </button>

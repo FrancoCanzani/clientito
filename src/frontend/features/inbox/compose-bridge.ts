@@ -3,7 +3,7 @@ import type { Editor } from "@tiptap/core";
 let activeEditor: Editor | null = null;
 
 const openComposeListeners = new Set<
-  (initial: { to?: string; subject?: string; body?: string }) => void
+  (initial: { mailboxId?: number; to?: string; subject?: string; body?: string }) => void
 >();
 
 export function registerComposeEditor(editor: Editor) {
@@ -15,6 +15,7 @@ export function unregisterComposeEditor() {
 }
 
 export function openCompose(initial: {
+  mailboxId?: number;
   to?: string;
   subject?: string;
   body?: string;

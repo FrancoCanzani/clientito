@@ -1,9 +1,13 @@
 import { routeAgentRequest } from "agents";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { csrf } from "hono/csrf";
 import { HTTPException } from "hono/http-exception";
+import { logger } from "hono/logger";
+import { secureHeaders } from "hono/secure-headers";
 import { auth } from "../../auth";
 import { authMiddleware } from "./middleware/auth";
+import { authLimiter, strictLimiter, standardLimiter } from "./middleware/rate-limit";
 import aiRoutes from "./routes/ai/router";
 import emailsRoutes from "./routes/emails/router";
 import healthRoutes from "./routes/health/router";
@@ -18,6 +22,9 @@ import type { AppRouteEnv } from "./routes/types";
 
 const app = new Hono<AppRouteEnv>();
 
+app.use("*", logger());
+app.use("*", secureHeaders());
+
 app.use(
   "/api/*",
   cors({
@@ -25,6 +32,8 @@ app.use(
     credentials: true,
   }),
 );
+
+app.use("/api/*", csrf());
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
@@ -35,6 +44,13 @@ app.onError((err, c) => {
 });
 
 app.use("*", authMiddleware);
+
+app.use("/api/auth/*", authLimiter);
+app.use("/api/sync/start", strictLimiter);
+app.use("/api/sync/recover", strictLimiter);
+app.use("/api/emails/send", strictLimiter);
+app.use("/api/ai/*", strictLimiter);
+app.use("/api/*", standardLimiter);
 
 app.all("/api/auth/*", async (c) => {
   const authInstance = auth(c.env);

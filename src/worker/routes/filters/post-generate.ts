@@ -26,8 +26,7 @@ const filterOutputSchema = z.object({
 
 export function registerGenerateFilter(app: Hono<AppRouteEnv>) {
   app.post("/generate", zValidator("json", generateSchema), async (c) => {
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const { prompt } = c.req.valid("json");
     const db = c.get("db");

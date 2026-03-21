@@ -1,6 +1,9 @@
 import type { Hono } from "hono";
 import type { AppRouteEnv } from "../types";
 
+const MAX_FILES = 10;
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB (Gmail limit)
+
 export function registerUploadAttachments(api: Hono<AppRouteEnv>) {
   api.post("/attachments", async (c) => {
     const user = c.get("user")!;
@@ -16,6 +19,16 @@ export function registerUploadAttachments(api: Hono<AppRouteEnv>) {
 
     if (files.length === 0) {
       return c.json({ error: "No files provided" }, 400);
+    }
+
+    if (files.length > MAX_FILES) {
+      return c.json({ error: `Too many files (max ${MAX_FILES})` }, 400);
+    }
+
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) {
+        return c.json({ error: `File "${file.name}" exceeds 25 MB limit` }, 400);
+      }
     }
 
     const results: Array<{

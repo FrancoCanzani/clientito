@@ -32,6 +32,7 @@ export const listEmailsQuerySchema = z.object({
   search: z.string().trim().optional(),
   isRead: z.enum(["true", "false"]).optional(),
   view: z.enum(["inbox", "sent", "spam", "trash", "snoozed", "archived", "starred"]).optional(),
+  mailboxId: z.coerce.number().int().positive().optional(),
 });
 
 export const emailListItemSchema = emailSearchItemSchema.extend({
@@ -135,8 +136,10 @@ export const patchEmailResponseSchema = z.object({
 });
 
 export const sendEmailBodySchema = z.object({
+  mailboxId: z.number().int().positive().optional(),
   to: z.string().email(),
   cc: z.string().optional(),
+  bcc: z.string().optional(),
   subject: z.string().trim().min(1),
   body: z.string().trim().min(1),
   inReplyTo: z.string().trim().optional(),

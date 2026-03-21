@@ -1,5 +1,5 @@
 import { tool } from "ai";
-import { and, asc, desc, eq, gte, like, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, like, lte, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
 import { emails, tasks } from "../../db/schema";
@@ -236,6 +236,105 @@ export function makeReadTools(db: Database, userId: string) {
           date: email.date,
           ...formatEmailDate(email.date),
           threadContext: context,
+        };
+      },
+    }),
+
+    resolveContact: tool({
+      description:
+        "Look up a contact by name or email address. Use this BEFORE sending or composing an email when the user refers to someone by name (e.g. 'email Pedro', 'send to Sarah'). Returns matching contacts from email history. If multiple matches, present the options to the user and ask which one.",
+      inputSchema: z.object({
+        name: z
+          .string()
+          .describe("Name or email fragment to search for, e.g. 'Pedro' or 'acme.com'."),
+      }),
+      execute: async ({ name }) => {
+        const pattern = `%${name}%`;
+
+        const received = db
+          .select({
+            email: emails.fromAddr,
+            name: emails.fromName,
+            lastSeen: sql<number>`MAX(${emails.date})`.as("last_seen"),
+            messageCount: sql<number>`COUNT(*)`.as("message_count"),
+          })
+          .from(emails)
+          .where(
+            and(
+              eq(emails.userId, userId),
+              or(
+                like(emails.fromName, pattern),
+                like(emails.fromAddr, pattern),
+              ),
+            ),
+          )
+          .groupBy(emails.fromAddr);
+
+        const sent = db
+          .select({
+            email: emails.toAddr,
+            name: sql<string | null>`NULL`.as("name"),
+            lastSeen: sql<number>`MAX(${emails.date})`.as("last_seen"),
+            messageCount: sql<number>`COUNT(*)`.as("message_count"),
+          })
+          .from(emails)
+          .where(
+            and(
+              eq(emails.userId, userId),
+              isNotNull(emails.toAddr),
+              like(emails.toAddr, pattern),
+            ),
+          )
+          .groupBy(emails.toAddr);
+
+        const [receivedRows, sentRows] = await Promise.all([received, sent]);
+        const allRows = [
+          ...receivedRows,
+          ...sentRows.filter(
+            (row): row is {
+              email: string;
+              name: string | null;
+              lastSeen: number;
+              messageCount: number;
+            } => row.email !== null,
+          ),
+        ];
+
+        const contactMap = new Map<string, { email: string; name: string | null; lastSeen: number; messageCount: number }>();
+        for (const row of allRows) {
+          const addr = row.email.toLowerCase();
+          const existing = contactMap.get(addr);
+          if (!existing || row.lastSeen > existing.lastSeen) {
+            contactMap.set(addr, {
+              email: row.email,
+              name: row.name || existing?.name || null,
+              lastSeen: row.lastSeen,
+              messageCount: (existing?.messageCount ?? 0) + row.messageCount,
+            });
+          }
+        }
+
+        const contacts = [...contactMap.values()]
+          .sort((a, b) => b.lastSeen - a.lastSeen)
+          .slice(0, 10)
+          .map((c) => ({
+            email: c.email,
+            name: c.name,
+            lastSeen: formatEmailDate(c.lastSeen).dateLabel,
+            messageCount: c.messageCount,
+          }));
+
+        if (contacts.length === 0) {
+          return { found: false, message: `No contacts found matching "${name}".` };
+        }
+        if (contacts.length === 1) {
+          return { found: true, exact: true, contact: contacts[0] };
+        }
+        return {
+          found: true,
+          exact: false,
+          message: `Found ${contacts.length} contacts matching "${name}". Ask the user which one they mean.`,
+          contacts,
         };
       },
     }),

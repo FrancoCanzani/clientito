@@ -6,11 +6,12 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BriefingText } from "@/features/home/components/briefing-text";
+import { TriageCard } from "@/features/home/components/triage-card";
 import { useBriefingStream } from "@/features/home/hooks/use-briefing-stream";
 import { getGreeting } from "@/features/home/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { getRouteApi } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useCallback, useState } from "react";
 
 const homeRoute = getRouteApi("/_dashboard/home");
 
@@ -18,18 +19,19 @@ export default function HomePage() {
   const briefing = homeRoute.useLoaderData();
   const { user } = useAuth();
   const greeting = getGreeting(user?.name, briefing);
-  const stream = useBriefingStream();
-
   const hasItems = briefing.items.length > 0;
-
-  useEffect(() => {
-    if (hasItems) {
-      stream.trigger();
-    }
-  }, [hasItems, stream.trigger]);
+  const stream = useBriefingStream(hasItems);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   const shouldShowBriefingSkeleton = hasItems && !stream.text && !stream.error;
   const isAnimating = stream.isStreaming;
+
+  const visibleItems = briefing.items.filter((item) => !dismissed.has(item.id));
+  const showCards = visibleItems.length > 0 && !isAnimating && stream.text;
+
+  const handleDismiss = useCallback((id: string) => {
+    setDismissed((prev) => new Set(prev).add(id));
+  }, []);
 
   return (
     <div className="mx-auto flex w-full pt-30 max-w-lg flex-1 flex-col justify-start space-y-6">
@@ -54,6 +56,19 @@ export default function HomePage() {
         ) : null}
       </div>
 
+      {showCards && (
+        <div className="space-y-2">
+          {visibleItems.map((item, i) => (
+            <TriageCard
+              key={item.id}
+              item={item}
+              index={i}
+              onDismiss={handleDismiss}
+            />
+          ))}
+        </div>
+      )}
+
       {!hasItems && !stream.isStreaming && (
         <Empty className="min-h-52 border-border/60">
           <EmptyHeader>
@@ -63,6 +78,12 @@ export default function HomePage() {
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
+      )}
+
+      {hasItems && visibleItems.length === 0 && !isAnimating && (
+        <p className="text-center text-xs text-muted-foreground">
+          All caught up.
+        </p>
       )}
     </div>
   );

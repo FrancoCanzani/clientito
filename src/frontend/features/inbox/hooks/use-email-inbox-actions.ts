@@ -3,7 +3,6 @@ import {
   markEmailRead,
   patchEmail,
 } from "@/features/inbox/mutations";
-import type { EmailSelection } from "@/features/inbox/hooks/use-email-selection";
 import type { EmailListItem, EmailListResponse } from "@/features/inbox/types";
 import type { EmailView } from "@/features/inbox/utils/inbox-filters";
 import {
@@ -14,7 +13,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
-const emailsRoute = getRouteApi("/_dashboard/inbox/");
+const emailsRoute = getRouteApi("/_dashboard/inbox/$id/");
 
 export type EmailInboxAction =
   | "archive"
@@ -68,29 +67,29 @@ type PendingAction = {
 
 export function useEmailInboxActions({
   view,
+  mailboxId,
   selectedEmailId,
   selectedIds,
-  selection,
-  onSelectionCleared,
+  clearSelection,
 }: {
   view: EmailView;
+  mailboxId: number | null;
   selectedEmailId: string | null;
   selectedIds: string[];
-  selection: EmailSelection;
-  onSelectionCleared: () => void;
+  clearSelection: () => void;
 }) {
   const navigate = emailsRoute.useNavigate();
   const queryClient = useQueryClient();
   const pendingRef = useRef<PendingAction | null>(null);
 
-  const emailsQueryKey = useMemo(() => ["emails", view], [view]);
+  const emailsQueryKey = useMemo(
+    () => ["emails", view, mailboxId ?? "all"],
+    [mailboxId, view],
+  );
 
   const closeEmail = useCallback(() => {
     navigate({
-      search: (prev) => ({
-        ...prev,
-        id: undefined,
-      }),
+      search: (prev) => ({ ...prev, id: undefined }),
       replace: true,
     });
   }, [navigate]);
@@ -98,10 +97,7 @@ export function useEmailInboxActions({
   const openEmail = useCallback(
     (email: EmailListItem) => {
       navigate({
-        search: (prev) => ({
-          ...prev,
-          id: email.id,
-        }),
+        search: (prev) => ({ ...prev, id: email.id }),
         replace: true,
       });
 
@@ -115,15 +111,15 @@ export function useEmailInboxActions({
               pages: old.pages.map((page) => ({
                 ...page,
                 data: page.data.map((current) =>
-                  current.id === email.id
-                    ? { ...current, isRead: true }
-                    : current,
+                  current.id === email.id ? { ...current, isRead: true } : current,
                 ),
               })),
             };
           },
         );
-        void markEmailRead(email.id);
+        markEmailRead(email.id).catch(() => {
+          void queryClient.invalidateQueries({ queryKey: emailsQueryKey });
+        });
       }
     },
     [emailsQueryKey, navigate, queryClient],
@@ -139,19 +135,12 @@ export function useEmailInboxActions({
         }
         void queryClient.invalidateQueries({ queryKey: ["emails"] });
         for (const id of ids) {
-          void queryClient.invalidateQueries({
-            queryKey: ["email-detail", id],
-          });
+          void queryClient.invalidateQueries({ queryKey: ["email-detail", id] });
         }
       } catch (error) {
-        queryClient.setQueryData(
-          emailsQueryKey,
-          queryClient.getQueryData(emailsQueryKey),
-        );
+        queryClient.setQueryData(emailsQueryKey, queryClient.getQueryData(emailsQueryKey));
         void queryClient.invalidateQueries({ queryKey: ["emails"] });
-        toast.error(
-          error instanceof Error ? error.message : "Action failed",
-        );
+        toast.error(error instanceof Error ? error.message : "Action failed");
       }
     },
     [emailsQueryKey, queryClient],
@@ -183,9 +172,7 @@ export function useEmailInboxActions({
 
       void queryClient.cancelQueries({ queryKey: emailsQueryKey });
 
-      const snapshot = queryClient.getQueryData<
-        InfiniteData<EmailListResponse>
-      >(emailsQueryKey);
+      const snapshot = queryClient.getQueryData<InfiniteData<EmailListResponse>>(emailsQueryKey);
 
       queryClient.setQueryData(
         emailsQueryKey,
@@ -201,9 +188,7 @@ export function useEmailInboxActions({
                     if (!idSet.has(email.id)) return email;
                     return {
                       ...email,
-                      ...(data.isRead !== undefined && {
-                        isRead: data.isRead,
-                      }),
+                      ...(data.isRead !== undefined && { isRead: data.isRead }),
                       ...(data.starred !== undefined && {
                         labelIds: data.starred
                           ? [...email.labelIds, "STARRED"]
@@ -220,9 +205,8 @@ export function useEmailInboxActions({
         closeEmail();
       }
 
-      if (selection.count > 0) {
-        selection.deselectAll();
-        onSelectionCleared();
+      if (selectedIds.length > 0) {
+        clearSelection();
       }
 
       const { one, many } = actionLabels[action];
@@ -252,29 +236,12 @@ export function useEmailInboxActions({
       pendingRef.current = { ids, data, timer };
 
       toast(message, {
-        action: {
-          label: "Undo",
-          onClick: rollback,
-        },
+        action: { label: "Undo", onClick: rollback },
         duration: 5000,
       });
     },
-    [
-      closeEmail,
-      emailsQueryKey,
-      fireMutation,
-      onSelectionCleared,
-      queryClient,
-      selectedEmailId,
-      selectedIds,
-      selection,
-    ],
+    [closeEmail, emailsQueryKey, fireMutation, clearSelection, queryClient, selectedEmailId, selectedIds],
   );
 
-  return {
-    openEmail,
-    closeEmail,
-    executeEmailAction,
-    mutationPending: false,
-  };
+  return { openEmail, closeEmail, executeEmailAction };
 }

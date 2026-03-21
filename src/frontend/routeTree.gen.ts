@@ -16,13 +16,11 @@ import { Route as DashboardTasksRouteImport } from './routes/_dashboard/tasks'
 import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
 import { Route as DashboardHomeRouteImport } from './routes/_dashboard/home'
 import { Route as DashboardGetStartedRouteImport } from './routes/_dashboard/get-started'
-import { Route as DashboardPeopleIndexRouteImport } from './routes/_dashboard/people/index'
 import { Route as DashboardNotesIndexRouteImport } from './routes/_dashboard/notes/index'
-import { Route as DashboardInboxIndexRouteImport } from './routes/_dashboard/inbox/index'
-import { Route as DashboardPeoplePersonIdRouteImport } from './routes/_dashboard/people/$personId'
 import { Route as DashboardNotesNoteIdRouteImport } from './routes/_dashboard/notes/$noteId'
-import { Route as DashboardInboxSubscriptionsRouteImport } from './routes/_dashboard/inbox/subscriptions'
-import { Route as DashboardInboxFiltersRouteImport } from './routes/_dashboard/inbox/filters'
+import { Route as DashboardInboxIdIndexRouteImport } from './routes/_dashboard/inbox/$id/index'
+import { Route as DashboardInboxIdSubscriptionsRouteImport } from './routes/_dashboard/inbox/$id/subscriptions'
+import { Route as DashboardInboxIdFiltersRouteImport } from './routes/_dashboard/inbox/$id/filters'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -58,24 +56,9 @@ const DashboardGetStartedRoute = DashboardGetStartedRouteImport.update({
   path: '/get-started',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
-const DashboardPeopleIndexRoute = DashboardPeopleIndexRouteImport.update({
-  id: '/people/',
-  path: '/people/',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
 const DashboardNotesIndexRoute = DashboardNotesIndexRouteImport.update({
   id: '/notes/',
   path: '/notes/',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardInboxIndexRoute = DashboardInboxIndexRouteImport.update({
-  id: '/inbox/',
-  path: '/inbox/',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardPeoplePersonIdRoute = DashboardPeoplePersonIdRouteImport.update({
-  id: '/people/$personId',
-  path: '/people/$personId',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardNotesNoteIdRoute = DashboardNotesNoteIdRouteImport.update({
@@ -83,15 +66,20 @@ const DashboardNotesNoteIdRoute = DashboardNotesNoteIdRouteImport.update({
   path: '/notes/$noteId',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
-const DashboardInboxSubscriptionsRoute =
-  DashboardInboxSubscriptionsRouteImport.update({
-    id: '/inbox/subscriptions',
-    path: '/inbox/subscriptions',
+const DashboardInboxIdIndexRoute = DashboardInboxIdIndexRouteImport.update({
+  id: '/inbox/$id/',
+  path: '/inbox/$id/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardInboxIdSubscriptionsRoute =
+  DashboardInboxIdSubscriptionsRouteImport.update({
+    id: '/inbox/$id/subscriptions',
+    path: '/inbox/$id/subscriptions',
     getParentRoute: () => DashboardRouteRoute,
   } as any)
-const DashboardInboxFiltersRoute = DashboardInboxFiltersRouteImport.update({
-  id: '/inbox/filters',
-  path: '/inbox/filters',
+const DashboardInboxIdFiltersRoute = DashboardInboxIdFiltersRouteImport.update({
+  id: '/inbox/$id/filters',
+  path: '/inbox/$id/filters',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 
@@ -102,13 +90,11 @@ export interface FileRoutesByFullPath {
   '/home': typeof DashboardHomeRoute
   '/settings': typeof DashboardSettingsRoute
   '/tasks': typeof DashboardTasksRoute
-  '/inbox/filters': typeof DashboardInboxFiltersRoute
-  '/inbox/subscriptions': typeof DashboardInboxSubscriptionsRoute
   '/notes/$noteId': typeof DashboardNotesNoteIdRoute
-  '/people/$personId': typeof DashboardPeoplePersonIdRoute
-  '/inbox/': typeof DashboardInboxIndexRoute
   '/notes/': typeof DashboardNotesIndexRoute
-  '/people/': typeof DashboardPeopleIndexRoute
+  '/inbox/$id/filters': typeof DashboardInboxIdFiltersRoute
+  '/inbox/$id/subscriptions': typeof DashboardInboxIdSubscriptionsRoute
+  '/inbox/$id/': typeof DashboardInboxIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -117,13 +103,11 @@ export interface FileRoutesByTo {
   '/home': typeof DashboardHomeRoute
   '/settings': typeof DashboardSettingsRoute
   '/tasks': typeof DashboardTasksRoute
-  '/inbox/filters': typeof DashboardInboxFiltersRoute
-  '/inbox/subscriptions': typeof DashboardInboxSubscriptionsRoute
   '/notes/$noteId': typeof DashboardNotesNoteIdRoute
-  '/people/$personId': typeof DashboardPeoplePersonIdRoute
-  '/inbox': typeof DashboardInboxIndexRoute
   '/notes': typeof DashboardNotesIndexRoute
-  '/people': typeof DashboardPeopleIndexRoute
+  '/inbox/$id/filters': typeof DashboardInboxIdFiltersRoute
+  '/inbox/$id/subscriptions': typeof DashboardInboxIdSubscriptionsRoute
+  '/inbox/$id': typeof DashboardInboxIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -134,13 +118,11 @@ export interface FileRoutesById {
   '/_dashboard/home': typeof DashboardHomeRoute
   '/_dashboard/settings': typeof DashboardSettingsRoute
   '/_dashboard/tasks': typeof DashboardTasksRoute
-  '/_dashboard/inbox/filters': typeof DashboardInboxFiltersRoute
-  '/_dashboard/inbox/subscriptions': typeof DashboardInboxSubscriptionsRoute
   '/_dashboard/notes/$noteId': typeof DashboardNotesNoteIdRoute
-  '/_dashboard/people/$personId': typeof DashboardPeoplePersonIdRoute
-  '/_dashboard/inbox/': typeof DashboardInboxIndexRoute
   '/_dashboard/notes/': typeof DashboardNotesIndexRoute
-  '/_dashboard/people/': typeof DashboardPeopleIndexRoute
+  '/_dashboard/inbox/$id/filters': typeof DashboardInboxIdFiltersRoute
+  '/_dashboard/inbox/$id/subscriptions': typeof DashboardInboxIdSubscriptionsRoute
+  '/_dashboard/inbox/$id/': typeof DashboardInboxIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -151,13 +133,11 @@ export interface FileRouteTypes {
     | '/home'
     | '/settings'
     | '/tasks'
-    | '/inbox/filters'
-    | '/inbox/subscriptions'
     | '/notes/$noteId'
-    | '/people/$personId'
-    | '/inbox/'
     | '/notes/'
-    | '/people/'
+    | '/inbox/$id/filters'
+    | '/inbox/$id/subscriptions'
+    | '/inbox/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -166,13 +146,11 @@ export interface FileRouteTypes {
     | '/home'
     | '/settings'
     | '/tasks'
-    | '/inbox/filters'
-    | '/inbox/subscriptions'
     | '/notes/$noteId'
-    | '/people/$personId'
-    | '/inbox'
     | '/notes'
-    | '/people'
+    | '/inbox/$id/filters'
+    | '/inbox/$id/subscriptions'
+    | '/inbox/$id'
   id:
     | '__root__'
     | '/'
@@ -182,13 +160,11 @@ export interface FileRouteTypes {
     | '/_dashboard/home'
     | '/_dashboard/settings'
     | '/_dashboard/tasks'
-    | '/_dashboard/inbox/filters'
-    | '/_dashboard/inbox/subscriptions'
     | '/_dashboard/notes/$noteId'
-    | '/_dashboard/people/$personId'
-    | '/_dashboard/inbox/'
     | '/_dashboard/notes/'
-    | '/_dashboard/people/'
+    | '/_dashboard/inbox/$id/filters'
+    | '/_dashboard/inbox/$id/subscriptions'
+    | '/_dashboard/inbox/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -248,32 +224,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardGetStartedRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
-    '/_dashboard/people/': {
-      id: '/_dashboard/people/'
-      path: '/people'
-      fullPath: '/people/'
-      preLoaderRoute: typeof DashboardPeopleIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
     '/_dashboard/notes/': {
       id: '/_dashboard/notes/'
       path: '/notes'
       fullPath: '/notes/'
       preLoaderRoute: typeof DashboardNotesIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/inbox/': {
-      id: '/_dashboard/inbox/'
-      path: '/inbox'
-      fullPath: '/inbox/'
-      preLoaderRoute: typeof DashboardInboxIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/people/$personId': {
-      id: '/_dashboard/people/$personId'
-      path: '/people/$personId'
-      fullPath: '/people/$personId'
-      preLoaderRoute: typeof DashboardPeoplePersonIdRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/notes/$noteId': {
@@ -283,18 +238,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardNotesNoteIdRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
-    '/_dashboard/inbox/subscriptions': {
-      id: '/_dashboard/inbox/subscriptions'
-      path: '/inbox/subscriptions'
-      fullPath: '/inbox/subscriptions'
-      preLoaderRoute: typeof DashboardInboxSubscriptionsRouteImport
+    '/_dashboard/inbox/$id/': {
+      id: '/_dashboard/inbox/$id/'
+      path: '/inbox/$id'
+      fullPath: '/inbox/$id/'
+      preLoaderRoute: typeof DashboardInboxIdIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
-    '/_dashboard/inbox/filters': {
-      id: '/_dashboard/inbox/filters'
-      path: '/inbox/filters'
-      fullPath: '/inbox/filters'
-      preLoaderRoute: typeof DashboardInboxFiltersRouteImport
+    '/_dashboard/inbox/$id/subscriptions': {
+      id: '/_dashboard/inbox/$id/subscriptions'
+      path: '/inbox/$id/subscriptions'
+      fullPath: '/inbox/$id/subscriptions'
+      preLoaderRoute: typeof DashboardInboxIdSubscriptionsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/inbox/$id/filters': {
+      id: '/_dashboard/inbox/$id/filters'
+      path: '/inbox/$id/filters'
+      fullPath: '/inbox/$id/filters'
+      preLoaderRoute: typeof DashboardInboxIdFiltersRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
   }
@@ -305,13 +267,11 @@ interface DashboardRouteRouteChildren {
   DashboardHomeRoute: typeof DashboardHomeRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardTasksRoute: typeof DashboardTasksRoute
-  DashboardInboxFiltersRoute: typeof DashboardInboxFiltersRoute
-  DashboardInboxSubscriptionsRoute: typeof DashboardInboxSubscriptionsRoute
   DashboardNotesNoteIdRoute: typeof DashboardNotesNoteIdRoute
-  DashboardPeoplePersonIdRoute: typeof DashboardPeoplePersonIdRoute
-  DashboardInboxIndexRoute: typeof DashboardInboxIndexRoute
   DashboardNotesIndexRoute: typeof DashboardNotesIndexRoute
-  DashboardPeopleIndexRoute: typeof DashboardPeopleIndexRoute
+  DashboardInboxIdFiltersRoute: typeof DashboardInboxIdFiltersRoute
+  DashboardInboxIdSubscriptionsRoute: typeof DashboardInboxIdSubscriptionsRoute
+  DashboardInboxIdIndexRoute: typeof DashboardInboxIdIndexRoute
 }
 
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
@@ -319,13 +279,11 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardHomeRoute: DashboardHomeRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardTasksRoute: DashboardTasksRoute,
-  DashboardInboxFiltersRoute: DashboardInboxFiltersRoute,
-  DashboardInboxSubscriptionsRoute: DashboardInboxSubscriptionsRoute,
   DashboardNotesNoteIdRoute: DashboardNotesNoteIdRoute,
-  DashboardPeoplePersonIdRoute: DashboardPeoplePersonIdRoute,
-  DashboardInboxIndexRoute: DashboardInboxIndexRoute,
   DashboardNotesIndexRoute: DashboardNotesIndexRoute,
-  DashboardPeopleIndexRoute: DashboardPeopleIndexRoute,
+  DashboardInboxIdFiltersRoute: DashboardInboxIdFiltersRoute,
+  DashboardInboxIdSubscriptionsRoute: DashboardInboxIdSubscriptionsRoute,
+  DashboardInboxIdIndexRoute: DashboardInboxIdIndexRoute,
 }
 
 const DashboardRouteRouteWithChildren = DashboardRouteRoute._addFileChildren(

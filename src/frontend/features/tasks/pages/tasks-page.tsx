@@ -28,6 +28,7 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { KanbanIcon, ListIcon } from "@phosphor-icons/react";
 import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 
@@ -95,6 +96,7 @@ export default function TasksPage() {
       closeEditor();
       invalidateTasks();
     },
+    onError: () => toast.error("Failed to create task"),
   });
 
   const updateTaskMutation = useMutation({
@@ -109,12 +111,14 @@ export default function TasksPage() {
       closeEditor();
       invalidateTasks();
     },
+    onError: () => toast.error("Failed to update task"),
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ taskId, status }: { taskId: number; status: TaskStatus }) =>
       updateTask(taskId, { status }),
     onSuccess: invalidateTasks,
+    onError: () => toast.error("Failed to update status"),
   });
 
   const priorityMutation = useMutation({
@@ -126,6 +130,7 @@ export default function TasksPage() {
       priority: TaskPriority;
     }) => updateTask(taskId, { priority }),
     onSuccess: invalidateTasks,
+    onError: () => toast.error("Failed to update priority"),
   });
 
   const deleteTaskMutation = useMutation({
@@ -134,6 +139,7 @@ export default function TasksPage() {
       closeEditor();
       invalidateTasks();
     },
+    onError: () => toast.error("Failed to delete task"),
   });
 
   const setView = useCallback(

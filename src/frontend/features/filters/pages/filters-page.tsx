@@ -31,6 +31,8 @@ const ACTION_LABELS: Record<string, string> = {
   trash: "Trash",
 };
 
+const FILTER_SKELETON_KEYS = ["filter-a", "filter-b", "filter-c"] as const;
+
 function formatActions(actions: Record<string, unknown>) {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(actions)) {
@@ -201,9 +203,9 @@ export default function FiltersPage() {
 
       {isPending ? (
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
+          {FILTER_SKELETON_KEYS.map((key) => (
             <div
-              key={i}
+              key={key}
               className="h-16 animate-pulse rounded-lg border border-border bg-muted/30"
             />
           ))}

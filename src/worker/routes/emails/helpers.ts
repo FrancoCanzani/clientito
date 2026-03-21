@@ -6,6 +6,7 @@ const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
 
 export const emailSummarySelection = {
   id: emails.id,
+  mailboxId: emails.mailboxId,
   gmailId: emails.gmailId,
   fromAddr: emails.fromAddr,
   fromName: emails.fromName,
@@ -42,6 +43,7 @@ export function hasAnyEmailCategoryLabel() {
 
 export function toEmailListResponse(row: {
   id: number;
+  mailboxId: number | null;
   gmailId: string;
   fromAddr: string;
   fromName: string | null;
@@ -62,6 +64,7 @@ export function toEmailListResponse(row: {
   const labelIds = row.labelIds ?? [];
   return {
     id: String(row.id),
+    mailboxId: row.mailboxId,
     gmailId: row.gmailId,
     fromAddr: row.fromAddr,
     fromName: row.fromName,
@@ -84,6 +87,7 @@ export function toEmailListResponse(row: {
 
 export function toEmailDetailResponse(row: {
   id: number;
+  mailboxId: number | null;
   gmailId: string;
   fromAddr: string;
   fromName: string | null;

@@ -8,11 +8,12 @@ const GMAIL_SCOPES = [
 
 export async function startFullSync(
   months?: number,
+  mailboxId?: number,
 ): Promise<void> {
   const response = await fetch("/api/sync/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ months }),
+    body: JSON.stringify({ months, mailboxId }),
   });
 
   if (response.status === 409) return;
@@ -24,7 +25,7 @@ export async function startFullSync(
 export async function beginGmailConnection() {
   const result = await authClient.linkSocial({
     provider: "google",
-    callbackURL: "/get-started",
+    callbackURL: "/settings",
     scopes: GMAIL_SCOPES,
   });
 
@@ -33,11 +34,11 @@ export async function beginGmailConnection() {
   }
 }
 
-export async function runIncrementalSync(): Promise<void> {
+export async function runIncrementalSync(mailboxId?: number): Promise<void> {
   const response = await fetch("/api/sync/incremental", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ mailboxId }),
   });
 
   if (response.status === 409) return;

@@ -5,7 +5,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
-import { user } from "./auth-schema";
+import { account, user } from "./auth-schema";
 
 export const dailyBriefings = sqliteTable(
   "daily_briefings",
@@ -49,6 +49,9 @@ export const emails = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    mailboxId: integer("mailbox_id").references(() => mailboxes.id, {
+      onDelete: "cascade",
+    }),
     gmailId: text("gmail_id").notNull().unique(),
     threadId: text("thread_id"),
     messageId: text("message_id"),
@@ -77,6 +80,7 @@ export const emails = sqliteTable(
     index("emails_user_date_idx").on(table.userId, table.date),
     index("emails_thread_idx").on(table.threadId),
     index("emails_user_snoozed_idx").on(table.userId, table.snoozedUntil),
+    index("emails_mailbox_date_idx").on(table.mailboxId, table.date),
   ],
 );
 
@@ -94,6 +98,9 @@ export const emailSubscriptions = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    mailboxId: integer("mailbox_id").references(() => mailboxes.id, {
+      onDelete: "cascade",
+    }),
     senderKey: text("sender_key").notNull(),
     fromAddr: text("from_addr").notNull(),
     fromName: text("from_name"),
@@ -112,8 +119,8 @@ export const emailSubscriptions = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
-    uniqueIndex("email_subscriptions_user_sender_idx").on(
-      table.userId,
+    uniqueIndex("email_subscriptions_mailbox_sender_idx").on(
+      table.mailboxId,
       table.senderKey,
     ),
     index("email_subscriptions_user_status_idx").on(table.userId, table.status),
@@ -209,8 +216,10 @@ export const mailboxes = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" })
-      .unique(),
+      .references(() => user.id, { onDelete: "cascade" }),
+    accountId: text("account_id").references(() => account.id, {
+      onDelete: "cascade",
+    }),
     gmailEmail: text("gmail_email"),
     historyId: text("history_id"),
     syncWindowMonths: integer("sync_window_months"),
@@ -226,6 +235,8 @@ export const mailboxes = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
+    index("mailboxes_user_idx").on(table.userId),
+    uniqueIndex("mailboxes_account_idx").on(table.accountId),
     index("mailboxes_auth_state_idx").on(table.authState),
     index("mailboxes_last_success_idx").on(table.lastSuccessfulSyncAt),
   ],

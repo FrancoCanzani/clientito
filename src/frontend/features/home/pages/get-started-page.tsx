@@ -1,32 +1,46 @@
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSyncStatus } from "@/features/home/hooks/use-sync-status";
 import {
   beginGmailConnection,
   runIncrementalSync,
   startFullSync,
 } from "@/features/home/mutations";
-import { cn } from "@/lib/utils";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { useAuth } from "@/hooks/use-auth";
 import {
   ArrowRightIcon,
-  CheckCircleIcon,
   EnvelopeSimpleIcon,
   ShieldCheckIcon,
   SpinnerGapIcon,
 } from "@phosphor-icons/react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
 const IMPORT_OPTIONS = [
-  { value: 6, label: "Last 6 months", description: "Quick start, recent emails only" },
-  { value: 12, label: "Last year", description: "Good balance of history and speed" },
-  { value: 0, label: "Everything", description: "Full archive, may take a while" },
-] as const;
+  {
+    value: 6,
+    label: "Last 6 months",
+    description: "Quick start, recent emails only",
+  },
+  {
+    value: 12,
+    label: "Last year",
+    description: "Good balance of history and speed",
+  },
+  {
+    value: 0,
+    label: "Everything",
+    description: "Full archive, may take a while",
+  },
+];
 
 export default function GetStartedPage() {
   const queryClient = useQueryClient();
   const [selectedMonths, setSelectedMonths] = useState<number>(12);
+  const { user } = useAuth();
 
   const syncStatusQuery = useSyncStatus({
     staleTime: 0,
@@ -45,17 +59,14 @@ export default function GetStartedPage() {
   });
 
   const startSyncMutation = useMutation({
-    mutationFn: async () =>
-      startFullSync(selectedMonths || undefined),
+    mutationFn: async () => startFullSync(selectedMonths || undefined),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["sync-status"] });
       await syncStatusQuery.refetch();
     },
     onError: (error) => {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to start Gmail sync.",
+        error instanceof Error ? error.message : "Failed to start Gmail sync.",
       );
     },
   });
@@ -68,9 +79,7 @@ export default function GetStartedPage() {
     },
     onError: (error) => {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to retry Gmail sync.",
+        error instanceof Error ? error.message : "Failed to retry Gmail sync.",
       );
     },
   });
@@ -104,17 +113,16 @@ export default function GetStartedPage() {
       : null;
 
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-10rem)] max-w-lg flex-col justify-center gap-10">
+    <div className="mx-auto flex-1 flex flex-col items-center justify-center gap-10">
       <div className="space-y-2 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Welcome to Clientito
+        <h1 className="text-2xl font-medium">
+          Welcome {user?.name.split(" ")[0]}
         </h1>
         <p className="text-sm text-muted-foreground">
           Connect your Gmail to get started
         </p>
       </div>
 
-      {/* Step 1: Connect */}
       {(showConnect || showReconnect) && (
         <div className="space-y-6">
           <div className="space-y-4 rounded-xl border border-border/60 p-5">
@@ -156,68 +164,44 @@ export default function GetStartedPage() {
         </div>
       )}
 
-      {/* Step 2: Choose import range */}
       {showStartSync && (
-        <div className="space-y-6">
+        <div className="space-y-10">
           <div className="text-center">
             <p className="text-sm font-medium">
               How much email history should we import?
             </p>
           </div>
 
-          <div className="space-y-2">
+          <RadioGroup
+            value={String(selectedMonths)}
+            onValueChange={(value) => setSelectedMonths(Number(value))}
+            className="space-y-2"
+          >
             {IMPORT_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setSelectedMonths(option.value)}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
-                  selectedMonths === option.value
-                    ? "border-foreground bg-muted/50"
-                    : "border-border/60 hover:border-border hover:bg-muted/30",
-                )}
-              >
-                <div
-                  className={cn(
-                    "flex size-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-                    selectedMonths === option.value
-                      ? "border-foreground"
-                      : "border-muted-foreground/40",
-                  )}
-                >
-                  {selectedMonths === option.value && (
-                    <div className="size-2 rounded-full bg-foreground" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{option.label}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {option.description}
-                  </p>
-                </div>
-              </button>
+              <div key={option.value} className="flex items-center gap-3">
+                <RadioGroupItem
+                  value={String(option.value)}
+                  id={String(option.value)}
+                />
+                <Label htmlFor={String(option.value)}>{option.label}</Label>
+              </div>
             ))}
-          </div>
+          </RadioGroup>
 
           <Button
             className="w-full"
             onClick={() => void startSyncMutation.mutateAsync()}
             disabled={startSyncMutation.isPending}
           >
-            {startSyncMutation.isPending
-              ? "Starting..."
-              : "Start import"}
-            <ArrowRightIcon className="ml-1.5 size-4" />
+            {startSyncMutation.isPending ? "Starting..." : "Start import"}
           </Button>
         </div>
       )}
 
-      {/* Step 3: Syncing */}
       {showSyncing && (
-        <div className="space-y-6">
+        <div className="space-y-10">
           <div className="space-y-4 text-center">
-            <SpinnerGapIcon className="mx-auto size-8 animate-spin text-muted-foreground" />
+            <SpinnerGapIcon className="mx-auto size-5 animate-spin text-muted-foreground" />
             <div className="space-y-1">
               <p className="text-sm font-medium">
                 {status?.phase === "listing"
@@ -225,10 +209,11 @@ export default function GetStartedPage() {
                   : "Importing your emails..."}
               </p>
               {progressLabel && (
-                <p className="text-2xl font-semibold tabular-nums tracking-tight">
+                <p className="text-sm font-medium tabular-nums tracking-tight">
                   {progressLabel}
                   <span className="text-sm font-normal text-muted-foreground">
-                    {" "}emails imported
+                    {" "}
+                    emails imported
                   </span>
                 </p>
               )}
@@ -238,7 +223,7 @@ export default function GetStartedPage() {
           {progressPercent !== null && (
             <div className="h-1 overflow-hidden rounded-full bg-border">
               <div
-                className="h-full rounded-full bg-foreground transition-all duration-500"
+                className="h-full rounded-xl bg-foreground transition-all duration-500"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -248,16 +233,12 @@ export default function GetStartedPage() {
             This runs in the background. You can start using the app now.
           </p>
 
-          <Button asChild variant="outline" className="w-full">
-            <Link to="/inbox">
-              Open inbox
-              <ArrowRightIcon className="ml-1.5 size-4" />
-            </Link>
+          <Button asChild className="w-full">
+            <Link to="/inbox/$id" params={{ id: "all" }}>Go to inbox</Link>
           </Button>
         </div>
       )}
 
-      {/* Error state */}
       {showError && (
         <div className="space-y-6">
           <div className="space-y-3 rounded-xl border border-destructive/30 bg-destructive/5 p-5">

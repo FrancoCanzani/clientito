@@ -24,6 +24,11 @@ export function auth(env: Env) {
         scope: ["openid", "email", "profile"],
       },
     },
+    account: {
+      accountLinking: {
+        allowDifferentEmails: true,
+      },
+    },
     session: {
       cookieCache: {
         enabled: true,

@@ -1,7 +1,7 @@
 import { formatInboxSectionDate } from "./format-inbox-section-date";
 import type { ThreadGroup } from "./group-emails-by-thread";
 
-type ThreadSection = {
+export type ThreadSection = {
   label: string;
   items: ThreadGroup[];
 };

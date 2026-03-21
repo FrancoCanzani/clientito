@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
 import {
+  beginGmailConnection,
   runIncrementalSync,
   startFullSync,
 } from "@/features/home/mutations";
@@ -12,13 +13,16 @@ import {
 } from "@/features/settings/mutations";
 import { fetchSyncPreference } from "@/features/settings/queries";
 import { useAuth } from "@/hooks/use-auth";
+import { useMailboxes, removeAccount, type MailboxAccount } from "@/hooks/use-mailboxes";
 import { useTheme } from "@/hooks/use-theme";
 import {
   ArrowClockwiseIcon,
   MonitorIcon,
   MoonIcon,
+  PlusIcon,
   SpinnerGapIcon,
   SunIcon,
+  TrashIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -113,6 +117,66 @@ function SettingsRow({
   );
 }
 
+function ConnectedAccountRow({
+  account,
+  canRemove,
+  onRemove,
+  onSync,
+  isSyncing,
+}: {
+  account: MailboxAccount;
+  canRemove: boolean;
+  onRemove: (accountId: string) => void;
+  onSync: (mailboxId: number) => void;
+  isSyncing: boolean;
+}) {
+  const authOk = account.authState === "ok";
+  return (
+    <div className="flex items-center justify-between gap-3 py-3">
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <p className="truncate text-sm font-medium">
+          {account.gmailEmail ?? "Unknown account"}
+        </p>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span
+            className={`inline-block size-1.5 rounded-full ${authOk ? "bg-green-500" : "bg-amber-500"}`}
+          />
+          {account.hasSynced
+            ? account.lastSync
+              ? `Synced ${formatLastSync(account.lastSync)}`
+              : "Synced"
+            : "Not synced"}
+        </div>
+      </div>
+      <div className="flex items-center gap-1">
+        {account.mailboxId != null && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onSync(account.mailboxId!)}
+            disabled={isSyncing}
+          >
+            {isSyncing ? (
+              <SpinnerGapIcon className="size-3.5 animate-spin text-muted-foreground" />
+            ) : (
+              <ArrowClockwiseIcon className="size-3.5 text-muted-foreground" />
+            )}
+          </Button>
+        )}
+        {canRemove && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onRemove(account.accountId)}
+          >
+            <TrashIcon className="size-3.5 text-muted-foreground" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -121,6 +185,38 @@ export default function SettingsPage() {
   const [confirmText, setConfirmText] = useState("");
 
   const syncStatus = useSyncStatus();
+  const accountsQuery = useMailboxes();
+  const accounts = accountsQuery.data?.accounts ?? [];
+
+  const addAccountMutation = useMutation({
+    mutationFn: beginGmailConnection,
+    onError: () => toast.error("Failed to connect Gmail account"),
+  });
+
+  const removeAccountMutation = useMutation({
+    mutationFn: removeAccount,
+    onSuccess: async () => {
+      toast.success("Account removed");
+      await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      await queryClient.invalidateQueries({ queryKey: ["sync-status"] });
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const [syncingMailboxId, setSyncingMailboxId] = useState<number | null>(null);
+  const perAccountSyncMutation = useMutation({
+    mutationFn: async (mailboxId: number) => {
+      setSyncingMailboxId(mailboxId);
+      await startFullSync(undefined, mailboxId);
+    },
+    onSuccess: async () => {
+      toast.success("Sync started");
+      await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      await queryClient.invalidateQueries({ queryKey: ["sync-status"] });
+    },
+    onError: () => toast.error("Failed to start sync"),
+    onSettled: () => setSyncingMailboxId(null),
+  });
   const syncPreferenceQuery = useQuery({
     queryKey: ["sync-preference"],
     queryFn: fetchSyncPreference,
@@ -131,7 +227,7 @@ export default function SettingsPage() {
   const selectedSyncMonths = syncPreference?.months ?? null;
 
   const incrementalSyncMutation = useMutation({
-    mutationFn: runIncrementalSync,
+    mutationFn: () => runIncrementalSync(),
     onSuccess: async () => {
       toast.success("Sync started");
       await queryClient.invalidateQueries({ queryKey: ["sync-status"] });
@@ -217,6 +313,37 @@ export default function SettingsPage() {
               {user?.email ?? "—"}
             </p>
           </SettingsRow>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        title="Connected accounts"
+        description="Manage your linked Gmail accounts."
+      >
+        <div className="border-t border-border/60">
+          {accounts.map((acct) => (
+            <div key={acct.accountId}>
+              <ConnectedAccountRow
+                account={acct}
+                canRemove={accounts.length > 1}
+                onRemove={(id) => removeAccountMutation.mutate(id)}
+                onSync={(id) => perAccountSyncMutation.mutate(id)}
+                isSyncing={syncingMailboxId === acct.mailboxId}
+              />
+              <div className="border-t border-border/60" />
+            </div>
+          ))}
+          <div className="py-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => addAccountMutation.mutate()}
+              disabled={addAccountMutation.isPending}
+            >
+              <PlusIcon className="mr-1.5 size-3.5" />
+              Add Gmail account
+            </Button>
+          </div>
         </div>
       </SettingsSection>
 

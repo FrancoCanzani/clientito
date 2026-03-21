@@ -14,9 +14,8 @@ const toolLabels: Record<string, string> = {
   archiveEmail: "Archive email",
   sendEmail: "Send email",
   composeEmail: "Compose email",
-  draftReply: "Draft reply",
   searchEmails: "Search emails",
-  lookupPerson: "Look up person",
+  resolveContact: "Look up contact",
   listTasks: "List tasks",
   summarizeEmail: "Summarize email",
 };
@@ -63,21 +62,15 @@ const toolActivityLabels: Record<
     error: "Couldn't prepare draft",
     denied: "Skipped draft",
   },
-  draftReply: {
-    pending: "Drafting reply",
-    complete: "Drafted reply",
-    error: "Couldn't draft reply",
-    denied: "Skipped reply draft",
-  },
   searchEmails: {
     pending: "Checking inbox",
     complete: "Checked inbox",
     error: "Couldn't check inbox",
   },
-  lookupPerson: {
+  resolveContact: {
     pending: "Looking up contact",
-    complete: "Checked contact",
-    error: "Couldn't check contact",
+    complete: "Found contact",
+    error: "Couldn't find contact",
   },
   listTasks: {
     pending: "Checking tasks",
@@ -143,7 +136,13 @@ function ToolBodyPreview({ text }: { text: string }) {
   );
 }
 
-function renderToolArgs(toolName: string, args: Record<string, unknown>): ReactNode {
+function ToolArgs({
+  toolName,
+  args,
+}: {
+  toolName: string;
+  args: Record<string, unknown>;
+}) {
   switch (toolName) {
     case "sendEmail":
     case "composeEmail": {
@@ -155,10 +154,16 @@ function renderToolArgs(toolName: string, args: Record<string, unknown>): ReactN
       return (
         <div className="space-y-3">
           {isPresent(args.to) ? (
-            <ToolField label="To" value={<p className="break-all">{String(args.to)}</p>} />
+            <ToolField
+              label="To"
+              value={<p className="break-all">{String(args.to)}</p>}
+            />
           ) : null}
           {isPresent(args.cc) ? (
-            <ToolField label="CC" value={<p className="break-all">{String(args.cc)}</p>} />
+            <ToolField
+              label="CC"
+              value={<p className="break-all">{String(args.cc)}</p>}
+            />
           ) : null}
           {isPresent(args.subject) ? (
             <ToolField
@@ -167,7 +172,11 @@ function renderToolArgs(toolName: string, args: Record<string, unknown>): ReactN
             />
           ) : null}
           {body ? (
-            <ToolField label="Body" multiline value={<ToolBodyPreview text={body} />} />
+            <ToolField
+              label="Body"
+              multiline
+              value={<ToolBodyPreview text={body} />}
+            />
           ) : null}
         </div>
       );
@@ -254,7 +263,11 @@ function renderToolArgs(toolName: string, args: Record<string, unknown>): ReactN
             />
           ) : null}
           {content ? (
-            <ToolField label="Content" multiline value={<ToolBodyPreview text={content} />} />
+            <ToolField
+              label="Content"
+              multiline
+              value={<ToolBodyPreview text={content} />}
+            />
           ) : null}
         </div>
       );
@@ -282,6 +295,71 @@ function renderToolArgs(toolName: string, args: Record<string, unknown>): ReactN
       );
     }
   }
+}
+
+function buildKeyedMessageParts(messageId: string, parts: UIMessage["parts"]) {
+  const counts = new Map<string, number>();
+
+  return parts.map((part) => {
+    const signature = getMessagePartSignature(part);
+    const nextCount = counts.get(signature) ?? 0;
+    counts.set(signature, nextCount + 1);
+    return {
+      key: `${messageId}-${signature}-${nextCount}`,
+      part,
+    };
+  });
+}
+
+function getMessagePartSignature(part: UIMessage["parts"][number]) {
+  if (part.type === "text") {
+    return `text:${part.text}`;
+  }
+
+  if (isReasoningUIPart(part)) {
+    return `reasoning:${part.text}`;
+  }
+
+  if (isToolUIPart(part)) {
+    return `tool:${part.toolCallId}`;
+  }
+
+  return part.type;
+}
+
+function MessagePart({
+  part,
+}: {
+  part: UIMessage["parts"][number];
+}) {
+  if (part.type === "text") {
+    return <p className="whitespace-pre-wrap">{part.text}</p>;
+  }
+
+  if (isReasoningUIPart(part)) {
+    return <p className="text-xs text-muted-foreground">{part.text}</p>;
+  }
+
+  if (isToolUIPart(part)) {
+    const toolName = getToolName(part);
+
+    if (part.state === "approval-requested") {
+      return null;
+    }
+
+    if (part.state === "output-error") {
+      return (
+        <ToolActivity
+          tone="error"
+          text={getToolActivityText(toolName, part.state)}
+        />
+      );
+    }
+
+    return <ToolActivity text={getToolActivityText(toolName, part.state)} />;
+  }
+
+  return null;
 }
 
 function getToolActivityText(toolName: string, state: string) {
@@ -319,6 +397,7 @@ function ToolActivity({
 
 export function AgentMessage({ message }: { message: UIMessage }) {
   const isUser = message.role === "user";
+  const keyedParts = buildKeyedMessageParts(message.id, message.parts);
 
   return (
     <div className={`px-3 py-2 text-xs ${isUser ? "flex justify-end" : ""}`}>
@@ -327,74 +406,9 @@ export function AgentMessage({ message }: { message: UIMessage }) {
           isUser ? "max-w-[85%] rounded-md bg-muted/40 px-3 py-2" : "w-full"
         }`}
       >
-        {message.parts.map((part, i) => {
-          if (part.type === "text") {
-            return (
-              <p
-                key={`${message.id}-text-${i}`}
-                className="whitespace-pre-wrap"
-              >
-                {part.text}
-              </p>
-            );
-          }
-
-          if (isReasoningUIPart(part)) {
-            return (
-              <p
-                key={`${message.id}-reasoning-${i}`}
-                className="text-xs text-muted-foreground"
-              >
-                {part.text}
-              </p>
-            );
-          }
-
-          if (isToolUIPart(part)) {
-            const toolName = getToolName(part);
-
-            if (part.state === "approval-requested") {
-              return null;
-            }
-
-            if (part.state === "output-available") {
-              return (
-                <ToolActivity
-                  key={`${message.id}-tool-${part.toolCallId}`}
-                  text={getToolActivityText(toolName, part.state)}
-                />
-              );
-            }
-
-            if (part.state === "output-error") {
-              return (
-                <ToolActivity
-                  key={`${message.id}-tool-${part.toolCallId}`}
-                  tone="error"
-                  text={getToolActivityText(toolName, part.state)}
-                />
-              );
-            }
-
-            if (part.state === "output-denied") {
-              return (
-                <ToolActivity
-                  key={`${message.id}-tool-${part.toolCallId}`}
-                  text={getToolActivityText(toolName, part.state)}
-                />
-              );
-            }
-
-            return (
-              <ToolActivity
-                key={`${message.id}-tool-${part.toolCallId}`}
-                text={getToolActivityText(toolName, part.state)}
-              />
-            );
-          }
-
-          return null;
-        })}
+        {keyedParts.map(({ key, part }) => (
+          <MessagePart key={key} part={part} />
+        ))}
       </div>
     </div>
   );
@@ -418,7 +432,9 @@ export function ToolApprovalCard({
   return (
     <div className="mx-3 my-1.5 rounded-md bg-muted/50 p-3">
       <p className="text-xs font-medium text-foreground">{label}</p>
-      <div className="mt-2">{renderToolArgs(toolName, args)}</div>
+      <div className="mt-2">
+        <ToolArgs toolName={toolName} args={args} />
+      </div>
       <div className="mt-2 flex gap-2">
         <Button
           size="sm"

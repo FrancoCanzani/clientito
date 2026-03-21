@@ -37,7 +37,6 @@ export function CommandListPanel({
   taskNavigationCommands,
   emailSelectionCommands,
   actionCommands,
-  normalizedQuery,
   enterAgentMode,
 }: {
   visibleNavigationCommands: PaletteCommand[];
@@ -45,7 +44,6 @@ export function CommandListPanel({
   taskNavigationCommands: PaletteCommand[];
   emailSelectionCommands: PaletteCommand[];
   actionCommands: PaletteCommand[];
-  normalizedQuery: string;
   enterAgentMode: (initialQuery?: string) => void;
 }) {
   return (
@@ -64,37 +62,20 @@ export function CommandListPanel({
         <CommandGroup heading="Select" commands={emailSelectionCommands} />
         <CommandGroup heading="Actions" commands={actionCommands} />
 
-        {normalizedQuery ? (
-          <Command.Group
-            heading="Agent"
-            className={commandGroupHeadingClassName}
+        <Command.Group
+          heading="Agent"
+          className={commandGroupHeadingClassName}
+        >
+          <Command.Item
+            value="Ask agent"
+            keywords={["agent", "assistant", "ai", "chat"]}
+            onSelect={() => enterAgentMode()}
+            className={commandItemClassName}
           >
-            <Command.Item
-              forceMount
-              value={`Ask agent about ${normalizedQuery}`}
-              onSelect={() => enterAgentMode(normalizedQuery)}
-              className={commandItemClassName}
-            >
-              <KeyReturnIcon className="size-4 text-muted-foreground" />
-              Ask agent about &ldquo;{normalizedQuery}&rdquo;
-            </Command.Item>
-          </Command.Group>
-        ) : (
-          <Command.Group
-            heading="Agent"
-            className={commandGroupHeadingClassName}
-          >
-            <Command.Item
-              forceMount
-              value="Ask agent"
-              onSelect={() => enterAgentMode()}
-              className={commandItemClassName}
-            >
-              <KeyReturnIcon className="size-4 text-muted-foreground" />
-              Ask agent
-            </Command.Item>
-          </Command.Group>
-        )}
+            <KeyReturnIcon className="size-4 text-muted-foreground" />
+            Ask agent
+          </Command.Item>
+        </Command.Group>
       </Command.List>
     </div>
   );

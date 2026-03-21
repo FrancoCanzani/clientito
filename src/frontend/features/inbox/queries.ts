@@ -11,6 +11,7 @@ type FetchEmailsParams = {
   view?: "inbox" | "sent" | "spam" | "trash" | "snoozed" | "archived" | "starred";
   limit?: number;
   offset?: number;
+  mailboxId?: number;
 };
 
 export async function fetchEmails(
@@ -22,6 +23,7 @@ export async function fetchEmails(
   if (params?.view) query.set("view", params.view);
   if (params?.limit) query.set("limit", String(params.limit));
   if (params?.offset) query.set("offset", String(params.offset));
+  if (params?.mailboxId) query.set("mailboxId", String(params.mailboxId));
 
   const response = await fetch(`/api/emails?${query}`);
   if (!response.ok) {

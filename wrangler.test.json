@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "petit-test",
+  "main": "./src/worker/index.ts",
+  "compatibility_date": "2025-10-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "petit-test-db",
+      "database_id": "TEST"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "NOTES_IMAGES",
+      "bucket_name": "petit-notes-images-test"
+    },
+    {
+      "binding": "ATTACHMENTS",
+      "bucket_name": "petit-attachments-test"
+    }
+  ]
+}

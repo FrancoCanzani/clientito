@@ -1,3 +1,4 @@
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { EmailCommandProvider } from "@/features/inbox/hooks/use-email-command-state";
 import { PageContextProvider } from "@/hooks/use-page-context";
 import type { ReactNode } from "react";
@@ -5,7 +6,9 @@ import type { ReactNode } from "react";
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <PageContextProvider>
-      <EmailCommandProvider>{children}</EmailCommandProvider>
+      <TooltipProvider delayDuration={300} skipDelayDuration={0}>
+        <EmailCommandProvider>{children}</EmailCommandProvider>
+      </TooltipProvider>
     </PageContextProvider>
   );
 }

@@ -65,26 +65,12 @@ CREATE TABLE `daily_briefings` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `daily_briefings_user_date_idx` ON `daily_briefings` (`user_id`,`date`);--> statement-breakpoint
-CREATE TABLE `drafts` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`user_id` text NOT NULL,
-	`to` text,
-	`cc` text,
-	`subject` text,
-	`body` text,
-	`in_reply_to` text,
-	`thread_id` text,
-	`updated_at` integer NOT NULL,
-	`created_at` integer NOT NULL,
-	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `drafts_user_idx` ON `drafts` (`user_id`);--> statement-breakpoint
 CREATE TABLE `email_filters` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` text NOT NULL,
 	`name` text NOT NULL,
-	`conditions` text NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
+	`conditions` text DEFAULT '[]' NOT NULL,
 	`actions` text NOT NULL,
 	`enabled` integer DEFAULT true NOT NULL,
 	`priority` integer DEFAULT 0 NOT NULL,
@@ -97,6 +83,7 @@ CREATE INDEX `email_filters_user_priority_idx` ON `email_filters` (`user_id`,`pr
 CREATE TABLE `email_subscriptions` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` text NOT NULL,
+	`mailbox_id` integer,
 	`sender_key` text NOT NULL,
 	`from_addr` text NOT NULL,
 	`from_name` text,
@@ -110,16 +97,18 @@ CREATE TABLE `email_subscriptions` (
 	`unsubscribed_at` integer,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`mailbox_id`) REFERENCES `mailboxes`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `email_subscriptions_user_sender_idx` ON `email_subscriptions` (`user_id`,`sender_key`);--> statement-breakpoint
+CREATE UNIQUE INDEX `email_subscriptions_mailbox_sender_idx` ON `email_subscriptions` (`mailbox_id`,`sender_key`);--> statement-breakpoint
 CREATE INDEX `email_subscriptions_user_status_idx` ON `email_subscriptions` (`user_id`,`status`);--> statement-breakpoint
 CREATE INDEX `email_subscriptions_user_updated_idx` ON `email_subscriptions` (`user_id`,`updated_at`);--> statement-breakpoint
 CREATE INDEX `email_subscriptions_user_last_received_idx` ON `email_subscriptions` (`user_id`,`last_received_at`);--> statement-breakpoint
 CREATE TABLE `emails` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` text NOT NULL,
+	`mailbox_id` integer,
 	`gmail_id` text NOT NULL,
 	`thread_id` text,
 	`message_id` text,
@@ -140,7 +129,8 @@ CREATE TABLE `emails` (
 	`unsubscribe_email` text,
 	`snoozed_until` integer,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`mailbox_id`) REFERENCES `mailboxes`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `emails_gmail_id_unique` ON `emails` (`gmail_id`);--> statement-breakpoint
@@ -148,21 +138,27 @@ CREATE INDEX `emails_user_idx` ON `emails` (`user_id`);--> statement-breakpoint
 CREATE INDEX `emails_user_date_idx` ON `emails` (`user_id`,`date`);--> statement-breakpoint
 CREATE INDEX `emails_thread_idx` ON `emails` (`thread_id`);--> statement-breakpoint
 CREATE INDEX `emails_user_snoozed_idx` ON `emails` (`user_id`,`snoozed_until`);--> statement-breakpoint
+CREATE INDEX `emails_mailbox_date_idx` ON `emails` (`mailbox_id`,`date`);--> statement-breakpoint
 CREATE TABLE `mailboxes` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` text NOT NULL,
+	`account_id` text,
 	`gmail_email` text,
 	`history_id` text,
+	`sync_window_months` integer,
+	`sync_cutoff_at` integer,
 	`auth_state` text DEFAULT 'unknown' NOT NULL,
 	`last_successful_sync_at` integer,
 	`last_error_at` integer,
 	`last_error_message` text,
 	`lock_until` integer,
 	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`account_id`) REFERENCES `account`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `mailboxes_user_id_unique` ON `mailboxes` (`user_id`);--> statement-breakpoint
+CREATE INDEX `mailboxes_user_idx` ON `mailboxes` (`user_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `mailboxes_account_idx` ON `mailboxes` (`account_id`);--> statement-breakpoint
 CREATE INDEX `mailboxes_auth_state_idx` ON `mailboxes` (`auth_state`);--> statement-breakpoint
 CREATE INDEX `mailboxes_last_success_idx` ON `mailboxes` (`last_successful_sync_at`);--> statement-breakpoint
 CREATE TABLE `notes` (
@@ -215,13 +211,4 @@ CREATE TABLE `tasks` (
 );
 --> statement-breakpoint
 CREATE INDEX `tasks_user_status_idx` ON `tasks` (`user_id`,`status`);--> statement-breakpoint
-CREATE INDEX `tasks_user_due_idx` ON `tasks` (`user_id`,`due_at`);--> statement-breakpoint
-CREATE TABLE `user_settings` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`user_id` text NOT NULL,
-	`signature` text,
-	`updated_at` integer,
-	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `user_settings_user_id_unique` ON `user_settings` (`user_id`);
+CREATE INDEX `tasks_user_due_idx` ON `tasks` (`user_id`,`due_at`);

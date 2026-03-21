@@ -4,8 +4,11 @@ import { account } from "../../db/auth-schema";
 import { mailboxes } from "../../db/schema";
 import { hasUsableAccessToken } from "../../lib/gmail/client";
 import { GOOGLE_RECONNECT_REQUIRED_MESSAGE } from "../../lib/gmail/errors";
-import { getMailboxSyncSnapshot } from "../../lib/gmail/mailbox-state";
-import { catchUpMailboxOnDemand } from "../../lib/gmail/sync";
+import {
+  getMailboxSyncSnapshot,
+  getUserMailboxes,
+} from "../../lib/gmail/mailbox-state";
+import { catchUpAllMailboxes } from "../../lib/gmail/sync";
 import type { AppRouteEnv } from "../types";
 
 const GOOGLE_GMAIL_SCOPES = [
@@ -37,7 +40,13 @@ export function registerGetSync(api: Hono<AppRouteEnv>) {
     const db = c.get("db");
     const user = c.get("user")!;
 
-    const snapshot = await getMailboxSyncSnapshot(db, user.id);
+    // Get all mailboxes for user; use the first one for the legacy single-account status
+    const userMailboxes = await getUserMailboxes(db, user.id);
+    const firstMailbox = userMailboxes[0] ?? null;
+
+    const snapshot = firstMailbox
+      ? await getMailboxSyncSnapshot(db, firstMailbox.id)
+      : { mailbox: null, latestJob: null, activeJob: null, hasLiveLock: false };
     const mailbox = snapshot.mailbox;
     const activeJob = snapshot.activeJob;
     const latestJob = snapshot.latestJob;
@@ -103,9 +112,9 @@ export function registerGetSync(api: Hono<AppRouteEnv>) {
               ? "error"
               : "ready_to_sync";
 
-    // Trigger catch-up after building the response snapshot so it doesn't race
+    // Trigger catch-up for all mailboxes
     c.executionCtx.waitUntil(
-      catchUpMailboxOnDemand(db, c.env, user.id, user.email).catch((err) => {
+      catchUpAllMailboxes(db, c.env, user.id).catch((err) => {
         console.error("Background catch-up failed", {
           userId: user.id,
           error: err instanceof Error ? err.message : String(err),

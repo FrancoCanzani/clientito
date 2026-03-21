@@ -4,7 +4,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
-const route = getRouteApi("/_dashboard/inbox/subscriptions");
+const route = getRouteApi("/_dashboard/inbox/$id/subscriptions");
 
 export default function SubscriptionsPage() {
   const { subscriptions } = route.useLoaderData();

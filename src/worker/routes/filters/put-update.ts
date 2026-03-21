@@ -25,8 +25,7 @@ const updateSchema = z.object({
 
 export function registerUpdateFilter(app: Hono<AppRouteEnv>) {
   app.put("/:id", zValidator("json", updateSchema), async (c) => {
-    const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const user = c.get("user")!;
 
     const id = Number(c.req.param("id"));
     if (!Number.isFinite(id)) return c.json({ error: "Invalid id" }, 400);

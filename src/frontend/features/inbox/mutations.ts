@@ -56,8 +56,10 @@ export async function markEmailRead(emailId: string): Promise<void> {
 }
 
 type SendEmailInput = {
+  mailboxId?: number;
   to: string;
   cc?: string;
+  bcc?: string;
   subject: string;
   body: string;
   inReplyTo?: string;
@@ -121,34 +123,5 @@ export async function uploadAttachments(
       size: number;
     }>;
   };
-  return json.data;
-}
-
-type DraftReplyInput = {
-  emailId: number;
-  instructions?: string;
-};
-
-type DraftReplyResult = {
-  draft: string;
-};
-
-export async function draftReply(
-  input: DraftReplyInput,
-): Promise<DraftReplyResult> {
-  const response = await fetch("/api/ai/draft-reply", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-
-  if (!response.ok) {
-    const json = await response.json().catch(() => ({}));
-    throw new Error(
-      (json as { error?: string }).error ?? "Failed to generate draft",
-    );
-  }
-
-  const json = (await response.json()) as { data: DraftReplyResult };
   return json.data;
 }

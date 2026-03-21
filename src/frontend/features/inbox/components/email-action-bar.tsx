@@ -3,7 +3,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
@@ -24,7 +23,7 @@ import { useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { unsubscribe } from "../../subscriptions/queries";
-import { draftReply, patchEmail, sendEmail } from "../mutations";
+import { patchEmail, sendEmail } from "../mutations";
 import type { EmailDetailItem } from "../types";
 import type { ComposeInitial } from "./compose-email-dialog";
 import { SnoozePicker } from "./snooze-picker";
@@ -53,7 +52,7 @@ function ActionButton({
           type="button"
           onClick={onClick}
           disabled={disabled}
-          className="rounded-md p-1.5 text-muted-foreground transition-[transform,background-color,color] duration-150 ease-out hover:bg-muted/60 hover:text-foreground active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40"
+          className="flex size-8 items-center justify-center text-muted-foreground transition-[transform,color,background-color] duration-150 ease-out hover:bg-muted/50 hover:text-foreground active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40"
           aria-label={label}
         >
           {children}
@@ -176,6 +175,7 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
   const sendMutation = useMutation({
     mutationFn: () =>
       sendEmail({
+        mailboxId: email.mailboxId ?? undefined,
         to: email.fromAddr,
         subject: email.subject
           ? email.subject.startsWith("Re:")
@@ -195,15 +195,6 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
     onError: (error) => toast.error(error.message),
   });
 
-  const draftMutation = useMutation({
-    mutationFn: () => draftReply({ emailId: Number(email.id) }),
-    onSuccess: (result) => {
-      setReplyBody(result.draft);
-      setReplyOpen(true);
-      setTimeout(() => textareaRef.current?.focus(), 0);
-    },
-    onError: () => toast.error("AI service unavailable"),
-  });
 
   const handleForward = () => {
     const subject = email.subject
@@ -220,7 +211,7 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
       email.resolvedBodyText ?? email.bodyText ?? "",
     ].join("\n");
 
-    onForward?.({ subject, body });
+    onForward?.({ mailboxId: email.mailboxId, subject, body });
   };
 
   const handleReplyAll = () => {
@@ -245,6 +236,7 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
       : "Re:";
 
     onForward?.({
+      mailboxId: email.mailboxId,
       to: replyTo,
       cc: uniqueCc || undefined,
       subject,
@@ -264,13 +256,26 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
   return (
     <div className="space-y-3">
       {replyOpen && (
-        <div className="space-y-2">
+        <div className="border-l border-border/80 pl-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                Quick reply
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Send with Cmd+Enter
+              </p>
+            </div>
+            <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              Reply
+            </span>
+          </div>
           <Textarea
             ref={textareaRef}
             value={replyBody}
             onChange={(e) => setReplyBody(e.target.value)}
             placeholder="Write your reply..."
-            className="min-h-20 resize-none text-sm"
+            className="min-h-28 resize-none rounded-none border-x-0 border-t-0 border-b border-border/70 bg-transparent px-0 py-0 text-sm leading-7 shadow-none focus-visible:ring-0"
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 e.preventDefault();
@@ -285,20 +290,13 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
               }
             }}
           />
-          <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => draftMutation.mutate()}
-              disabled={draftMutation.isPending}
-              className="gap-1.5 text-xs"
-            >
-              {draftMutation.isPending ? "Drafting..." : "Draft"}
-            </Button>
-            <div className="flex gap-2">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">Esc closes the draft</p>
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="sm"
+                className="rounded-full px-3"
                 onClick={() => {
                   setReplyOpen(false);
                   setReplyBody("");
@@ -308,6 +306,7 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
               </Button>
               <Button
                 size="sm"
+                className="rounded-full px-3"
                 onClick={() => sendMutation.mutate()}
                 disabled={
                   sendMutation.isPending || replyBody.trim().length === 0
@@ -320,111 +319,115 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
         </div>
       )}
 
-      <TooltipProvider>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-xs"
-              onClick={() => {
-                setReplyOpen(true);
-                setTimeout(() => textareaRef.current?.focus(), 0);
-              }}
-            >
-              <ArrowBendUpLeftIcon className="size-3.5" />
-              Reply
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-xs"
-              onClick={handleReplyAll}
-            >
-              <UsersThreeIcon className="size-3.5" />
-              Reply All
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-0.5">
-            <ActionButton
-              label="Archive"
-              onClick={() => archiveMutation.mutate()}
-              disabled={actionsPending}
-            >
-              <ArchiveIcon className="size-4" />
-            </ActionButton>
-            <ActionButton
-              label="Delete"
-              onClick={() => trashMutation.mutate()}
-              disabled={actionsPending}
-            >
-              <TrashIcon className="size-4" />
-            </ActionButton>
-            <ActionButton
-              label="Move to spam"
-              onClick={() => spamMutation.mutate()}
-              disabled={actionsPending}
-            >
-              <WarningIcon className="size-4" />
-            </ActionButton>
-            <ActionButton
-              label={isStarred ? "Unstar" : "Star"}
-              onClick={() => starMutation.mutate()}
-              disabled={actionsPending}
-            >
-              <StarIcon
-                className="size-4"
-                weight={isStarred ? "fill" : "regular"}
-              />
-            </ActionButton>
-            <ActionButton
-              label={email.isRead ? "Mark unread" : "Mark read"}
-              onClick={() => readMutation.mutate()}
-              disabled={actionsPending}
-            >
-              {email.isRead ? (
-                <EnvelopeSimpleIcon className="size-4" />
-              ) : (
-                <EnvelopeSimpleOpenIcon className="size-4" />
-              )}
-            </ActionButton>
-            {isSnoozed ? (
-              <ActionButton
-                label="Unsnooze"
-                onClick={() => snoozeMutation.mutate(null)}
-                disabled={actionsPending}
-              >
-                <ClockIcon className="size-4" weight="fill" />
-              </ActionButton>
-            ) : (
-              <SnoozePicker onSnooze={(ts) => snoozeMutation.mutate(ts)}>
-                <span>
-                  <ActionButton
-                    label="Snooze"
-                    onClick={() => {}}
-                    disabled={actionsPending}
-                  >
-                    <ClockIcon className="size-4" />
-                  </ActionButton>
-                </span>
-              </SnoozePicker>
-            )}
-            <ActionButton label="Forward" onClick={handleForward}>
-              <ArrowBendUpRightIcon className="size-4" />
-            </ActionButton>
-            {hasUnsubscribe && (
-              <ActionButton
-                label="Unsubscribe"
-                onClick={() => unsubscribeMutation.mutate()}
-                disabled={actionsPending}
-              >
-                <BellSlashIcon className="size-4" />
-              </ActionButton>
-            )}
-          </div>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant={replyOpen ? "default" : "secondary"}
+            size="sm"
+            className="h-8 rounded-full px-3 text-xs shadow-none"
+            onClick={() => {
+              setReplyOpen(true);
+              setTimeout(() => textareaRef.current?.focus(), 0);
+            }}
+          >
+            <ArrowBendUpLeftIcon className="size-3.5" />
+            Reply
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-full px-3 text-xs"
+            onClick={handleReplyAll}
+          >
+            <UsersThreeIcon className="size-3.5" />
+            Reply all
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 rounded-full px-3 text-xs"
+            onClick={handleForward}
+          >
+            <ArrowBendUpRightIcon className="size-3.5" />
+            Forward
+          </Button>
         </div>
-      </TooltipProvider>
+
+        <div className="flex flex-wrap items-center gap-0.5">
+          <ActionButton
+            label="Archive"
+            onClick={() => archiveMutation.mutate()}
+            disabled={actionsPending}
+          >
+            <ArchiveIcon className="size-4" />
+          </ActionButton>
+          <ActionButton
+            label="Delete"
+            onClick={() => trashMutation.mutate()}
+            disabled={actionsPending}
+          >
+            <TrashIcon className="size-4" />
+          </ActionButton>
+          <ActionButton
+            label="Move to spam"
+            onClick={() => spamMutation.mutate()}
+            disabled={actionsPending}
+          >
+            <WarningIcon className="size-4" />
+          </ActionButton>
+          <ActionButton
+            label={isStarred ? "Unstar" : "Star"}
+            onClick={() => starMutation.mutate()}
+            disabled={actionsPending}
+          >
+            <StarIcon
+              className="size-4"
+              weight={isStarred ? "fill" : "regular"}
+            />
+          </ActionButton>
+          <ActionButton
+            label={email.isRead ? "Mark unread" : "Mark read"}
+            onClick={() => readMutation.mutate()}
+            disabled={actionsPending}
+          >
+            {email.isRead ? (
+              <EnvelopeSimpleIcon className="size-4" />
+            ) : (
+              <EnvelopeSimpleOpenIcon className="size-4" />
+            )}
+          </ActionButton>
+          {isSnoozed ? (
+            <ActionButton
+              label="Unsnooze"
+              onClick={() => snoozeMutation.mutate(null)}
+              disabled={actionsPending}
+            >
+              <ClockIcon className="size-4" weight="fill" />
+            </ActionButton>
+          ) : (
+            <SnoozePicker onSnooze={(ts) => snoozeMutation.mutate(ts)}>
+              <span>
+                <ActionButton
+                  label="Snooze"
+                  onClick={() => {}}
+                  disabled={actionsPending}
+                >
+                  <ClockIcon className="size-4" />
+                </ActionButton>
+              </span>
+            </SnoozePicker>
+          )}
+          {hasUnsubscribe && (
+            <ActionButton
+              label="Unsubscribe"
+              onClick={() => unsubscribeMutation.mutate()}
+              disabled={actionsPending}
+            >
+              <BellSlashIcon className="size-4" />
+            </ActionButton>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

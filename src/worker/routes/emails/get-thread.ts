@@ -16,7 +16,7 @@ export function registerGetEmailThread(api: Hono<AppRouteEnv>) {
       const user = c.get("user")!;
 
       const { threadId } = c.req.valid("param");
-      await catchUpMailboxOnDemand(db, c.env, user.id, user.email);
+      await catchUpMailboxOnDemand(db, c.env, Number(user.id), user.email);
 
       const rows = await db
         .select(emailSummarySelection)

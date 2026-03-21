@@ -1,5 +1,5 @@
 import type { Database } from "../../db/client";
-import { GMAIL_API_BASE, getGmailToken, gmailRequest } from "./client";
+import { GMAIL_API_BASE, getGmailTokenForMailbox, gmailRequest } from "./client";
 import type {
   GmailAttachmentMeta,
   GmailAttachmentResponse,
@@ -167,6 +167,7 @@ function buildMimeMessage(
   input: {
     to: string;
     cc?: string;
+    bcc?: string;
     subject: string;
     body: string;
     inReplyTo?: string;
@@ -187,6 +188,9 @@ function buildMimeMessage(
   headers.push(`To: ${input.to}`);
   if (input.cc) {
     headers.push(`Cc: ${input.cc}`);
+  }
+  if (input.bcc) {
+    headers.push(`Bcc: ${input.bcc}`);
   }
   headers.push(`Subject: ${encodeMimeHeader(input.subject)}`);
   headers.push("MIME-Version: 1.0");
@@ -299,10 +303,10 @@ export function extractMessageAttachments(
 export async function getGmailMessageById(
   db: Database,
   env: Env,
-  userId: string,
+  mailboxId: number,
   messageId: string,
 ): Promise<GmailMessage> {
-  const accessToken = await getGmailToken(db, userId, {
+  const accessToken = await getGmailTokenForMailbox(db, mailboxId, {
     GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
   });
@@ -316,11 +320,11 @@ export async function getGmailMessageById(
 export async function getGmailAttachmentBytes(
   db: Database,
   env: Env,
-  userId: string,
+  mailboxId: number,
   messageId: string,
   attachmentId: string,
 ): Promise<Uint8Array> {
-  const accessToken = await getGmailToken(db, userId, {
+  const accessToken = await getGmailTokenForMailbox(db, mailboxId, {
     GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
   });
@@ -349,11 +353,12 @@ export async function fetchAttachmentFromR2(
 export async function sendGmailMessage(
   db: Database,
   env: Env,
-  userId: string,
+  mailboxId: number,
   userEmail: string,
   input: {
     to: string;
     cc?: string;
+    bcc?: string;
     subject: string;
     body: string;
     inReplyTo?: string;
@@ -366,7 +371,7 @@ export async function sendGmailMessage(
     }>;
   },
 ): Promise<{ gmailId: string; threadId: string }> {
-  const accessToken = await getGmailToken(db, userId, {
+  const accessToken = await getGmailTokenForMailbox(db, mailboxId, {
     GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
   });
@@ -401,8 +406,8 @@ export async function sendGmailMessage(
 
 export async function batchModifyGmailMessages(
   db: Database,
+  mailboxId: number,
   env: GoogleOAuthConfig,
-  userId: string,
   gmailMessageIds: string[],
   addLabelIds?: string[],
   removeLabelIds?: string[],
@@ -412,7 +417,7 @@ export async function batchModifyGmailMessages(
     return;
   }
 
-  const accessToken = await getGmailToken(db, userId, env);
+  const accessToken = await getGmailTokenForMailbox(db, mailboxId, env);
   await postGmailModify(accessToken, "/messages/batchModify", {
     ids,
     addLabelIds: addLabelIds?.length ? Array.from(new Set(addLabelIds)) : [],
@@ -424,10 +429,10 @@ export async function batchModifyGmailMessages(
 
 export async function archiveGmailMessage(
   db: Database,
+  mailboxId: number,
   env: GoogleOAuthConfig,
-  userId: string,
   gmailMessageId: string,
 ): Promise<void> {
-  const accessToken = await getGmailToken(db, userId, env);
+  const accessToken = await getGmailTokenForMailbox(db, mailboxId, env);
   await modifyGmailMessage(accessToken, gmailMessageId, undefined, ["INBOX"]);
 }

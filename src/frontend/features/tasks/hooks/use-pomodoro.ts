@@ -26,6 +26,10 @@ export function usePomodoro() {
   const [taskId, setTaskId] = useState<number | null>(null);
   const [taskTitle, setTaskTitle] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const phaseRef = useRef(phase);
+  const sessionsRef = useRef(sessionsCompleted);
+  phaseRef.current = phase;
+  sessionsRef.current = sessionsCompleted;
 
   const totalSeconds =
     phase === "work"
@@ -80,7 +84,7 @@ export function usePomodoro() {
     intervalRef.current = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
-          startNextPhase(phase, sessionsCompleted);
+          startNextPhase(phaseRef.current, sessionsRef.current);
           return 0;
         }
         return prev - 1;
@@ -88,7 +92,7 @@ export function usePomodoro() {
     }, 1000);
 
     return clearTimer;
-  }, [status, phase, sessionsCompleted, clearTimer, startNextPhase]);
+  }, [status, clearTimer, startNextPhase]);
 
   const start = useCallback(
     (forTaskId?: number, forTaskTitle?: string) => {

@@ -1,12 +1,14 @@
 import { fetchContactSuggestions } from "@/features/inbox/queries";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDebounce } from "use-debounce";
 
 type RecipientInputProps = {
   value: string;
   onChange: (value: string) => void;
   autoFocus?: boolean;
   placeholder?: string;
+  inputClassName?: string;
 };
 
 export function RecipientInput({
@@ -14,26 +16,13 @@ export function RecipientInput({
   onChange,
   autoFocus,
   placeholder = "To",
+  inputClassName,
 }: RecipientInputProps) {
-  const [inputValue, setInputValue] = useState(value);
-  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setInputValue(value);
-  }, [value]);
-
-  useEffect(() => {
-    if (inputValue.length < 2) {
-      setDebouncedQuery("");
-      return;
-    }
-    const timer = setTimeout(() => setDebouncedQuery(inputValue), 200);
-    return () => clearTimeout(timer);
-  }, [inputValue]);
+  const [debouncedValue] = useDebounce(value, 200);
+  const debouncedQuery = debouncedValue.length >= 2 ? debouncedValue : "";
 
   const { data } = useQuery({
     queryKey: ["contact-suggestions", debouncedQuery],
@@ -43,25 +32,25 @@ export function RecipientInput({
   });
 
   const suggestions = data?.data ?? [];
-
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [suggestions.length]);
+  const activeSuggestionIndex =
+    suggestions.length > 0
+      ? Math.min(selectedIndex, suggestions.length - 1)
+      : 0;
 
   const selectSuggestion = useCallback(
     (email: string) => {
       onChange(email);
-      setInputValue(email);
       setOpen(false);
+      setSelectedIndex(0);
     },
     [onChange],
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const next = e.target.value;
-    setInputValue(next);
     onChange(next);
     setOpen(true);
+    setSelectedIndex(0);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -76,9 +65,9 @@ export function RecipientInput({
         (i) => (i - 1 + suggestions.length) % suggestions.length,
       );
     } else if (e.key === "Enter" || e.key === "Tab") {
-      if (suggestions[selectedIndex]) {
+      if (suggestions[activeSuggestionIndex]) {
         e.preventDefault();
-        selectSuggestion(suggestions[selectedIndex].email);
+        selectSuggestion(suggestions[activeSuggestionIndex].email);
       }
     } else if (e.key === "Escape") {
       setOpen(false);
@@ -101,31 +90,30 @@ export function RecipientInput({
 
   // Don't show dropdown if the input looks like a complete email already selected
   const looksLikeCompleteEmail =
-    inputValue.includes("@") && inputValue.includes(".");
+    value.includes("@") && value.includes(".");
   const showDropdown =
     open && suggestions.length > 0 && !looksLikeCompleteEmail;
 
   return (
     <div ref={containerRef} className="relative">
       <input
-        ref={inputRef}
         type="email"
         placeholder={placeholder}
-        value={inputValue}
+        value={value}
         onChange={handleInputChange}
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
         autoFocus={autoFocus}
-        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        className={`flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${inputClassName ?? ""}`}
       />
       {showDropdown && (
-        <div className="absolute top-full left-0 z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md">
+        <div className="absolute top-full left-0 z-50 mt-1 w-full overflow-hidden rounded-lg border border-border bg-popover">
           {suggestions.map((suggestion, i) => (
             <button
               key={suggestion.email}
               type="button"
               className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                i === selectedIndex ? "bg-muted" : "hover:bg-muted/50"
+                i === activeSuggestionIndex ? "bg-muted" : "hover:bg-muted/50"
               }`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => selectSuggestion(suggestion.email)}

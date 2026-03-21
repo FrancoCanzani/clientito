@@ -23,6 +23,7 @@ export function registerPatchEmail(api: Hono<AppRouteEnv>) {
         .select({
           id: emails.id,
           gmailId: emails.gmailId,
+          mailboxId: emails.mailboxId,
           isRead: emails.isRead,
           labelIds: emails.labelIds,
           snoozedUntil: emails.snoozedUntil,
@@ -32,7 +33,7 @@ export function registerPatchEmail(api: Hono<AppRouteEnv>) {
         .limit(1);
 
       const email = row[0];
-      if (!email) return c.json({ error: "Email not found" }, 404);
+      if (!email || !email.mailboxId) return c.json({ error: "Email not found" }, 404);
 
       const nextState = applyEmailPatch(email, body);
       const { dbUpdates } = nextState;
@@ -44,8 +45,8 @@ export function registerPatchEmail(api: Hono<AppRouteEnv>) {
         try {
           await batchModifyGmailMessages(
             db,
+            email.mailboxId,
             c.env,
-            user.id,
             [email.gmailId],
             nextState.addLabelIds,
             nextState.removeLabelIds,

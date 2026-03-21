@@ -1,7 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
+import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { z } from "zod";
+import { account } from "../../db/auth-schema";
 import { sendGmailMessage } from "../../lib/gmail/mailbox";
+import { ensureMailbox, getUserMailboxes } from "../../lib/gmail/mailbox-state";
 import {
   markEmailSubscriptionStatus,
   normalizeUnsubscribeEmail,
@@ -74,7 +77,20 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
 
       if (unsubscribeEmail) {
         try {
-          await sendGmailMessage(db, c.env, user.id, user.email, {
+          // Resolve mailbox for sending
+          const userMailboxes = await getUserMailboxes(db, user.id);
+          let mailbox = userMailboxes[0];
+          if (!mailbox) {
+            const googleAccount = await db.query.account.findFirst({
+              where: and(eq(account.userId, user.id), eq(account.providerId, "google")),
+            });
+            mailbox = (await ensureMailbox(db, user.id, googleAccount?.id ?? null))!;
+          }
+          if (!mailbox) {
+            return c.json({ error: "No mailbox configured" }, 400);
+          }
+
+          await sendGmailMessage(db, c.env, mailbox.id, mailbox.gmailEmail ?? user.email, {
             to: unsubscribeEmail,
             subject: "Unsubscribe",
             body: "Unsubscribe",

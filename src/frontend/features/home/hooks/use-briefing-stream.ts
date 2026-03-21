@@ -1,7 +1,7 @@
 import { useCompletion } from "@ai-sdk/react";
-import { useCallback, useRef } from "react";
+import { useEffect, useRef } from "react";
 
-export function useBriefingStream() {
+export function useBriefingStream(enabled = false) {
   const hasTriggered = useRef(false);
 
   const { completion, isLoading, error, complete } = useCompletion({
@@ -10,16 +10,15 @@ export function useBriefingStream() {
     streamProtocol: "text",
   });
 
-  const trigger = useCallback(() => {
-    if (hasTriggered.current) return;
+  useEffect(() => {
+    if (!enabled || hasTriggered.current) return;
     hasTriggered.current = true;
-    complete("");
-  }, [complete]);
+    void complete("");
+  }, [enabled, complete]);
 
   return {
     text: completion,
     isStreaming: isLoading,
     error,
-    trigger,
   };
 }

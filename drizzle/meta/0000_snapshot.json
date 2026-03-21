@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e1115542-d0fa-49f5-803c-22b942e8c4bf",
+  "id": "0aba3f90-f129-4605-81fc-5d9a29610cc4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "account": {
@@ -454,108 +454,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "drafts": {
-      "name": "drafts",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "to": {
-          "name": "to",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "cc": {
-          "name": "cc",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "subject": {
-          "name": "subject",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "body": {
-          "name": "body",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "in_reply_to": {
-          "name": "in_reply_to",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "thread_id": {
-          "name": "thread_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "drafts_user_idx": {
-          "name": "drafts_user_idx",
-          "columns": [
-            "user_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "drafts_user_id_user_id_fk": {
-          "name": "drafts_user_id_user_id_fk",
-          "tableFrom": "drafts",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "email_filters": {
       "name": "email_filters",
       "columns": {
@@ -580,12 +478,21 @@
           "notNull": true,
           "autoincrement": false
         },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
         "conditions": {
           "name": "conditions",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "'[]'"
         },
         "actions": {
           "name": "actions",
@@ -669,6 +576,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "mailbox_id": {
+          "name": "mailbox_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "sender_key": {
@@ -766,10 +680,10 @@
         }
       },
       "indexes": {
-        "email_subscriptions_user_sender_idx": {
-          "name": "email_subscriptions_user_sender_idx",
+        "email_subscriptions_mailbox_sender_idx": {
+          "name": "email_subscriptions_mailbox_sender_idx",
           "columns": [
-            "user_id",
+            "mailbox_id",
             "sender_key"
           ],
           "isUnique": true
@@ -812,6 +726,19 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "email_subscriptions_mailbox_id_mailboxes_id_fk": {
+          "name": "email_subscriptions_mailbox_id_mailboxes_id_fk",
+          "tableFrom": "email_subscriptions",
+          "tableTo": "mailboxes",
+          "columnsFrom": [
+            "mailbox_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -833,6 +760,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "mailbox_id": {
+          "name": "mailbox_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "gmail_id": {
@@ -1014,6 +948,14 @@
             "snoozed_until"
           ],
           "isUnique": false
+        },
+        "emails_mailbox_date_idx": {
+          "name": "emails_mailbox_date_idx",
+          "columns": [
+            "mailbox_id",
+            "date"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -1023,6 +965,19 @@
           "tableTo": "user",
           "columnsFrom": [
             "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "emails_mailbox_id_mailboxes_id_fk": {
+          "name": "emails_mailbox_id_mailboxes_id_fk",
+          "tableFrom": "emails",
+          "tableTo": "mailboxes",
+          "columnsFrom": [
+            "mailbox_id"
           ],
           "columnsTo": [
             "id"
@@ -1052,6 +1007,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "gmail_email": {
           "name": "gmail_email",
           "type": "text",
@@ -1062,6 +1024,20 @@
         "history_id": {
           "name": "history_id",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sync_window_months": {
+          "name": "sync_window_months",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sync_cutoff_at": {
+          "name": "sync_cutoff_at",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1111,10 +1087,17 @@
         }
       },
       "indexes": {
-        "mailboxes_user_id_unique": {
-          "name": "mailboxes_user_id_unique",
+        "mailboxes_user_idx": {
+          "name": "mailboxes_user_idx",
           "columns": [
             "user_id"
+          ],
+          "isUnique": false
+        },
+        "mailboxes_account_idx": {
+          "name": "mailboxes_account_idx",
+          "columns": [
+            "account_id"
           ],
           "isUnique": true
         },
@@ -1140,6 +1123,19 @@
           "tableTo": "user",
           "columnsFrom": [
             "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mailboxes_account_id_account_id_fk": {
+          "name": "mailboxes_account_id_account_id_fk",
+          "tableFrom": "mailboxes",
+          "tableTo": "account",
+          "columnsFrom": [
+            "account_id"
           ],
           "columnsTo": [
             "id"
@@ -1497,66 +1493,6 @@
         "tasks_user_id_user_id_fk": {
           "name": "tasks_user_id_user_id_fk",
           "tableFrom": "tasks",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "user_settings": {
-      "name": "user_settings",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "signature": {
-          "name": "signature",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "user_settings_user_id_unique": {
-          "name": "user_settings_user_id_unique",
-          "columns": [
-            "user_id"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "user_settings_user_id_user_id_fk": {
-          "name": "user_settings_user_id_user_id_fk",
-          "tableFrom": "user_settings",
           "tableTo": "user",
           "columnsFrom": [
             "user_id"

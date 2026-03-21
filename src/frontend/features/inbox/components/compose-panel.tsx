@@ -56,9 +56,9 @@ function ComposePanelBody({
 
   return createPortal(
     <div className="fixed inset-x-0 bottom-0 z-50 px-0 sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-120 sm:px-0">
-      <div className="flex max-h-[min(85vh,720px)] min-h-0 flex-col overflow-hidden rounded-t-xl border border-border/80 bg-background shadow-2xl sm:rounded-xl">
+      <div className="flex max-h-[min(85vh,720px)] min-h-0 flex-col overflow-hidden border border-border/70 bg-background sm:rounded-sm">
         <div
-          className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-muted/30 px-4 py-3"
+          className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 px-4 py-3"
           role="button"
           tabIndex={0}
           onClick={() => setMinimized(false)}
@@ -82,7 +82,7 @@ function ComposePanelBody({
               type="button"
               variant="ghost"
               size="icon"
-              className="size-7"
+              className="size-7 rounded-full text-muted-foreground"
               onClick={(event) => {
                 event.stopPropagation();
                 setMinimized((current) => !current);
@@ -95,7 +95,7 @@ function ComposePanelBody({
               type="button"
               variant="ghost"
               size="icon"
-              className="size-7"
+              className="size-7 rounded-full text-muted-foreground"
               onClick={(event) => {
                 event.stopPropagation();
                 onOpenChange(false);
@@ -108,7 +108,7 @@ function ComposePanelBody({
         </div>
 
         {!minimized && (
-          <div className="flex min-h-0 flex-1 px-4 py-4">
+          <div className="flex min-h-0 flex-1 px-4 py-3">
             <ComposeEmailFields
               compose={compose}
               bodyClassName="min-h-[220px] flex-1 resize-none overflow-y-auto text-sm [field-sizing:fixed]"

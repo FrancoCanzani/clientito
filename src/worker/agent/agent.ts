@@ -11,7 +11,6 @@ import { AgentMemory } from "./memory";
 import { makeMemoryTools } from "./tools/memory-tools";
 import { makeReadTools } from "./tools/read-tools";
 import { makeWriteTools } from "./tools/write-tools";
-import { safeSerialize, type AgentTools } from "./utils";
 
 const MODEL = "gpt-5.4";
 const MAX_AGENT_STEPS = 6;
@@ -19,15 +18,16 @@ const MAX_AGENT_STEPS = 6;
 const BASE_SYSTEM_PROMPT = `You are a CRM command assistant. Answer in 1-2 short sentences.
 Use tools to look up information or take actions. Be direct and factual.
 Prefer doing over explaining. Never ask clarifying questions.
-Use the exact runtime tool names when calling tools: searchEmails, searchEmailsByDate, listTasks, summarizeEmail, createTask, updateTask, deleteTask, createNote, archiveEmail, trashEmail, markEmailRead, markEmailUnread, starEmail, unstarEmail, sendEmail, draftReply, composeEmail, rememberThis, forgetThis, recallMemories.
+Use the exact runtime tool names when calling tools: searchEmails, searchEmailsByDate, listTasks, summarizeEmail, resolveContact, createTask, updateTask, deleteTask, createNote, archiveEmail, trashEmail, markEmailRead, markEmailUnread, starEmail, unstarEmail, sendEmail, composeEmail, rememberThis, forgetThis, recallMemories.
 After using tools, produce a final answer for the user. Do not end on a tool call unless you need approval for a write action.
-If the user asks for a draft reply or asks you to write a reply to an email, call draftReply and then return only the reply body text. Do not add an intro, explanation, quotes, or labels.
-draftReply is safe to use without approval because it only generates text and does not send or change anything.
+If the user asks to reply to an email, use composeEmail to open a compose window with a pre-filled reply. Do not generate drafts separately.
+When the user refers to a person by name (e.g. "email Pedro", "send to Sarah"), ALWAYS use resolveContact first to find their email address. If multiple matches are returned, present the list and ask the user to pick. Never guess an email address.
+The user may have multiple Gmail accounts connected. Email searches return results from all accounts. If a mailbox ID is available in the current context, use it for composeEmail/sendEmail. If sending account selection is ambiguous, tell the user they need to choose the sender account.
 
 You have persistent memory. When the user shares preferences, tells you about contacts, or asks you to remember something, use rememberThis to save it. Your memories are automatically included in the context so you can personalize responses. Use recallMemories if you need to check what you know.`;
 
 type EntityContext =
-  | { type: "email"; id: string; subject: string | null; fromName: string | null; fromAddr: string; threadId: string | null }
+  | { type: "email"; id: string; subject: string | null; fromName: string | null; fromAddr: string; threadId: string | null; mailboxId: number | null }
   | { type: "person"; id: string; name: string | null; email: string | null }
   | { type: "note"; id: string; title: string | null }
   | { type: "task"; id: string; title: string };
@@ -44,6 +44,7 @@ function describeEntity(entity: EntityContext): string {
       if (entity.subject) lines.push(`Subject: ${entity.subject}`);
       lines.push(`Email ID: ${entity.id}`);
       if (entity.threadId) lines.push(`Thread ID: ${entity.threadId}`);
+      if (entity.mailboxId) lines.push(`Mailbox ID: ${entity.mailboxId}`);
       return `an email:\n${lines.join("\n")}`;
     }
     case "person": {
@@ -168,7 +169,7 @@ export class Agent extends AIChatAgent<Env> {
       apiKey: this.env.OPENAI_API_KEY,
     });
     const memory = new AgentMemory(this.ctx.storage);
-    const tools: AgentTools = {
+    const tools: ToolSet = {
       ...makeReadTools(db, userId),
       ...makeWriteTools(db, userId, userEmail, this.env),
       ...makeMemoryTools(memory),
@@ -199,13 +200,14 @@ export class Agent extends AIChatAgent<Env> {
             reason: event.finishReason,
           });
         }
+
+        await onFinish(event);
       },
     });
 
     return result.toUIMessageStreamResponse({
       originalMessages: this.messages,
       sendFinish: true,
-      onFinish,
     });
   }
 }

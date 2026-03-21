@@ -8,6 +8,7 @@ import {
   fetchAttachmentFromR2,
   sendGmailMessage,
 } from "../../lib/gmail/mailbox";
+import { resolveOutgoingMailbox } from "../../lib/gmail/mailbox-state";
 import { syncGmailMessageIds } from "../../lib/gmail/sync";
 import type { AppRouteEnv } from "../types";
 import { sendEmailBodySchema } from "./schemas";
@@ -18,15 +19,17 @@ const SENT_EMAIL_PROJECTION_DELAY_MS = 300;
 async function projectSentEmail(
   db: Database,
   env: Env,
+  mailboxId: number,
   userId: string,
   gmailId: string,
 ): Promise<boolean> {
   for (let attempt = 0; attempt < SENT_EMAIL_PROJECTION_RETRIES; attempt += 1) {
     try {
-      await syncGmailMessageIds(db, env, userId, [gmailId], true);
+      await syncGmailMessageIds(db, env, mailboxId, userId, [gmailId], true);
     } catch (error) {
       console.warn("Sent email projection attempt failed", {
         userId,
+        mailboxId,
         gmailId,
         attempt: attempt + 1,
         error,
@@ -59,6 +62,16 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
 
     const input = c.req.valid("json");
 
+    let mailbox;
+    try {
+      mailbox = await resolveOutgoingMailbox(db, user.id, input.mailboxId);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to resolve sender account";
+      const status = message === "Selected sender account not found." ? 404 : 400;
+      return c.json({ error: message }, status);
+    }
+
     try {
       let attachments:
         | Array<{ filename: string; mimeType: string; content: ArrayBuffer }>
@@ -74,9 +87,10 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
         );
       }
 
-      const result = await sendGmailMessage(db, env, user.id, user.email, {
+      const result = await sendGmailMessage(db, env, mailbox.id, mailbox.gmailEmail ?? user.email, {
         to: input.to,
         cc: input.cc,
+        bcc: input.bcc,
         subject: input.subject,
         body: input.body,
         inReplyTo: input.inReplyTo,
@@ -88,6 +102,7 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
       const projected = await projectSentEmail(
         db,
         env,
+        mailbox.id,
         user.id,
         result.gmailId,
       );

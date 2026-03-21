@@ -27,23 +27,16 @@ export function useEmailInboxKeyboard({
   const moveToIndex = useCallback(
     (index: number) => {
       const nextId = orderedIds[index];
-      if (!nextId) {
-        return;
-      }
-
+      if (!nextId) return;
       const nextEmail = emailById.get(nextId);
-      if (nextEmail) {
-        openEmail(nextEmail);
-      }
+      if (nextEmail) openEmail(nextEmail);
     },
     [emailById, openEmail, orderedIds],
   );
 
   const goToEmail = useCallback(
     (direction: "prev" | "next") => {
-      const nextIndex =
-        direction === "next" ? selectedIndex + 1 : selectedIndex - 1;
-      moveToIndex(nextIndex);
+      moveToIndex(direction === "next" ? selectedIndex + 1 : selectedIndex - 1);
     },
     [moveToIndex, selectedIndex],
   );
@@ -51,77 +44,37 @@ export function useEmailInboxKeyboard({
   const hasPrev = selectedIndex > 0;
   const hasNext = selectedIndex >= 0 && selectedIndex < orderedIds.length - 1;
 
-  useHotkey(
-    "ArrowDown",
-    (event) => {
-      if (shouldIgnoreHotkeyTarget(event.target) || orderedIds.length === 0) {
-        return;
-      }
-
+  const guardedMove = useCallback(
+    (event: KeyboardEvent, getIndex: () => number) => {
+      if (shouldIgnoreHotkeyTarget(event.target) || orderedIds.length === 0) return;
       event.preventDefault();
-      moveToIndex(
-        selectedIndex >= 0
-          ? Math.min(selectedIndex + 1, orderedIds.length - 1)
-          : 0,
-      );
+      moveToIndex(getIndex());
     },
-    { preventDefault: false, stopPropagation: false },
+    [moveToIndex, orderedIds.length],
   );
 
-  useHotkey(
-    "J",
-    (event) => {
-      if (shouldIgnoreHotkeyTarget(event.target) || orderedIds.length === 0) {
-        return;
-      }
-
-      event.preventDefault();
-      moveToIndex(
-        selectedIndex >= 0
-          ? Math.min(selectedIndex + 1, orderedIds.length - 1)
-          : 0,
-      );
-    },
-    { preventDefault: false, stopPropagation: false },
+  const nextIndex = useCallback(
+    () =>
+      selectedIndex >= 0
+        ? Math.min(selectedIndex + 1, orderedIds.length - 1)
+        : 0,
+    [selectedIndex, orderedIds.length],
   );
 
-  useHotkey(
-    "ArrowUp",
-    (event) => {
-      if (shouldIgnoreHotkeyTarget(event.target) || orderedIds.length === 0) {
-        return;
-      }
-
-      event.preventDefault();
-      moveToIndex(selectedIndex > 0 ? selectedIndex - 1 : 0);
-    },
-    { preventDefault: false, stopPropagation: false },
+  const prevIndex = useCallback(
+    () => (selectedIndex > 0 ? selectedIndex - 1 : 0),
+    [selectedIndex],
   );
 
-  useHotkey(
-    "K",
-    (event) => {
-      if (shouldIgnoreHotkeyTarget(event.target) || orderedIds.length === 0) {
-        return;
-      }
-
-      event.preventDefault();
-      moveToIndex(selectedIndex > 0 ? selectedIndex - 1 : 0);
-    },
-    { preventDefault: false, stopPropagation: false },
-  );
+  useHotkey("ArrowDown", (e) => guardedMove(e, nextIndex), { preventDefault: false, stopPropagation: false });
+  useHotkey("J", (e) => guardedMove(e, nextIndex), { preventDefault: false, stopPropagation: false });
+  useHotkey("ArrowUp", (e) => guardedMove(e, prevIndex), { preventDefault: false, stopPropagation: false });
+  useHotkey("K", (e) => guardedMove(e, prevIndex), { preventDefault: false, stopPropagation: false });
 
   useHotkey(
     "Enter",
     (event) => {
-      if (
-        shouldIgnoreHotkeyTarget(event.target) ||
-        selectedIndex !== -1 ||
-        orderedIds.length === 0
-      ) {
-        return;
-      }
-
+      if (shouldIgnoreHotkeyTarget(event.target) || selectedIndex !== -1 || orderedIds.length === 0) return;
       event.preventDefault();
       moveToIndex(0);
     },
@@ -131,10 +84,7 @@ export function useEmailInboxKeyboard({
   useHotkey(
     "Escape",
     (event) => {
-      if (shouldIgnoreHotkeyTarget(event.target) || !selectedEmailId) {
-        return;
-      }
-
+      if (shouldIgnoreHotkeyTarget(event.target) || !selectedEmailId) return;
       event.preventDefault();
       closeEmail();
     },
@@ -144,10 +94,7 @@ export function useEmailInboxKeyboard({
   useHotkey(
     "E",
     (event) => {
-      if (shouldIgnoreHotkeyTarget(event.target)) {
-        return;
-      }
-
+      if (shouldIgnoreHotkeyTarget(event.target)) return;
       event.preventDefault();
       executeEmailAction("archive");
     },
@@ -155,27 +102,14 @@ export function useEmailInboxKeyboard({
   );
 
   useHotkey(
-    {
-      key: "#",
-      shift: true,
-      alt: false,
-      ctrl: false,
-      meta: false,
-    },
+    { key: "#", shift: true, alt: false, ctrl: false, meta: false },
     (event) => {
-      if (shouldIgnoreHotkeyTarget(event.target)) {
-        return;
-      }
-
+      if (shouldIgnoreHotkeyTarget(event.target)) return;
       event.preventDefault();
       executeEmailAction("trash");
     },
     { preventDefault: false, stopPropagation: false },
   );
 
-  return {
-    goToEmail,
-    hasPrev,
-    hasNext,
-  };
+  return { goToEmail, hasPrev, hasNext };
 }

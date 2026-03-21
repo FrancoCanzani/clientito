@@ -10,6 +10,7 @@ import { batchPatchEmailsBodySchema } from "./schemas";
 import { chunkArray } from "../../lib/utils";
 
 type GmailMutationGroup = {
+  mailboxId: number;
   gmailIds: string[];
   addLabelIds: string[];
   removeLabelIds: string[];
@@ -76,6 +77,7 @@ export function registerBatchPatchEmails(api: Hono<AppRouteEnv>) {
             .select({
               id: emails.id,
               gmailId: emails.gmailId,
+              mailboxId: emails.mailboxId,
               isRead: emails.isRead,
               labelIds: emails.labelIds,
               snoozedUntil: emails.snoozedUntil,
@@ -105,11 +107,14 @@ export function registerBatchPatchEmails(api: Hono<AppRouteEnv>) {
           state,
         };
 
-        if (state.addLabelIds.length > 0 || state.removeLabelIds.length > 0) {
-          const key = createMutationGroupKey(
+        if (
+          (state.addLabelIds.length > 0 || state.removeLabelIds.length > 0) &&
+          email.mailboxId
+        ) {
+          const key = `${email.mailboxId}:${createMutationGroupKey(
             state.addLabelIds,
             state.removeLabelIds,
-          );
+          )}`;
           const group = gmailMutationGroups.get(key);
 
           if (group) {
@@ -117,6 +122,7 @@ export function registerBatchPatchEmails(api: Hono<AppRouteEnv>) {
             group.rows.push(nextRow);
           } else {
             gmailMutationGroups.set(key, {
+              mailboxId: email.mailboxId,
               gmailIds: [email.gmailId],
               addLabelIds: state.addLabelIds,
               removeLabelIds: state.removeLabelIds,
@@ -136,8 +142,8 @@ export function registerBatchPatchEmails(api: Hono<AppRouteEnv>) {
         try {
           await batchModifyGmailMessages(
             db,
+            group.mailboxId,
             c.env,
-            user.id,
             group.gmailIds,
             group.addLabelIds,
             group.removeLabelIds,

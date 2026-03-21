@@ -152,7 +152,7 @@
 }
 
 .tiptap img {
-  @apply my-3 max-h-[420px] w-auto max-w-full rounded-lg object-contain;
+  @apply my-3 max-h-105 w-auto max-w-full rounded-lg object-contain;
 }
 
 .tiptap p.is-editor-empty:first-child::before {
@@ -258,6 +258,22 @@
 .animate-briefing-fade-in {
   opacity: 0;
   animation: briefing-fade-in 0.4s ease forwards;
+}
+
+@keyframes triage-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.triage-card {
+  opacity: 0;
+  animation: triage-card-in 0.3s cubic-bezier(0.23, 1, 0.32, 1) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {

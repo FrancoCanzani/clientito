@@ -2,8 +2,12 @@ import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element
 import type { Task, TaskStatus } from "@/features/tasks/types";
 import { STATUS_LABELS } from "@/features/tasks/utils";
 import { cn } from "@/lib/utils";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { TaskBoardCard } from "./task-board-card";
+
+function dragOverReducer(_state: boolean, action: "enter" | "leave") {
+  return action === "enter";
+}
 
 export function TaskBoardColumn({
   status,
@@ -17,7 +21,7 @@ export function TaskBoardColumn({
   onPomodoro: (taskId: number, title: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [isDragOver, dispatchDragOver] = useReducer(dragOverReducer, false);
 
   useEffect(() => {
     const el = ref.current;
@@ -26,9 +30,9 @@ export function TaskBoardColumn({
     return dropTargetForElements({
       element: el,
       getData: () => ({ status }),
-      onDragEnter: () => setIsDragOver(true),
-      onDragLeave: () => setIsDragOver(false),
-      onDrop: () => setIsDragOver(false),
+      onDragEnter: () => dispatchDragOver("enter"),
+      onDragLeave: () => dispatchDragOver("leave"),
+      onDrop: () => dispatchDragOver("leave"),
     });
   }, [status]);
 

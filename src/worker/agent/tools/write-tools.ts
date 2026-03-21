@@ -1,23 +1,21 @@
-import { createOpenAI } from "@ai-sdk/openai";
 import { tool } from "ai";
-import { and, asc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
 import { emails, notes, tasks } from "../../db/schema";
 import {
-  archiveGmailMessage,
   batchModifyGmailMessages,
   sendGmailMessage,
 } from "../../lib/gmail/mailbox";
+import { resolveOutgoingMailbox } from "../../lib/gmail/mailbox-state";
 import { applyEmailPatch } from "../../routes/emails/mutation";
-
-const MODEL = "gpt-5.4";
 
 async function getEmailForUser(db: Database, userId: string, emailId: number) {
   const rows = await db
     .select({
       id: emails.id,
       gmailId: emails.gmailId,
+      mailboxId: emails.mailboxId,
       isRead: emails.isRead,
       labelIds: emails.labelIds,
       threadId: emails.threadId,
@@ -43,6 +41,7 @@ async function patchEmailLabels(
 ) {
   const email = await getEmailForUser(db, userId, emailId);
   if (!email) return { error: "Email not found" };
+  if (!email.mailboxId) return { error: "Email has no linked mailbox" };
 
   const patch = applyEmailPatch(email, mutation);
 
@@ -56,8 +55,8 @@ async function patchEmailLabels(
   if (patch.addLabelIds.length > 0 || patch.removeLabelIds.length > 0) {
     await batchModifyGmailMessages(
       db,
+      email.mailboxId,
       env,
-      userId,
       [email.gmailId],
       patch.addLabelIds.length > 0 ? patch.addLabelIds : undefined,
       patch.removeLabelIds.length > 0 ? patch.removeLabelIds : undefined,
@@ -139,7 +138,7 @@ export function makeWriteTools(
       }),
       needsApproval: true,
       execute: async ({ taskId }) => {
-        const result = await db
+        await db
           .delete(tasks)
           .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
         return { deleted: true, taskId };
@@ -228,8 +227,14 @@ export function makeWriteTools(
 
     sendEmail: tool({
       description:
-        "Send an email from the user's Gmail account. Use this when the user explicitly asks to send a message.",
+        "Send an email from the user's Gmail account. Use this when the user explicitly asks to send a message. The user may have multiple Gmail accounts connected.",
       inputSchema: z.object({
+        mailboxId: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Mailbox ID to send from when the user has multiple connected accounts."),
         to: z.string().email().describe("Recipient email address."),
         subject: z.string().describe("Email subject."),
         body: z.string().describe("Email body as plain text."),
@@ -237,10 +242,23 @@ export function makeWriteTools(
         threadId: z.string().optional().describe("Gmail thread ID if replying in a thread."),
       }),
       needsApproval: true,
-      execute: async ({ to, subject, body, inReplyTo, threadId }) => {
-        if (!userEmail) return { error: "User email not available" };
+      execute: async ({ mailboxId, to, subject, body, inReplyTo, threadId }) => {
+        let mailbox;
+        try {
+          mailbox = await resolveOutgoingMailbox(db, userId, mailboxId);
+        } catch (error) {
+          return {
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to resolve sender account",
+          };
+        }
 
-        const result = await sendGmailMessage(db, env, userId, userEmail, {
+        const fromEmail = mailbox.gmailEmail ?? userEmail;
+        if (!fromEmail) return { error: "User email not available" };
+
+        const result = await sendGmailMessage(db, env, mailbox.id, fromEmail, {
           to,
           subject,
           body,
@@ -255,77 +273,21 @@ export function makeWriteTools(
       description:
         "Open a compose window pre-filled with email content. Use when user wants to draft without sending immediately.",
       inputSchema: z.object({
+        mailboxId: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Mailbox ID to preselect as the sender account."),
         to: z.string().email().optional().describe("Recipient email address."),
         subject: z.string().optional().describe("Email subject line."),
         body: z.string().describe("Email body content as HTML."),
       }),
       needsApproval: true,
-      execute: async ({ to, subject, body }) => {
-        return { action: "composeEmail", to, subject, body };
+      execute: async ({ mailboxId, to, subject, body }) => {
+        return { action: "composeEmail", mailboxId, to, subject, body };
       },
     }),
 
-    draftReply: tool({
-      description: "Generate a draft reply to an email thread. Does not send anything.",
-      inputSchema: z.object({
-        emailId: z.number().int().positive().describe("Email ID to reply to."),
-        instructions: z
-          .string()
-          .optional()
-          .describe("Guidance about tone, intent, or what to say."),
-      }),
-      execute: async ({ emailId, instructions }) => {
-        const email = await getEmailForUser(db, userId, emailId);
-        if (!email) return { error: "Email not found" };
-
-        let threadContext = "";
-        if (email.threadId) {
-          const threadMessages = await db
-            .select({
-              fromAddr: emails.fromAddr,
-              fromName: emails.fromName,
-              bodyText: emails.bodyText,
-              date: emails.date,
-            })
-            .from(emails)
-            .where(and(eq(emails.threadId, email.threadId), eq(emails.userId, userId)))
-            .orderBy(asc(emails.date))
-            .limit(5);
-
-          threadContext = threadMessages
-            .map((msg, i) => {
-              const from = msg.fromName || msg.fromAddr;
-              const body = (msg.bodyText ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
-              return `--- Message ${i + 1} from ${from} ---\n${body}`;
-            })
-            .join("\n\n");
-        } else {
-          threadContext = `--- Original email from ${email.fromName || email.fromAddr} ---\n${(email.bodyText ?? "").replace(/\s+/g, " ").trim().slice(0, 1000)}`;
-        }
-
-        const openai = createOpenAI({ apiKey: env.OPENAI_API_KEY });
-        const { streamText } = await import("ai");
-        const result = streamText({
-          model: openai.responses(MODEL),
-          system:
-            "You are a helpful email assistant. Draft a concise, professional reply. Match the conversation tone. Return only the reply body text.",
-          prompt: [
-            `Subject: ${email.subject ?? "(no subject)"}`,
-            "",
-            "Thread context:",
-            threadContext,
-            "",
-            instructions ? `Instructions: ${instructions}` : "Write a natural, concise reply.",
-          ].join("\n"),
-        });
-
-        let draft = "";
-        for await (const chunk of result.textStream) {
-          draft += chunk;
-        }
-
-        return { draft: draft.trim(), emailId, subject: email.subject };
-      },
-    }),
   };
 }

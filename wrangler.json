@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "hauler",
+  "name": "petit",
   "main": "./src/worker/index.ts",
   "compatibility_date": "2025-10-08",
   "compatibility_flags": ["nodejs_compat"],
@@ -26,7 +26,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "releaselayer-db",
+      "database_name": "petit-db",
       "database_id": "LOCAL",
       "migrations_dir": "drizzle"
     }
@@ -34,19 +34,15 @@
   "r2_buckets": [
     {
       "binding": "NOTES_IMAGES",
-      "bucket_name": "releaselayer-notes-images"
+      "bucket_name": "petit-notes-images"
     },
     {
       "binding": "ATTACHMENTS",
-      "bucket_name": "releaselayer-attachments"
+      "bucket_name": "petit-attachments"
     }
   ],
   "vars": {
-    "GOOGLE_CLIENT_ID": "",
-    "GOOGLE_CLIENT_SECRET": "",
-    "BETTER_AUTH_SECRET": "",
-    "BETTER_AUTH_URL": "http://localhost:5173",
-    "OPENAI_API_KEY": ""
+    "BETTER_AUTH_URL": "http://localhost:5173"
   },
   "ai": {
     "binding": "AI"

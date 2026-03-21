@@ -1,5 +1,6 @@
 import { updateNote, uploadNoteImage } from "@/features/notes/mutations";
 import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import type { Editor } from "@tiptap/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
@@ -158,8 +159,8 @@ export function useNoteAutosave({
         .focus()
         .setImageInline({ src: uploaded.url, alt: file.name })
         .run();
-    } catch (error) {
-      console.error("Failed to upload note image", error);
+    } catch {
+      toast.error("Failed to upload image");
     }
   }, []);
 

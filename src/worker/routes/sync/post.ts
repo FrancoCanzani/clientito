@@ -10,8 +10,8 @@ import {
 import {
   acquireMailboxSyncLock,
   createSyncJob,
-  ensureMailbox,
   getMailboxSyncSnapshot,
+  resolveMailbox,
   markSyncJobFailed,
   markSyncJobSucceeded,
   releaseMailboxSyncLock,
@@ -29,8 +29,8 @@ import {
 import type { AppRouteEnv } from "../types";
 import { syncRequestSchema } from "./schemas";
 
-async function isSyncInProgress(db: Database, userId: string): Promise<boolean> {
-  const snapshot = await getMailboxSyncSnapshot(db, userId);
+async function isSyncInProgress(db: Database, mailboxId: number): Promise<boolean> {
+  const snapshot = await getMailboxSyncSnapshot(db, mailboxId);
   return snapshot.hasLiveLock;
 }
 
@@ -38,14 +38,14 @@ function runFullSyncInBackground(
   db: Database,
   env: Env,
   userId: string,
-  userEmail: string,
+  mailboxId?: number,
   months?: number,
 ) {
   return (async () => {
-    const mailbox = await ensureMailbox(db, userId, userEmail);
+    const mailbox = await resolveMailbox(db, userId, mailboxId);
     if (!mailbox) return;
 
-    const hasLock = await acquireMailboxSyncLock(db, userId, userEmail);
+    const hasLock = await acquireMailboxSyncLock(db, mailbox.id);
     if (!hasLock) return;
 
     const job = await createSyncJob(db, mailbox.id, "full", "manual");
@@ -70,7 +70,7 @@ function runFullSyncInBackground(
       }
 
       await startFullGmailSync(
-        db, env, userId,
+        db, env, mailbox.id, userId,
         (phase, current, total) =>
           updateSyncJobProgress(db, mailbox.id, job.id, phase, current, total),
         { skipLock: true, cutoffAt: syncCutoffAt },
@@ -86,9 +86,9 @@ function runFullSyncInBackground(
       }
       await markSyncJobFailed(
         db, mailbox.id, job.id, message, classifySyncError(error),
-      ).catch(() => {});
+      ).catch((e) => console.error("Failed to mark sync job as failed", { mailboxId: mailbox.id, error: e }));
     } finally {
-      await releaseMailboxSyncLock(db, userId).catch(() => {});
+      await releaseMailboxSyncLock(db, mailbox.id).catch((e) => console.error("Failed to release sync lock", { mailboxId: mailbox.id, error: e }));
     }
   })();
 }
@@ -98,13 +98,14 @@ export function registerPostSync(api: Hono<AppRouteEnv>) {
     const db = c.get("db");
     const user = c.get("user")!;
 
-    const { months } = c.req.valid("json");
-    if (await isSyncInProgress(db, user.id)) {
+    const { months, mailboxId } = c.req.valid("json");
+    const mailbox = await resolveMailbox(db, user.id, mailboxId);
+    if (mailbox && await isSyncInProgress(db, mailbox.id)) {
       return c.json({ error: "Sync already in progress" }, 409);
     }
 
     c.executionCtx.waitUntil(
-      runFullSyncInBackground(db, c.env, user.id, user.email, months),
+      runFullSyncInBackground(db, c.env, user.id, mailboxId, months),
     );
     return c.json({ data: { status: "started" } }, 202);
   });
@@ -113,9 +114,14 @@ export function registerPostSync(api: Hono<AppRouteEnv>) {
     const db = c.get("db");
     const user = c.get("user")!;
 
-    c.req.valid("json");
+    const { mailboxId } = c.req.valid("json");
+    const mailbox = await resolveMailbox(db, user.id, mailboxId);
+    if (!mailbox) {
+      return c.json({ error: "No mailbox found" }, 400);
+    }
+
     const result = await catchUpMailboxOnDemand(
-      db, c.env, user.id, user.email, { force: true },
+      db, c.env, mailbox.id, user.id, { force: true },
     );
 
     if (result.status === "skipped" && result.reason === "sync_in_progress") {
@@ -133,8 +139,13 @@ export function registerPostSync(api: Hono<AppRouteEnv>) {
     const db = c.get("db");
     const user = c.get("user")!;
 
+    const mailbox = await resolveMailbox(db, user.id);
+    if (!mailbox) {
+      return c.json({ error: "No mailbox found" }, 400);
+    }
+
     c.executionCtx.waitUntil(
-      recoverMailboxSync(db, c.env, user.id, user.email),
+      recoverMailboxSync(db, c.env, mailbox.id, user.id),
     );
 
     return c.json({ data: { status: "started" } }, 202);

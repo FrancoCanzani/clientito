@@ -1,40 +1,34 @@
 import { fetchEmails } from "@/features/inbox/queries";
-import type { EmailListItem, EmailListResponse } from "@/features/inbox/types";
+import type { EmailListItem } from "@/features/inbox/types";
 import { buildThreadSections } from "@/features/inbox/utils/build-thread-sections";
 import { groupEmailsByThread } from "@/features/inbox/utils/group-emails-by-thread";
 import type { EmailView } from "@/features/inbox/utils/inbox-filters";
+import { parseMailboxId } from "@/lib/utils";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
 import { useMemo } from "react";
 
 const INBOX_POLL_INTERVAL_MS = 15_000;
+const emailsRoute = getRouteApi("/_dashboard/inbox/$id/");
 
-export function useEmailData({
-  view,
-  initialEmails,
-  selectedEmailId,
-}: {
-  view: EmailView;
-  initialEmails: EmailListResponse;
-  selectedEmailId: string | null;
-}) {
+export function useEmailData() {
+  const search = emailsRoute.useSearch();
+  const params = emailsRoute.useParams();
+
+  const view: EmailView = search.view ?? "inbox";
+  const selectedEmailId = search.id ?? search.emailId ?? null;
+  const mailboxId = parseMailboxId(params.id);
+
   const emailsQuery = useInfiniteQuery({
-    queryKey: ["emails", view],
+    queryKey: ["emails", view, mailboxId ?? "all"],
     queryFn: async ({ pageParam }) =>
-      fetchEmails({
-        view,
-        limit: 60,
-        offset: pageParam,
-      }),
+      fetchEmails({ view, limit: 60, offset: pageParam, mailboxId }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) =>
       lastPage?.pagination?.hasMore
         ? lastPage.pagination.offset + lastPage.pagination.limit
         : undefined,
-    initialData: {
-      pages: [initialEmails],
-      pageParams: [0],
-    },
     refetchInterval: INBOX_POLL_INTERVAL_MS,
     refetchIntervalInBackground: false,
   });
@@ -63,13 +57,10 @@ export function useEmailData({
     () => threadGroups.map((group) => group.representative.id),
     [threadGroups],
   );
-  const selectedEmail = useMemo<EmailListItem | null>(() => {
-    if (!selectedEmailId) {
-      return null;
-    }
-
-    return emailById.get(selectedEmailId) ?? null;
-  }, [emailById, selectedEmailId]);
+  const selectedEmail = useMemo<EmailListItem | null>(
+    () => (selectedEmailId ? emailById.get(selectedEmailId) ?? null : null),
+    [emailById, selectedEmailId],
+  );
 
   const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } =
     emailsQuery;
@@ -78,22 +69,23 @@ export function useEmailData({
     rootMargin: "200px 0px",
     threshold: 0.01,
     onChange: (isIntersecting) => {
-      if (!isIntersecting || !hasNextPage || isFetchingNextPage || isFetching) {
+      if (!isIntersecting || !hasNextPage || isFetchingNextPage || isFetching)
         return;
-      }
-
       void fetchNextPage();
     },
   });
 
   return {
+    view,
+    selectedEmailId,
+    mailboxId,
     displayRows,
     sections,
     selectedEmail,
     orderedIds,
     emailById,
-    emailsPending: emailsQuery.isPending,
-    emailsError: emailsQuery.isError,
+    isPending: emailsQuery.isPending,
+    isError: emailsQuery.isError,
     hasNextPage: hasNextPage ?? false,
     isFetchingNextPage,
     loadMoreRef,

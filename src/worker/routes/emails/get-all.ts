@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, desc, eq, isNull, like, lte, or, sql, gt } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emails } from "../../db/schema";
-import { catchUpMailboxOnDemand } from "../../lib/gmail/sync";
+import { catchUpAllMailboxes } from "../../lib/gmail/sync";
 import type { AppRouteEnv } from "../types";
 import {
   emailSummarySelection,
@@ -22,6 +22,7 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
       search,
       isRead,
       view = "inbox",
+      mailboxId,
     } = c.req.valid("query");
 
     const now = Date.now();
@@ -38,10 +39,14 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
       );
 
     if (offset === 0) {
-      await catchUpMailboxOnDemand(db, c.env, user.id, user.email);
+      await catchUpAllMailboxes(db, c.env, user.id);
     }
 
     const conditions = [eq(emails.userId, user.id)];
+
+    if (mailboxId) {
+      conditions.push(eq(emails.mailboxId, mailboxId));
+    }
 
     if (search) {
       const pattern = `%${search}%`;

@@ -1,5 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
+import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
+import { emails } from "../../db/schema";
 import { isGmailReconnectRequiredError } from "../../lib/gmail/errors";
 import { getGmailAttachmentBytes } from "../../lib/gmail/mailbox";
 import type { AppRouteEnv } from "../types";
@@ -17,12 +19,22 @@ export function registerGetAttachment(api: Hono<AppRouteEnv>) {
       const { gmailMessageId, attachmentId, filename, mimeType, inline } =
         c.req.valid("query");
 
+      // Resolve mailboxId from the email row
+      const emailRow = await db
+        .select({ mailboxId: emails.mailboxId })
+        .from(emails)
+        .where(and(eq(emails.userId, user.id), eq(emails.gmailId, gmailMessageId)))
+        .limit(1);
+      const mailboxId = emailRow[0]?.mailboxId;
+      if (!mailboxId) {
+        return c.json({ error: "Email not found" }, 404);
+      }
+
       try {
-        // getGmailAttachmentBytes() refreshes the Gmail access token when needed.
         const bytes = await getGmailAttachmentBytes(
           db,
           c.env,
-          user.id,
+          mailboxId,
           gmailMessageId,
           attachmentId,
         );

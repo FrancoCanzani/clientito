@@ -19,7 +19,6 @@ import {
   NewspaperIcon,
   NoteBlankIcon,
   PaperPlaneTiltIcon,
-  PlusIcon,
   SignOutIcon,
   StarIcon,
   SunIcon,
@@ -32,6 +31,12 @@ import { useNavigate, useRouter } from "@tanstack/react-router";
 import React, { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import type { PaletteCommand, PaletteMode } from "./types";
+
+/** Extract the current mailbox $id from the pathname, defaulting to "all". */
+function getActiveInboxId(pathname: string): string {
+  const match = pathname.match(/^\/inbox\/([^/]+)/);
+  return match?.[1] ?? "all";
+}
 
 export function usePaletteCommands({
   close,
@@ -47,8 +52,16 @@ export function usePaletteCommands({
   const logout = useLogout();
   const { resolved: resolvedTheme, toggle: toggleTheme } = useTheme();
 
+  const pathname = router.state.location.pathname;
+  const activeInboxId = getActiveInboxId(pathname);
+
+  const navigateToInbox = useCallback(() => {
+    navigate({ to: "/inbox/$id", params: { id: activeInboxId } });
+    close();
+  }, [close, navigate, activeInboxId]);
+
   const runNavigation = useCallback(
-    (to: "/home" | "/inbox" | "/notes" | "/tasks" | "/settings") => {
+    (to: "/home" | "/notes" | "/tasks" | "/settings") => {
       navigate({ to });
       close();
     },
@@ -83,8 +96,8 @@ export function usePaletteCommands({
     onError: () => toast.error("Failed to create note"),
   });
 
-  const isEmailsRoute = router.state.location.pathname === "/inbox";
-  const isTasksRoute = router.state.location.pathname === "/tasks";
+  const isEmailsRoute = pathname.startsWith("/inbox/");
+  const isTasksRoute = pathname === "/tasks";
 
   const commands: PaletteCommand[] = useMemo(() => {
     const viewIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -104,7 +117,8 @@ export function usePaletteCommands({
           icon: React.createElement(viewIcons[view] ?? TrayIcon, { className: "size-4" }),
           onSelect: () => {
             navigate({
-              to: "/inbox",
+              to: "/inbox/$id",
+              params: { id: activeInboxId },
               search: (prev) => ({
                 ...prev,
                 view: view === "inbox" ? undefined : view,
@@ -198,9 +212,9 @@ export function usePaletteCommands({
         id: "inbox",
         label: "Inbox",
         section: "navigation",
-        to: "/inbox",
+        to: "/inbox/$id",
         icon: React.createElement(TrayIcon, { className: "size-4" }),
-        onSelect: () => runNavigation("/inbox"),
+        onSelect: navigateToInbox,
       },
       {
         id: "tasks",
@@ -224,7 +238,7 @@ export function usePaletteCommands({
         section: "navigation",
         icon: React.createElement(NewspaperIcon, { className: "size-4" }),
         onSelect: () => {
-          navigate({ to: "/inbox/subscriptions" });
+          navigate({ to: "/inbox/$id/subscriptions", params: { id: activeInboxId } });
           close();
         },
       },
@@ -234,7 +248,7 @@ export function usePaletteCommands({
         section: "navigation",
         icon: React.createElement(FunnelIcon, { className: "size-4" }),
         onSelect: () => {
-          navigate({ to: "/inbox/filters" });
+          navigate({ to: "/inbox/$id/filters", params: { id: activeInboxId } });
           close();
         },
       },
@@ -250,15 +264,16 @@ export function usePaletteCommands({
       ...taskViewCommands,
       {
         id: "compose",
-        label: "Compose Message",
+        label: "New Email",
         section: "actions",
         icon: React.createElement(EnvelopeSimpleIcon, {
           className: "size-4",
         }),
         onSelect: () => {
           navigate({
-            to: "/inbox",
-            search: { compose: true },
+            to: "/inbox/$id",
+            params: { id: activeInboxId },
+            search: (prev) => ({ ...prev, compose: true }),
           });
           close();
         },
@@ -268,7 +283,7 @@ export function usePaletteCommands({
         id: "new-task",
         label: "New Task",
         section: "actions",
-        icon: React.createElement(PlusIcon, { className: "size-4" }),
+        icon: React.createElement(CheckSquareIcon, { className: "size-4" }),
         onSelect: () => setMode("new-task"),
       },
       {
@@ -306,6 +321,7 @@ export function usePaletteCommands({
       },
     ];
   }, [
+    activeInboxId,
     close,
     createNoteMutation,
     isEmailsRoute,
@@ -313,6 +329,7 @@ export function usePaletteCommands({
     issueEmailCommand,
     logout,
     navigate,
+    navigateToInbox,
     queryClient,
     resolvedTheme,
     runNavigation,
@@ -342,21 +359,21 @@ export function usePaletteCommands({
   );
 
   const agentSuggestions = useMemo(() => {
-    if (router.state.location.pathname === "/inbox") {
+    if (pathname.startsWith("/inbox/")) {
       return [
         "Summarize what I'm looking at",
         "Draft a reply for the current email",
         "What should I follow up on here?",
       ];
     }
-    if (router.state.location.pathname === "/notes") {
+    if (pathname === "/notes" || pathname.startsWith("/notes/")) {
       return [
         "Summarize this note",
         "Turn this note into tasks",
         "What is missing here?",
       ];
     }
-    if (router.state.location.pathname === "/tasks") {
+    if (pathname === "/tasks") {
       return [
         "What should I prioritize today?",
         "Show overdue tasks",
@@ -368,7 +385,7 @@ export function usePaletteCommands({
       "Find emails I should reply to",
       "Create a task from my current context",
     ];
-  }, [router.state.location.pathname]);
+  }, [pathname]);
 
   const submitTask = useCallback(
     (taskInput: string) => {

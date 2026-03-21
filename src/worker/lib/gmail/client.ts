@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { account, user } from "../../db/auth-schema";
 import type { Database } from "../../db/client";
+import { mailboxes } from "../../db/schema";
 import {
   GOOGLE_RECONNECT_REQUIRED_MESSAGE,
   GmailHistoryExpiredError,
@@ -454,7 +455,7 @@ export async function refreshGoogleAccessToken(
 
 export async function clearGoogleConnectionTokens(
   db: Database,
-  userId: string,
+  accountId: string,
 ): Promise<void> {
   await db
     .update(account)
@@ -464,16 +465,19 @@ export async function clearGoogleConnectionTokens(
       accessTokenExpiresAt: null,
       refreshTokenExpiresAt: null,
     })
-    .where(and(eq(account.userId, userId), eq(account.providerId, "google")));
+    .where(eq(account.id, accountId));
 }
 
+/**
+ * Get a Gmail access token by account ID (better-auth account row PK).
+ */
 export async function getGmailToken(
   db: Database,
-  userId: string,
+  accountId: string,
   config?: GoogleOAuthConfig,
 ): Promise<string> {
   const googleAccount = await db.query.account.findFirst({
-    where: and(eq(account.userId, userId), eq(account.providerId, "google")),
+    where: eq(account.id, accountId),
   });
 
   if (!googleAccount) {
@@ -491,7 +495,7 @@ export async function getGmailToken(
   }
 
   if (!googleAccount.refreshToken) {
-    await clearGoogleConnectionTokens(db, userId);
+    await clearGoogleConnectionTokens(db, accountId);
     throw new Error(GOOGLE_RECONNECT_REQUIRED_MESSAGE);
   }
 
@@ -503,7 +507,7 @@ export async function getGmailToken(
     );
   } catch (error) {
     if (isGmailReconnectRequiredError(error)) {
-      await clearGoogleConnectionTokens(db, userId);
+      await clearGoogleConnectionTokens(db, accountId);
     }
     throw error;
   }
@@ -524,6 +528,45 @@ export async function getGmailToken(
     .where(eq(account.id, googleAccount.id));
 
   return refreshed.accessToken;
+}
+
+/**
+ * Legacy helper: get Gmail token by userId (picks the first google account).
+ * Used during migration period where callers still pass userId.
+ */
+export async function getGmailTokenByUserId(
+  db: Database,
+  userId: string,
+  config?: GoogleOAuthConfig,
+): Promise<string> {
+  const googleAccount = await db.query.account.findFirst({
+    where: and(eq(account.userId, userId), eq(account.providerId, "google")),
+  });
+
+  if (!googleAccount) {
+    throw new Error("Google account is not connected.");
+  }
+
+  return getGmailToken(db, googleAccount.id, config);
+}
+
+/**
+ * Get a Gmail access token by mailbox ID. Joins mailbox → account.
+ */
+export async function getGmailTokenForMailbox(
+  db: Database,
+  mailboxId: number,
+  config?: GoogleOAuthConfig,
+): Promise<string> {
+  const mailbox = await db.query.mailboxes.findFirst({
+    where: eq(mailboxes.id, mailboxId),
+  });
+
+  if (!mailbox?.accountId) {
+    throw new Error("Mailbox has no linked account.");
+  }
+
+  return getGmailToken(db, mailbox.accountId, config);
 }
 
 export async function syncGoogleUserProfile(

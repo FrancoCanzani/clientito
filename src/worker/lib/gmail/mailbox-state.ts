@@ -1,5 +1,6 @@
 import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import type { Database } from "../../db/client";
+import { account } from "../../db/auth-schema";
 import { mailboxes, syncJobs } from "../../db/schema";
 import { GOOGLE_RECONNECT_REQUIRED_MESSAGE, type SyncJobErrorClass } from "./errors";
 import type { SyncWindowMonths } from "./sync-preferences";
@@ -20,18 +21,97 @@ function hasLiveLock(lockUntil: number | null | undefined, now = Date.now()) {
   );
 }
 
-async function findMailbox(db: Database, userId: string) {
+async function findMailboxById(db: Database, mailboxId: number) {
   return db.query.mailboxes.findFirst({
-    where: eq(mailboxes.userId, userId),
+    where: eq(mailboxes.id, mailboxId),
   });
 }
 
+/** Return all mailboxes belonging to a user. */
+export async function getUserMailboxes(db: Database, userId: string) {
+  return db
+    .select()
+    .from(mailboxes)
+    .where(eq(mailboxes.userId, userId));
+}
+
+/**
+ * Resolve a specific mailbox by id (with ownership check) or fall back to
+ * the user's first mailbox, creating one if none exists.
+ */
+export async function resolveMailbox(
+  db: Database,
+  userId: string,
+  mailboxId?: number,
+) {
+  if (mailboxId) {
+    const mb = await db.query.mailboxes.findFirst({
+      where: and(eq(mailboxes.id, mailboxId), eq(mailboxes.userId, userId)),
+    });
+    return mb ?? null;
+  }
+
+  const userMailboxes = await getUserMailboxes(db, userId);
+  if (userMailboxes[0]) return userMailboxes[0];
+
+  const googleAccount = await db.query.account.findFirst({
+    where: and(eq(account.userId, userId), eq(account.providerId, "google")),
+  });
+  return ensureMailbox(db, userId, googleAccount?.id ?? null);
+}
+
+/**
+ * Ensure a mailbox exists for the given user + accountId pair.
+ * If accountId is provided, upserts on accountId; otherwise falls back to userId lookup.
+ */
 export async function ensureMailbox(
   db: Database,
   userId: string,
+  accountId?: string | null,
   gmailEmail?: string | null,
 ) {
-  const existing = await findMailbox(db, userId);
+  // If accountId supplied, look up by accountId first
+  if (accountId) {
+    const existing = await db.query.mailboxes.findFirst({
+      where: eq(mailboxes.accountId, accountId),
+    });
+
+    if (existing) {
+      if (gmailEmail && existing.gmailEmail !== gmailEmail) {
+        await db
+          .update(mailboxes)
+          .set({ gmailEmail, updatedAt: Date.now() })
+          .where(eq(mailboxes.id, existing.id));
+        return { ...existing, gmailEmail };
+      }
+      return existing;
+    }
+
+    const now = Date.now();
+    const inserted = await db
+      .insert(mailboxes)
+      .values({
+        userId,
+        accountId,
+        gmailEmail: gmailEmail ?? null,
+        authState: "unknown",
+        updatedAt: now,
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    return (
+      inserted[0] ??
+      (await db.query.mailboxes.findFirst({
+        where: eq(mailboxes.accountId, accountId),
+      }))
+    );
+  }
+
+  // Legacy: fallback to first mailbox for user
+  const existing = await db.query.mailboxes.findFirst({
+    where: eq(mailboxes.userId, userId),
+  });
 
   if (existing) {
     if (gmailEmail && existing.gmailEmail !== gmailEmail) {
@@ -53,7 +133,7 @@ export async function ensureMailbox(
       authState: "unknown",
       updatedAt: now,
     })
-    .onConflictDoNothing({ target: mailboxes.userId })
+    .onConflictDoNothing()
     .returning();
 
   return (
@@ -64,18 +144,46 @@ export async function ensureMailbox(
   );
 }
 
-export async function getMailboxSyncPreferences(
+export async function resolveOutgoingMailbox(
   db: Database,
   userId: string,
-  gmailEmail?: string | null,
+  mailboxId?: number,
+) {
+  if (mailboxId) {
+    const mailbox = await resolveMailbox(db, userId, mailboxId);
+    if (!mailbox) {
+      throw new Error("Selected sender account not found.");
+    }
+    return mailbox;
+  }
+
+  const userMailboxes = await getUserMailboxes(db, userId);
+  if (userMailboxes.length === 1) {
+    return userMailboxes[0];
+  }
+  if (userMailboxes.length > 1) {
+    throw new Error("Select a sender account before sending.");
+  }
+
+  const mailbox = await resolveMailbox(db, userId);
+  if (!mailbox) {
+    throw new Error("No mailbox configured");
+  }
+
+  return mailbox;
+}
+
+export async function getMailboxSyncPreferences(
+  db: Database,
+  mailboxId: number,
 ): Promise<{
   mailbox: typeof mailboxes.$inferSelect | null;
   syncWindowMonths: SyncWindowMonths | null;
   syncCutoffAt: number | null;
 }> {
-  const mailbox = await ensureMailbox(db, userId, gmailEmail);
+  const mailbox = await findMailboxById(db, mailboxId);
   return {
-    mailbox,
+    mailbox: mailbox ?? null,
     syncWindowMonths: (mailbox?.syncWindowMonths as SyncWindowMonths | null) ?? null,
     syncCutoffAt: mailbox?.syncCutoffAt ?? null,
   };
@@ -83,14 +191,13 @@ export async function getMailboxSyncPreferences(
 
 export async function setMailboxSyncPreferences(
   db: Database,
-  userId: string,
-  gmailEmail: string | null | undefined,
+  mailboxId: number,
   input: {
     syncWindowMonths: SyncWindowMonths | null;
     syncCutoffAt: number | null;
   },
 ): Promise<typeof mailboxes.$inferSelect | null> {
-  const mailbox = await ensureMailbox(db, userId, gmailEmail);
+  const mailbox = await findMailboxById(db, mailboxId);
   if (!mailbox) return null;
 
   const now = Date.now();
@@ -113,11 +220,8 @@ export async function setMailboxSyncPreferences(
 
 export async function acquireMailboxSyncLock(
   db: Database,
-  userId: string,
-  gmailEmail?: string | null,
+  mailboxId: number,
 ): Promise<boolean> {
-  await ensureMailbox(db, userId, gmailEmail);
-
   const now = Date.now();
   const locked = await db
     .update(mailboxes)
@@ -127,7 +231,7 @@ export async function acquireMailboxSyncLock(
     })
     .where(
       and(
-        eq(mailboxes.userId, userId),
+        eq(mailboxes.id, mailboxId),
         or(isNull(mailboxes.lockUntil), lt(mailboxes.lockUntil, now)),
       ),
     )
@@ -138,7 +242,7 @@ export async function acquireMailboxSyncLock(
 
 export async function touchMailboxSyncLock(
   db: Database,
-  userId: string,
+  mailboxId: number,
 ): Promise<boolean> {
   const now = Date.now();
   const gt = (col: typeof mailboxes.lockUntil, val: number) => sql`${col} > ${val}`;
@@ -151,7 +255,7 @@ export async function touchMailboxSyncLock(
     })
     .where(
       and(
-        eq(mailboxes.userId, userId),
+        eq(mailboxes.id, mailboxId),
         gt(mailboxes.lockUntil, now),
       ),
     )
@@ -162,27 +266,25 @@ export async function touchMailboxSyncLock(
 
 export async function releaseMailboxSyncLock(
   db: Database,
-  userId: string,
+  mailboxId: number,
 ): Promise<void> {
   await db
     .update(mailboxes)
     .set({ lockUntil: null, updatedAt: Date.now() })
-    .where(eq(mailboxes.userId, userId));
+    .where(eq(mailboxes.id, mailboxId));
 }
 
 export async function persistMailboxHistoryState(
   db: Database,
-  userId: string,
+  mailboxId: number,
   historyId: string | null,
 ): Promise<void> {
   if (!historyId) return;
 
-  const mailbox = await findMailbox(db, userId);
-  if (!mailbox) {
-    await ensureMailbox(db, userId);
-  }
+  const mailbox = await findMailboxById(db, mailboxId);
+  if (!mailbox) return;
 
-  if (mailbox?.historyId) {
+  if (mailbox.historyId) {
     try {
       if (BigInt(historyId) <= BigInt(mailbox.historyId)) return;
     } catch {
@@ -193,12 +295,12 @@ export async function persistMailboxHistoryState(
   await db
     .update(mailboxes)
     .set({ historyId, updatedAt: Date.now() })
-    .where(eq(mailboxes.userId, userId));
+    .where(eq(mailboxes.id, mailboxId));
 }
 
 export async function resetMailboxSyncState(
   db: Database,
-  userId: string,
+  mailboxId: number,
 ): Promise<void> {
   await db
     .update(mailboxes)
@@ -209,15 +311,12 @@ export async function resetMailboxSyncState(
       lockUntil: null,
       updatedAt: Date.now(),
     })
-    .where(eq(mailboxes.userId, userId));
+    .where(eq(mailboxes.id, mailboxId));
 
-  const mailbox = await findMailbox(db, userId);
-  if (mailbox) {
-    await db
-      .update(syncJobs)
-      .set({ status: "failed", finishedAt: Date.now(), errorMessage: "Reset by user" })
-      .where(and(eq(syncJobs.mailboxId, mailbox.id), eq(syncJobs.status, "running")));
-  }
+  await db
+    .update(syncJobs)
+    .set({ status: "failed", finishedAt: Date.now(), errorMessage: "Reset by user" })
+    .where(and(eq(syncJobs.mailboxId, mailboxId), eq(syncJobs.status, "running")));
 }
 
 export async function createSyncJob(
@@ -320,10 +419,9 @@ export async function markSyncJobFailed(
 
 export async function markMailboxReconnectRequired(
   db: Database,
-  userId: string,
+  mailboxId: number,
   message = GOOGLE_RECONNECT_REQUIRED_MESSAGE,
 ): Promise<void> {
-  await ensureMailbox(db, userId);
   await db
     .update(mailboxes)
     .set({
@@ -333,7 +431,7 @@ export async function markMailboxReconnectRequired(
       lockUntil: null,
       updatedAt: Date.now(),
     })
-    .where(eq(mailboxes.userId, userId));
+    .where(eq(mailboxes.id, mailboxId));
 }
 
 export async function expireStaleSyncJobs(
@@ -388,14 +486,14 @@ export async function countConsecutiveFailedJobs(
 
 export async function getMailboxSyncSnapshot(
   db: Database,
-  userId: string,
+  mailboxId: number,
 ): Promise<{
   mailbox: typeof mailboxes.$inferSelect | null;
   latestJob: typeof syncJobs.$inferSelect | null;
   activeJob: typeof syncJobs.$inferSelect | null;
   hasLiveLock: boolean;
 }> {
-  let mailbox = await findMailbox(db, userId);
+  let mailbox = await findMailboxById(db, mailboxId);
   if (!mailbox) {
     return { mailbox: null, latestJob: null, activeJob: null, hasLiveLock: false };
   }

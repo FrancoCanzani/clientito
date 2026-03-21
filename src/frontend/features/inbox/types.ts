@@ -23,6 +23,7 @@ export type ContactSuggestion = {
 
 export type EmailListItem = {
   id: string;
+  mailboxId: number | null;
   gmailId: string;
   fromAddr: string;
   fromName: string | null;

@@ -4,7 +4,7 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 const SYNC_ACTIVE_POLL_MS = 1_000;
 const SYNC_IDLE_POLL_MS = 60_000;
 
-export const syncStatusQueryOptions = queryOptions({
+const syncStatusQueryOptions = queryOptions({
   queryKey: ["sync-status"] as const,
   queryFn: fetchSyncStatus,
   staleTime: 30_000,

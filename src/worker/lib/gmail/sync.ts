@@ -13,7 +13,7 @@ import {
   fetchMessage,
   fetchMessagesBatch,
   getCurrentHistoryId,
-  getGmailToken,
+  getGmailTokenForMailbox,
   listHistoryPage,
   listMessagesPage,
   sleep,
@@ -28,9 +28,9 @@ import {
   acquireMailboxSyncLock,
   countConsecutiveFailedJobs,
   createSyncJob,
-  ensureMailbox,
   getMailboxSyncPreferences,
   getMailboxSyncSnapshot,
+  getUserMailboxes,
   markSyncJobFailed,
   markSyncJobSucceeded,
   persistMailboxHistoryState,
@@ -87,6 +87,7 @@ type ProcessMessagesInput = {
   db: Database;
   accessToken: string;
   userId: string;
+  mailboxId: number;
   messageIds: string[];
   env?: Env;
   refreshExisting?: boolean;
@@ -102,6 +103,7 @@ async function processMessageIds({
   db,
   accessToken,
   userId,
+  mailboxId,
   messageIds,
   env,
   refreshExisting = false,
@@ -339,6 +341,7 @@ async function processMessageIds({
         } else {
           pendingInserts.push({
             userId,
+            mailboxId,
             gmailId: message.id,
             ...emailValues,
             createdAt: Date.now(),
@@ -450,7 +453,7 @@ async function processMessageIds({
         .where(and(eq(emails.userId, userId), eq(emails.gmailId, gmailId)));
     }
 
-    await syncEmailSubscriptions(db, userId, subscriptionEvents);
+    await syncEmailSubscriptions(db, userId, mailboxId, subscriptionEvents);
 
     if (onProgress) {
       await onProgress("fetching", progressOffset + result.processed, total);
@@ -479,22 +482,23 @@ type SyncExecutionOptions = {
 export async function startFullGmailSync(
   db: Database,
   env: Env,
+  mailboxId: number,
   userId: string,
   onProgress?: SyncProgressFn,
   options?: SyncExecutionOptions,
 ): Promise<GmailSyncResult> {
   const hasLock =
-    options?.skipLock === true ? true : await acquireMailboxSyncLock(db, userId);
+    options?.skipLock === true ? true : await acquireMailboxSyncLock(db, mailboxId);
   if (!hasLock) {
     throw new GmailSyncStateError("Sync already in progress.");
   }
 
   try {
-    const { syncCutoffAt } = await getMailboxSyncPreferences(db, userId);
+    const { syncCutoffAt } = await getMailboxSyncPreferences(db, mailboxId);
     const effectiveCutoffAt =
       options && "cutoffAt" in options ? options.cutoffAt ?? null : syncCutoffAt;
     const gmailQuery = buildGmailQueryFromCutoff(effectiveCutoffAt);
-    const accessToken = await getGmailToken(db, userId, {
+    const accessToken = await getGmailTokenForMailbox(db, mailboxId, {
       GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
     });
@@ -518,20 +522,18 @@ export async function startFullGmailSync(
       db,
       accessToken,
       userId,
+      mailboxId,
       messageIds: allMessageIds,
       env,
       onProgress,
-      onHeartbeat: () => touchMailboxSyncLock(db, userId),
+      onHeartbeat: () => touchMailboxSyncLock(db, mailboxId),
       progressOffset: 0,
       progressTotal: allMessageIds.length,
       minDateMs: effectiveCutoffAt,
     });
 
-    // Checkpoint the historyId captured before the full sync started.
-    // If the delta below fails, incremental sync can resume from here
-    // instead of needing another full sync.
     if (historyIdBeforeFullSync) {
-      await persistMailboxHistoryState(db, userId, historyIdBeforeFullSync);
+      await persistMailboxHistoryState(db, mailboxId, historyIdBeforeFullSync);
     }
 
     if (historyIdBeforeFullSync) {
@@ -539,6 +541,7 @@ export async function startFullGmailSync(
         db,
         accessToken,
         userId,
+        mailboxId,
         startHistoryId: historyIdBeforeFullSync,
         env,
       });
@@ -555,11 +558,11 @@ export async function startFullGmailSync(
       result.historyId ?? (await getCurrentHistoryId(accessToken));
     result.historyId = latestHistoryId;
 
-    await persistMailboxHistoryState(db, userId, latestHistoryId);
+    await persistMailboxHistoryState(db, mailboxId, latestHistoryId);
     return result;
   } finally {
     if (options?.skipLock !== true) {
-      await releaseMailboxSyncLock(db, userId);
+      await releaseMailboxSyncLock(db, mailboxId);
     }
   }
 }
@@ -618,6 +621,7 @@ type IncrementalSyncCoreInput = {
   db: Database;
   accessToken: string;
   userId: string;
+  mailboxId: number;
   startHistoryId: string;
   env?: Env;
 };
@@ -626,10 +630,11 @@ async function runIncrementalGmailSyncWithAccessToken({
   db,
   accessToken,
   userId,
+  mailboxId,
   startHistoryId,
   env,
 }: IncrementalSyncCoreInput): Promise<GmailSyncResult> {
-  const { syncCutoffAt } = await getMailboxSyncPreferences(db, userId);
+  const { syncCutoffAt } = await getMailboxSyncPreferences(db, mailboxId);
   let pageToken: string | undefined;
   let latestHistoryId: string | null = startHistoryId;
   const seenChangedMessageIds = new Set<string>();
@@ -640,7 +645,7 @@ async function runIncrementalGmailSyncWithAccessToken({
     skipped: 0,
     historyId: null,
   };
-  const heartbeat = () => touchMailboxSyncLock(db, userId);
+  const heartbeat = () => touchMailboxSyncLock(db, mailboxId);
 
   do {
     await heartbeat();
@@ -670,6 +675,7 @@ async function runIncrementalGmailSyncWithAccessToken({
       db,
       accessToken,
       userId,
+      mailboxId,
       messageIds: pageChangedMessageIds,
       env,
       refreshExisting: true,
@@ -690,7 +696,7 @@ async function runIncrementalGmailSyncWithAccessToken({
   }
 
   aggregate.historyId = latestHistoryId;
-  await persistMailboxHistoryState(db, userId, latestHistoryId);
+  await persistMailboxHistoryState(db, mailboxId, latestHistoryId);
 
   return aggregate;
 }
@@ -698,26 +704,27 @@ async function runIncrementalGmailSyncWithAccessToken({
 export async function runIncrementalGmailSync(
   db: Database,
   env: Env,
+  mailboxId: number,
   userId: string,
   startHistoryIdInput?: string | null,
   options?: SyncExecutionOptions,
 ): Promise<GmailSyncResult> {
   const hasLock =
-    options?.skipLock === true ? true : await acquireMailboxSyncLock(db, userId);
+    options?.skipLock === true ? true : await acquireMailboxSyncLock(db, mailboxId);
   if (!hasLock) {
     throw new GmailSyncStateError("Sync already in progress.");
   }
 
   try {
     const mailbox = await db.query.mailboxes.findFirst({
-      where: eq(mailboxes.userId, userId),
+      where: eq(mailboxes.id, mailboxId),
     });
     const startHistoryId = startHistoryIdInput ?? mailbox?.historyId ?? null;
     if (!startHistoryId) {
       throw new GmailSyncStateError("No sync state found. Run full sync first.");
     }
 
-    const accessToken = await getGmailToken(db, userId, {
+    const accessToken = await getGmailTokenForMailbox(db, mailboxId, {
       GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
     });
@@ -726,57 +733,55 @@ export async function runIncrementalGmailSync(
       db,
       accessToken,
       userId,
+      mailboxId,
       startHistoryId,
       env,
     });
   } finally {
     if (options?.skipLock !== true) {
-      await releaseMailboxSyncLock(db, userId);
+      await releaseMailboxSyncLock(db, mailboxId);
     }
   }
 }
 
 async function withSyncJob(
   db: Database,
+  mailboxId: number,
   userId: string,
-  userEmail: string,
   kind: SyncJobKind,
   trigger: SyncJobTrigger,
   fn: (mailboxId: number, jobId: string) => Promise<GmailSyncResult>,
 ): Promise<{ status: "completed"; result: GmailSyncResult } | { status: "failed"; error: string }> {
-  const mailbox = await ensureMailbox(db, userId, userEmail);
-  if (!mailbox) return { status: "failed", error: "No mailbox" };
-
-  const hasLock = await acquireMailboxSyncLock(db, userId, userEmail);
+  const hasLock = await acquireMailboxSyncLock(db, mailboxId);
   if (!hasLock) return { status: "failed", error: "Sync already in progress" };
 
-  const job = await createSyncJob(db, mailbox.id, kind, trigger);
+  const job = await createSyncJob(db, mailboxId, kind, trigger);
 
   try {
-    const result = await fn(mailbox.id, job.id);
-    await markSyncJobSucceeded(db, mailbox.id, job.id);
+    const result = await fn(mailboxId, job.id);
+    await markSyncJobSucceeded(db, mailboxId, job.id);
     return { status: "completed", result };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Sync failed";
     if (isGmailReconnectRequiredError(error)) {
-      console.warn(`${kind} sync requires Google reconnect`, { userId });
+      console.warn(`${kind} sync requires Google reconnect`, { userId, mailboxId });
     } else {
-      console.error(`${kind} sync failed`, { userId, error });
+      console.error(`${kind} sync failed`, { userId, mailboxId, error });
     }
     await markSyncJobFailed(
-      db, mailbox.id, job.id, message, classifySyncError(error),
-    ).catch(() => {});
+      db, mailboxId, job.id, message, classifySyncError(error),
+    ).catch((e) => console.error("Failed to mark sync job as failed", { mailboxId, error: e }));
     return { status: "failed", error: message };
   } finally {
-    await releaseMailboxSyncLock(db, userId).catch(() => {});
+    await releaseMailboxSyncLock(db, mailboxId).catch((e) => console.error("Failed to release sync lock", { mailboxId, error: e }));
   }
 }
 
 export async function catchUpMailboxOnDemand(
   db: Database,
   env: Env,
+  mailboxId: number,
   userId: string,
-  userEmail: string,
   options?: {
     minIntervalMs?: number;
     force?: boolean;
@@ -793,8 +798,8 @@ export async function catchUpMailboxOnDemand(
     }
   | { status: "failed"; error: string }
 > {
-  const snapshot = await getMailboxSyncSnapshot(db, userId);
-  const mailbox = snapshot.mailbox ?? (await ensureMailbox(db, userId, userEmail));
+  const snapshot = await getMailboxSyncSnapshot(db, mailboxId);
+  const mailbox = snapshot.mailbox;
 
   if (!mailbox?.historyId) {
     return { status: "skipped", reason: "needs_full_sync" };
@@ -823,25 +828,26 @@ export async function catchUpMailboxOnDemand(
   if (shouldEscalate) {
     console.warn("Escalating to full sync after consecutive failures", {
       userId,
+      mailboxId,
       consecutiveFailures,
     });
-    return withSyncJob(db, userId, userEmail, "full", "system", async () => {
+    return withSyncJob(db, mailboxId, userId, "full", "system", async () => {
       return startFullGmailSync(
-        db, env, userId, undefined, { skipLock: true },
+        db, env, mailboxId, userId, undefined, { skipLock: true },
       );
     });
   }
 
-  return withSyncJob(db, userId, userEmail, "incremental", "system", async () => {
+  return withSyncJob(db, mailboxId, userId, "incremental", "system", async () => {
     try {
       return await runIncrementalGmailSync(
-        db, env, userId, mailbox.historyId, { skipLock: true },
+        db, env, mailboxId, userId, mailbox.historyId, { skipLock: true },
       );
     } catch (error) {
       if (error instanceof GmailHistoryExpiredError) {
-        console.warn("History expired, falling back to full sync", { userId });
+        console.warn("History expired, falling back to full sync", { userId, mailboxId });
         return startFullGmailSync(
-          db, env, userId, undefined, { skipLock: true },
+          db, env, mailboxId, userId, undefined, { skipLock: true },
         );
       }
       throw error;
@@ -849,20 +855,38 @@ export async function catchUpMailboxOnDemand(
   });
 }
 
-export async function recoverMailboxSync(
+/** Catch up all mailboxes for a user. Returns when all are done. */
+export async function catchUpAllMailboxes(
   db: Database,
   env: Env,
   userId: string,
-  userEmail: string,
+) {
+  const userMailboxes = await getUserMailboxes(db, userId);
+  if (userMailboxes.length === 0) return;
+
+  await Promise.allSettled(
+    userMailboxes.map((mb) =>
+      catchUpMailboxOnDemand(db, env, mb.id, userId).catch((err) => {
+        console.error("catchUpAllMailboxes: mailbox failed", {
+          mailboxId: mb.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }),
+    ),
+  );
+}
+
+export async function recoverMailboxSync(
+  db: Database,
+  env: Env,
+  mailboxId: number,
+  userId: string,
 ): Promise<void> {
-  await resetMailboxSyncState(db, userId);
+  await resetMailboxSyncState(db, mailboxId);
 
-  const mailbox = await ensureMailbox(db, userId, userEmail);
-  if (!mailbox) return;
-
-  await withSyncJob(db, userId, userEmail, "full", "manual", async (mailboxId, jobId) => {
+  await withSyncJob(db, mailboxId, userId, "full", "manual", async (_mbId, jobId) => {
     return startFullGmailSync(
-      db, env, userId,
+      db, env, mailboxId, userId,
       (phase, current, total) =>
         updateSyncJobProgress(db, mailboxId, jobId, phase, current, total),
       { skipLock: true },
@@ -877,6 +901,7 @@ export async function recoverMailboxSync(
 export async function syncGmailMessageIds(
   db: Database,
   env: Env,
+  mailboxId: number,
   userId: string,
   messageIds: string[],
   refreshExisting = true,
@@ -886,16 +911,17 @@ export async function syncGmailMessageIds(
     return { processed: 0, inserted: 0, skipped: 0, historyId: null };
   }
 
-  const accessToken = await getGmailToken(db, userId, {
+  const accessToken = await getGmailTokenForMailbox(db, mailboxId, {
     GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
   });
-  const { syncCutoffAt } = await getMailboxSyncPreferences(db, userId);
+  const { syncCutoffAt } = await getMailboxSyncPreferences(db, mailboxId);
 
   return processMessageIds({
     db,
     accessToken,
     userId,
+    mailboxId,
     messageIds: dedupedMessageIds,
     env,
     refreshExisting,
