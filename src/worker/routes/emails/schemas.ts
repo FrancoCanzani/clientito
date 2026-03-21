@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-export const errorResponseSchema = z.object({ error: z.string() });
+const errorResponseSchema = z.object({ error: z.string() });
 
-export const emailSearchItemSchema = z.object({
+const emailSearchItemSchema = z.object({
   id: z.string(),
   gmailId: z.string(),
   fromAddr: z.string(),
@@ -22,7 +22,7 @@ export const searchEmailsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
-export const searchEmailsResponseSchema = z.object({
+const searchEmailsResponseSchema = z.object({
   data: z.array(emailSearchItemSchema),
 });
 
@@ -35,7 +35,7 @@ export const listEmailsQuerySchema = z.object({
   mailboxId: z.coerce.number().int().positive().optional(),
 });
 
-export const emailListItemSchema = emailSearchItemSchema.extend({
+const emailListItemSchema = emailSearchItemSchema.extend({
   threadId: z.string().nullable(),
   direction: z.enum(["sent", "received"]).nullable(),
   hasAttachment: z.boolean(),
@@ -45,7 +45,7 @@ export const emailListItemSchema = emailSearchItemSchema.extend({
   snoozedUntil: z.number().nullable(),
 });
 
-export const emailAttachmentSchema = z.object({
+const emailAttachmentSchema = z.object({
   attachmentId: z.string(),
   filename: z.string().nullable(),
   mimeType: z.string().nullable(),
@@ -65,7 +65,7 @@ export const emailDetailQuerySchema = z.object({
   refreshLive: z.coerce.boolean().optional(),
 });
 
-export const emailDetailResponseSchema = z.object({
+const emailDetailResponseSchema = z.object({
   data: emailListItemSchema.extend({
     bodyText: z.string().nullable(),
     bodyHtml: z.string().nullable(),
@@ -75,7 +75,7 @@ export const emailDetailResponseSchema = z.object({
   }),
 });
 
-export const listEmailsResponseSchema = z.object({
+const listEmailsResponseSchema = z.object({
   data: z.array(emailListItemSchema),
   pagination: z.object({
     limit: z.number(),
@@ -96,7 +96,7 @@ export const emailThreadParamsSchema = z.object({
   threadId: z.string().trim().min(1),
 });
 
-export const emailThreadResponseSchema = z.object({
+const emailThreadResponseSchema = z.object({
   data: z.array(emailListItemSchema),
 });
 
@@ -123,7 +123,7 @@ export const batchPatchEmailsBodySchema = z.object({
   snoozedUntil: z.number().nullable().optional(),
 });
 
-export const patchEmailResponseSchema = z.object({
+const patchEmailResponseSchema = z.object({
   data: z.object({
     id: z.string(),
     isRead: z.boolean(),
@@ -137,10 +137,10 @@ export const patchEmailResponseSchema = z.object({
 
 export const sendEmailBodySchema = z.object({
   mailboxId: z.number().int().positive().optional(),
-  to: z.string().email(),
+  to: z.string().min(1),
   cc: z.string().optional(),
   bcc: z.string().optional(),
-  subject: z.string().trim().min(1),
+  subject: z.string().trim().optional().default(""),
   body: z.string().trim().min(1),
   inReplyTo: z.string().trim().optional(),
   references: z.string().trim().optional(),
@@ -156,7 +156,7 @@ export const sendEmailBodySchema = z.object({
     .optional(),
 });
 
-export const sendEmailResponseSchema = z.object({
+const sendEmailResponseSchema = z.object({
   data: z.object({
     gmailId: z.string(),
     threadId: z.string(),

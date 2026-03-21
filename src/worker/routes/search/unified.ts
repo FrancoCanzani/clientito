@@ -67,7 +67,11 @@ searchRoutes.get(
           eq(emails.userId, user.id),
           or(
             eq(emails.direction, "received"),
-            and(eq(emails.direction, "sent"), isNotNull(emails.toAddr)),
+            and(
+              eq(emails.direction, "sent"),
+              isNotNull(emails.toAddr),
+              sql`${emails.toAddr} not like '%,%'`,
+            ),
           ),
         ),
       )

@@ -19,6 +19,7 @@ export const emailSummarySelection = {
   direction: emails.direction,
   isRead: emails.isRead,
   labelIds: emails.labelIds,
+  aiLabel: emails.aiLabel,
   createdAt: emails.createdAt,
   unsubscribeUrl: emails.unsubscribeUrl,
   unsubscribeEmail: emails.unsubscribeEmail,
@@ -30,14 +31,6 @@ export function hasEmailLabel(label: string) {
     select 1
     from json_each(coalesce(${emails.labelIds}, '[]'))
     where value = ${label}
-  )`;
-}
-
-export function hasAnyEmailCategoryLabel() {
-  return sql<boolean>`exists(
-    select 1
-    from json_each(coalesce(${emails.labelIds}, '[]'))
-    where value like 'CATEGORY_%'
   )`;
 }
 
@@ -56,6 +49,7 @@ export function toEmailListResponse(row: {
   direction: "sent" | "received" | null;
   isRead: boolean;
   labelIds: string[] | null;
+  aiLabel: string | null;
   createdAt: number;
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
@@ -77,6 +71,7 @@ export function toEmailListResponse(row: {
     direction: row.direction,
     isRead: row.isRead,
     labelIds,
+    aiLabel: row.aiLabel,
     hasAttachment: labelIds.includes(HAS_ATTACHMENT_LABEL),
     createdAt: row.createdAt,
     unsubscribeUrl: row.unsubscribeUrl,
@@ -102,6 +97,7 @@ export function toEmailDetailResponse(row: {
   direction: "sent" | "received" | null;
   isRead: boolean;
   labelIds: string[] | null;
+  aiLabel: string | null;
   createdAt: number;
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;

@@ -6,14 +6,15 @@ import {
   EnvelopeOpenIcon,
   EnvelopeSimpleIcon,
   StarIcon,
-  XIcon,
+  TrashSimpleIcon,
 } from "@phosphor-icons/react";
+import { useId } from "react";
 
 type EmailBulkToolbarProps = {
   count: number;
   allSelected: boolean;
   disabled?: boolean;
-  onSelectAll: () => void;
+  onToggleAll: (checked: boolean) => void;
   onArchive: () => void;
   onTrash: () => void;
   onMarkRead: () => void;
@@ -26,7 +27,7 @@ export function EmailBulkToolbar({
   count,
   allSelected,
   disabled = false,
-  onSelectAll,
+  onToggleAll,
   onArchive,
   onTrash,
   onMarkRead,
@@ -34,94 +35,78 @@ export function EmailBulkToolbar({
   onStarToggle,
   onDeselect,
 }: EmailBulkToolbarProps) {
+  const selectAllId = useId();
+
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/60 bg-background/92 px-2.5 py-2 shadow-sm backdrop-blur-sm">
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onSelectAll}
-        className={`inline-flex items-center gap-2 rounded-lg px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors ${
-          disabled
-            ? "pointer-events-none opacity-50"
-            : "hover:bg-muted/70 hover:text-foreground"
-        }`}
-        onKeyDown={(event) => {
-          if (disabled) {
-            return;
+    <div className="sticky top-11 z-20 -mx-1 flex flex-wrap items-center gap-1.5">
+      <div className={"text-xs flex items-center justify-start gap-1"}>
+        <Checkbox
+          id={selectAllId}
+          checked={allSelected}
+          disabled={disabled}
+          onCheckedChange={(checked) => onToggleAll(checked === true)}
+          aria-label={
+            allSelected
+              ? "Deselect all visible emails"
+              : "Select all visible emails"
           }
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onSelectAll();
-          }
-        }}
-        aria-disabled={disabled}
-      >
-        <Checkbox checked={allSelected} aria-hidden />
-        <span>{allSelected ? "All visible" : "Select all"}</span>
+        />
+        <label
+          htmlFor={selectAllId}
+          className={`transition-colors ${disabled ? "" : "cursor-pointer hover:text-foreground"}`}
+        >
+          {allSelected ? "All visible" : "Select all"}
+        </label>
       </div>
-      <div className="rounded-lg bg-muted px-2 py-1 text-[11px] font-medium tracking-tight text-foreground">
-        {count} selected
-      </div>
-      <span className="mx-0.5 h-4 w-px bg-border/70" aria-hidden />
-      <Button
-        size="sm"
-        variant="ghost"
-        className="rounded-lg text-[11px]"
-        onClick={onArchive}
-        disabled={disabled}
-      >
-        <ArchiveIcon className="size-3.5" />
+      <div className="text-muted-foreground text-xs">{count} selected</div>
+      <Button size="xs" variant="ghost" onClick={onArchive} disabled={disabled}>
+        <ArchiveIcon className="size-3" />
         Archive
       </Button>
       <Button
-        size="sm"
+        size="xs"
         variant="ghost"
-        className="rounded-lg text-[11px]"
         onClick={onMarkRead}
         disabled={disabled}
       >
-        <EnvelopeOpenIcon className="size-3.5" />
+        <EnvelopeOpenIcon className="size-3" />
         Read
       </Button>
       <Button
-        size="sm"
+        size="xs"
         variant="ghost"
-        className="rounded-lg text-[11px]"
         onClick={onMarkUnread}
         disabled={disabled}
       >
-        <EnvelopeSimpleIcon className="size-3.5" />
+        <EnvelopeSimpleIcon className="size-3" />
         Unread
       </Button>
       <Button
-        size="sm"
+        size="xs"
         variant="ghost"
-        className="rounded-lg text-[11px]"
         onClick={onStarToggle}
         disabled={disabled}
       >
-        <StarIcon className="size-3.5" />
+        <StarIcon className="size-3" />
         Star
       </Button>
       <Button
-        size="sm"
-        variant="ghost"
-        className="rounded-lg text-[11px] text-destructive hover:bg-destructive/10 hover:text-destructive"
+        size="xs"
+        variant="destructive"
         onClick={onTrash}
         disabled={disabled}
       >
-        <XIcon className="size-3.5" />
+        <TrashSimpleIcon className="size-3" />
         Trash
       </Button>
       <span className="ml-auto" />
       <Button
-        size="sm"
+        size="xs"
         variant="ghost"
-        className="rounded-lg text-[11px] text-muted-foreground"
         onClick={onDeselect}
         disabled={disabled}
       >
-        <CheckIcon className="size-3.5" />
+        <CheckIcon className="size-3" />
         Done
       </Button>
     </div>

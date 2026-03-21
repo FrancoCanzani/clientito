@@ -2,7 +2,7 @@ import type { TaskEditorSubmitValue } from "@/features/tasks/components/task-edi
 import type { TaskPriority, TaskStatus } from "@/features/tasks/types";
 import { createContext, useContext } from "react";
 
-export type TaskActions = {
+type TaskActions = {
   isUpdateSubmitting: boolean;
   onStatusChange: (taskId: number, status: TaskStatus) => void;
   onPriorityChange: (taskId: number, priority: TaskPriority) => void;

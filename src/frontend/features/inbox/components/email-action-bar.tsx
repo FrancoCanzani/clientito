@@ -5,6 +5,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/use-auth";
 import {
   ArchiveIcon,
   ArrowBendUpLeftIcon,
@@ -19,13 +20,13 @@ import {
   WarningIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
+import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 import { unsubscribe } from "../../subscriptions/queries";
+import { useUndoSend } from "../hooks/use-undo-send";
 import { patchEmail, sendEmail } from "../mutations";
 import type { EmailDetailItem } from "../types";
-import type { ComposeInitial } from "./compose-email-dialog";
+import type { ComposeInitial } from "./compose-email-fields";
 import { SnoozePicker } from "./snooze-picker";
 
 type ActionBarProps = {
@@ -140,7 +141,8 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
     onError: () => toast.error("Failed to update"),
   });
 
-  const isSnoozed = email.snoozedUntil != null && email.snoozedUntil > Date.now();
+  const isSnoozed =
+    email.snoozedUntil != null && email.snoozedUntil > Date.now();
 
   const snoozeMutation = useMutation({
     mutationFn: (timestamp: number | null) =>
@@ -172,9 +174,23 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
     onError: (error) => toast.error(error.message),
   });
 
-  const sendMutation = useMutation({
-    mutationFn: () =>
-      sendEmail({
+  const replyBodySnapshotRef = useRef("");
+  const [replySendPending, setReplySendPending] = useState(false);
+
+  const undoReplySend = useUndoSend({
+    onSend: () => {
+      const body = replyBodySnapshotRef.current;
+      const originalFrom = email.fromName
+        ? `${email.fromName} <${email.fromAddr}>`
+        : email.fromAddr;
+      const originalDate = new Date(email.date).toLocaleString();
+      const originalText = (email.resolvedBodyText ?? email.bodyText ?? "")
+        .split("\n")
+        .map((line) => `> ${line}`)
+        .join("\n");
+      const quotedBody = `${body}\n\nOn ${originalDate}, ${originalFrom} wrote:\n${originalText}`;
+
+      return sendEmail({
         mailboxId: email.mailboxId ?? undefined,
         to: email.fromAddr,
         subject: email.subject
@@ -182,19 +198,29 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
             ? email.subject
             : `Re: ${email.subject}`
           : "Re:",
-        body: replyBody,
+        body: quotedBody,
         inReplyTo: email.gmailId,
         threadId: email.threadId ?? undefined,
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Reply sent");
-      setReplyBody("");
-      setReplyOpen(false);
+      setReplySendPending(false);
       invalidateEmails();
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) => {
+      setReplySendPending(false);
+      toast.error(error.message);
+    },
   });
 
+  const triggerReplySend = useCallback(() => {
+    replyBodySnapshotRef.current = replyBody;
+    setReplySendPending(true);
+    setReplyBody("");
+    setReplyOpen(false);
+    undoReplySend.trigger();
+  }, [replyBody, undoReplySend]);
 
   const handleForward = () => {
     const subject = email.subject
@@ -235,12 +261,20 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
         : `Re: ${email.subject}`
       : "Re:";
 
+    const originalFrom = email.fromName
+      ? `${email.fromName} &lt;${email.fromAddr}&gt;`
+      : email.fromAddr;
+    const originalDate = new Date(email.date).toLocaleString();
+    const originalBody =
+      email.resolvedBodyHtml ?? email.resolvedBodyText ?? email.bodyText ?? "";
+    const quotedHtml = `<br><br><div style="border-left:2px solid #ccc;padding-left:12px;margin-left:0;color:#555">On ${originalDate}, ${originalFrom} wrote:<br>${originalBody}</div>`;
+
     onForward?.({
       mailboxId: email.mailboxId,
       to: replyTo,
       cc: uniqueCc || undefined,
       subject,
-      body: "",
+      body: quotedHtml,
     });
   };
 
@@ -259,9 +293,7 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
         <div className="border-l border-border/80 pl-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-sm font-medium text-foreground">
-                Quick reply
-              </p>
+              <p className="text-sm font-medium text-foreground">Quick reply</p>
               <p className="text-xs text-muted-foreground">
                 Send with Cmd+Enter
               </p>
@@ -279,8 +311,8 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 e.preventDefault();
-                if (replyBody.trim().length > 0 && !sendMutation.isPending) {
-                  sendMutation.mutate();
+                if (replyBody.trim().length > 0 && !replySendPending) {
+                  triggerReplySend();
                 }
               }
               if (e.key === "Escape") {
@@ -291,7 +323,9 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
             }}
           />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">Esc closes the draft</p>
+            <p className="text-xs text-muted-foreground">
+              Esc closes the draft
+            </p>
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
@@ -307,12 +341,10 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
               <Button
                 size="sm"
                 className="rounded-full px-3"
-                onClick={() => sendMutation.mutate()}
-                disabled={
-                  sendMutation.isPending || replyBody.trim().length === 0
-                }
+                onClick={() => triggerReplySend()}
+                disabled={replySendPending || replyBody.trim().length === 0}
               >
-                {sendMutation.isPending ? "Sending..." : "Send"}
+                {replySendPending ? "Sending..." : "Send"}
               </Button>
             </div>
           </div>

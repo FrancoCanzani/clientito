@@ -2,7 +2,7 @@ import { useEmailData } from "@/features/inbox/hooks/use-email-data";
 import { useEmailInboxActions } from "@/features/inbox/hooks/use-email-inbox-actions";
 import { useSelectionStore } from "@/features/inbox/stores/selection-store";
 import { useMemo } from "react";
-import type { ComposeInitial } from "./compose-email-dialog";
+import type { ComposeInitial } from "./compose-email-fields";
 import { EmailDetailSheet } from "./email-detail-sheet";
 import { EmailList } from "./email-list";
 
@@ -11,7 +11,8 @@ export function InboxMobileView({
 }: {
   onForward: (initial: ComposeInitial) => void;
 }) {
-  const { view, mailboxId, selectedEmailId, selectedEmail, displayRows } = useEmailData();
+  const { view, mailboxId, selectedEmailId, selectedEmail, displayRows } =
+    useEmailData();
   const selection = useSelectionStore(displayRows);
   const selectedIds = useMemo(
     () => Array.from(selection.selectedIds),

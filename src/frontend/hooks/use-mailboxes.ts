@@ -19,7 +19,7 @@ async function fetchAccounts(): Promise<{ accounts: MailboxAccount[] }> {
   return json.data;
 }
 
-export const accountsQueryOptions = queryOptions({
+const accountsQueryOptions = queryOptions({
   queryKey: ["accounts"] as const,
   queryFn: fetchAccounts,
   staleTime: 60_000,

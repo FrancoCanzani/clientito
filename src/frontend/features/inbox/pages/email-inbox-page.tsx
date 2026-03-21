@@ -1,4 +1,4 @@
-import { type ComposeInitial } from "@/features/inbox/components/compose-email-dialog";
+import { type ComposeInitial } from "@/features/inbox/components/compose-email-fields";
 import { ComposePanel } from "@/features/inbox/components/compose-panel";
 import { InboxDesktopView } from "@/features/inbox/components/inbox-desktop-view";
 import { InboxMobileView } from "@/features/inbox/components/inbox-mobile-view";

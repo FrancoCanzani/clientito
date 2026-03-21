@@ -10,6 +10,7 @@ const AI_LABELS = [
   "important",
   "later",
   "newsletter",
+  "marketing",
   "transactional",
   "notification",
 ] as const;
@@ -85,7 +86,8 @@ export async function classifyEmails(
 Categories:
 - important: Personal emails, direct messages from real people, time-sensitive requests, emails requiring action
 - later: Non-urgent but relevant — FYI updates, discussions you're CC'd on, low-priority requests
-- newsletter: Newsletters, digests, blog updates, marketing content from companies
+- newsletter: Curated content the user subscribed to — blog digests, weekly roundups, industry reports, editorial newsletters (e.g. Stratechery, Morning Brew, Substack authors)
+- marketing: Promotional emails, ads, sales, discounts, flash deals, company announcements pushing a product or offer (e.g. Ryanair deals, Amazon promos, SaaS upgrade nudges)
 - transactional: Receipts, order confirmations, shipping notifications, password resets, verification codes
 - notification: Automated alerts from apps/services — GitHub, Slack, calendar, social media notifications
 ${filterSection}
@@ -93,7 +95,7 @@ ${filterSection}
 Emails:
 ${emailList}
 
-Return a JSON object with a "results" array. Each item must have "index" (the number in brackets) and "label" (one of: important, later, newsletter, transactional, notification).${hasFilters ? ' Each item should also have "matchedFilters" — an array of filter IDs that apply to that email (empty array if none match).' : ""}`,
+Return a JSON object with a "results" array. Each item must have "index" (the number in brackets) and "label" (one of: important, later, newsletter, marketing, transactional, notification).${hasFilters ? ' Each item should also have "matchedFilters" — an array of filter IDs that apply to that email (empty array if none match).' : ""}`,
       });
 
       for (const r of object.results) {

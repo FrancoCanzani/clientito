@@ -15,6 +15,7 @@ import {
   FunnelIcon,
   GearIcon,
   HouseSimpleIcon,
+  MagnifyingGlassIcon,
   MoonIcon,
   NewspaperIcon,
   NoteBlankIcon,
@@ -100,7 +101,10 @@ export function usePaletteCommands({
   const isTasksRoute = pathname === "/tasks";
 
   const commands: PaletteCommand[] = useMemo(() => {
-    const viewIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+    const viewIcons: Record<
+      string,
+      React.ComponentType<{ className?: string }>
+    > = {
       inbox: TrayIcon,
       sent: PaperPlaneTiltIcon,
       spam: WarningIcon,
@@ -110,24 +114,46 @@ export function usePaletteCommands({
     };
 
     const emailViewCommands: PaletteCommand[] = isEmailsRoute
-      ? (["inbox", "sent", "archived", "starred", "spam", "trash"] as EmailView[]).map((view) => ({
-          id: `email-view-${view}`,
-          label: VIEW_LABELS[view],
-          section: "email-navigation",
-          icon: React.createElement(viewIcons[view] ?? TrayIcon, { className: "size-4" }),
-          onSelect: () => {
-            navigate({
-              to: "/inbox/$id",
-              params: { id: activeInboxId },
-              search: (prev) => ({
-                ...prev,
-                view: view === "inbox" ? undefined : view,
-                id: undefined,
-              }),
-            });
-            close();
+      ? [
+          ...(
+            [
+              "inbox",
+              "sent",
+              "archived",
+              "starred",
+              "spam",
+              "trash",
+            ] as EmailView[]
+          ).map((view) => ({
+            id: `email-view-${view}`,
+            label: VIEW_LABELS[view],
+            section: "email-navigation",
+            icon: React.createElement(viewIcons[view] ?? TrayIcon, {
+              className: "size-4",
+            }),
+            onSelect: () => {
+              navigate({
+                to: "/inbox/$id",
+                params: { id: activeInboxId },
+                search: (prev) => ({
+                  ...prev,
+                  view: view === "inbox" ? undefined : view,
+                  id: undefined,
+                }),
+              });
+              close();
+            },
+          })),
+          {
+            id: "search-emails",
+            label: "Search",
+            section: "email-navigation",
+            icon: React.createElement(MagnifyingGlassIcon, {
+              className: "size-4",
+            }),
+            onSelect: () => setMode("search"),
           },
-        }))
+        ]
       : [];
 
     const emailSelectionCommands: PaletteCommand[] = isEmailsRoute
@@ -238,7 +264,10 @@ export function usePaletteCommands({
         section: "navigation",
         icon: React.createElement(NewspaperIcon, { className: "size-4" }),
         onSelect: () => {
-          navigate({ to: "/inbox/$id/subscriptions", params: { id: activeInboxId } });
+          navigate({
+            to: "/inbox/$id/subscriptions",
+            params: { id: activeInboxId },
+          });
           close();
         },
       },

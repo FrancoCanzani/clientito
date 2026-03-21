@@ -17,6 +17,8 @@ export function useCommandPaletteState() {
   const [agentHasSubmitted, setAgentHasSubmitted] = useState(false);
   const [taskInput, setTaskInput] = useState("");
   const [agentInput, setAgentInput] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const {
     messages,
@@ -38,6 +40,7 @@ export function useCommandPaletteState() {
     setQuery("");
     setMode("commands");
     setTaskInput("");
+    setSearchInput("");
     setAgentHasSubmitted(false);
   }, []);
 
@@ -70,6 +73,14 @@ export function useCommandPaletteState() {
     [submitAgentMessage],
   );
 
+  const enterSearchMode = useCallback(() => {
+    setMode("search");
+    setOpen(true);
+    setQuery("");
+    setSearchInput("");
+    setTimeout(() => searchInputRef.current?.focus(), 0);
+  }, []);
+
   const startFreshChat = useCallback(() => {
     setAgentHasSubmitted(false);
     clearHistory();
@@ -91,8 +102,9 @@ export function useCommandPaletteState() {
   useHotkey(
     "Escape",
     () => {
-      if (mode === "agent") {
+      if (mode === "agent" || mode === "search") {
         setMode("commands");
+        setSearchInput("");
         setTimeout(() => inputRef.current?.focus(), 0);
         return;
       }
@@ -150,6 +162,11 @@ export function useCommandPaletteState() {
     isConnected,
     hasPendingApprovals,
     addToolApprovalResponse,
+    // Search
+    searchInput,
+    setSearchInput,
+    searchInputRef,
+    enterSearchMode,
     // Callbacks
     close,
     submitAgentMessage,

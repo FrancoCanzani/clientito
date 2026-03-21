@@ -87,6 +87,7 @@ type LatestThreadRow = {
     | "important"
     | "later"
     | "newsletter"
+    | "marketing"
     | "transactional"
     | "notification"
     | null;
@@ -204,6 +205,7 @@ function isNonActionableBriefingLabel(
 ) {
   return (
     label === "newsletter" ||
+    label === "marketing" ||
     label === "notification" ||
     label === "transactional"
   );

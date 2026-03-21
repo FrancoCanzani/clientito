@@ -21,14 +21,3 @@ export type EmailFilter = {
   priority: number;
   createdAt: number;
 };
-
-export type FilterTestResult = {
-  matchCount: number;
-  totalTested: number;
-  samples: Array<{
-    id: number;
-    from: string;
-    subject: string | null;
-    date: number;
-  }>;
-};

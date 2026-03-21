@@ -1,21 +1,30 @@
-import { openCompose } from "@/features/inbox/compose-bridge";
+import { openCompose } from "@/features/inbox/components/compose-bridge";
+import { cn, parseMailboxId } from "@/lib/utils";
 import {
   CaretDownIcon,
   CaretRightIcon,
   KeyReturnIcon,
 } from "@phosphor-icons/react";
 import { Command } from "cmdk";
+import { useRouter } from "@tanstack/react-router";
 import { AnimatePresence, LazyMotion, domAnimation, m } from "motion/react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { AgentPanel } from "./agent-panel";
 import { CommandListPanel } from "./command-list-panel";
 import { NewTaskPanel } from "./new-task-panel";
+import { SearchPanel } from "./search-panel";
 import { Button } from "@/components/ui/button";
 import { useCommandPaletteState } from "./use-command-palette-state";
 import { usePaletteCommands } from "./use-palette-commands";
 
 export function CommandPalette() {
   const state = useCommandPaletteState();
+  const router = useRouter();
+  const searchMailboxId = useMemo(() => {
+    const pathname = router.state.location.pathname;
+    const match = pathname.match(/^\/inbox\/([^/]+)/);
+    return match ? parseMailboxId(match[1]) : undefined;
+  }, [router.state.location.pathname]);
   const {
     queryClient,
     visibleNavigationCommands,
@@ -103,6 +112,14 @@ export function CommandPalette() {
                     onBack={() => state.setMode("commands")}
                     isPending={createTaskMutation.isPending}
                   />
+                ) : state.mode === "search" ? (
+                  <SearchPanel
+                    searchInput={state.searchInput}
+                    setSearchInput={state.setSearchInput}
+                    searchInputRef={state.searchInputRef}
+                    close={state.close}
+                    mailboxId={searchMailboxId}
+                  />
                 ) : (
                   <CommandListPanel
                     visibleNavigationCommands={visibleNavigationCommands}
@@ -118,7 +135,7 @@ export function CommandPalette() {
           </AnimatePresence>
         </LazyMotion>
 
-        <div className="flex items-center gap-2 px-3 py-2">
+        <div className={cn("flex items-center gap-2 px-3 py-2", state.mode === "search" && "hidden")}>
           {state.mode === "agent" ? (
             <>
               <input

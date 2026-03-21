@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-export const errorResponseSchema = z.object({ error: z.string() });
+const errorResponseSchema = z.object({ error: z.string() });
 
 export const noteIdParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
 
-export const noteSchema = z.object({
+const noteSchema = z.object({
   id: z.number(),
   title: z.string(),
   content: z.string(),
@@ -14,7 +14,7 @@ export const noteSchema = z.object({
   updatedAt: z.number(),
 });
 
-export const noteSummarySchema = noteSchema.pick({
+const noteSummarySchema = noteSchema.pick({
   id: true,
   title: true,
   createdAt: true,
@@ -26,7 +26,7 @@ export const getNotesQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional(),
 });
 
-export const listNotesResponseSchema = z.object({
+const listNotesResponseSchema = z.object({
   data: z.array(noteSummarySchema),
   pagination: z.object({
     limit: z.number(),
@@ -52,11 +52,11 @@ export const noteImageQuerySchema = z.object({
   key: z.string().trim().min(1),
 });
 
-export const noteResponseSchema = z.object({
+const noteResponseSchema = z.object({
   data: noteSchema,
 });
 
-export const deleteNoteResponseSchema = z.object({
+const deleteNoteResponseSchema = z.object({
   data: z.object({
     deleted: z.boolean(),
   }),

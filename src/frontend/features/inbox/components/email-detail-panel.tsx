@@ -5,7 +5,7 @@ import { useEmailInboxKeyboard } from "@/features/inbox/hooks/use-email-inbox-ke
 import { useSelectionStore } from "@/features/inbox/stores/selection-store";
 import { CaretDownIcon, CaretUpIcon, XIcon } from "@phosphor-icons/react";
 import { useMemo } from "react";
-import type { ComposeInitial } from "./compose-email-dialog";
+import type { ComposeInitial } from "./compose-email-fields";
 import { EmailDetailContent } from "./email-detail-content";
 
 export function EmailDetailPanel({
@@ -13,8 +13,15 @@ export function EmailDetailPanel({
 }: {
   onForward: (initial: ComposeInitial) => void;
 }) {
-  const { view, mailboxId, selectedEmailId, selectedEmail, displayRows, orderedIds, emailById } =
-    useEmailData();
+  const {
+    view,
+    mailboxId,
+    selectedEmailId,
+    selectedEmail,
+    displayRows,
+    orderedIds,
+    emailById,
+  } = useEmailData();
   const selection = useSelectionStore(displayRows);
   const selectedIds = useMemo(
     () => Array.from(selection.selectedIds),

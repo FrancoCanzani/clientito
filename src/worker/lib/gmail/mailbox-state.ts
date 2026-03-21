@@ -2,7 +2,7 @@ import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import type { Database } from "../../db/client";
 import { account } from "../../db/auth-schema";
 import { mailboxes, syncJobs } from "../../db/schema";
-import { GOOGLE_RECONNECT_REQUIRED_MESSAGE, type SyncJobErrorClass } from "./errors";
+import { type SyncJobErrorClass } from "./errors";
 import type { SyncWindowMonths } from "./sync-preferences";
 
 export type { SyncJobErrorClass };
@@ -413,23 +413,6 @@ export async function markSyncJobFailed(
       lastErrorMessage: message,
       lockUntil: null,
       updatedAt: now,
-    })
-    .where(eq(mailboxes.id, mailboxId));
-}
-
-export async function markMailboxReconnectRequired(
-  db: Database,
-  mailboxId: number,
-  message = GOOGLE_RECONNECT_REQUIRED_MESSAGE,
-): Promise<void> {
-  await db
-    .update(mailboxes)
-    .set({
-      authState: "reconnect_required",
-      lastErrorAt: Date.now(),
-      lastErrorMessage: message,
-      lockUntil: null,
-      updatedAt: Date.now(),
     })
     .where(eq(mailboxes.id, mailboxId));
 }

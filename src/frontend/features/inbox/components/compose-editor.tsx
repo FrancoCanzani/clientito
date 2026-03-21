@@ -1,10 +1,10 @@
 import { EditorContent } from "@tiptap/react";
 import { useEffect } from "react";
+import { useComposeEditor } from "../hooks/use-compose-editor";
 import {
   registerComposeEditor,
   unregisterComposeEditor,
-} from "../compose-bridge";
-import { useComposeEditor } from "../hooks/use-compose-editor";
+} from "./compose-bridge";
 import { ComposeBubbleMenu } from "./compose-bubble-menu";
 
 type ComposeEditorProps = {

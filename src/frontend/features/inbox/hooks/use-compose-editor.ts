@@ -12,6 +12,7 @@ import { Italic } from "reactjs-tiptap-editor/italic";
 import { Link as LinkExtension } from "reactjs-tiptap-editor/link";
 import { OrderedList } from "reactjs-tiptap-editor/orderedlist";
 import { Strike } from "reactjs-tiptap-editor/strike";
+
 async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -60,7 +61,8 @@ export function useComposeEditor({
     },
     editorProps: {
       attributes: {
-        class: "min-h-[120px] text-sm outline-none prose prose-sm max-w-none",
+        class:
+          "min-h-[120px] text-[13px] outline-none prose prose-sm max-w-none",
       },
     },
   });

@@ -55,6 +55,9 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
           like(emails.subject, pattern),
           like(emails.snippet, pattern),
           like(emails.fromAddr, pattern),
+          like(emails.fromName, pattern),
+          like(emails.toAddr, pattern),
+          like(emails.bodyText, pattern),
         )!,
       );
     }

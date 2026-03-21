@@ -58,6 +58,10 @@ const REMOVES_FROM_LIST: Set<EmailInboxAction> = new Set([
   "trash",
   "spam",
 ]);
+const IMMEDIATE_ACTIONS: Set<EmailInboxAction> = new Set([
+  "mark-read",
+  "mark-unread",
+]);
 
 type PendingAction = {
   ids: string[];
@@ -73,7 +77,7 @@ export function useEmailInboxActions({
   clearSelection,
 }: {
   view: EmailView;
-  mailboxId: number | null;
+  mailboxId: number | null | undefined;
   selectedEmailId: string | null;
   selectedIds: string[];
   clearSelection: () => void;
@@ -207,6 +211,11 @@ export function useEmailInboxActions({
 
       if (selectedIds.length > 0) {
         clearSelection();
+      }
+
+      if (IMMEDIATE_ACTIONS.has(action)) {
+        void fireMutation(ids, data);
+        return;
       }
 
       const { one, many } = actionLabels[action];

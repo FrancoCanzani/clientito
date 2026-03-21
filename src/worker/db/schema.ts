@@ -68,7 +68,7 @@ export const emails = sqliteTable(
     isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
     labelIds: text("label_ids", { mode: "json" }).$type<string[] | null>(),
     aiLabel: text("ai_label").$type<
-      "important" | "later" | "newsletter" | "transactional" | "notification"
+      "important" | "later" | "newsletter" | "marketing" | "transactional" | "notification"
     >(),
     unsubscribeUrl: text("unsubscribe_url"),
     unsubscribeEmail: text("unsubscribe_email"),
@@ -206,7 +206,7 @@ export type FilterActions = {
   archive?: boolean;
   markRead?: boolean;
   star?: boolean;
-  applyAiLabel?: "important" | "later" | "newsletter" | "transactional" | "notification";
+  applyAiLabel?: "important" | "later" | "newsletter" | "marketing" | "transactional" | "notification";
   trash?: boolean;
 };
 

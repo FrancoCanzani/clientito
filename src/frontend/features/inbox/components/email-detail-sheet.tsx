@@ -5,7 +5,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { EmailListItem } from "../types";
-import type { ComposeInitial } from "./compose-email-dialog";
+import type { ComposeInitial } from "./compose-email-fields";
 import { EmailDetailContent } from "./email-detail-content";
 
 export function EmailDetailSheet({

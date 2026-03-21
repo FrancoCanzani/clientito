@@ -1,5 +1,5 @@
-import { and, eq } from "drizzle-orm";
-import { account, user } from "../../db/auth-schema";
+import { eq } from "drizzle-orm";
+import { account } from "../../db/auth-schema";
 import type { Database } from "../../db/client";
 import { mailboxes } from "../../db/schema";
 import {
@@ -531,26 +531,6 @@ export async function getGmailToken(
 }
 
 /**
- * Legacy helper: get Gmail token by userId (picks the first google account).
- * Used during migration period where callers still pass userId.
- */
-export async function getGmailTokenByUserId(
-  db: Database,
-  userId: string,
-  config?: GoogleOAuthConfig,
-): Promise<string> {
-  const googleAccount = await db.query.account.findFirst({
-    where: and(eq(account.userId, userId), eq(account.providerId, "google")),
-  });
-
-  if (!googleAccount) {
-    throw new Error("Google account is not connected.");
-  }
-
-  return getGmailToken(db, googleAccount.id, config);
-}
-
-/**
  * Get a Gmail access token by mailbox ID. Joins mailbox → account.
  */
 export async function getGmailTokenForMailbox(
@@ -569,31 +549,3 @@ export async function getGmailTokenForMailbox(
   return getGmailToken(db, mailbox.accountId, config);
 }
 
-export async function syncGoogleUserProfile(
-  db: Database,
-  userId: string,
-  accessToken: string,
-): Promise<void> {
-  const response = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-    method: "GET",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-
-  if (!response.ok) return;
-
-  const payload = (await response
-    .json()
-    .catch(() => ({}))) as { name?: string; picture?: string };
-  const nextName = payload.name?.trim();
-  const nextImage = payload.picture?.trim();
-
-  if (!nextName && !nextImage) return;
-
-  const updates: Partial<typeof user.$inferInsert> = {};
-  if (nextName) updates.name = nextName;
-  if (nextImage) updates.image = nextImage;
-
-  if (Object.keys(updates).length === 0) return;
-
-  await db.update(user).set(updates).where(eq(user.id, userId));
-}

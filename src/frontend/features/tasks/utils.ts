@@ -134,11 +134,6 @@ export function buildTaskSections(
     }));
 }
 
-export function toTaskDateInputValue(timestamp: number | null | undefined) {
-  if (!timestamp) return "";
-  return format(new Date(timestamp), "yyyy-MM-dd");
-}
-
 export function fromTaskDateInputValue(value: string) {
   if (!value) return null;
   const [year, month, day] = value.split("-").map(Number);

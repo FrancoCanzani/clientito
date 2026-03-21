@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { MinusIcon, XIcon } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ComposeEmailFields,
   type ComposeInitial,
-} from "./compose-email-dialog";
+} from "./compose-email-fields";
 import { getComposeInitialKey, useComposeEmail } from "./compose-email-state";
 
 export function ComposePanel({
@@ -45,6 +46,11 @@ function ComposePanelBody({
   });
   const hasInitialRecipient = (initial?.to?.trim().length ?? 0) > 0;
 
+  const handleClose = () => {
+    compose.clearDraft();
+    onOpenChange(false);
+  };
+
   const title = useMemo(() => {
     const subject = compose.subject.trim();
     if (subject.length > 0) {
@@ -55,10 +61,16 @@ function ComposePanelBody({
   }, [compose.subject, initial?.subject]);
 
   return createPortal(
-    <div className="fixed inset-x-0 bottom-0 z-50 px-0 sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-120 sm:px-0">
-      <div className="flex max-h-[min(85vh,720px)] min-h-0 flex-col overflow-hidden border border-border/70 bg-background sm:rounded-sm">
+    <div
+      className={cn(
+        "fixed antialiased inset-x-0 bottom-0 z-50 px-0 sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-120 sm:px-0",
+
+        minimized && "w-72!",
+      )}
+    >
+      <div className="flex max-h-[min(85vh,720px)] min-h-0 flex-col overflow-hidden rounded-xl border border-border/50 bg-background shadow-xl">
         <div
-          className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 px-4 py-3"
+          className="flex shrink-0 items-center justify-between gap-3 border-b border-border/40 px-2 py-1"
           role="button"
           tabIndex={0}
           onClick={() => setMinimized(false)}
@@ -69,50 +81,42 @@ function ComposePanelBody({
             }
           }}
         >
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{title}</p>
-            {!minimized && (
-              <p className="text-xs text-muted-foreground">
-                Press Cmd+Enter to send
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-1">
+          <h3 className="text-xs font-medium">{title}</h3>
+          <div className="flex items-center gap-0.5">
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="size-7 rounded-full text-muted-foreground"
+              className="hidden sm:inline-flex"
               onClick={(event) => {
                 event.stopPropagation();
                 setMinimized((current) => !current);
               }}
               aria-label={minimized ? "Expand compose" : "Minimize compose"}
             >
-              <MinusIcon className="size-4" />
+              <MinusIcon className="size-3" />
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="size-7 rounded-full text-muted-foreground"
               onClick={(event) => {
                 event.stopPropagation();
-                onOpenChange(false);
+                handleClose();
               }}
               aria-label="Close compose"
             >
-              <XIcon className="size-4" />
+              <XIcon className="size-3" />
             </Button>
           </div>
         </div>
 
         {!minimized && (
-          <div className="flex min-h-0 flex-1 px-4 py-3">
+          <div className="flex min-h-0 flex-1">
             <ComposeEmailFields
               compose={compose}
-              bodyClassName="min-h-[220px] flex-1 resize-none overflow-y-auto text-sm [field-sizing:fixed]"
-              onEscape={() => onOpenChange(false)}
+              bodyClassName="min-h-50 text-sm leading-relaxed"
+              onEscape={handleClose}
               recipientAutoFocus={!hasInitialRecipient}
               editorAutoFocus={hasInitialRecipient}
             />

@@ -11,7 +11,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import type { EmailDetailItem, EmailListItem } from "../types";
 import { prepareEmailHtml } from "../utils/prepare-email-html";
 import { AttachmentItem } from "./attachment-item";
-import type { ComposeInitial } from "./compose-email-dialog";
+import type { ComposeInitial } from "./compose-email-fields";
 import { EmailActionBar } from "./email-action-bar";
 import { EmailHtmlRenderer } from "./email-html-renderer";
 
@@ -149,7 +149,9 @@ function ThreadMessageCard({
                 </p>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-mono tracking-tight">{formattedDate}</span>
+                <span className="font-mono tracking-tight">
+                  {formattedDate}
+                </span>
                 {expanded ? (
                   <CaretDownIcon className="size-4 shrink-0" />
                 ) : (
@@ -168,38 +170,38 @@ function ThreadMessageCard({
         {expanded && (
           <div className="border-t border-border/50 pb-4 pt-4">
             <div className="ml-11 space-y-4">
-            {showAttachments && (
-              <section className="space-y-1">
-                <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  <PaperclipIcon className="size-3.5" />
-                  Attachments
-                </div>
-                {attachmentLoading ? (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {ATTACHMENT_SKELETON_KEYS.map((key) => (
-                      <Skeleton key={key} className="h-16 rounded-2xl" />
-                    ))}
+              {showAttachments && (
+                <section className="space-y-1">
+                  <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                    <PaperclipIcon className="size-3.5" />
+                    Attachments
                   </div>
-                ) : attachmentError ? (
-                  <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                    We could not load attachments for this message.
-                  </p>
-                ) : attachments.length > 0 ? (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {attachments.map((attachment) => (
-                      <AttachmentItem
-                        key={attachment.attachmentId}
-                        attachment={attachment}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-              </section>
-            )}
+                  {attachmentLoading ? (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {ATTACHMENT_SKELETON_KEYS.map((key) => (
+                        <Skeleton key={key} className="h-16 rounded-2xl" />
+                      ))}
+                    </div>
+                  ) : attachmentError ? (
+                    <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                      We could not load attachments for this message.
+                    </p>
+                  ) : attachments.length > 0 ? (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {attachments.map((attachment) => (
+                        <AttachmentItem
+                          key={attachment.attachmentId}
+                          attachment={attachment}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              )}
 
-            <div className="min-w-0">
-              <MessageBody detail={detail} previewText={preview} />
-            </div>
+              <div className="min-w-0">
+                <MessageBody detail={detail} previewText={preview} />
+              </div>
             </div>
           </div>
         )}
@@ -429,8 +431,13 @@ export function EmailDetailContent({
                   </section>
                 )}
 
-                <div className={cn("min-w-0", hasSelectedAttachments && "pt-5")}>
-                  <MessageBody detail={detail} previewText={buildPreview(email, detail)} />
+                <div
+                  className={cn("min-w-0", hasSelectedAttachments && "pt-5")}
+                >
+                  <MessageBody
+                    detail={detail}
+                    previewText={buildPreview(email, detail)}
+                  />
                 </div>
               </div>
             )}

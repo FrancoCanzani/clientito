@@ -4,7 +4,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { useEmailData } from "@/features/inbox/hooks/use-email-data";
-import type { ComposeInitial } from "./compose-email-dialog";
+import type { ComposeInitial } from "./compose-email-fields";
 import { EmailDetailPanel } from "./email-detail-panel";
 import { EmailList } from "./email-list";
 

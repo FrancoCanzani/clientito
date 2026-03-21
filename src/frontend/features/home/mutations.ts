@@ -46,13 +46,3 @@ export async function runIncrementalSync(mailboxId?: number): Promise<void> {
     throw new Error("Failed to run incremental Gmail sync.");
   }
 }
-
-export async function recoverSync(): Promise<void> {
-  const response = await fetch("/api/sync/recover", {
-    method: "POST",
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to start recovery sync.");
-  }
-}

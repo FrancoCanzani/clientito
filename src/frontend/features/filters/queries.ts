@@ -1,4 +1,4 @@
-import type { EmailFilter, FilterActions, FilterTestResult } from "./types";
+import type { EmailFilter, FilterActions } from "./types";
 
 export async function fetchFilters(): Promise<EmailFilter[]> {
   const res = await fetch("/api/filters");
@@ -47,19 +47,6 @@ export async function updateFilter(
 export async function deleteFilter(id: number): Promise<void> {
   const res = await fetch(`/api/filters/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete filter");
-}
-
-export async function testFilter(input: {
-  description: string;
-}): Promise<FilterTestResult> {
-  const res = await fetch("/api/filters/test", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) throw new Error("Failed to test filter");
-  const json = (await res.json()) as { data: FilterTestResult };
-  return json.data;
 }
 
 export type GeneratedFilter = {

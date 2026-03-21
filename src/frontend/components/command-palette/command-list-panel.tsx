@@ -55,11 +55,11 @@ export function CommandListPanel({
 
         <CommandGroup heading="Mailbox" commands={emailNavigationCommands} />
         <CommandGroup heading="Task Views" commands={taskNavigationCommands} />
+        <CommandGroup heading="Select" commands={emailSelectionCommands} />
         <CommandGroup
           heading="Navigation"
           commands={visibleNavigationCommands}
         />
-        <CommandGroup heading="Select" commands={emailSelectionCommands} />
         <CommandGroup heading="Actions" commands={actionCommands} />
 
         <Command.Group

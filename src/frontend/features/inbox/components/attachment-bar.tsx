@@ -30,11 +30,10 @@ export function AttachmentBar({
         type="button"
         variant="ghost"
         size="sm"
-        className="h-7 gap-1.5 rounded-full px-2.5 text-xs text-muted-foreground"
         onClick={() => fileInputRef.current?.click()}
         disabled={uploading}
       >
-        <PaperclipIcon className="size-3.5" />
+        <PaperclipIcon className="size-3" />
         {uploading ? "Uploading..." : "Attach"}
       </Button>
       <input
@@ -52,7 +51,7 @@ export function AttachmentBar({
       {files.map((file) => (
         <span
           key={file.key}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border/70 px-2.5 py-1 text-xs text-muted-foreground"
+          className="inline-flex items-center gap-1 rounded-md border border-border/70 p-1 text-[10px] text-muted-foreground"
         >
           {file.filename}
           <span className="text-muted-foreground/80">

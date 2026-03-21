@@ -52,47 +52,49 @@ export function EmailContextMenu({
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuTrigger className="block w-full">
+        {children}
+      </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem
           onSelect={onArchive}
-          className="flex items-center justify-start gap-2"
+          className="flex items-center justify-start gap-1.5"
         >
-          <ArchiveIcon className="size-4" />
+          <ArchiveIcon className="size-3.5" />
           Archive
         </ContextMenuItem>
         <ContextMenuItem
           onSelect={onTrash}
           variant="destructive"
-          className="flex items-center justify-start gap-2"
+          className="flex items-center justify-start gap-1.5"
         >
-          <TrashIcon className="size-4" />
+          <TrashIcon className="size-3.5" />
           Move to trash
         </ContextMenuItem>
         <ContextMenuItem
           onSelect={onSpam}
-          className="flex items-center justify-start gap-2"
+          className="flex items-center justify-start gap-1.5"
         >
-          <WarningIcon className="size-4" />
+          <WarningIcon className="size-3.5" />
           Move to spam
         </ContextMenuItem>
         <ContextMenuItem
           onSelect={() => onSetRead(!allRead)}
-          className="flex items-center justify-start gap-2"
+          className="flex items-center justify-start gap-1.5"
         >
           {allRead ? (
-            <EnvelopeSimpleIcon className="size-4" />
+            <EnvelopeSimpleIcon className="size-3.5" />
           ) : (
-            <EnvelopeOpenIcon className="size-4" />
+            <EnvelopeOpenIcon className="size-3.5" />
           )}
           {allRead ? "Mark as unread" : "Mark as read"}
         </ContextMenuItem>
         <ContextMenuItem
           onSelect={() => onSetStarred(!allStarred)}
-          className="flex items-center justify-start gap-2"
+          className="flex items-center justify-start gap-1.5"
         >
           <StarIcon
-            className="size-4"
+            className="size-3.5"
             weight={allStarred ? "fill" : "regular"}
           />
           {allStarred ? "Unstar" : "Star"}
@@ -101,16 +103,16 @@ export function EmailContextMenu({
         <ContextMenuCheckboxItem
           checked={selected}
           onSelect={onToggleSelect}
-          className="flex items-center justify-start gap-2"
+          className="flex items-center justify-start gap-1.5"
         >
-          <CheckSquareIcon className="size-4" />
+          <CheckSquareIcon className="size-3.5" />
           {selected ? "Deselect" : "Select"}
         </ContextMenuCheckboxItem>
         <ContextMenuItem
           onSelect={onSelectAll}
-          className="flex items-center justify-start gap-2"
+          className="flex items-center justify-start gap-1.5"
         >
-          <SquaresFourIcon className="size-4" />
+          <SquaresFourIcon className="size-3.5" />
           Select all
         </ContextMenuItem>
       </ContextMenuContent>

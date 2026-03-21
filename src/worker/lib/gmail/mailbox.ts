@@ -427,12 +427,3 @@ export async function batchModifyGmailMessages(
   });
 }
 
-export async function archiveGmailMessage(
-  db: Database,
-  mailboxId: number,
-  env: GoogleOAuthConfig,
-  gmailMessageId: string,
-): Promise<void> {
-  const accessToken = await getGmailTokenForMailbox(db, mailboxId, env);
-  await modifyGmailMessage(accessToken, gmailMessageId, undefined, ["INBOX"]);
-}

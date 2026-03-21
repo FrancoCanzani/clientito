@@ -1,18 +1,3 @@
-export type EmailSearchResult = {
-  id: string;
-  gmailId: string;
-  fromAddr: string;
-  fromName: string | null;
-  toAddr: string | null;
-  ccAddr: string | null;
-  subject: string | null;
-  snippet: string | null;
-  date: number;
-  isRead: boolean;
-  labelIds: string[];
-  snoozedUntil: number | null;
-};
-
 export type ContactSuggestion = {
   email: string;
   name: string | null;
@@ -20,6 +5,8 @@ export type ContactSuggestion = {
   lastInteractionAt: number | null;
   interactionCount: number;
 };
+
+export type AiLabel = "important" | "later" | "newsletter" | "marketing" | "transactional" | "notification";
 
 export type EmailListItem = {
   id: string;
@@ -36,6 +23,7 @@ export type EmailListItem = {
   direction: "sent" | "received" | null;
   isRead: boolean;
   labelIds: string[];
+  aiLabel: AiLabel | null;
   hasAttachment: boolean;
   createdAt: number;
   unsubscribeUrl: string | null;

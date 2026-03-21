@@ -1,8 +1,8 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { PaperclipIcon } from "@phosphor-icons/react";
-import { formatInboxRowDate } from "../utils/format-inbox-row-date";
 import type { EmailListItem } from "../types";
+import { formatInboxRowDate } from "../utils/format-inbox-row-date";
 
 type EmailRowProps = {
   email: EmailListItem;
@@ -38,7 +38,7 @@ export function EmailRow({
       role="button"
       tabIndex={0}
       className={cn(
-        "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40 cursor-default",
+        "flex w-full group items-center gap-2 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40 cursor-default",
         isOpen && "bg-muted/50",
       )}
       onClick={onOpen}
@@ -49,20 +49,18 @@ export function EmailRow({
         }
       }}
     >
-      {selectionMode ? (
-        <Checkbox
-          checked={isSelected}
-          className="shrink-0"
-          aria-label={`Select email from ${email.fromName || email.fromAddr}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggleSelection(event.shiftKey);
-          }}
-          onKeyDown={(event) => {
-            event.stopPropagation();
-          }}
-        />
-      ) : null}
+      <Checkbox
+        checked={isSelected}
+        className={cn("shrink-0 size-3.5 hidden", selectionMode && "block")}
+        aria-label={`Select email from ${email.fromName || email.fromAddr}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleSelection(event.shiftKey);
+        }}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+        }}
+      />
 
       <span
         className={cn(
@@ -82,13 +80,21 @@ export function EmailRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+        {email.aiLabel && (
+          <span
+            className={cn(
+              "capitalize hidden",
+              email.aiLabel === "important" && "block italic",
+            )}
+          >
+            {email.aiLabel}
+          </span>
+        )}
         {email.hasAttachment && (
           <PaperclipIcon className="size-3.5" aria-hidden />
         )}
         {threadCount > 1 && (
-          <span className="rounded-full border border-border/70 px-1.5 py-0.5 font-mono text-[10px] text-foreground">
-            {threadCount}
-          </span>
+          <span className="font-mono tabular-nums">[{threadCount}]</span>
         )}
         <span className="font-mono">{formatInboxRowDate(email.date)}</span>
       </div>

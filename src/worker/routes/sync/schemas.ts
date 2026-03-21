@@ -5,9 +5,9 @@ export const syncRequestSchema = z.object({
   mailboxId: z.number().int().positive().optional(),
 });
 
-export const errorResponseSchema = z.object({ error: z.string() });
+const errorResponseSchema = z.object({ error: z.string() });
 
-export const syncStatusResponseSchema = z.object({
+const syncStatusResponseSchema = z.object({
   data: z.object({
     state: z.enum([
       "needs_mailbox_connect",
@@ -29,6 +29,6 @@ export const syncStatusResponseSchema = z.object({
   }),
 });
 
-export const syncAcceptedResponseSchema = z.object({
+const syncAcceptedResponseSchema = z.object({
   data: z.object({ status: z.string() }),
 });

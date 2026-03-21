@@ -1,4 +1,5 @@
 import { AccountSwitcher } from "@/components/account-switcher";
+import { Button } from "@/components/ui/button";
 import {
   Empty,
   EmptyDescription,
@@ -10,15 +11,19 @@ import { useEmailData } from "@/features/inbox/hooks/use-email-data";
 import { useEmailInboxActions } from "@/features/inbox/hooks/use-email-inbox-actions";
 import { useSelectionStore } from "@/features/inbox/stores/selection-store";
 import { VIEW_LABELS } from "@/features/inbox/utils/inbox-filters";
-import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
+import { Link, getRouteApi } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { EmailBulkToolbar } from "./email-bulk-toolbar";
 import { EmailContextMenu } from "./email-context-menu";
 import { EmailRow } from "./email-row";
 
+const emailsRoute = getRouteApi("/_dashboard/inbox/$id/");
+
 export function EmailList() {
   const isMobile = useIsMobile();
+  const search = emailsRoute.useSearch();
   const {
     view,
     mailboxId,
@@ -61,14 +66,37 @@ export function EmailList() {
       className={cn(
         "flex min-w-0 flex-col",
         isSplitView
-          ? "h-full w-full overflow-hidden px-4 py-4"
+          ? "h-full w-full overflow-hidden p-4"
           : "mx-auto w-full max-w-3xl",
       )}
     >
-      <div className={cn("min-h-0 flex-1", isSplitView && "overflow-y-auto")}>
-        <header className="sticky top-0 z-20 flex items-center gap-2 bg-background pb-2">
-          <h2 className="text-lg font-medium">{pageTitle}</h2>
-          <AccountSwitcher />
+      <div
+        className={cn(
+          "min-h-0 flex-1 space-y-6",
+          isSplitView && "overflow-y-auto",
+        )}
+      >
+        <header className="sticky top-0 z-20 flex items-center justify-between bg-background py-2">
+          <h2 className="text-xl font-medium">{pageTitle}</h2>
+          <div className="flex items-center justify-end gap-2">
+            <AccountSwitcher />
+
+            <Button asChild size="sm" variant={"secondary"}>
+              <Link
+                to="/inbox/$id"
+                params={{ id: mailboxId != null ? String(mailboxId) : "all" }}
+                search={{
+                  view: search.view,
+                  compose: true,
+                  id: search.id,
+                  emailId: search.emailId,
+                  threadId: search.threadId,
+                }}
+              >
+                New Email
+              </Link>
+            </Button>
+          </div>
         </header>
 
         {selection.selectionMode && selection.hasSelection && (
@@ -76,7 +104,13 @@ export function EmailList() {
             count={selection.count}
             allSelected={allVisibleSelected}
             disabled={false}
-            onSelectAll={selection.selectAll}
+            onToggleAll={(checked) => {
+              if (checked) {
+                selection.selectAll();
+                return;
+              }
+              selection.clearSelection();
+            }}
             onArchive={() => executeEmailAction("archive", selectedIds)}
             onTrash={() => executeEmailAction("trash", selectedIds)}
             onMarkRead={() => executeEmailAction("mark-read", selectedIds)}
@@ -104,10 +138,6 @@ export function EmailList() {
               />
             ))}
           </div>
-        ) : isError ? (
-          <p className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-center text-sm text-destructive">
-            Failed to load emails.
-          </p>
         ) : displayRows.length > 0 ? (
           <div className="space-y-5">
             {sections.map((section) => (
@@ -132,16 +162,26 @@ export function EmailList() {
                         email={email}
                         selected={selected}
                         targetEmails={targetEmails}
-                        onArchive={() => executeEmailAction("archive", targetIds)}
+                        onArchive={() =>
+                          executeEmailAction("archive", targetIds)
+                        }
                         onTrash={() => executeEmailAction("trash", targetIds)}
                         onSpam={() => executeEmailAction("spam", targetIds)}
                         onSetRead={(read) =>
-                          executeEmailAction(read ? "mark-read" : "mark-unread", targetIds)
+                          executeEmailAction(
+                            read ? "mark-read" : "mark-unread",
+                            targetIds,
+                          )
                         }
                         onSetStarred={(starred) =>
-                          executeEmailAction(starred ? "star" : "unstar", targetIds)
+                          executeEmailAction(
+                            starred ? "star" : "unstar",
+                            targetIds,
+                          )
                         }
-                        onToggleSelect={() => selection.toggleSelectionFromMenu(email.id)}
+                        onToggleSelect={() =>
+                          selection.toggleSelectionFromMenu(email.id)
+                        }
                         onSelectAll={selection.selectAll}
                       >
                         <EmailRow
