@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/page-header";
 import {
   beginGmailConnection,
   runIncrementalSync,
@@ -13,7 +14,12 @@ import {
 } from "@/features/settings/mutations";
 import { fetchSyncPreference } from "@/features/settings/queries";
 import { useAuth } from "@/hooks/use-auth";
-import { useMailboxes, removeAccount, type MailboxAccount } from "@/hooks/use-mailboxes";
+import {
+  getMailboxDisplayEmail,
+  useMailboxes,
+  removeAccount,
+  type MailboxAccount,
+} from "@/hooks/use-mailboxes";
 import { useTheme } from "@/hooks/use-theme";
 import {
   ArrowClockwiseIcon,
@@ -131,21 +137,25 @@ function ConnectedAccountRow({
   isSyncing: boolean;
 }) {
   const authOk = account.authState === "ok";
+  const statusText = isSyncing
+    ? "Syncing..."
+    : account.hasSynced
+      ? account.lastSync
+        ? `Synced ${formatLastSync(account.lastSync)}`
+        : "Synced"
+      : "Not synced";
+
   return (
     <div className="flex items-center justify-between gap-3 py-3">
       <div className="min-w-0 flex-1 space-y-0.5">
         <p className="truncate text-sm font-medium">
-          {account.gmailEmail ?? "Unknown account"}
+          {getMailboxDisplayEmail(account) ?? "Unknown account"}
         </p>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span
             className={`inline-block size-1.5 rounded-full ${authOk ? "bg-green-500" : "bg-amber-500"}`}
           />
-          {account.hasSynced
-            ? account.lastSync
-              ? `Synced ${formatLastSync(account.lastSync)}`
-              : "Synced"
-            : "Not synced"}
+          {statusText}
         </div>
       </div>
       <div className="flex items-center gap-1">
@@ -189,7 +199,7 @@ export default function SettingsPage() {
   const accounts = accountsQuery.data?.accounts ?? [];
 
   const addAccountMutation = useMutation({
-    mutationFn: beginGmailConnection,
+    mutationFn: () => beginGmailConnection("/settings"),
     onError: () => toast.error("Failed to connect Gmail account"),
   });
 
@@ -293,12 +303,7 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-8">
-      <header className="space-y-1">
-        <h1 className="text-xl font-medium tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Personal details, sync controls, and appearance preferences.
-        </p>
-      </header>
+      <PageHeader title="Settings" />
 
       <SettingsSection title="Account">
         <div className="border-t border-border/60">
@@ -328,7 +333,7 @@ export default function SettingsPage() {
                 canRemove={accounts.length > 1}
                 onRemove={(id) => removeAccountMutation.mutate(id)}
                 onSync={(id) => perAccountSyncMutation.mutate(id)}
-                isSyncing={syncingMailboxId === acct.mailboxId}
+                isSyncing={isSyncing || syncingMailboxId === acct.mailboxId}
               />
               <div className="border-t border-border/60" />
             </div>

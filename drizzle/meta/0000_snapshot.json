@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0aba3f90-f129-4605-81fc-5d9a29610cc4",
+  "id": "ff8f2ffc-c660-4549-86fb-bceb0af22ce9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "account": {
@@ -769,8 +769,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "gmail_id": {
-          "name": "gmail_id",
+        "provider_message_id": {
+          "name": "provider_message_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -912,10 +912,10 @@
         }
       },
       "indexes": {
-        "emails_gmail_id_unique": {
-          "name": "emails_gmail_id_unique",
+        "emails_provider_message_id_unique": {
+          "name": "emails_provider_message_id_unique",
           "columns": [
-            "gmail_id"
+            "provider_message_id"
           ],
           "isUnique": true
         },
@@ -1014,8 +1014,16 @@
           "notNull": false,
           "autoincrement": false
         },
-        "gmail_email": {
-          "name": "gmail_email",
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'google'"
+        },
+        "email": {
+          "name": "email",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

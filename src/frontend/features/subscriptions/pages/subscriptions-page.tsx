@@ -1,3 +1,10 @@
+import { PageHeader } from "@/components/page-header";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { unsubscribe } from "@/features/subscriptions/queries";
 import type { Subscription, UnsubscribeResult } from "@/features/subscriptions/types";
 import { getRouteApi } from "@tanstack/react-router";
@@ -13,24 +20,22 @@ export default function SubscriptionsPage() {
   if (items.length === 0) {
     return (
       <div className="mx-auto w-full max-w-3xl space-y-4 py-4">
-        <h2 className="text-lg font-medium">Subscriptions</h2>
-        <p className="text-sm text-muted-foreground">
-          No subscriptions found. Unsubscribe data is collected as new emails
-          arrive.
-        </p>
+        <PageHeader title="Subscriptions" />
+        <Empty className="min-h-56 border-0 p-0">
+          <EmptyHeader>
+            <EmptyTitle>No subscriptions found</EmptyTitle>
+            <EmptyDescription>
+              Unsubscribe data is collected as new emails arrive.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </div>
     );
   }
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 py-4">
-      <header>
-        <h2 className="text-lg font-medium">Subscriptions</h2>
-        <p className="text-sm text-muted-foreground">
-          {items.length} subscription{items.length !== 1 && "s"}{" "}
-          detected
-        </p>
-      </header>
+      <PageHeader title="Subscriptions" />
 
       <div className="space-y-1">
         {items.map((sub) => (

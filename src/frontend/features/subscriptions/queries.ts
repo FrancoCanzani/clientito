@@ -1,7 +1,7 @@
 import type { Subscription, UnsubscribeResult } from "./types";
 
 export async function fetchSubscriptions(): Promise<Subscription[]> {
-  const response = await fetch("/api/subscriptions");
+  const response = await fetch("/api/inbox/subscriptions");
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
     const message =
@@ -20,7 +20,7 @@ export async function unsubscribe(input: {
   unsubscribeUrl?: string;
   unsubscribeEmail?: string;
 }): Promise<UnsubscribeResult> {
-  const response = await fetch("/api/subscriptions/unsubscribe", {
+  const response = await fetch("/api/inbox/subscriptions/unsubscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

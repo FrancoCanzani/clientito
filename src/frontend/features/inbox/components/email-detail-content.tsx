@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEmail } from "@/features/inbox/context/email-context";
 import { fetchEmailDetail, fetchEmailThread } from "@/features/inbox/queries";
 import { cn } from "@/lib/utils";
 import {
@@ -11,7 +12,6 @@ import { type ReactNode, useMemo, useState } from "react";
 import type { EmailDetailItem, EmailListItem } from "../types";
 import { prepareEmailHtml } from "../utils/prepare-email-html";
 import { AttachmentItem } from "./attachment-item";
-import type { ComposeInitial } from "./compose-email-fields";
 import { EmailActionBar } from "./email-action-bar";
 import { EmailHtmlRenderer } from "./email-html-renderer";
 
@@ -213,14 +213,13 @@ function ThreadMessageCard({
 export function EmailDetailContent({
   email,
   onClose,
-  onForward,
   headerActions,
 }: {
   email: EmailListItem;
   onClose?: () => void;
-  onForward?: (initial: ComposeInitial) => void;
   headerActions?: ReactNode;
 }) {
+  const { forward } = useEmail();
   const formattedDate = formatDateTime(email.date);
   const [threadExpansionOverrides, setThreadExpansionOverrides] = useState<
     Map<string, boolean>
@@ -336,7 +335,7 @@ export function EmailDetailContent({
               <EmailActionBar
                 email={detail}
                 onClose={onClose}
-                onForward={onForward}
+                onForward={forward}
               />
             </div>
           )}

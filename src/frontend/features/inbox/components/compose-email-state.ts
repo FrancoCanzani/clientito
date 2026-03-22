@@ -6,7 +6,7 @@ import { useAttachmentUpload } from "../hooks/use-attachment-upload";
 import { useLocalDraft } from "../hooks/use-local-draft";
 import { useUndoSend } from "../hooks/use-undo-send";
 import { sendEmail } from "../mutations";
-import type { ComposeInitial } from "./compose-email-fields";
+import type { ComposeInitial } from "../types";
 
 type UseComposeEmailOptions = {
   onSent?: () => void;

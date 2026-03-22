@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { getMailboxDisplayEmail } from "@/hooks/use-mailboxes";
 import {
   Select,
   SelectContent,
@@ -11,15 +12,6 @@ import { AttachmentBar } from "./attachment-bar";
 import { ComposeEditor } from "./compose-editor";
 import { useComposeEmail } from "./compose-email-state";
 import { RecipientInput } from "./recipient-input";
-
-export type ComposeInitial = {
-  mailboxId?: number | null;
-  to?: string;
-  cc?: string;
-  bcc?: string;
-  subject?: string;
-  body?: string;
-};
 
 type ComposeEmailFieldsProps = {
   compose: ReturnType<typeof useComposeEmail>;
@@ -87,7 +79,7 @@ export function ComposeEmailFields({
                   key={mailbox.mailboxId}
                   value={String(mailbox.mailboxId)}
                 >
-                  {mailbox.gmailEmail ?? "Unknown account"}
+                  {getMailboxDisplayEmail(mailbox) ?? "Unknown account"}
                 </SelectItem>
               ))}
             </SelectContent>

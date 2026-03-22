@@ -56,7 +56,7 @@ export async function fetchBriefing(): Promise<HomeBriefing> {
 }
 
 export async function fetchSyncStatus(): Promise<SyncStatus> {
-  const response = await fetch("/api/sync/status");
+  const response = await fetch("/api/inbox/sync/status");
   if (!response.ok) {
     throw new ApiError("Failed to fetch sync status.", response.status);
   }

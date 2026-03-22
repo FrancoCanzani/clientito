@@ -3,10 +3,8 @@ import { cn } from "@/lib/utils";
 import { MinusIcon, XIcon } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  ComposeEmailFields,
-  type ComposeInitial,
-} from "./compose-email-fields";
+import type { ComposeInitial } from "../types";
+import { ComposeEmailFields } from "./compose-email-fields";
 import { getComposeInitialKey, useComposeEmail } from "./compose-email-state";
 
 export function ComposePanel({

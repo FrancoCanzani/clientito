@@ -1,4 +1,4 @@
-import { useMailboxes } from "@/hooks/use-mailboxes";
+import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import { Link, getRouteApi, useParams } from "@tanstack/react-router";
 
 const inboxRoute = getRouteApi("/_dashboard/inbox/$id/");
@@ -19,7 +19,7 @@ export function AccountSwitcher() {
       .filter((account) => account.mailboxId != null)
       .map((account) => ({
         id: String(account.mailboxId),
-        label: account.gmailEmail ?? "Account",
+        label: getMailboxDisplayEmail(account) ?? "Account",
       })),
   ];
 
@@ -34,7 +34,8 @@ export function AccountSwitcher() {
   const label =
     activeId === "all"
       ? "All accounts"
-      : (activeAccount?.gmailEmail ?? "Account");
+      : (activeAccount ? getMailboxDisplayEmail(activeAccount) : null) ??
+        "Account";
 
   return (
     <Link

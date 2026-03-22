@@ -12,7 +12,7 @@ import {
   fromTaskDateInputValue,
   type TaskSection,
 } from "@/features/tasks/utils";
-import { CircleDashedIcon, PlusIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 
 type EditorState =
   | { mode: "create"; dueAt: number | null }
@@ -45,7 +45,6 @@ export function TaskListView({
       <div className="space-y-5">
         <Empty className="min-h-[60vh] border-0 p-0">
           <EmptyHeader>
-            <CircleDashedIcon className="mx-auto mb-2 size-5 text-muted-foreground" />
             <EmptyTitle>
               {totalTasks > 0 && !showCompleted
                 ? "No open tasks"

@@ -18,12 +18,17 @@ export function useEmailData() {
 
   const view: EmailView = search.view ?? "inbox";
   const selectedEmailId = search.id ?? search.emailId ?? null;
-  const mailboxId = parseMailboxId(params.id);
+  const mailboxId = parseMailboxId(params.id) ?? null;
 
   const emailsQuery = useInfiniteQuery({
     queryKey: ["emails", view, mailboxId ?? "all"],
     queryFn: async ({ pageParam }) =>
-      fetchEmails({ view, limit: 60, offset: pageParam, mailboxId }),
+      fetchEmails({
+        view,
+        limit: 60,
+        offset: pageParam,
+        mailboxId: mailboxId ?? undefined,
+      }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) =>
       lastPage?.pagination?.hasMore

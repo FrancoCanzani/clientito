@@ -4,6 +4,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BriefingText } from "@/features/home/components/briefing-text";
 import { TriageCard } from "@/features/home/components/triage-card";
@@ -28,33 +29,42 @@ export default function HomePage() {
 
   const visibleItems = briefing.items.filter((item) => !dismissed.has(item.id));
   const showCards = visibleItems.length > 0 && !isAnimating && stream.text;
+  const showEmptyState = !hasItems && !stream.isStreaming;
 
   const handleDismiss = useCallback((id: string) => {
     setDismissed((prev) => new Set(prev).add(id));
   }, []);
 
   return (
-    <div className="mx-auto flex w-full pt-30 max-w-lg flex-1 flex-col justify-start space-y-6">
-      <div className="space-y-3">
-        <h1 className="text-xl font-medium">{greeting.line}</h1>
-        {shouldShowBriefingSkeleton ? (
-          <div className="space-y-2 pt-1">
-            <Skeleton className="h-4 w-[88%]" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-[76%]" />
-            <Skeleton className="h-4 w-[50%]" />
-            <Skeleton className="h-4 w-[89%]" />
-            <Skeleton className="h-4 w-[98%]" />
-            <Skeleton className="h-4 w-[72%]" />
-          </div>
-        ) : stream.text ? (
-          <BriefingText text={stream.text} animate={isAnimating} />
-        ) : stream.error ? (
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Today&apos;s briefing couldn&apos;t load right now.
-          </p>
-        ) : null}
-      </div>
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col space-y-6">
+      {!showEmptyState && <PageHeader title={greeting.line} />}
+
+      {!showEmptyState && (
+        <div className="space-y-3">
+          {shouldShowBriefingSkeleton ? (
+            <div className="space-y-2 pt-1">
+              <Skeleton className="h-4 w-[88%]" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-[76%]" />
+              <Skeleton className="h-4 w-[50%]" />
+              <Skeleton className="h-4 w-[89%]" />
+              <Skeleton className="h-4 w-[98%]" />
+              <Skeleton className="h-4 w-[72%]" />
+            </div>
+          ) : stream.text ? (
+            <BriefingText text={stream.text} animate={isAnimating} />
+          ) : stream.error ? (
+            <Empty className="min-h-52 border-0 p-0">
+              <EmptyHeader>
+                <EmptyTitle>{greeting.line}</EmptyTitle>
+                <EmptyDescription>
+                  Today&apos;s briefing couldn&apos;t load right now.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : null}
+        </div>
+      )}
 
       {showCards && (
         <div className="space-y-2">
@@ -69,21 +79,27 @@ export default function HomePage() {
         </div>
       )}
 
-      {!hasItems && !stream.isStreaming && (
-        <Empty className="min-h-52 border-border/60">
+      {showEmptyState && (
+        <Empty className="min-h-[60vh] border-0 p-0">
           <EmptyHeader>
-            <EmptyTitle>Everything looks handled.</EmptyTitle>
+            <EmptyTitle>{greeting.line}</EmptyTitle>
             <EmptyDescription>
-              No recent reply-needed threads or overdue tasks right now.
+              Everything looks handled. No recent reply-needed threads or overdue
+              tasks right now.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
       )}
 
       {hasItems && visibleItems.length === 0 && !isAnimating && (
-        <p className="text-center text-xs text-muted-foreground">
-          All caught up.
-        </p>
+        <Empty className="min-h-40 border-0 p-0">
+          <EmptyHeader>
+            <EmptyTitle>All caught up</EmptyTitle>
+            <EmptyDescription>
+              There is nothing else to triage right now.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       )}
     </div>
   );

@@ -9,14 +9,15 @@ import { auth } from "../../auth";
 import { authMiddleware } from "./middleware/auth";
 import { authLimiter, strictLimiter, standardLimiter } from "./middleware/rate-limit";
 import aiRoutes from "./routes/ai/router";
-import emailsRoutes from "./routes/emails/router";
 import healthRoutes from "./routes/health/router";
+import inboxRoutes from "./routes/inbox/router";
+import emailsRoutes from "./routes/inbox/emails/router";
+import filtersRoutes from "./routes/inbox/filters/router";
 import notesRoutes from "./routes/notes/router";
-import searchRoutes from "./routes/search/unified";
 import settingsRoutes from "./routes/settings/router";
-import filtersRoutes from "./routes/filters/router";
-import subscriptionsRoutes from "./routes/subscriptions/router";
-import syncRoutes from "./routes/sync/router";
+import searchRoutes from "./routes/inbox/search/router";
+import subscriptionsRoutes from "./routes/inbox/subscriptions/router";
+import syncRoutes from "./routes/inbox/sync/router";
 import tasksRoutes from "./routes/tasks/router";
 import type { AppRouteEnv } from "./routes/types";
 
@@ -49,6 +50,9 @@ app.use("/api/auth/*", authLimiter);
 app.use("/api/sync/start", strictLimiter);
 app.use("/api/sync/recover", strictLimiter);
 app.use("/api/emails/send", strictLimiter);
+app.use("/api/inbox/sync/start", strictLimiter);
+app.use("/api/inbox/sync/recover", strictLimiter);
+app.use("/api/inbox/emails/send", strictLimiter);
 app.use("/api/ai/*", strictLimiter);
 app.use("/api/*", standardLimiter);
 
@@ -58,6 +62,7 @@ app.all("/api/auth/*", async (c) => {
 });
 
 app.route("/api/health", healthRoutes);
+app.route("/api/inbox", inboxRoutes);
 app.route("/api/sync", syncRoutes);
 app.route("/api/emails", emailsRoutes);
 app.route("/api/ai", aiRoutes);

@@ -3,8 +3,8 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import { tasks } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
-import { TASK_COLUMNS } from "./helpers";
 import { postTaskBodySchema } from "./schemas";
+import { TASK_COLUMNS } from "./utils";
 
 export function registerPostTasks(api: Hono<AppRouteEnv>) {
   return api.post("/", zValidator("json", postTaskBodySchema), async (c) => {

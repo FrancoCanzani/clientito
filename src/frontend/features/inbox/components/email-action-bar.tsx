@@ -25,8 +25,7 @@ import { toast } from "sonner";
 import { unsubscribe } from "../../subscriptions/queries";
 import { useUndoSend } from "../hooks/use-undo-send";
 import { patchEmail, sendEmail } from "../mutations";
-import type { EmailDetailItem } from "../types";
-import type { ComposeInitial } from "./compose-email-fields";
+import type { ComposeInitial, EmailDetailItem } from "../types";
 import { SnoozePicker } from "./snooze-picker";
 
 type ActionBarProps = {
@@ -199,7 +198,7 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
             : `Re: ${email.subject}`
           : "Re:",
         body: quotedBody,
-        inReplyTo: email.gmailId,
+        inReplyTo: email.providerMessageId,
         threadId: email.threadId ?? undefined,
       });
     },

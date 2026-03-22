@@ -25,7 +25,7 @@ export async function fetchEmails(
   if (params?.offset) query.set("offset", String(params.offset));
   if (params?.mailboxId) query.set("mailboxId", String(params.mailboxId));
 
-  const response = await fetch(`/api/emails?${query}`);
+  const response = await fetch(`/api/inbox/emails?${query}`);
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
     const message =
@@ -48,7 +48,7 @@ export async function fetchEmailDetail(
   }
 
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
-  const response = await fetch(`/api/emails/${emailId}${suffix}`);
+  const response = await fetch(`/api/inbox/emails/${emailId}${suffix}`);
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
     const message =
@@ -65,7 +65,7 @@ export async function fetchEmailDetail(
 export async function fetchEmailThread(
   threadId: string,
 ): Promise<EmailListItem[]> {
-  const response = await fetch(`/api/emails/thread/${threadId}`);
+  const response = await fetch(`/api/inbox/emails/thread/${threadId}`);
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
     const message =
@@ -84,7 +84,7 @@ export async function fetchContactSuggestions(
   limit = 8,
 ): Promise<{ data: ContactSuggestion[] }> {
   const params = new URLSearchParams({ q, limit: String(limit) });
-  const response = await fetch(`/api/search/contacts?${params}`);
+  const response = await fetch(`/api/inbox/search/contacts?${params}`);
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
     const message =

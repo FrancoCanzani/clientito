@@ -3,17 +3,12 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { useEmailData } from "@/features/inbox/hooks/use-email-data";
-import type { ComposeInitial } from "./compose-email-fields";
+import { useEmail } from "@/features/inbox/context/email-context";
 import { EmailDetailPanel } from "./email-detail-panel";
 import { EmailList } from "./email-list";
 
-export function InboxDesktopView({
-  onForward,
-}: {
-  onForward: (initial: ComposeInitial) => void;
-}) {
-  const { selectedEmail } = useEmailData();
+export function InboxDesktopView() {
+  const { selectedEmail } = useEmail();
 
   if (!selectedEmail) {
     return <EmailList />;
@@ -36,7 +31,7 @@ export function InboxDesktopView({
           minSize="40%"
           className="min-w-0 overflow-hidden"
         >
-          <EmailDetailPanel onForward={onForward} />
+          <EmailDetailPanel />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

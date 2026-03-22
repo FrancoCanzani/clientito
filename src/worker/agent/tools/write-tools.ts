@@ -3,18 +3,15 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
 import { emails, notes, tasks } from "../../db/schema";
-import {
-  batchModifyGmailMessages,
-  sendGmailMessage,
-} from "../../lib/gmail/mailbox";
-import { resolveOutgoingMailbox } from "../../lib/gmail/mailbox-state";
-import { applyEmailPatch } from "../../routes/emails/mutation";
+import { createEmailProvider } from "../../lib/email";
+import { resolveOutgoingMailbox } from "../../lib/email/mailbox-state";
+import { applyEmailPatch } from "../../routes/inbox/emails/internal/mutation";
 
 async function getEmailForUser(db: Database, userId: string, emailId: number) {
   const rows = await db
     .select({
       id: emails.id,
-      gmailId: emails.gmailId,
+      providerMessageId: emails.providerMessageId,
       mailboxId: emails.mailboxId,
       isRead: emails.isRead,
       labelIds: emails.labelIds,
@@ -53,13 +50,11 @@ async function patchEmailLabels(
   }
 
   if (patch.addLabelIds.length > 0 || patch.removeLabelIds.length > 0) {
-    await batchModifyGmailMessages(
-      db,
-      email.mailboxId,
-      env,
-      [email.gmailId],
-      patch.addLabelIds.length > 0 ? patch.addLabelIds : undefined,
-      patch.removeLabelIds.length > 0 ? patch.removeLabelIds : undefined,
+    const provider = await createEmailProvider(db, env, email.mailboxId);
+    await provider.modifyLabels(
+      [email.providerMessageId],
+      patch.addLabelIds,
+      patch.removeLabelIds,
     );
   }
 
@@ -255,17 +250,18 @@ export function makeWriteTools(
           };
         }
 
-        const fromEmail = mailbox.gmailEmail ?? userEmail;
+        const fromEmail = mailbox.email ?? userEmail;
         if (!fromEmail) return { error: "User email not available" };
 
-        const result = await sendGmailMessage(db, env, mailbox.id, fromEmail, {
+        const provider = await createEmailProvider(db, env, mailbox.id);
+        const result = await provider.send(fromEmail, {
           to,
           subject,
           body,
           inReplyTo,
           threadId,
         });
-        return { sent: true, gmailId: result.gmailId, threadId: result.threadId };
+        return { sent: true, providerMessageId: result.providerMessageId, threadId: result.threadId };
       },
     }),
 

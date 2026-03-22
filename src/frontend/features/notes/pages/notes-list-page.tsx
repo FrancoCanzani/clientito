@@ -1,4 +1,12 @@
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { createNote } from "@/features/notes/mutations";
 import { useMutation } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
@@ -26,17 +34,20 @@ export default function NotesListPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium">Notes</h2>
-        <Button
-          type="button"
-          onClick={() => createNoteMutation.mutate()}
-          disabled={createNoteMutation.isPending}
-          variant={"secondary"}
-        >
-          {createNoteMutation.isPending ? "Creating..." : "New note"}
-        </Button>
-      </div>
+      <PageHeader
+        title="Notes"
+        actions={
+          <Button
+            type="button"
+            onClick={() => createNoteMutation.mutate()}
+            disabled={createNoteMutation.isPending}
+            variant="secondary"
+            size="sm"
+          >
+            {createNoteMutation.isPending ? "Creating..." : "New note"}
+          </Button>
+        }
+      />
 
       <div className="space-y-2">
         {notes.length > 0 ? (
@@ -59,7 +70,24 @@ export default function NotesListPage() {
             </Link>
           ))
         ) : (
-          <p className="py-8 text-sm text-muted-foreground">No notes yet.</p>
+          <Empty className="min-h-56 border-0 p-0">
+            <EmptyHeader>
+              <EmptyTitle>No notes yet</EmptyTitle>
+              <EmptyDescription>
+                Create a note to get started.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button
+                type="button"
+                onClick={() => createNoteMutation.mutate()}
+                disabled={createNoteMutation.isPending}
+                size="sm"
+              >
+                {createNoteMutation.isPending ? "Creating..." : "New note"}
+              </Button>
+            </EmptyContent>
+          </Empty>
         )}
       </div>
     </div>

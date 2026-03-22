@@ -23,7 +23,7 @@ function imageKeyFromSrc(src: string, userId: string): string | null {
   }
 }
 
-export function extractNoteImageKeys(content: string, userId: string): Set<string> {
+function extractNoteImageKeys(content: string, userId: string): Set<string> {
   const keys = new Set<string>();
   for (const match of content.matchAll(SRC_ATTRIBUTE_REGEX)) {
     const src = match[2];

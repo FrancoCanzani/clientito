@@ -7,9 +7,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEmailData } from "@/features/inbox/hooks/use-email-data";
-import { useEmailInboxActions } from "@/features/inbox/hooks/use-email-inbox-actions";
-import { useSelectionStore } from "@/features/inbox/stores/selection-store";
+import { useEmail } from "@/features/inbox/context/email-context";
 import { VIEW_LABELS } from "@/features/inbox/utils/inbox-filters";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -32,13 +30,14 @@ export function EmailList() {
     sections,
     selectedEmail,
     isPending,
-    isError,
     hasNextPage,
     isFetchingNextPage,
     loadMoreRef,
-  } = useEmailData();
+    selection,
+    openEmail,
+    executeEmailAction,
+  } = useEmail();
 
-  const selection = useSelectionStore(displayRows);
   const selectedIds = useMemo(
     () => Array.from(selection.selectedIds),
     [selection.selectedIds],
@@ -49,14 +48,6 @@ export function EmailList() {
   );
   const allVisibleSelected =
     displayRows.length > 0 && selection.count === displayRows.length;
-
-  const { openEmail, executeEmailAction } = useEmailInboxActions({
-    view,
-    mailboxId,
-    selectedEmailId,
-    selectedIds,
-    clearSelection: selection.clearSelection,
-  });
 
   const isSplitView = !isMobile && selectedEmail !== null;
   const pageTitle = VIEW_LABELS[view];

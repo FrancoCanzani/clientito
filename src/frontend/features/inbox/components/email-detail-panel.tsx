@@ -1,40 +1,19 @@
 import { Button } from "@/components/ui/button";
-import { useEmailData } from "@/features/inbox/hooks/use-email-data";
-import { useEmailInboxActions } from "@/features/inbox/hooks/use-email-inbox-actions";
+import { useEmail } from "@/features/inbox/context/email-context";
 import { useEmailInboxKeyboard } from "@/features/inbox/hooks/use-email-inbox-keyboard";
-import { useSelectionStore } from "@/features/inbox/stores/selection-store";
 import { CaretDownIcon, CaretUpIcon, XIcon } from "@phosphor-icons/react";
-import { useMemo } from "react";
-import type { ComposeInitial } from "./compose-email-fields";
 import { EmailDetailContent } from "./email-detail-content";
 
-export function EmailDetailPanel({
-  onForward,
-}: {
-  onForward: (initial: ComposeInitial) => void;
-}) {
+export function EmailDetailPanel() {
   const {
-    view,
-    mailboxId,
-    selectedEmailId,
     selectedEmail,
-    displayRows,
     orderedIds,
-    emailById,
-  } = useEmailData();
-  const selection = useSelectionStore(displayRows);
-  const selectedIds = useMemo(
-    () => Array.from(selection.selectedIds),
-    [selection.selectedIds],
-  );
-
-  const { openEmail, closeEmail, executeEmailAction } = useEmailInboxActions({
-    view,
-    mailboxId,
     selectedEmailId,
-    selectedIds,
-    clearSelection: selection.clearSelection,
-  });
+    emailById,
+    openEmail,
+    closeEmail,
+    executeEmailAction,
+  } = useEmail();
 
   const { goToEmail, hasPrev, hasNext } = useEmailInboxKeyboard({
     orderedIds,
@@ -54,7 +33,6 @@ export function EmailDetailPanel({
           key={selectedEmail.id}
           email={selectedEmail}
           onClose={closeEmail}
-          onForward={onForward}
           headerActions={
             <>
               <Button

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { registerGetFilters } from "../../src/worker/routes/filters/get-all";
-import { registerCreateFilter } from "../../src/worker/routes/filters/post-create";
-import { registerUpdateFilter } from "../../src/worker/routes/filters/put-update";
-import { registerDeleteFilter } from "../../src/worker/routes/filters/delete";
+import { registerGetFilters } from "../../src/worker/routes/inbox/filters/get-all";
+import { registerCreateFilter } from "../../src/worker/routes/inbox/filters/post-create";
+import { registerUpdateFilter } from "../../src/worker/routes/inbox/filters/put-update";
+import { registerDeleteFilter } from "../../src/worker/routes/inbox/filters/delete";
 import { setupTestDb, TEST_USER, TEST_USER_2, seedTestUser } from "../helpers/setup";
 import { createTestApp, testRequest } from "../helpers/request";
 import type { Hono } from "hono";

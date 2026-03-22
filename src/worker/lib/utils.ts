@@ -1,3 +1,7 @@
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function chunkArray<T>(list: T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < list.length; i += size) {

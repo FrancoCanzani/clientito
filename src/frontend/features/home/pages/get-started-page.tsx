@@ -49,7 +49,7 @@ export default function GetStartedPage() {
 
   const reconnectMutation = useMutation({
     mutationFn: async () => {
-      beginGmailConnection();
+      return beginGmailConnection("/get-started");
     },
     onError: (error) => {
       toast.error(

@@ -3,12 +3,28 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 export type MailboxAccount = {
   accountId: string;
   mailboxId: number | null;
-  gmailEmail: string | null;
+  email: string | null;
+  gmailEmail?: string | null;
   authState: string;
   lastSync: number | null;
   hasSynced: boolean;
   hasValidCredentials: boolean;
 };
+
+export function getMailboxDisplayEmail(
+  account: Pick<MailboxAccount, "email" | "gmailEmail">,
+): string | null {
+  const candidates = [account.email, account.gmailEmail];
+
+  for (const candidate of candidates) {
+    const normalized = candidate?.trim();
+    if (normalized && normalized.toLowerCase() !== "email") {
+      return normalized;
+    }
+  }
+
+  return null;
+}
 
 async function fetchAccounts(): Promise<{ accounts: MailboxAccount[] }> {
   const response = await fetch("/api/settings/accounts");

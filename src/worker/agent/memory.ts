@@ -1,8 +1,3 @@
-/**
- * Agent memory backed by Durable Object SQLite storage.
- * Stores key-value memories that persist across conversations.
- */
-
 export type MemoryEntry = {
   key: string;
   content: string;
@@ -34,7 +29,11 @@ export class AgentMemory {
     this.initialized = true;
   }
 
-  save(key: string, content: string, category: MemoryEntry["category"] = "context"): void {
+  save(
+    key: string,
+    content: string,
+    category: MemoryEntry["category"] = "context",
+  ): void {
     this.ensureTable();
     const now = Date.now();
     this.storage.sql.exec(
@@ -52,7 +51,10 @@ export class AgentMemory {
   get(key: string): MemoryEntry | null {
     this.ensureTable();
     const row = this.storage.sql
-      .exec(`SELECT key, content, category, created_at, updated_at FROM ${TABLE_NAME} WHERE key = ?`, key)
+      .exec(
+        `SELECT key, content, category, created_at, updated_at FROM ${TABLE_NAME} WHERE key = ?`,
+        key,
+      )
       .toArray()[0];
 
     if (!row) return null;
@@ -69,7 +71,9 @@ export class AgentMemory {
   getAll(): MemoryEntry[] {
     this.ensureTable();
     return this.storage.sql
-      .exec(`SELECT key, content, category, created_at, updated_at FROM ${TABLE_NAME} ORDER BY updated_at DESC`)
+      .exec(
+        `SELECT key, content, category, created_at, updated_at FROM ${TABLE_NAME} ORDER BY updated_at DESC`,
+      )
       .toArray()
       .map((row) => ({
         key: row.key as string,

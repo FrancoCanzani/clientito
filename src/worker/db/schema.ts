@@ -52,7 +52,7 @@ export const emails = sqliteTable(
     mailboxId: integer("mailbox_id").references(() => mailboxes.id, {
       onDelete: "cascade",
     }),
-    gmailId: text("gmail_id").notNull().unique(),
+    providerMessageId: text("provider_message_id").notNull().unique(),
     threadId: text("thread_id"),
     messageId: text("message_id"),
     fromAddr: text("from_addr").notNull(),
@@ -220,7 +220,8 @@ export const mailboxes = sqliteTable(
     accountId: text("account_id").references(() => account.id, {
       onDelete: "cascade",
     }),
-    gmailEmail: text("gmail_email"),
+    provider: text("provider").$type<"google" | "outlook">().notNull().default("google"),
+    email: text("email"),
     historyId: text("history_id"),
     syncWindowMonths: integer("sync_window_months"),
     syncCutoffAt: integer("sync_cutoff_at"),

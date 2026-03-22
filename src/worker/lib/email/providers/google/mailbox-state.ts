@@ -1,0 +1,17 @@
+export {
+  type SyncJobKind,
+  type SyncJobTrigger,
+  getUserMailboxes,
+  getMailboxSyncPreferences,
+  acquireMailboxSyncLock,
+  touchMailboxSyncLock,
+  releaseMailboxSyncLock,
+  persistMailboxHistoryState,
+  resetMailboxSyncState,
+  createSyncJob,
+  updateSyncJobProgress,
+  markSyncJobSucceeded,
+  markSyncJobFailed,
+  countConsecutiveFailedJobs,
+  getMailboxSyncSnapshot,
+} from "../../mailbox-state";

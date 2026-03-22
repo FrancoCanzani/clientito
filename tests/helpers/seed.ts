@@ -7,7 +7,7 @@ export async function seedEmail(
   overrides: Partial<{
     userId: string;
     mailboxId: number | null;
-    gmailId: string;
+    providerMessageId: string;
     threadId: string;
     fromAddr: string;
     fromName: string;
@@ -28,7 +28,7 @@ export async function seedEmail(
   const defaults = {
     userId: TEST_USER.id,
     mailboxId: null,
-    gmailId: `gmail-${emailCounter}-${now}`,
+    providerMessageId: `gmail-${emailCounter}-${now}`,
     threadId: `thread-${emailCounter}`,
     fromAddr: "sender@example.com",
     fromName: "Sender",
@@ -48,7 +48,7 @@ export async function seedEmail(
 
   const result = await env.DB.prepare(
     `INSERT INTO emails (
-      user_id, mailbox_id, gmail_id, thread_id, from_addr, from_name,
+      user_id, mailbox_id, provider_message_id, thread_id, from_addr, from_name,
       to_addr, subject, snippet, body_text, body_html, date, direction,
       is_read, label_ids, snoozed_until, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -56,7 +56,7 @@ export async function seedEmail(
     .bind(
       data.userId,
       data.mailboxId,
-      data.gmailId,
+      data.providerMessageId,
       data.threadId,
       data.fromAddr,
       data.fromName,
@@ -81,18 +81,18 @@ export async function seedMailbox(
   overrides: Partial<{
     userId: string;
     accountId: string;
-    gmailEmail: string;
+    email: string;
   }> = {},
 ): Promise<number> {
   const now = Date.now();
   const result = await env.DB.prepare(
-    `INSERT INTO mailboxes (user_id, account_id, gmail_email, updated_at)
+    `INSERT INTO mailboxes (user_id, account_id, email, updated_at)
      VALUES (?, ?, ?, ?)`,
   )
     .bind(
       overrides.userId ?? TEST_USER.id,
       overrides.accountId ?? null,
-      overrides.gmailEmail ?? "test@gmail.com",
+      overrides.email ?? "test@gmail.com",
       now,
     )
     .run();

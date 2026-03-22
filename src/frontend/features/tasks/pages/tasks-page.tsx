@@ -3,6 +3,7 @@ import { ButtonGroup } from "@/components/ui/button-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { PageHeader } from "@/components/page-header";
 import { PomodoroPill } from "@/features/tasks/components/pomodoro-pill";
 import { TaskBoard } from "@/features/tasks/components/task-board";
 import {
@@ -214,40 +215,58 @@ export default function TasksPage() {
   return (
     <TaskActionsProvider value={taskActions}>
       <div className="mx-auto w-full max-w-3xl space-y-5">
-        <div className="flex items-center justify-between">
-          <h2 className="font-medium">{VIEW_LABELS[view]}</h2>
-          <div className="flex items-center gap-2">
-            <ButtonGroup>
-              {(["all", "today", "upcoming"] as TaskView[]).map((v) => (
-                <Button
-                  key={v}
-                  variant={view === v ? "default" : "outline"}
-                  onClick={() => setView(v)}
-                >
-                  {VIEW_LABELS[v]}
-                </Button>
-              ))}
-            </ButtonGroup>
-            {!isMobile && (
-              <ButtonGroup>
-                <Button
-                  variant={layout === "list" ? "default" : "outline"}
-                  onClick={() => setLayout("list")}
-                >
-                  <ListIcon />
-                </Button>
-                <Button
-                  variant={layout === "board" ? "default" : "outline"}
-                  onClick={() => setLayout("board")}
-                >
-                  <KanbanIcon />
-                </Button>
-              </ButtonGroup>
-            )}
-          </div>
-        </div>
+        <PageHeader
+          title={VIEW_LABELS[view]}
+          actions={
+            <>
+              <Button
+                size="sm"
+                onClick={() =>
+                  setEditor({
+                    mode: "create",
+                    dueAt: view === "today" ? getDefaultCreateDueAt() : null,
+                  })
+                }
+              >
+                Add task
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => pomodoro.start()}>
+                {pomodoro.state.status !== "idle" ? "Focusing..." : "Focus"}
+              </Button>
+            </>
+          }
+        />
 
         <div className="flex flex-wrap items-center gap-2">
+          <ButtonGroup>
+            {(["all", "today", "upcoming"] as TaskView[]).map((v) => (
+              <Button
+                key={v}
+                variant={view === v ? "default" : "outline"}
+                onClick={() => setView(v)}
+              >
+                {VIEW_LABELS[v]}
+              </Button>
+            ))}
+          </ButtonGroup>
+
+          {!isMobile && (
+            <ButtonGroup>
+              <Button
+                variant={layout === "list" ? "default" : "outline"}
+                onClick={() => setLayout("list")}
+              >
+                <ListIcon />
+              </Button>
+              <Button
+                variant={layout === "board" ? "default" : "outline"}
+                onClick={() => setLayout("board")}
+              >
+                <KanbanIcon />
+              </Button>
+            </ButtonGroup>
+          )}
+
           {layout === "list" && (
             <>
               <ButtonGroup>
@@ -280,22 +299,6 @@ export default function TasksPage() {
               </div>
             </>
           )}
-
-          <div className="ml-auto flex gap-2">
-            <Button
-              onClick={() =>
-                setEditor({
-                  mode: "create",
-                  dueAt: view === "today" ? getDefaultCreateDueAt() : null,
-                })
-              }
-            >
-              Add task
-            </Button>
-            <Button variant="outline" onClick={() => pomodoro.start()}>
-              {pomodoro.state.status !== "idle" ? "Focusing..." : "Focus"}
-            </Button>
-          </div>
         </div>
 
         {!isMobile && editor?.mode === "create" ? (

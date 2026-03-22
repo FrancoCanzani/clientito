@@ -13,7 +13,7 @@ import {
   persistMailboxHistoryState,
   resetMailboxSyncState,
   SYNC_LOCK_TTL_MS,
-} from "../../src/worker/lib/gmail/mailbox-state";
+} from "../../src/worker/lib/email/mailbox-state";
 import { setupTestDb, TEST_USER, getDb } from "../helpers/setup";
 import { seedMailbox, seedAccount } from "../helpers/seed";
 import type { Database } from "../../src/worker/db/client";
@@ -159,7 +159,7 @@ describe("Mailbox State", () => {
       const acctId = await seedAccount({ id: "new-account-id" });
       const mb = await ensureMailbox(db, TEST_USER.id, acctId, "new@gmail.com");
       expect(mb).not.toBeNull();
-      expect(mb?.gmailEmail).toBe("new@gmail.com");
+      expect(mb?.email).toBe("new@gmail.com");
     });
 
     it("returns existing mailbox for same accountId", async () => {
@@ -169,11 +169,11 @@ describe("Mailbox State", () => {
       expect(mb1?.id).toBe(mb2?.id);
     });
 
-    it("updates gmailEmail on existing mailbox", async () => {
+    it("updates email on existing mailbox", async () => {
       const acctId = await seedAccount({ id: "acct-2" });
       await ensureMailbox(db, TEST_USER.id, acctId, "old@gmail.com");
       const mb = await ensureMailbox(db, TEST_USER.id, acctId, "new@gmail.com");
-      expect(mb?.gmailEmail).toBe("new@gmail.com");
+      expect(mb?.email).toBe("new@gmail.com");
     });
 
     it("getUserMailboxes returns all user mailboxes", async () => {

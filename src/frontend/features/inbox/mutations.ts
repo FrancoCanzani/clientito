@@ -9,7 +9,7 @@ export async function patchEmail(
     snoozedUntil?: number | null;
   },
 ): Promise<void> {
-  const response = await fetch(`/api/emails/${emailId}`, {
+  const response = await fetch(`/api/inbox/emails/${emailId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -34,7 +34,7 @@ export async function batchPatchEmails(
     snoozedUntil?: number | null;
   },
 ): Promise<void> {
-  const response = await fetch("/api/emails/batch", {
+  const response = await fetch("/api/inbox/emails/batch", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -69,14 +69,14 @@ type SendEmailInput = {
 };
 
 type SendEmailResult = {
-  gmailId: string;
+  providerMessageId: string;
   threadId: string;
 };
 
 export async function sendEmail(
   input: SendEmailInput,
 ): Promise<SendEmailResult> {
-  const response = await fetch("/api/emails/send", {
+  const response = await fetch("/api/inbox/emails/send", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -103,7 +103,7 @@ export async function uploadAttachments(
     formData.append("file", file);
   }
 
-  const response = await fetch("/api/emails/attachments", {
+  const response = await fetch("/api/inbox/emails/attachments", {
     method: "POST",
     body: formData,
   });

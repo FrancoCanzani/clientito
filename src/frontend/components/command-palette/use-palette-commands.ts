@@ -114,36 +114,40 @@ export function usePaletteCommands({
     };
 
     const emailViewCommands: PaletteCommand[] = isEmailsRoute
+      ? (
+          [
+            "inbox",
+            "sent",
+            "archived",
+            "starred",
+            "spam",
+            "trash",
+          ] as EmailView[]
+        ).map((view) => ({
+          id: `email-view-${view}`,
+          label: VIEW_LABELS[view],
+          section: "email-navigation",
+          icon: React.createElement(viewIcons[view] ?? TrayIcon, {
+            className: "size-4",
+          }),
+          onSelect: () => {
+            navigate({
+              to: "/inbox/$id",
+              params: { id: activeInboxId },
+              search: (prev) => ({
+                ...prev,
+                view: view === "inbox" ? undefined : view,
+                id: undefined,
+              }),
+            });
+            close();
+          },
+        }))
+      : [];
+
+    const mailboxCommands: PaletteCommand[] = isEmailsRoute
       ? [
-          ...(
-            [
-              "inbox",
-              "sent",
-              "archived",
-              "starred",
-              "spam",
-              "trash",
-            ] as EmailView[]
-          ).map((view) => ({
-            id: `email-view-${view}`,
-            label: VIEW_LABELS[view],
-            section: "email-navigation",
-            icon: React.createElement(viewIcons[view] ?? TrayIcon, {
-              className: "size-4",
-            }),
-            onSelect: () => {
-              navigate({
-                to: "/inbox/$id",
-                params: { id: activeInboxId },
-                search: (prev) => ({
-                  ...prev,
-                  view: view === "inbox" ? undefined : view,
-                  id: undefined,
-                }),
-              });
-              close();
-            },
-          })),
+          ...emailViewCommands,
           {
             id: "search-emails",
             label: "Search",
@@ -152,6 +156,32 @@ export function usePaletteCommands({
               className: "size-4",
             }),
             onSelect: () => setMode("search"),
+          },
+          {
+            id: "subscriptions",
+            label: "Subscriptions",
+            section: "email-navigation",
+            icon: React.createElement(NewspaperIcon, { className: "size-4" }),
+            onSelect: () => {
+              navigate({
+                to: "/inbox/$id/subscriptions",
+                params: { id: activeInboxId },
+              });
+              close();
+            },
+          },
+          {
+            id: "filters",
+            label: "Filters",
+            section: "email-navigation",
+            icon: React.createElement(FunnelIcon, { className: "size-4" }),
+            onSelect: () => {
+              navigate({
+                to: "/inbox/$id/filters",
+                params: { id: activeInboxId },
+              });
+              close();
+            },
           },
         ]
       : [];
@@ -259,29 +289,6 @@ export function usePaletteCommands({
         onSelect: () => runNavigation("/notes"),
       },
       {
-        id: "subscriptions",
-        label: "Subscriptions",
-        section: "navigation",
-        icon: React.createElement(NewspaperIcon, { className: "size-4" }),
-        onSelect: () => {
-          navigate({
-            to: "/inbox/$id/subscriptions",
-            params: { id: activeInboxId },
-          });
-          close();
-        },
-      },
-      {
-        id: "filters",
-        label: "Filters",
-        section: "navigation",
-        icon: React.createElement(FunnelIcon, { className: "size-4" }),
-        onSelect: () => {
-          navigate({ to: "/inbox/$id/filters", params: { id: activeInboxId } });
-          close();
-        },
-      },
-      {
         id: "settings",
         label: "Settings",
         section: "navigation",
@@ -289,7 +296,7 @@ export function usePaletteCommands({
         icon: React.createElement(GearIcon, { className: "size-4" }),
         onSelect: () => runNavigation("/settings"),
       },
-      ...emailViewCommands,
+      ...mailboxCommands,
       ...taskViewCommands,
       {
         id: "compose",
@@ -302,7 +309,7 @@ export function usePaletteCommands({
           navigate({
             to: "/inbox/$id",
             params: { id: activeInboxId },
-            search: (prev) => ({ ...prev, compose: true }),
+            search: { compose: true },
           });
           close();
         },
@@ -359,7 +366,6 @@ export function usePaletteCommands({
     logout,
     navigate,
     navigateToInbox,
-    queryClient,
     resolvedTheme,
     runNavigation,
     setMode,

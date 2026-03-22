@@ -4,8 +4,8 @@ import { and, asc, desc, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { tasks } from "../../db/schema";
 import { getDayBoundsUtc } from "../../lib/utils";
 import type { AppRouteEnv } from "../types";
-import { TASK_COLUMNS } from "./helpers";
 import { getTasksQuerySchema } from "./schemas";
+import { TASK_COLUMNS } from "./utils";
 
 export function registerGetTasks(api: Hono<AppRouteEnv>) {
   api.get("/", zValidator("query", getTasksQuerySchema), async (c) => {

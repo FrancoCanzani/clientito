@@ -15,8 +15,9 @@ import { createWorkersAI } from "workers-ai-provider";
 import { formatDistanceToNowStrict } from "date-fns";
 import { dailyBriefings, emails, tasks } from "../../db/schema";
 import { isAutomatedSender, isPublicDomain } from "../../lib/domains";
+import { STANDARD_LABELS } from "../../lib/email/types";
 import type { AppRouteEnv } from "../types";
-import { hasEmailLabel } from "../emails/helpers";
+import { hasEmailLabel } from "../inbox/emails/utils";
 import { getDayBoundsUtc } from "../../lib/utils";
 
 const MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
@@ -373,8 +374,8 @@ async function buildBriefing(input: {
       and(
         eq(emails.userId, input.userId),
         isNotNull(emails.threadId),
-        not(hasEmailLabel("TRASH")),
-        not(hasEmailLabel("SPAM")),
+        not(hasEmailLabel(STANDARD_LABELS.TRASH)),
+        not(hasEmailLabel(STANDARD_LABELS.SPAM)),
       ),
     )
     .groupBy(emails.threadId)

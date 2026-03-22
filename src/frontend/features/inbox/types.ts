@@ -11,7 +11,7 @@ export type AiLabel = "important" | "later" | "newsletter" | "marketing" | "tran
 export type EmailListItem = {
   id: string;
   mailboxId: number | null;
-  gmailId: string;
+  providerMessageId: string;
   fromAddr: string;
   fromName: string | null;
   toAddr: string | null;
@@ -58,4 +58,13 @@ export type EmailListResponse = {
     offset: number;
     hasMore: boolean;
   };
+};
+
+export type ComposeInitial = {
+  mailboxId?: number | null;
+  to?: string;
+  cc?: string;
+  bcc?: string;
+  subject?: string;
+  body?: string;
 };

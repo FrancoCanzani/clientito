@@ -1,37 +1,12 @@
 import { z } from "zod";
 
-const errorResponseSchema = z.object({ error: z.string() });
-
 export const noteIdParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
-});
-
-const noteSchema = z.object({
-  id: z.number(),
-  title: z.string(),
-  content: z.string(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-});
-
-const noteSummarySchema = noteSchema.pick({
-  id: true,
-  title: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export const getNotesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional(),
   offset: z.coerce.number().int().min(0).optional(),
-});
-
-const listNotesResponseSchema = z.object({
-  data: z.array(noteSummarySchema),
-  pagination: z.object({
-    limit: z.number(),
-    offset: z.number(),
-  }),
 });
 
 export const postNoteBodySchema = z.object({
@@ -50,14 +25,4 @@ export const patchNoteBodySchema = z
 
 export const noteImageQuerySchema = z.object({
   key: z.string().trim().min(1),
-});
-
-const noteResponseSchema = z.object({
-  data: noteSchema,
-});
-
-const deleteNoteResponseSchema = z.object({
-  data: z.object({
-    deleted: z.boolean(),
-  }),
 });

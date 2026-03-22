@@ -58,7 +58,8 @@ CREATE TABLE IF NOT EXISTS \`mailboxes\` (
   \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
   \`user_id\` text NOT NULL,
   \`account_id\` text,
-  \`gmail_email\` text,
+  \`provider\` text DEFAULT 'google' NOT NULL,
+  \`email\` text,
   \`history_id\` text,
   \`sync_window_months\` integer,
   \`sync_cutoff_at\` integer,
@@ -78,7 +79,7 @@ CREATE TABLE IF NOT EXISTS \`emails\` (
   \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
   \`user_id\` text NOT NULL,
   \`mailbox_id\` integer,
-  \`gmail_id\` text NOT NULL,
+  \`provider_message_id\` text NOT NULL,
   \`thread_id\` text,
   \`message_id\` text,
   \`from_addr\` text NOT NULL,
@@ -101,7 +102,7 @@ CREATE TABLE IF NOT EXISTS \`emails\` (
   FOREIGN KEY (\`user_id\`) REFERENCES \`user\`(\`id\`) ON DELETE cascade,
   FOREIGN KEY (\`mailbox_id\`) REFERENCES \`mailboxes\`(\`id\`) ON DELETE cascade
 );
-CREATE UNIQUE INDEX IF NOT EXISTS \`emails_gmail_id_unique\` ON \`emails\` (\`gmail_id\`);
+CREATE UNIQUE INDEX IF NOT EXISTS \`emails_provider_message_id_unique\` ON \`emails\` (\`provider_message_id\`);
 CREATE INDEX IF NOT EXISTS \`emails_user_idx\` ON \`emails\` (\`user_id\`);
 CREATE INDEX IF NOT EXISTS \`emails_user_date_idx\` ON \`emails\` (\`user_id\`,\`date\`);
 CREATE INDEX IF NOT EXISTS \`emails_thread_idx\` ON \`emails\` (\`thread_id\`);
@@ -220,13 +221,13 @@ export function getDb(): Database {
   return createDb(env.DB);
 }
 
-export async function migrateDb(): Promise<void> {
+async function migrateDb(): Promise<void> {
   const statements = MIGRATION_SQL.split(";")
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
-  for (const sql of statements) {
-    await env.DB.prepare(sql).run();
+  for (const statement of statements) {
+    await env.DB.prepare(statement).run();
   }
 }
 
@@ -241,7 +242,7 @@ export async function seedTestUser(
     .run();
 }
 
-export async function cleanDb(): Promise<void> {
+async function cleanDb(): Promise<void> {
   const tables = [
     "sync_jobs",
     "daily_briefings",

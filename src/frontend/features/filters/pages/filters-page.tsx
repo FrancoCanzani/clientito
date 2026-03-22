@@ -1,6 +1,14 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/page-header";
 import { Switch } from "@/components/ui/switch";
 import {
   FilterEditor,
@@ -157,12 +165,7 @@ export default function FiltersPage() {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-8 py-2">
-      <div>
-        <h1 className="text-lg font-medium tracking-tight">Filters</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Automatically sort incoming emails with AI.
-        </p>
-      </div>
+      <PageHeader title="Filters" />
 
       <form onSubmit={handlePromptSubmit} className="relative">
         <SparkleIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -211,26 +214,31 @@ export default function FiltersPage() {
           ))}
         </div>
       ) : filters.length === 0 && !editing ? (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border/60 py-12 text-center">
-          <p className="text-sm text-muted-foreground">
-            No filters yet. Describe what you want above or create one manually.
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setEditing({
-                id: null,
-                name: "",
-                description: "",
-                actions: {},
-                enabled: true,
-              });
-            }}
-          >
-            Create manually
-          </Button>
-        </div>
+        <Empty className="min-h-56 border-0 p-0">
+          <EmptyHeader>
+            <EmptyTitle>No filters yet</EmptyTitle>
+            <EmptyDescription>
+              Describe what you want above or create one manually.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditing({
+                  id: null,
+                  name: "",
+                  description: "",
+                  actions: {},
+                  enabled: true,
+                });
+              }}
+            >
+              Create manually
+            </Button>
+          </EmptyContent>
+        </Empty>
       ) : (
         <div className="space-y-2">
           {filters.map((filter) => (
