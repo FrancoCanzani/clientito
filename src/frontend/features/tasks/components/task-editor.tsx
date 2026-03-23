@@ -143,8 +143,7 @@ export function TaskEditor({
         "flex flex-col border border-border/50 shadow-2xs gap-4 rounded-md p-3",
         isSheet && "border-none shadow-none",
       )}
-      onSubmit={(event) => {
-        event.preventDefault();
+      action={() => {
         if (!form.title.trim()) return;
         onSubmit({
           title: form.title.trim(),

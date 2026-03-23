@@ -11,7 +11,13 @@ import {
 export type EmailCommand =
   | { type: "selection-mode"; enabled: boolean }
   | { type: "select-all-visible" }
-  | { type: "clear-selection" };
+  | { type: "clear-selection" }
+  | { type: "open-first-visible" }
+  | { type: "navigate-next" }
+  | { type: "navigate-prev" }
+  | { type: "archive" }
+  | { type: "trash" }
+  | { type: "escape" };
 
 type EmailCommandContextValue = {
   issueCommand: (command: EmailCommand) => void;

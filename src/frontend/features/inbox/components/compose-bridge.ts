@@ -1,29 +1,22 @@
 import type { Editor } from "@tiptap/core";
+import type { ComposeInitial } from "../types";
 
-let activeEditor: Editor | null = null;
+const openComposeListeners = new Set<(initial: ComposeInitial) => void>();
 
-const openComposeListeners = new Set<
-  (initial: { mailboxId?: number; to?: string; subject?: string; body?: string }) => void
->();
+export function registerComposeEditor(_editor?: Editor) {}
 
-export function registerComposeEditor(editor: Editor) {
-  activeEditor = editor;
+export function unregisterComposeEditor() {}
+
+export function registerOpenComposeListener(
+  listener: (initial: ComposeInitial) => void,
+) {
+  openComposeListeners.add(listener);
+  return () => {
+    openComposeListeners.delete(listener);
+  };
 }
 
-export function unregisterComposeEditor() {
-  activeEditor = null;
-}
-
-export function openCompose(initial: {
-  mailboxId?: number;
-  to?: string;
-  subject?: string;
-  body?: string;
-}) {
-  if (activeEditor && !activeEditor.isDestroyed && initial.body) {
-    activeEditor.commands.setContent(initial.body);
-    return;
-  }
+export function openCompose(initial: ComposeInitial) {
   for (const listener of openComposeListeners) {
     listener(initial);
   }

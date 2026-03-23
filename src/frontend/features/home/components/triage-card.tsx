@@ -4,8 +4,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { patchEmail } from "@/features/inbox/mutations";
 import type { HomeBriefingItem } from "@/features/home/queries";
+import { patchEmail } from "@/features/inbox/mutations";
 import {
   ArchiveIcon,
   ChatCircleDotsIcon,
@@ -58,14 +58,15 @@ export function TriageCard({
 
   return (
     <div
-      className="triage-card group rounded-lg border border-border bg-card px-4 py-3 transition-[transform,opacity] duration-200"
+      className="group rounded-lg border border-border bg-card px-4 py-3 opacity-0 transition-[transform,opacity] duration-200 [animation:triage-card-in_0.3s_cubic-bezier(0.23,1,0.32,1)_forwards]"
       style={{
         animationDelay: `${index * 60}ms`,
       }}
     >
       <div className="flex items-start justify-between gap-3">
-        <div
-          className="min-w-0 flex-1 cursor-pointer"
+        <button
+          type="button"
+          className="min-w-0 flex-1 cursor-pointer bg-transparent p-0 text-left"
           onClick={() => navigate({ to: item.href })}
         >
           <div className="flex items-center gap-2">
@@ -94,7 +95,7 @@ export function TriageCard({
             )}
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">{item.reason}</p>
-        </div>
+        </button>
 
         <div className="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
           {!isTask && emailId && (

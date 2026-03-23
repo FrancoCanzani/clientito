@@ -33,7 +33,6 @@ import React, { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import type { PaletteCommand, PaletteMode } from "./types";
 
-/** Extract the current mailbox $id from the pathname, defaulting to "all". */
 function getActiveInboxId(pathname: string): string {
   const match = pathname.match(/^\/inbox\/([^/]+)/);
   return match?.[1] ?? "all";
@@ -55,6 +54,8 @@ export function usePaletteCommands({
 
   const pathname = router.state.location.pathname;
   const activeInboxId = getActiveInboxId(pathname);
+  const isEmailsRoute = pathname.startsWith("/inbox/");
+  const isTasksRoute = pathname === "/tasks";
 
   const navigateToInbox = useCallback(() => {
     navigate({ to: "/inbox/$id", params: { id: activeInboxId } });
@@ -62,7 +63,7 @@ export function usePaletteCommands({
   }, [close, navigate, activeInboxId]);
 
   const runNavigation = useCallback(
-    (to: "/home" | "/notes" | "/tasks" | "/settings") => {
+    (to: "/home" | "/notes" | "/tasks" | "/docs" | "/settings") => {
       navigate({ to });
       close();
     },
@@ -96,9 +97,6 @@ export function usePaletteCommands({
     },
     onError: () => toast.error("Failed to create note"),
   });
-
-  const isEmailsRoute = pathname.startsWith("/inbox/");
-  const isTasksRoute = pathname === "/tasks";
 
   const commands: PaletteCommand[] = useMemo(() => {
     const viewIcons: Record<

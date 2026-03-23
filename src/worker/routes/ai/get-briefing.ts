@@ -343,7 +343,7 @@ function buildTaskReason(task: TaskRow, type: "overdue_task" | "due_today_task")
     : `Due ${age}.`;
 }
 
-async function buildBriefing(input: {
+export async function buildBriefing(input: {
   db: AppRouteEnv["Variables"]["db"];
   env: Env;
   userId: string;

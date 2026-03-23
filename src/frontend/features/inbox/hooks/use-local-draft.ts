@@ -10,6 +10,7 @@ type DraftState = {
   bcc: string;
   subject: string;
   body: string;
+  forwardedContent?: string;
 };
 
 type StoredDraft = DraftState & { savedAt: number };
@@ -55,7 +56,8 @@ function isDraftEmpty(d: DraftState): boolean {
     !d.cc &&
     !d.bcc &&
     !d.subject &&
-    (!d.body || d.body === "<p></p>" || d.body === "<p><br></p>")
+    (!d.body || d.body === "<p></p>" || d.body === "<p><br></p>") &&
+    !d.forwardedContent
   );
 }
 

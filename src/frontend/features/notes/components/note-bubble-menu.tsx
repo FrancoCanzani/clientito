@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { useHotkey } from "@tanstack/react-hotkeys";
 import type { Editor } from "@tiptap/core";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,6 +14,16 @@ import { RichTextOrderedList } from "reactjs-tiptap-editor/orderedlist";
 import { RichTextStrike } from "reactjs-tiptap-editor/strike";
 
 const YELLOW_HIGHLIGHT = "#fde047";
+const bubbleMenuClassName = cn(
+  "relative inline-flex items-center gap-[0.2rem] overflow-visible rounded-full border border-[#1f2430] bg-[#161a22] px-[0.34rem] py-[0.28rem] text-[#f3f4f6] shadow-[0_10px_24px_rgba(0,0,0,0.25)]",
+  "[&_button]:h-[1.9rem] [&_button]:min-w-[1.9rem] [&_button]:rounded-lg [&_button]:border-0 [&_button]:text-[#e5e7eb] [&_button]:transition-[background-color,color,transform] [&_button]:duration-150 [&_button]:ease-out [&_button:hover]:bg-white/10 [&_button:active]:scale-[0.98]",
+  "[&_button[data-state=on]]:bg-white/16 [&_button[data-state=on]]:text-white",
+);
+
+const blockPickerMenuClassName = cn(
+  "absolute left-0 top-[calc(100%+0.35rem)] z-40 min-w-36 rounded-[0.6rem] border border-[#2a3140] bg-[#10151e] p-1 shadow-[0_10px_24px_rgba(0,0,0,0.32)]",
+  "[&_button]:flex [&_button]:w-full [&_button]:items-center [&_button]:justify-start [&_button]:rounded-md [&_button]:px-2 [&_button]:text-left [&_button]:text-sm [&_button]:leading-none",
+);
 
 export function NoteBubbleMenu({ editor }: { editor: Editor }) {
   const [isBlockMenuOpen, setIsBlockMenuOpen] = useState(false);
@@ -95,19 +106,22 @@ export function NoteBubbleMenu({ editor }: { editor: Editor }) {
       <RichTextBubbleText
         buttonBubble={
           <div
-            className="notes-bubble-menu"
+            role="toolbar"
+            aria-label="Text formatting"
+            className={bubbleMenuClassName}
             onMouseDown={(event) => event.preventDefault()}
           >
-            <div className="notes-block-picker" ref={blockMenuRef}>
+            <div className="relative" ref={blockMenuRef}>
               <button
                 ref={blockMenuButtonRef}
                 type="button"
                 onClick={() => setIsBlockMenuOpen((prev) => !prev)}
+                className="px-[0.55rem] text-[0.95rem] leading-none text-slate-300"
               >
                 {blockLabel}
               </button>
               {isBlockMenuOpen ? (
-                <div className="notes-block-picker-menu">
+                <div className={blockPickerMenuClassName}>
                   <button type="button" onClick={() => setBlockType("body")}>
                     Body
                   </button>
@@ -124,10 +138,10 @@ export function NoteBubbleMenu({ editor }: { editor: Editor }) {
               ) : null}
             </div>
 
-            <span className="notes-bubble-divider" />
+            <span className="h-[1.15rem] w-px bg-white/18" />
             <RichTextBulletList />
             <RichTextOrderedList />
-            <span className="notes-bubble-divider" />
+            <span className="h-[1.15rem] w-px bg-white/18" />
             <RichTextLink />
             <RichTextBold />
             <RichTextItalic />
@@ -142,6 +156,7 @@ export function NoteBubbleMenu({ editor }: { editor: Editor }) {
                   ? "on"
                   : "off"
               }
+              className="px-[0.55rem] text-[0.85rem] leading-none"
             >
               Yellow
             </button>

@@ -6,6 +6,7 @@ import {
   type EmailCommand,
 } from "@/features/inbox/hooks/use-email-command-state";
 import { EmailProvider, useEmail } from "@/features/inbox/context/email-context";
+import { useEmailInboxKeyboard } from "@/features/inbox/hooks/use-email-inbox-keyboard";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSetPageContext } from "@/hooks/use-page-context";
 import { getRouteApi } from "@tanstack/react-router";
@@ -21,13 +22,25 @@ function InboxContent() {
   const {
     mailboxId,
     selectedEmail,
+    selectedEmailId,
+    orderedIds,
+    emailById,
     selection,
+    openEmail,
+    closeEmail,
+    executeEmailAction,
     forwardOpen,
     composeInitial,
     closeForward,
   } = useEmail();
 
   const isComposing = search.compose === true;
+  const { goToEmail } = useEmailInboxKeyboard({
+    orderedIds,
+    selectedEmailId,
+    emailById,
+    openEmail,
+  });
 
   useSetPageContext(
     useMemo(
@@ -63,9 +76,40 @@ function InboxContent() {
           case "clear-selection":
             selection.clearSelection();
             break;
+          case "open-first-visible":
+            if (selectedEmailId) break;
+            goToEmail("next");
+            break;
+          case "navigate-next":
+            goToEmail("next");
+            break;
+          case "navigate-prev":
+            goToEmail("prev");
+            break;
+          case "archive":
+            executeEmailAction("archive");
+            break;
+          case "trash":
+            executeEmailAction("trash");
+            break;
+          case "escape":
+            if (selectedEmailId) {
+              closeEmail();
+              break;
+            }
+            if (selection.selectionMode || selection.hasSelection) {
+              selection.clearSelection();
+            }
+            break;
         }
       },
-      [selection],
+      [
+        closeEmail,
+        executeEmailAction,
+        goToEmail,
+        selectedEmailId,
+        selection,
+      ],
     ),
   );
 

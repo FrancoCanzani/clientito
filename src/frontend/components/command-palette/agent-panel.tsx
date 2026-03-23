@@ -117,7 +117,7 @@ export function AgentPanel({
         )}
         {hasPendingApprovals && (
           <p className="px-3 py-2 text-xs text-muted-foreground">
-            Resolve the pending action before sending another message.
+            Approve, discard, or send a follow-up message to revise the pending action.
           </p>
         )}
         {status === "error" && messages.length === 0 && agentHasSubmitted && (

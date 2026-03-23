@@ -1,5 +1,5 @@
+import { eq } from "drizzle-orm";
 import type { Hono } from "hono";
-import { and, eq } from "drizzle-orm";
 import { mailboxes } from "../../../db/schema";
 import {
   getMailboxSyncSnapshot,
@@ -36,7 +36,8 @@ export function registerGetSync(api: Hono<AppRouteEnv>) {
 
     // Auto-clear stale reconnect_required when Google tokens are valid again
     if (mailbox && mailbox.authState === "reconnect_required") {
-      const latestError = latestJob?.errorMessage ?? mailbox.lastErrorMessage ?? "";
+      const latestError =
+        latestJob?.errorMessage ?? mailbox.lastErrorMessage ?? "";
       if (!latestError) {
         await db
           .update(mailboxes)

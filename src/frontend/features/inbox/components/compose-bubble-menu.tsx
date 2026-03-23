@@ -67,8 +67,7 @@ export function ComposeBubbleMenu({ editor }: { editor: Editor }) {
     >
       {showLinkInput ? (
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
+          action={() => {
             setLink();
           }}
           className="flex items-center gap-1"

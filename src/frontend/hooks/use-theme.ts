@@ -2,7 +2,7 @@ import { useCallback, useSyncExternalStore } from "react";
 
 type Theme = "light" | "dark" | "system";
 
-const STORAGE_KEY = "clientito-theme";
+const STORAGE_KEY = "petit-theme";
 
 function getStoredTheme(): Theme {
   try {

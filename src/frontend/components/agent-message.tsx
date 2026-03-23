@@ -1,3 +1,7 @@
+import { fetchEmailDetail } from "@/features/inbox/queries";
+import type { EmailDetailItem } from "@/features/inbox/types";
+import DOMPurify from "dompurify";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { CheckIcon, XIcon } from "@phosphor-icons/react";
 import {
@@ -6,7 +10,8 @@ import {
   isToolUIPart,
   type UIMessage,
 } from "ai";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 const toolLabels: Record<string, string> = {
   createTask: "Create task",
@@ -127,11 +132,127 @@ function ToolField({
 }
 
 function ToolBodyPreview({ text }: { text: string }) {
+  const looksLikeHtml = /<([a-z][\w-]*)\b[^>]*>/i.test(text);
+
+  if (looksLikeHtml) {
+    const sanitized = useMemo(
+      () =>
+        DOMPurify.sanitize(text, {
+          USE_PROFILES: { html: true },
+        }),
+      [text],
+    );
+
+    return (
+      <div className="max-h-48 overflow-y-auto rounded-md border border-border/60 bg-background px-3 py-2">
+        <div
+          className={cn("prose prose-sm max-w-none text-xs text-foreground")}
+          dangerouslySetInnerHTML={{ __html: sanitized }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="max-h-48 overflow-y-auto rounded-md border border-border/60 bg-background px-3 py-2">
       <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground">
         {text}
       </p>
+    </div>
+  );
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildForwardedEmailPreviewHtml(email: EmailDetailItem) {
+  const fromLine = email.fromName
+    ? `${escapeHtml(email.fromName)} &lt;${escapeHtml(email.fromAddr)}&gt;`
+    : escapeHtml(email.fromAddr);
+  const dateLine = new Date(email.date).toLocaleString();
+  const subjectLine = escapeHtml(email.subject ?? "(no subject)");
+  const toLine = email.toAddr?.trim() ? escapeHtml(email.toAddr) : null;
+  const ccLine = email.ccAddr?.trim() ? escapeHtml(email.ccAddr) : null;
+  const originalBody = email.resolvedBodyHtml?.trim().length
+    ? email.resolvedBodyHtml
+    : `<div style="white-space:pre-wrap">${escapeHtml(email.resolvedBodyText ?? "")}</div>`;
+
+  return [
+    "<p><br></p>",
+    '<div data-forwarded-message="true" style="border-top:1px solid #dadce0;margin-top:16px;padding-top:16px;color:#5f6368;font-size:13px">',
+    '<div data-forwarded-header="true">---------- Forwarded message ---------</div>',
+    `<div><strong>From:</strong> ${fromLine}</div>`,
+    `<div><strong>Date:</strong> ${escapeHtml(dateLine)}</div>`,
+    `<div><strong>Subject:</strong> ${subjectLine}</div>`,
+    ...(toLine ? [`<div><strong>To:</strong> ${toLine}</div>`] : []),
+    ...(ccLine ? [`<div><strong>Cc:</strong> ${ccLine}</div>`] : []),
+    "<br>",
+    `<div data-forwarded-original-body="true">${originalBody}</div>`,
+    "</div>",
+  ].join("");
+}
+
+function EmailActionArgs({ args }: { args: Record<string, unknown> }) {
+  const forwardEmailId =
+    typeof args.forwardEmailId === "number" ? String(args.forwardEmailId) : null;
+  const forwardEmailQuery = useQuery({
+    queryKey: ["email-detail", forwardEmailId, "agent-approval"],
+    queryFn: () => fetchEmailDetail(forwardEmailId!),
+    enabled: forwardEmailId !== null,
+    staleTime: 30_000,
+  });
+
+  const prefaceHtml =
+    typeof args.body === "string" && args.body.trim().length > 0
+      ? args.body.trim()
+      : null;
+  const resolvedSubject = isPresent(args.subject)
+    ? String(args.subject)
+    : forwardEmailQuery.data
+      ? (forwardEmailQuery.data.subject?.startsWith("Fwd:")
+          ? forwardEmailQuery.data.subject
+          : `Fwd: ${forwardEmailQuery.data.subject ?? ""}`.trim())
+      : null;
+  const resolvedBody = forwardEmailQuery.data
+    ? prefaceHtml
+      ? `${prefaceHtml}<p><br></p>${buildForwardedEmailPreviewHtml(
+          forwardEmailQuery.data,
+        )}`
+      : buildForwardedEmailPreviewHtml(forwardEmailQuery.data)
+    : prefaceHtml;
+
+  return (
+    <div className="space-y-3">
+      {isPresent(args.to) ? (
+        <ToolField
+          label="To"
+          value={<p className="break-all">{String(args.to)}</p>}
+        />
+      ) : null}
+      {isPresent(args.cc) ? (
+        <ToolField
+          label="CC"
+          value={<p className="break-all">{String(args.cc)}</p>}
+        />
+      ) : null}
+      {resolvedSubject ? (
+        <ToolField
+          label="Subject"
+          value={<p className="text-balance">{resolvedSubject}</p>}
+        />
+      ) : null}
+      {resolvedBody ? (
+        <ToolBodyPreview text={resolvedBody} />
+      ) : null}
+      {forwardEmailId && forwardEmailQuery.isPending ? (
+        <ToolField label="Forward" value="Loading forwarded email preview..." />
+      ) : null}
     </div>
   );
 }
@@ -145,42 +266,8 @@ function ToolArgs({
 }) {
   switch (toolName) {
     case "sendEmail":
-    case "composeEmail": {
-      const body =
-        typeof args.body === "string" && args.body.trim().length > 0
-          ? args.body.trim()
-          : null;
-
-      return (
-        <div className="space-y-3">
-          {isPresent(args.to) ? (
-            <ToolField
-              label="To"
-              value={<p className="break-all">{String(args.to)}</p>}
-            />
-          ) : null}
-          {isPresent(args.cc) ? (
-            <ToolField
-              label="CC"
-              value={<p className="break-all">{String(args.cc)}</p>}
-            />
-          ) : null}
-          {isPresent(args.subject) ? (
-            <ToolField
-              label="Subject"
-              value={<p className="text-balance">{String(args.subject)}</p>}
-            />
-          ) : null}
-          {body ? (
-            <ToolField
-              label="Body"
-              multiline
-              value={<ToolBodyPreview text={body} />}
-            />
-          ) : null}
-        </div>
-      );
-    }
+    case "composeEmail":
+      return <EmailActionArgs args={args} />;
     case "createTask": {
       return (
         <div className="space-y-3">
@@ -298,9 +385,23 @@ function ToolArgs({
 }
 
 function buildKeyedMessageParts(messageId: string, parts: UIMessage["parts"]) {
+  const normalizedParts: UIMessage["parts"] = [];
+
+  for (const part of parts) {
+    const previousPart = normalizedParts[normalizedParts.length - 1];
+    if (
+      previousPart &&
+      getMessagePartSignature(previousPart) === getMessagePartSignature(part)
+    ) {
+      continue;
+    }
+
+    normalizedParts.push(part);
+  }
+
   const counts = new Map<string, number>();
 
-  return parts.map((part) => {
+  return normalizedParts.map((part) => {
     const signature = getMessagePartSignature(part);
     const nextCount = counts.get(signature) ?? 0;
     counts.set(signature, nextCount + 1);

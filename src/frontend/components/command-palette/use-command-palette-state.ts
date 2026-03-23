@@ -1,8 +1,7 @@
 import { useAppAgent } from "@/hooks/use-agent";
 import { isToolUIPart } from "ai";
 import { useHotkey } from "@tanstack/react-hotkeys";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PaletteMode } from "./types";
 
 export function useCommandPaletteState() {
@@ -34,6 +33,19 @@ export function useCommandPaletteState() {
       (part) => isToolUIPart(part) && part.state === "approval-requested",
     ),
   );
+  const pendingApprovalIds = useMemo(() => {
+    const ids: string[] = [];
+
+    for (const message of messages) {
+      for (const part of message.parts) {
+        if (isToolUIPart(part) && part.state === "approval-requested") {
+          ids.push(part.approval.id);
+        }
+      }
+    }
+
+    return ids;
+  }, [messages]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -48,29 +60,34 @@ export function useCommandPaletteState() {
     (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      if (hasPendingApprovals) {
-        toast.error("Approve or discard the pending action before sending another message.");
-        return;
+
+      if (pendingApprovalIds.length > 0) {
+        for (const id of pendingApprovalIds) {
+          addToolApprovalResponse({ id, approved: false });
+        }
       }
+
       setAgentHasSubmitted(true);
       sendMessage({ text: trimmed });
     },
-    [hasPendingApprovals, sendMessage],
+    [addToolApprovalResponse, pendingApprovalIds, sendMessage],
   );
 
   const enterAgentMode = useCallback(
     (initialQuery?: string) => {
       const text = initialQuery?.trim();
+      clearHistory();
       setMode("agent");
       setOpen(true);
       setQuery("");
+      setAgentInput("");
       setAgentHasSubmitted(false);
       setTimeout(() => agentInputRef.current?.focus(), 0);
       if (text) {
         submitAgentMessage(text);
       }
     },
-    [submitAgentMessage],
+    [clearHistory, submitAgentMessage],
   );
 
   const enterSearchMode = useCallback(() => {

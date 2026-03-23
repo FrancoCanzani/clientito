@@ -12,7 +12,6 @@ export function EmailDetailPanel() {
     emailById,
     openEmail,
     closeEmail,
-    executeEmailAction,
   } = useEmail();
 
   const { goToEmail, hasPrev, hasNext } = useEmailInboxKeyboard({
@@ -20,8 +19,6 @@ export function EmailDetailPanel() {
     selectedEmailId,
     emailById,
     openEmail,
-    closeEmail,
-    executeEmailAction,
   });
 
   if (!selectedEmail) return null;

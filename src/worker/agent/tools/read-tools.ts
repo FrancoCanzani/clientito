@@ -1,8 +1,113 @@
 import { tool } from "ai";
-import { and, asc, desc, eq, gte, isNotNull, like, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, isNull, like, lte, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
 import { emails, tasks } from "../../db/schema";
+import { syncAllMailboxes } from "../../lib/email/sync";
+import { STANDARD_LABELS } from "../../lib/email/types";
+import { getDayBoundsUtc } from "../../lib/utils";
+import { buildBriefing } from "../../routes/ai/get-briefing";
+import { hasEmailLabel } from "../../routes/inbox/emails/utils";
+
+type InboxView =
+  | "inbox"
+  | "sent"
+  | "spam"
+  | "trash"
+  | "snoozed"
+  | "archived"
+  | "starred";
+
+function parseInboxScope(currentUrl?: string | null): {
+  mailboxId?: number;
+  view: InboxView;
+} {
+  const fallback = { view: "inbox" as InboxView };
+  if (!currentUrl) return fallback;
+
+  try {
+    const url = new URL(currentUrl);
+    const match = url.pathname.match(/\/inbox\/([^/?#]+)/);
+    const mailboxValue = match?.[1];
+    const maybeView = url.searchParams.get("view");
+    const view: InboxView =
+      maybeView === "sent" ||
+      maybeView === "spam" ||
+      maybeView === "trash" ||
+      maybeView === "snoozed" ||
+      maybeView === "archived" ||
+      maybeView === "starred"
+        ? maybeView
+        : "inbox";
+
+    return {
+      mailboxId:
+        mailboxValue && mailboxValue !== "all" && /^\d+$/.test(mailboxValue)
+          ? Number(mailboxValue)
+          : undefined,
+      view,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function buildEmailSearchCondition(query: string) {
+  const pattern = `%${query}%`;
+
+  return or(
+    like(emails.subject, pattern),
+    like(emails.snippet, pattern),
+    like(emails.fromAddr, pattern),
+    like(emails.fromName, pattern),
+    like(emails.toAddr, pattern),
+    like(emails.bodyText, pattern),
+  )!;
+}
+
+function buildInboxScopeConditions(scope: {
+  mailboxId?: number;
+  view: InboxView;
+  now: number;
+}) {
+  const conditions = [];
+
+  if (scope.mailboxId) {
+    conditions.push(eq(emails.mailboxId, scope.mailboxId));
+  }
+
+  switch (scope.view) {
+    case "inbox":
+      conditions.push(hasEmailLabel(STANDARD_LABELS.INBOX));
+      conditions.push(
+        or(isNull(emails.snoozedUntil), lte(emails.snoozedUntil, scope.now))!,
+      );
+      break;
+    case "sent":
+      conditions.push(hasEmailLabel(STANDARD_LABELS.SENT));
+      break;
+    case "spam":
+      conditions.push(hasEmailLabel(STANDARD_LABELS.SPAM));
+      break;
+    case "trash":
+      conditions.push(hasEmailLabel(STANDARD_LABELS.TRASH));
+      break;
+    case "snoozed":
+      conditions.push(gt(emails.snoozedUntil, scope.now));
+      break;
+    case "archived":
+      conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.INBOX)}`);
+      conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SENT)}`);
+      conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.TRASH)}`);
+      conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SPAM)}`);
+      break;
+    case "starred":
+      conditions.push(hasEmailLabel(STANDARD_LABELS.STARRED));
+      break;
+  }
+
+  return conditions;
+}
 
 function formatEmailDate(dateMs: number | null) {
   if (typeof dateMs !== "number" || Number.isNaN(dateMs)) {
@@ -24,15 +129,20 @@ function formatEmailDate(dateMs: number | null) {
   };
 }
 
-export function makeReadTools(db: Database, userId: string) {
+export function makeReadTools(
+  db: Database,
+  userId: string,
+  env: Env,
+  currentUrl?: string | null,
+) {
   return {
     searchEmails: tool({
       description:
-        "Search the signed-in user's emails by subject, sender address, sender name, or snippet text. Use this when the user asks to find messages or references a company, sender, or topic.",
+        "Search the signed-in user's emails by subject, sender, recipients, preview text, or body text. Use this when the user asks to find messages or references a company, sender, or topic.",
       inputSchema: z.object({
         query: z
           .string()
-          .describe("Plain-language search term to match against subject, sender, or email preview text."),
+          .describe("Plain-language search term to match against subject, sender, recipients, preview text, or body text."),
         limit: z
           .number()
           .int()
@@ -43,13 +153,25 @@ export function makeReadTools(db: Database, userId: string) {
           .describe("Maximum number of matching emails to return."),
       }),
       execute: async ({ query, limit }) => {
-        const pattern = `%${query}%`;
+        const now = Date.now();
+        const scope = parseInboxScope(currentUrl);
+
+        await db
+          .update(emails)
+          .set({ snoozedUntil: null })
+          .where(
+            and(eq(emails.userId, userId), lte(emails.snoozedUntil, now)),
+          );
+
+        await syncAllMailboxes(db, env, userId);
+
         const rows = await db
           .select({
             id: emails.id,
             subject: emails.subject,
             fromAddr: emails.fromAddr,
             fromName: emails.fromName,
+            toAddr: emails.toAddr,
             snippet: emails.snippet,
             date: emails.date,
             isRead: emails.isRead,
@@ -58,11 +180,8 @@ export function makeReadTools(db: Database, userId: string) {
           .where(
             and(
               eq(emails.userId, userId),
-              or(
-                like(emails.subject, pattern),
-                like(emails.fromAddr, pattern),
-                like(emails.snippet, pattern),
-              ),
+              ...buildInboxScopeConditions({ ...scope, now }),
+              buildEmailSearchCondition(query),
             ),
           )
           .orderBy(desc(emails.date))
@@ -74,6 +193,18 @@ export function makeReadTools(db: Database, userId: string) {
           })),
           count: rows.length,
         };
+      },
+    }),
+    getBriefing: tool({
+      description:
+        "Build a short briefing from the signed-in user's email and task state. Use this when the user asks for a briefing, summary of what needs attention, or an overview of their inbox.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        return buildBriefing({
+          db,
+          env,
+          userId,
+        });
       },
     }),
     listTasks: tool({
@@ -94,12 +225,9 @@ export function makeReadTools(db: Database, userId: string) {
         const conditions = [eq(tasks.userId, userId)];
         if (!includeCompleted) conditions.push(ne(tasks.status, "done"));
         if (dueToday) {
-          const startOfDay = new Date();
-          startOfDay.setHours(0, 0, 0, 0);
-          const endOfDay = new Date();
-          endOfDay.setHours(23, 59, 59, 999);
+          const { start, end } = getDayBoundsUtc(Date.now());
           conditions.push(
-            sql`${tasks.dueAt} >= ${startOfDay.getTime()} AND ${tasks.dueAt} <= ${endOfDay.getTime()}`,
+            sql`${tasks.dueAt} >= ${start} AND ${tasks.dueAt} < ${end}`,
           );
         }
 
@@ -132,25 +260,31 @@ export function makeReadTools(db: Database, userId: string) {
         query: z
           .string()
           .optional()
-          .describe("Optional text to filter by subject, sender, or snippet."),
+          .describe("Optional text to filter by subject, sender, recipients, preview text, or body text."),
         limit: z.number().int().min(1).max(20).optional().default(10),
       }),
       execute: async ({ after, before, query, limit }) => {
+        const now = Date.now();
+        const scope = parseInboxScope(currentUrl);
+
+        await db
+          .update(emails)
+          .set({ snoozedUntil: null })
+          .where(
+            and(eq(emails.userId, userId), lte(emails.snoozedUntil, now)),
+          );
+
+        await syncAllMailboxes(db, env, userId);
+
         const conditions = [
           eq(emails.userId, userId),
-          gte(emails.date, after),
+          sql`${emails.date} >= ${after}`,
           lte(emails.date, before),
+          ...buildInboxScopeConditions({ ...scope, now }),
         ];
 
         if (query) {
-          const pattern = `%${query}%`;
-          conditions.push(
-            or(
-              like(emails.subject, pattern),
-              like(emails.fromAddr, pattern),
-              like(emails.snippet, pattern),
-            )!,
-          );
+          conditions.push(buildEmailSearchCondition(query));
         }
 
         const rows = await db
@@ -159,6 +293,7 @@ export function makeReadTools(db: Database, userId: string) {
             subject: emails.subject,
             fromAddr: emails.fromAddr,
             fromName: emails.fromName,
+            toAddr: emails.toAddr,
             snippet: emails.snippet,
             date: emails.date,
             isRead: emails.isRead,

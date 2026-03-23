@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { getMailboxDisplayEmail } from "@/hooks/use-mailboxes";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -7,7 +7,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState } from "react";
+import { getMailboxDisplayEmail } from "@/hooks/use-mailboxes";
+import DOMPurify from "dompurify";
+import { useMemo, useState } from "react";
 import { AttachmentBar } from "./attachment-bar";
 import { ComposeEditor } from "./compose-editor";
 import { useComposeEmail } from "./compose-email-state";
@@ -20,6 +22,30 @@ type ComposeEmailFieldsProps = {
   recipientAutoFocus?: boolean;
   editorAutoFocus?: boolean;
 };
+
+function ForwardedMessagePreview({ html }: { html: string }) {
+  const sanitized = useMemo(
+    () =>
+      DOMPurify.sanitize(html, {
+        USE_PROFILES: { html: true },
+      }),
+    [html],
+  );
+
+  return (
+    <div className="mt-8 pt-4">
+      <div
+        className={cn(
+          "prose prose-sm max-w-none text-xs text-foreground",
+          "[&_[data-forwarded-message]]:mt-0 [&_[data-forwarded-message]]:border-0 [&_[data-forwarded-message]]:p-0",
+          "[&_[data-forwarded-header]]:mb-2 [&_[data-forwarded-header]]:font-medium [&_[data-forwarded-header]]:text-foreground/80",
+          "[&_[data-forwarded-original-body]]:mt-3 [&_[data-forwarded-original-body]]:border-t [&_[data-forwarded-original-body]]:border-border/40 [&_[data-forwarded-original-body]]:pt-3",
+        )}
+        dangerouslySetInnerHTML={{ __html: sanitized }}
+      />
+    </div>
+  );
+}
 
 export function ComposeEmailFields({
   compose,
@@ -41,6 +67,7 @@ export function ComposeEmailFields({
     setSubject,
     body,
     setBody,
+    forwardedContent,
     canSend,
     availableMailboxes,
     send,
@@ -53,6 +80,8 @@ export function ComposeEmailFields({
 
   return (
     <div
+      role="group"
+      aria-label="Compose email"
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
       onKeyDown={(e) => {
         if (e.key === "Escape") {
@@ -166,6 +195,9 @@ export function ComposeEmailFields({
           className={bodyClassName ?? "min-h-32 text-sm leading-relaxed"}
           autoFocus={editorAutoFocus}
         />
+        {forwardedContent ? (
+          <ForwardedMessagePreview html={forwardedContent} />
+        ) : null}
       </div>
 
       <div className="mt-auto px-3 py-2">

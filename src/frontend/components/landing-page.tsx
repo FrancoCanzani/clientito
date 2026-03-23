@@ -1,208 +1,238 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "@tanstack/react-router";
+import { CaretRightIcon, CheckCircleIcon, CircleIcon } from "@phosphor-icons/react";
 
-const FEATURE_ITEMS = [
+const SAVED_TIME_POINTS = [
   {
-    title: "Sync Gmail instantly",
-    description: "Pull customer threads into one shared workspace.",
+    title: "Work the inbox once",
+    description:
+      "Reply-needed threads, notes, and next actions stay together instead of being rebuilt from memory.",
   },
   {
-    title: "Classify with AI",
-    description: "Auto-label urgent requests, quotes, and follow-ups.",
+    title: "Stop losing context",
+    description:
+      "Customer details live beside the conversation, so handoffs and follow-ups take less rereading.",
   },
   {
-    title: "Capture notes fast",
-    description: "Keep context on each customer account and shipment lane.",
-  },
-  {
-    title: "Set tasks",
-    description: "Never miss callbacks, ETA checks, or renewal dates.",
-  },
-  {
-    title: "Send dispatch emails",
-    description: "Compose outbound updates from the same customer record.",
-  },
-  {
-    title: "Stay lightweight",
-    description: "Clean UI, minimal setup, and no CRM bloat.",
-  },
-];
-
-const PLANS = [
-  {
-    name: "Basic",
-    price: "Free",
-    points: [
-      "40 customers",
-      "Gmail sync",
-      "Notes and tasks",
-      "Email dispatch",
-    ],
-  },
-  {
-    name: "Pro",
-    price: "$29",
-    suffix: "/mo",
-    points: [
-      "Unlimited customers",
-      "AI classification",
-      "Team access",
-      "Priority support",
-    ],
+    title: "Turn follow-up into a system",
+    description:
+      "Tasks come out of real customer work, which means fewer dropped promises and fewer late callbacks.",
   },
 ];
 
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
   const primaryCtaTo = isAuthenticated ? "/home" : "/login";
-  const primaryCtaLabel = isAuthenticated ? "Go to app" : "Log in";
+  const primaryCtaLabel = isAuthenticated ? "Open app" : "Log in";
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      <section className="mx-auto w-full max-w-[1080px] px-4 pt-20 text-center md:pt-24">
-        <div className="mx-auto size-12 rounded bg-muted" aria-hidden />
+    <main className="min-h-screen bg-background text-foreground subpixel-antialiased">
+      <div className="mx-auto flex min-h-screen w-full max-w-4xl flex-col px-4 sm:px-6">
+        <header className="flex items-center justify-between py-5 sm:py-6">
+          <Link
+            to="/"
+            className="text-sm font-medium tracking-[-0.02em] text-foreground"
+          >
+            Petit
+          </Link>
 
-        <p className="mt-4 text-[42px] leading-none font-semibold tracking-tight text-foreground">
-          Clientito
-        </p>
-
-        <h1 className="mx-auto mt-8 max-w-[560px] text-[40px] leading-[1.12] font-semibold tracking-tight text-muted-foreground md:text-[54px]">
-          A beautifully simple
-          <br />
-          customer CRM app.
-        </h1>
-
-        <Button
-          asChild
-          className="mt-8 h-12 rounded px-7 text-base font-semibold"
-        >
-          <Link to={primaryCtaTo}>{primaryCtaLabel}</Link>
-        </Button>
-
-        <p className="mt-8 text-sm text-muted-foreground">
-          No setup friction, just clear customer operations.
-        </p>
-
-        <div className="mx-auto mt-10 w-full max-w-[760px] overflow-hidden rounded border border-border bg-card shadow-sm">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <div className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded bg-muted" />
-              <span className="size-2.5 rounded bg-muted" />
-              <span className="size-2.5 rounded bg-muted" />
-            </div>
-            <div className="rounded border border-border bg-panel px-1.5 py-1 text-[11px]">
-              <span className="rounded bg-card px-2 py-0.5 font-medium text-foreground">
-                Inbox
-              </span>
-              <span className="px-2 text-muted-foreground">Archive</span>
-            </div>
-            <span className="size-6 rounded bg-muted" />
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="sm" className="h-8 px-3">
+              <Link to="/docs">Docs</Link>
+            </Button>
+            <Button asChild size="sm" className="h-8 px-3">
+              <Link to={primaryCtaTo}>{primaryCtaLabel}</Link>
+            </Button>
           </div>
+        </header>
 
-          <div className="space-y-3 px-5 py-5 text-left">
-            <p className="text-xs font-medium text-muted-foreground">Today</p>
-            <PreviewItem
-              title="Need rate quote for route ATL -> MIA"
-              source="gmail.com"
-            />
-            <PreviewItem
-              title="Pickup delayed 45 minutes, please confirm"
-              source="gmail.com"
-            />
-            <PreviewItem
-              title="Reminder: call Northway Logistics by 4pm"
-              source="clientito.app"
-            />
-          </div>
-        </div>
-      </section>
+        <section className="border-t border-border py-11 sm:py-14">
+          <div className="max-w-[46rem]">
+            <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">
+              Regain life hours
+            </p>
 
-      <section className="mx-auto mt-14 w-full max-w-[980px] px-4 md:mt-16">
-        <h2 className="text-center text-2xl font-semibold tracking-tight">
-          Supercharged customer operations.
-        </h2>
-        <p className="mx-auto mt-2 max-w-[520px] text-center text-sm text-muted-foreground">
-          Everything you need to organize communication for transport customers.
-        </p>
+            <h1 className="mt-4 max-w-[42rem] text-[2.35rem] leading-[0.98] font-medium tracking-[-0.065em] text-foreground sm:text-[4rem]">
+              Get hours back from customer follow-up.
+            </h1>
 
-        <div className="mt-6 grid gap-2.5 md:grid-cols-2">
-          {FEATURE_ITEMS.map((item) => (
-            <article
-              key={item.title}
-              className="rounded border border-border bg-card px-4 py-3"
-            >
-              <p className="text-sm font-semibold text-foreground">
-                {item.title}
-              </p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                {item.description}
-              </p>
-            </article>
-          ))}
-        </div>
-      </section>
+            <p className="mt-4 max-w-[38rem] text-[0.98rem] leading-7 text-muted-foreground sm:text-[1.06rem]">
+              Petit keeps email, notes, and tasks in one quiet workspace so
+              your team spends less time triaging, less time rereading threads,
+              and more time finishing the actual work.
+            </p>
 
-      <section className="mx-auto mt-14 w-full max-w-[980px] px-4 pb-16 md:mt-16">
-        <h2 className="text-center text-2xl font-semibold tracking-tight">
-          Pricing
-        </h2>
-        <p className="mt-2 text-center text-sm text-muted-foreground">
-          Start free, upgrade when your team needs more control.
-        </p>
-
-        <div className="mx-auto mt-6 grid max-w-[760px] gap-3 md:grid-cols-2">
-          {PLANS.map((plan) => (
-            <article
-              key={plan.name}
-              className="rounded border border-border bg-card p-4"
-            >
-              <p className="text-sm font-semibold text-foreground">
-                {plan.name}
-              </p>
-              <p className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
-                {plan.price}
-                {plan.suffix ? (
-                  <span className="ml-1 text-sm font-medium text-muted-foreground">
-                    {plan.suffix}
-                  </span>
-                ) : null}
-              </p>
-              <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
-                {plan.points.map((point) => (
-                  <li key={point}>• {point}</li>
-                ))}
-              </ul>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button asChild size="lg" className="h-10 rounded-lg px-4 text-sm">
+                <Link to={primaryCtaTo}>{primaryCtaLabel}</Link>
+              </Button>
               <Button
                 asChild
-                variant={plan.name === "Pro" ? "default" : "outline"}
-                size="sm"
-                className="mt-4"
+                variant="outline"
+                size="lg"
+                className="h-10 rounded-lg px-4 text-sm"
               >
-                <Link to={primaryCtaTo}>
-                  {plan.name === "Pro"
-                    ? (isAuthenticated ? "Go to app" : "Log in")
-                    : primaryCtaLabel}
-                </Link>
+                <Link to="/docs">Read docs</Link>
               </Button>
-            </article>
-          ))}
-        </div>
+            </div>
+          </div>
+        </section>
 
-        <p className="mt-8 text-center text-xs text-muted-foreground">
-          Made for focused transport teams.
-        </p>
-      </section>
+        <section className="pb-10 sm:pb-14">
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-foreground">
+                  Today
+                </span>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  2 reply-needed
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                Clear the day in one pass
+              </span>
+            </div>
+
+            <div className="border-b border-border px-4 py-4">
+              <p className="max-w-3xl text-[0.96rem] leading-7 text-foreground">
+                Two customers need a response before noon. One shipment lane
+                still needs pricing confirmation. The renewal follow-up is
+                already queued for later today.
+              </p>
+            </div>
+
+            <div className="px-2 py-2">
+              <PreviewRow
+                title="Rate quote for ATL -> MIA"
+                description="Needs reply today"
+                badge="Urgent"
+              />
+              <PreviewRow
+                title="Pickup delayed 45 minutes"
+                description="Waiting on confirmation"
+                badge="Follow-up"
+              />
+              <PreviewRow
+                title="Northway renewal call"
+                description="Task already attached"
+                badge="Tracked"
+              />
+            </div>
+
+            <div className="grid border-t border-border md:grid-cols-2">
+              <div className="border-b border-border px-4 py-4 md:border-r md:border-b-0">
+                <p className="text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
+                  Notes
+                </p>
+                <div className="mt-3 space-y-2">
+                  <InlineNote text="Northway prefers WhatsApp for pickup changes." />
+                  <InlineNote text="Atlas wants quote revisions in the same thread." />
+                </div>
+              </div>
+
+              <div className="px-4 py-4">
+                <p className="text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
+                  Follow-ups
+                </p>
+                <div className="mt-3 space-y-2">
+                  <TaskLine text="Call Northway by 4pm" />
+                  <TaskLine text="Send revised ATL -> MIA quote" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border-t border-border py-10 sm:py-14">
+          <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
+            <div>
+              <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">
+                Where the hours go back
+              </p>
+              <h2 className="mt-3 max-w-md text-[1.9rem] leading-tight font-medium tracking-[-0.05em] text-foreground">
+                Less churn. Fewer missed follow-ups. More finished days.
+              </h2>
+            </div>
+
+            <div className="divide-y divide-border border-y border-border">
+              {SAVED_TIME_POINTS.map((item) => (
+                <article
+                  key={item.title}
+                  className="grid gap-2 py-5 sm:grid-cols-[190px_1fr]"
+                >
+                  <p className="text-sm font-medium text-foreground">
+                    {item.title}
+                  </p>
+                  <p className="max-w-xl text-[0.95rem] leading-7 text-muted-foreground">
+                    {item.description}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <footer className="mt-auto flex flex-col gap-4 border-t border-border py-6 text-[0.92rem] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <p>A calmer system for customer email, notes, and follow-up.</p>
+          <div className="flex items-center gap-4">
+            <Link to="/docs" className="transition-colors hover:text-foreground">
+              Docs
+            </Link>
+            <Link
+              to={primaryCtaTo}
+              className="transition-colors hover:text-foreground"
+            >
+              {primaryCtaLabel}
+            </Link>
+          </div>
+        </footer>
+      </div>
     </main>
   );
 }
 
-function PreviewItem(props: { title: string; source: string }) {
+function PreviewRow(props: {
+  title: string;
+  description: string;
+  badge: string;
+}) {
   return (
-    <div className="flex items-center gap-2 text-[15px]">
-      <span className="size-2 rounded bg-primary" />
-      <span className="font-medium text-foreground">{props.title}</span>
-      <span className="text-muted-foreground">{props.source}</span>
+    <div className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors duration-150 hover:bg-muted/35">
+      <span className="size-1.5 shrink-0 rounded-full bg-blue-500" aria-hidden />
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[0.92rem] font-medium text-foreground">
+          {props.title}
+        </p>
+        <p className="mt-0.5 text-[0.92rem] text-muted-foreground">
+          {props.description}
+        </p>
+      </div>
+
+      <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+        {props.badge}
+      </span>
+    </div>
+  );
+}
+
+function InlineNote(props: { text: string }) {
+  return (
+    <div className="flex items-start gap-2 text-[0.92rem] text-foreground/88">
+      <CircleIcon className="mt-[0.35rem] size-2.5 shrink-0 fill-current text-muted-foreground" weight="fill" />
+      <p className="leading-6">{props.text}</p>
+    </div>
+  );
+}
+
+function TaskLine(props: { text: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md px-1 py-1 text-[0.92rem] text-foreground/88">
+      <CheckCircleIcon className="size-4 shrink-0 text-muted-foreground" />
+      <span className="leading-6">{props.text}</span>
+      <CaretRightIcon className="ml-auto size-3.5 text-muted-foreground" />
     </div>
   );
 }

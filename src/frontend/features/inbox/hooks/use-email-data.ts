@@ -1,11 +1,11 @@
-import { fetchEmails } from "@/features/inbox/queries";
-import type { EmailListItem } from "@/features/inbox/types";
+import { fetchEmailDetail, fetchEmails } from "@/features/inbox/queries";
+import type { EmailDetailItem, EmailListItem } from "@/features/inbox/types";
 import { buildThreadSections } from "@/features/inbox/utils/build-thread-sections";
 import { groupEmailsByThread } from "@/features/inbox/utils/group-emails-by-thread";
 import type { EmailView } from "@/features/inbox/utils/inbox-filters";
 import { parseMailboxId } from "@/lib/utils";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useMemo } from "react";
 
@@ -58,13 +58,24 @@ export function useEmailData() {
     () => new Map(displayRows.map((email) => [email.id, email])),
     [displayRows],
   );
+  const selectedEmailFallbackQuery = useQuery<EmailDetailItem>({
+    queryKey: ["email-detail", selectedEmailId, "selected-fallback"],
+    queryFn: () => fetchEmailDetail(selectedEmailId!),
+    enabled: Boolean(selectedEmailId) && !emailById.has(selectedEmailId!),
+    staleTime: 60_000,
+  });
   const orderedIds = useMemo(
     () => threadGroups.map((group) => group.representative.id),
     [threadGroups],
   );
   const selectedEmail = useMemo<EmailListItem | null>(
-    () => (selectedEmailId ? emailById.get(selectedEmailId) ?? null : null),
-    [emailById, selectedEmailId],
+    () =>
+      selectedEmailId
+        ? emailById.get(selectedEmailId) ??
+          selectedEmailFallbackQuery.data ??
+          null
+        : null,
+    [emailById, selectedEmailFallbackQuery.data, selectedEmailId],
   );
 
   const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } =

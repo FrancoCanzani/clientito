@@ -67,4 +67,5 @@ export type ComposeInitial = {
   bcc?: string;
   subject?: string;
   body?: string;
+  bodyHtml?: string;
 };

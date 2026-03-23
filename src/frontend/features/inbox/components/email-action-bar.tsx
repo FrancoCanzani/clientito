@@ -78,6 +78,46 @@ function parseRecipientList(raw: string | null): string[] {
     .filter((s) => s.length > 0);
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildForwardedEmailHtml(email: EmailDetailItem) {
+  const fromLine = email.fromName
+    ? `${escapeHtml(email.fromName)} &lt;${escapeHtml(email.fromAddr)}&gt;`
+    : escapeHtml(email.fromAddr);
+  const dateLine = new Date(email.date).toLocaleString();
+  const subjectLine = escapeHtml(email.subject ?? "(no subject)");
+  const toLine = email.toAddr?.trim() ? escapeHtml(email.toAddr) : null;
+  const ccLine = email.ccAddr?.trim() ? escapeHtml(email.ccAddr) : null;
+  const originalBody = email.resolvedBodyHtml?.trim().length
+    ? email.resolvedBodyHtml
+    : email.bodyHtml?.trim().length
+      ? email.bodyHtml
+      : `<div style="white-space:pre-wrap">${escapeHtml(
+          email.resolvedBodyText ?? email.bodyText ?? "",
+        )}</div>`;
+
+  return [
+    "<p><br></p>",
+    '<div data-forwarded-message="true" style="border-top:1px solid #dadce0;margin-top:16px;padding-top:16px;color:#5f6368;font-size:13px">',
+    '<div data-forwarded-header="true">---------- Forwarded message ---------</div>',
+    `<div><strong>From:</strong> ${fromLine}</div>`,
+    `<div><strong>Date:</strong> ${escapeHtml(dateLine)}</div>`,
+    `<div><strong>Subject:</strong> ${subjectLine}</div>`,
+    ...(toLine ? [`<div><strong>To:</strong> ${toLine}</div>`] : []),
+    ...(ccLine ? [`<div><strong>Cc:</strong> ${ccLine}</div>`] : []),
+    "<br>",
+    `<div data-forwarded-original-body="true">${originalBody}</div>`,
+    "</div>",
+  ].join("");
+}
+
 export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -227,16 +267,9 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
         ? email.subject
         : `Fwd: ${email.subject}`
       : "Fwd:";
-    const body = [
-      "---------- Forwarded message ----------",
-      `From: ${email.fromName ? `${email.fromName} <${email.fromAddr}>` : email.fromAddr}`,
-      `Date: ${new Date(email.date).toLocaleString()}`,
-      `Subject: ${email.subject ?? "(no subject)"}`,
-      "",
-      email.resolvedBodyText ?? email.bodyText ?? "",
-    ].join("\n");
+    const bodyHtml = buildForwardedEmailHtml(email);
 
-    onForward?.({ mailboxId: email.mailboxId, subject, body });
+    onForward?.({ mailboxId: email.mailboxId, subject, bodyHtml });
   };
 
   const handleReplyAll = () => {

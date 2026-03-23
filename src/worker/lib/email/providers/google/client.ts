@@ -235,7 +235,7 @@ export async function fetchMessage(
   });
 }
 
-const BATCH_BOUNDARY = "batch_clientito";
+const BATCH_BOUNDARY = "batch_petit";
 const GMAIL_BATCH_URL = "https://www.googleapis.com/batch/gmail/v1";
 const GMAIL_BATCH_MAX_SIZE = 100;
 

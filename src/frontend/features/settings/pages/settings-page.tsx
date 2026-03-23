@@ -51,7 +51,7 @@ function formatImportHistoryHint(
   cutoffAt: number | null,
 ): string {
   if (months === null || cutoffAt === null) {
-    return "No cutoff. Clientito can import your full mailbox.";
+    return "No cutoff. Petit can import your full mailbox.";
   }
 
   const date = new Date(cutoffAt).toLocaleDateString(undefined, {
@@ -429,7 +429,7 @@ export default function SettingsPage() {
 
       <SettingsSection title="Appearance">
         <div className="border-t border-border/60">
-          <SettingsRow label="Theme" hint="Choose how Clientito looks.">
+          <SettingsRow label="Theme" hint="Choose how Petit looks.">
             <ButtonGroup className="w-full sm:w-auto">
               {themeOptions.map((option) => (
                 <Button

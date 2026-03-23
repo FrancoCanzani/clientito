@@ -157,10 +157,7 @@ export function RecipientInput({
 
   return (
     <div ref={containerRef} className="relative w-full">
-      <div
-        className="flex max-h-24 flex-wrap items-center gap-1 overflow-y-auto"
-        onClick={() => inputRef.current?.focus()}
-      >
+      <label className="flex max-h-24 flex-wrap items-center gap-1 overflow-y-auto">
         {chips.map((email, i) => {
           const displayName = nameMap.get(email);
           return (
@@ -173,6 +170,7 @@ export function RecipientInput({
               <button
                 type="button"
                 className="shrink-0 text-muted-foreground/60 hover:text-foreground"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.stopPropagation();
                   removeChip(i);
@@ -196,7 +194,7 @@ export function RecipientInput({
           autoFocus={autoFocus}
           className={`min-w-20 flex-1 bg-transparent py-1 text-xs outline-none placeholder:text-muted-foreground/50 ${inputClassName ?? ""}`}
         />
-      </div>
+      </label>
 
       {showDropdown && (
         <div className="absolute top-full left-0 z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-lg">

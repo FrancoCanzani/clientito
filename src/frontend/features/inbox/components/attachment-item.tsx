@@ -8,7 +8,7 @@ import {
   WarningCircleIcon,
   XIcon,
 } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EmailAttachment } from "../types";
 import { formatBytes } from "../utils/format-bytes";
 
@@ -47,8 +47,19 @@ function ImageLightbox({
   alt: string;
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
+
   return (
     <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={alt}
+      tabIndex={-1}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
       onClick={onClose}
       onKeyDown={(e) => {

@@ -10,8 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as DocsRouteRouteImport } from './routes/docs/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DocsIndexRouteImport } from './routes/docs/index'
+import { Route as DocsSlugRouteImport } from './routes/docs/$slug'
 import { Route as DashboardTasksRouteImport } from './routes/_dashboard/tasks'
 import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
 import { Route as DashboardHomeRouteImport } from './routes/_dashboard/home'
@@ -27,6 +30,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocsRouteRoute = DocsRouteRouteImport.update({
+  id: '/docs',
+  path: '/docs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRouteRoute = DashboardRouteRouteImport.update({
   id: '/_dashboard',
   getParentRoute: () => rootRouteImport,
@@ -35,6 +43,16 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const DocsIndexRoute = DocsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DocsRouteRoute,
+} as any)
+const DocsSlugRoute = DocsSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => DocsRouteRoute,
 } as any)
 const DashboardTasksRoute = DashboardTasksRouteImport.update({
   id: '/tasks',
@@ -85,11 +103,14 @@ const DashboardInboxIdFiltersRoute = DashboardInboxIdFiltersRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/docs': typeof DocsRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/get-started': typeof DashboardGetStartedRoute
   '/home': typeof DashboardHomeRoute
   '/settings': typeof DashboardSettingsRoute
   '/tasks': typeof DashboardTasksRoute
+  '/docs/$slug': typeof DocsSlugRoute
+  '/docs/': typeof DocsIndexRoute
   '/notes/$noteId': typeof DashboardNotesNoteIdRoute
   '/notes/': typeof DashboardNotesIndexRoute
   '/inbox/$id/filters': typeof DashboardInboxIdFiltersRoute
@@ -103,6 +124,8 @@ export interface FileRoutesByTo {
   '/home': typeof DashboardHomeRoute
   '/settings': typeof DashboardSettingsRoute
   '/tasks': typeof DashboardTasksRoute
+  '/docs/$slug': typeof DocsSlugRoute
+  '/docs': typeof DocsIndexRoute
   '/notes/$noteId': typeof DashboardNotesNoteIdRoute
   '/notes': typeof DashboardNotesIndexRoute
   '/inbox/$id/filters': typeof DashboardInboxIdFiltersRoute
@@ -113,11 +136,14 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_dashboard': typeof DashboardRouteRouteWithChildren
+  '/docs': typeof DocsRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/_dashboard/get-started': typeof DashboardGetStartedRoute
   '/_dashboard/home': typeof DashboardHomeRoute
   '/_dashboard/settings': typeof DashboardSettingsRoute
   '/_dashboard/tasks': typeof DashboardTasksRoute
+  '/docs/$slug': typeof DocsSlugRoute
+  '/docs/': typeof DocsIndexRoute
   '/_dashboard/notes/$noteId': typeof DashboardNotesNoteIdRoute
   '/_dashboard/notes/': typeof DashboardNotesIndexRoute
   '/_dashboard/inbox/$id/filters': typeof DashboardInboxIdFiltersRoute
@@ -128,11 +154,14 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/docs'
     | '/login'
     | '/get-started'
     | '/home'
     | '/settings'
     | '/tasks'
+    | '/docs/$slug'
+    | '/docs/'
     | '/notes/$noteId'
     | '/notes/'
     | '/inbox/$id/filters'
@@ -146,6 +175,8 @@ export interface FileRouteTypes {
     | '/home'
     | '/settings'
     | '/tasks'
+    | '/docs/$slug'
+    | '/docs'
     | '/notes/$noteId'
     | '/notes'
     | '/inbox/$id/filters'
@@ -155,11 +186,14 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_dashboard'
+    | '/docs'
     | '/login'
     | '/_dashboard/get-started'
     | '/_dashboard/home'
     | '/_dashboard/settings'
     | '/_dashboard/tasks'
+    | '/docs/$slug'
+    | '/docs/'
     | '/_dashboard/notes/$noteId'
     | '/_dashboard/notes/'
     | '/_dashboard/inbox/$id/filters'
@@ -170,6 +204,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
+  DocsRouteRoute: typeof DocsRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
 }
 
@@ -180,6 +215,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs': {
+      id: '/docs'
+      path: '/docs'
+      fullPath: '/docs'
+      preLoaderRoute: typeof DocsRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_dashboard': {
@@ -195,6 +237,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/docs/': {
+      id: '/docs/'
+      path: '/'
+      fullPath: '/docs/'
+      preLoaderRoute: typeof DocsIndexRouteImport
+      parentRoute: typeof DocsRouteRoute
+    }
+    '/docs/$slug': {
+      id: '/docs/$slug'
+      path: '/$slug'
+      fullPath: '/docs/$slug'
+      preLoaderRoute: typeof DocsSlugRouteImport
+      parentRoute: typeof DocsRouteRoute
     }
     '/_dashboard/tasks': {
       id: '/_dashboard/tasks'
@@ -290,9 +346,24 @@ const DashboardRouteRouteWithChildren = DashboardRouteRoute._addFileChildren(
   DashboardRouteRouteChildren,
 )
 
+interface DocsRouteRouteChildren {
+  DocsSlugRoute: typeof DocsSlugRoute
+  DocsIndexRoute: typeof DocsIndexRoute
+}
+
+const DocsRouteRouteChildren: DocsRouteRouteChildren = {
+  DocsSlugRoute: DocsSlugRoute,
+  DocsIndexRoute: DocsIndexRoute,
+}
+
+const DocsRouteRouteWithChildren = DocsRouteRoute._addFileChildren(
+  DocsRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
+  DocsRouteRoute: DocsRouteRouteWithChildren,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport

@@ -8,11 +8,13 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
   type RefCallback,
 } from "react";
+import { registerOpenComposeListener } from "../components/compose-bridge";
 
 type Selection = ReturnType<typeof useSelectionStore>;
 type Actions = ReturnType<typeof useEmailInboxActions>;
@@ -73,6 +75,13 @@ export function EmailProvider({ children }: { children: ReactNode }) {
   const closeForward = useCallback(() => {
     setForwardOpen(false);
     setComposeInitial(undefined);
+  }, []);
+
+  useEffect(() => {
+    return registerOpenComposeListener((initial) => {
+      setComposeInitial(initial);
+      setForwardOpen(true);
+    });
   }, []);
 
   const value = useMemo<EmailContextValue>(

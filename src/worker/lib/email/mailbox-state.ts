@@ -1,11 +1,9 @@
 import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
-import type { Database } from "../../db/client";
 import { account } from "../../db/auth-schema";
+import type { Database } from "../../db/client";
 import { mailboxes, syncJobs } from "../../db/schema";
 import { type SyncJobErrorClass } from "./providers/google/errors";
 import type { SyncWindowMonths } from "./sync-preferences";
-
-export type { SyncJobErrorClass };
 
 export const SYNC_LOCK_TTL_MS = 4 * 60_000;
 const STALE_SYNC_JOB_MESSAGE = "Sync job stalled or timed out.";
@@ -29,10 +27,7 @@ async function findMailboxById(db: Database, mailboxId: number) {
 
 /** Return all mailboxes belonging to a user. */
 export async function getUserMailboxes(db: Database, userId: string) {
-  return db
-    .select()
-    .from(mailboxes)
-    .where(eq(mailboxes.userId, userId));
+  return db.select().from(mailboxes).where(eq(mailboxes.userId, userId));
 }
 
 /**
@@ -184,7 +179,8 @@ export async function getMailboxSyncPreferences(
   const mailbox = await findMailboxById(db, mailboxId);
   return {
     mailbox: mailbox ?? null,
-    syncWindowMonths: (mailbox?.syncWindowMonths as SyncWindowMonths | null) ?? null,
+    syncWindowMonths:
+      (mailbox?.syncWindowMonths as SyncWindowMonths | null) ?? null,
     syncCutoffAt: mailbox?.syncCutoffAt ?? null,
   };
 }
@@ -245,7 +241,8 @@ export async function touchMailboxSyncLock(
   mailboxId: number,
 ): Promise<boolean> {
   const now = Date.now();
-  const gt = (col: typeof mailboxes.lockUntil, val: number) => sql`${col} > ${val}`;
+  const gt = (col: typeof mailboxes.lockUntil, val: number) =>
+    sql`${col} > ${val}`;
 
   const rows = await db
     .update(mailboxes)
@@ -253,12 +250,7 @@ export async function touchMailboxSyncLock(
       lockUntil: now + SYNC_LOCK_TTL_MS,
       updatedAt: now,
     })
-    .where(
-      and(
-        eq(mailboxes.id, mailboxId),
-        gt(mailboxes.lockUntil, now),
-      ),
-    )
+    .where(and(eq(mailboxes.id, mailboxId), gt(mailboxes.lockUntil, now)))
     .returning({ id: mailboxes.id });
 
   return rows.length > 0;
@@ -315,8 +307,14 @@ export async function resetMailboxSyncState(
 
   await db
     .update(syncJobs)
-    .set({ status: "failed", finishedAt: Date.now(), errorMessage: "Reset by user" })
-    .where(and(eq(syncJobs.mailboxId, mailboxId), eq(syncJobs.status, "running")));
+    .set({
+      status: "failed",
+      finishedAt: Date.now(),
+      errorMessage: "Reset by user",
+    })
+    .where(
+      and(eq(syncJobs.mailboxId, mailboxId), eq(syncJobs.status, "running")),
+    );
 }
 
 export async function createSyncJob(
@@ -402,7 +400,12 @@ export async function markSyncJobFailed(
 
   await db
     .update(syncJobs)
-    .set({ status: "failed", finishedAt: now, errorClass, errorMessage: message })
+    .set({
+      status: "failed",
+      finishedAt: now,
+      errorClass,
+      errorMessage: message,
+    })
     .where(and(eq(syncJobs.id, jobId), eq(syncJobs.mailboxId, mailboxId)));
 
   await db
@@ -430,7 +433,9 @@ export async function expireStaleSyncJobs(
       errorClass: "stale_lock",
       errorMessage: STALE_SYNC_JOB_MESSAGE,
     })
-    .where(and(eq(syncJobs.mailboxId, mailboxId), eq(syncJobs.status, "running")))
+    .where(
+      and(eq(syncJobs.mailboxId, mailboxId), eq(syncJobs.status, "running")),
+    )
     .returning({ id: syncJobs.id });
 
   if (staleJobs.length === 0) return false;
@@ -478,7 +483,12 @@ export async function getMailboxSyncSnapshot(
 }> {
   let mailbox = await findMailboxById(db, mailboxId);
   if (!mailbox) {
-    return { mailbox: null, latestJob: null, activeJob: null, hasLiveLock: false };
+    return {
+      mailbox: null,
+      latestJob: null,
+      activeJob: null,
+      hasLiveLock: false,
+    };
   }
 
   let liveLock = hasLiveLock(mailbox.lockUntil);
@@ -506,7 +516,10 @@ export async function getMailboxSyncSnapshot(
         .select()
         .from(syncJobs)
         .where(
-          and(eq(syncJobs.mailboxId, mailbox.id), eq(syncJobs.status, "running")),
+          and(
+            eq(syncJobs.mailboxId, mailbox.id),
+            eq(syncJobs.status, "running"),
+          ),
         )
         .orderBy(desc(syncJobs.createdAt))
         .limit(1)

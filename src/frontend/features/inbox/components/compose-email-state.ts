@@ -12,14 +12,120 @@ type UseComposeEmailOptions = {
   onSent?: () => void;
 };
 
+type ComposeDraft = {
+  mailboxId: number | null;
+  to: string;
+  cc: string;
+  bcc: string;
+  subject: string;
+  body: string;
+  forwardedContent: string;
+};
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildPlainForwardedHtml(content: string) {
+  return [
+    '<div data-forwarded-message="true" style="border-top:1px solid #dadce0;margin-top:16px;padding-top:16px;color:#5f6368;font-size:13px">',
+    '<div data-forwarded-original-body="true" style="white-space:pre-wrap">',
+    escapeHtml(content),
+    "</div>",
+    "</div>",
+  ].join("");
+}
+
+function splitPlainForwardedContent(content: string) {
+  const marker = /-{5,}\s*Forwarded message\s*-{5,}/i;
+  const match = content.match(marker);
+
+  if (!match || match.index == null) {
+    return null;
+  }
+
+  const body = content.slice(0, match.index).trim();
+  const forwardedRaw = content.slice(match.index).trim();
+
+  return {
+    body,
+    forwardedContent: buildPlainForwardedHtml(forwardedRaw),
+  };
+}
+
+function splitForwardedContent(content: string) {
+  if (!content.includes('data-forwarded-message="true"')) {
+    return splitPlainForwardedContent(content) ?? {
+      body: content,
+      forwardedContent: "",
+    };
+  }
+
+  if (typeof DOMParser === "undefined") {
+    return { body: content, forwardedContent: "" };
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(content, "text/html");
+  const forwardedMessage = doc.body.querySelector('[data-forwarded-message="true"]');
+
+  if (!forwardedMessage) {
+    return splitPlainForwardedContent(content) ?? {
+      body: content,
+      forwardedContent: "",
+    };
+  }
+
+  const forwardedContent = forwardedMessage.outerHTML;
+  const previous = forwardedMessage.previousElementSibling;
+  const previousHtml = previous?.outerHTML?.trim().toLowerCase();
+  const isSpacer =
+    previousHtml === "<p><br></p>" || previousHtml === "<p></p>";
+
+  if (isSpacer) {
+    previous?.remove();
+  }
+  forwardedMessage.remove();
+
+  const body = doc.body.innerHTML.trim();
+  return {
+    body,
+    forwardedContent,
+  };
+}
+
+function combineComposeBody(body: string, forwardedContent: string) {
+  const trimmedBody = body.trim();
+  const trimmedForwarded = forwardedContent.trim();
+
+  if (!trimmedForwarded) {
+    return body;
+  }
+
+  if (!trimmedBody) {
+    return forwardedContent;
+  }
+
+  return `${body}<p><br></p>${forwardedContent}`;
+}
+
 function createComposeDraft(initial?: ComposeInitial) {
+  const initialContent = initial?.bodyHtml ?? initial?.body ?? "";
+  const { body, forwardedContent } = splitForwardedContent(initialContent);
+
   return {
     mailboxId: initial?.mailboxId ?? null,
     to: initial?.to ?? "",
     cc: initial?.cc ?? "",
     bcc: initial?.bcc ?? "",
     subject: initial?.subject ?? "",
-    body: initial?.body ?? "",
+    body,
+    forwardedContent,
   };
 }
 
@@ -31,6 +137,7 @@ export function getComposeInitialKey(initial?: ComposeInitial) {
     initial?.bcc ?? "",
     initial?.subject ?? "",
     initial?.body ?? "",
+    initial?.bodyHtml ?? "",
   ].join("\u0001");
 }
 
@@ -43,14 +150,40 @@ export function useComposeEmail(
   const composeKey = getComposeInitialKey(initial);
   const [draft, setDraft] = useState(() => {
     const saved = useLocalDraft.load(composeKey);
-    return saved ?? createComposeDraft(initial);
+    if (!saved) {
+      return createComposeDraft(initial);
+    }
+
+    const normalizedSaved = saved as Partial<ComposeDraft>;
+    if (typeof normalizedSaved.forwardedContent === "string") {
+      return {
+        mailboxId: normalizedSaved.mailboxId ?? null,
+        to: normalizedSaved.to ?? "",
+        cc: normalizedSaved.cc ?? "",
+        bcc: normalizedSaved.bcc ?? "",
+        subject: normalizedSaved.subject ?? "",
+        body: normalizedSaved.body ?? "",
+        forwardedContent: normalizedSaved.forwardedContent,
+      } satisfies ComposeDraft;
+    }
+
+    const split = splitForwardedContent(normalizedSaved.body ?? "");
+    return {
+      mailboxId: normalizedSaved.mailboxId ?? null,
+      to: normalizedSaved.to ?? "",
+      cc: normalizedSaved.cc ?? "",
+      bcc: normalizedSaved.bcc ?? "",
+      subject: normalizedSaved.subject ?? "",
+      body: split.body,
+      forwardedContent: split.forwardedContent,
+    } satisfies ComposeDraft;
   });
   const { clearDraft } = useLocalDraft(composeKey, draft);
   const attachments = useAttachmentUpload();
   const bodyRef = useRef(draft.body);
   const [sendPending, setSendPending] = useState(false);
 
-  const { mailboxId, to, cc, bcc, subject, body } = draft;
+  const { mailboxId, to, cc, bcc, subject, body, forwardedContent } = draft;
   const availableMailboxes = useMemo(
     () =>
       (mailboxesQuery.data?.accounts ?? []).filter(
@@ -112,7 +245,7 @@ export function useComposeEmail(
         cc: snap.cc.trim().length > 0 ? snap.cc.trim() : undefined,
         bcc: snap.bcc.trim().length > 0 ? snap.bcc.trim() : undefined,
         subject: snap.subject,
-        body: bodyRef.current,
+        body: combineComposeBody(bodyRef.current, snap.forwardedContent),
         attachments: attSnap,
       });
     },
@@ -144,10 +277,11 @@ export function useComposeEmail(
   }, [draft, attachments, undoSend, options]);
 
   const canSend = useMemo(() => {
-    const hasBody =
+    const hasDraftBody =
       body.trim().length > 0 && body !== "<p></p>" && body !== "<p><br></p>";
+    const hasBody = hasDraftBody || forwardedContent.trim().length > 0;
     return mailboxId != null && to.trim().length > 0 && hasBody && !sendPending;
-  }, [body, mailboxId, sendPending, subject, to]);
+  }, [body, forwardedContent, mailboxId, sendPending, subject, to]);
 
   return {
     mailboxId,
@@ -163,6 +297,7 @@ export function useComposeEmail(
     setSubject,
     body,
     setBody,
+    forwardedContent,
     canSend,
     send,
     isPending: sendPending,

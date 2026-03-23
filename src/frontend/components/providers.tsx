@@ -1,13 +1,22 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { EmailCommandProvider } from "@/features/inbox/hooks/use-email-command-state";
+import { useAppShortcuts } from "@/hooks/use-app-shortcuts";
 import { PageContextProvider } from "@/hooks/use-page-context";
 import type { ReactNode } from "react";
+
+function AppShortcutBindings() {
+  useAppShortcuts();
+  return null;
+}
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <PageContextProvider>
       <TooltipProvider delayDuration={300} skipDelayDuration={0}>
-        <EmailCommandProvider>{children}</EmailCommandProvider>
+        <EmailCommandProvider>
+          <AppShortcutBindings />
+          {children}
+        </EmailCommandProvider>
       </TooltipProvider>
     </PageContextProvider>
   );
