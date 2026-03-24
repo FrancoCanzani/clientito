@@ -633,7 +633,6 @@ export function registerGetBriefing(app: Hono<AppRouteEnv>) {
       db,
       env: c.env,
       userId: user.id,
-      includeNarrative: false,
     });
     return c.json({ data: briefing }, 200);
   });

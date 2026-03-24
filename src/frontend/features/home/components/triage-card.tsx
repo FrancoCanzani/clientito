@@ -57,25 +57,18 @@ export function TriageCard({
   });
 
   return (
-    <div
-      className="group rounded-lg border border-border bg-card px-4 py-3 opacity-0 transition-[transform,opacity] duration-200 [animation:triage-card-in_0.3s_cubic-bezier(0.23,1,0.32,1)_forwards]"
-      style={{
-        animationDelay: `${index * 60}ms`,
-      }}
-    >
+    <div className="group rounded-lg border border-border bg-card p-2">
       <div className="flex items-start justify-between gap-3">
         <button
           type="button"
-          className="min-w-0 flex-1 cursor-pointer bg-transparent p-0 text-left"
+          className="flex-1 space-y-2 cursor-pointer bg-transparent text-left"
           onClick={() => navigate({ to: item.href })}
         >
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-foreground">
-              {item.title}
-            </span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium">{item.title}</span>
             {item.type === "reply" && (
               <span className="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                Reply
+                Reply needed
               </span>
             )}
             {item.type === "fyi" && (
@@ -94,7 +87,7 @@ export function TriageCard({
               </span>
             )}
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">{item.reason}</p>
+          <p className="text-xs text-muted-foreground">{item.reason}</p>
         </button>
 
         <div className="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">

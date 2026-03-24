@@ -137,7 +137,7 @@ export function AttachmentItem({
 
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex items-center gap-2">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted/[0.45]">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted/45">
               {attachment.isImage ? (
                 <ImageIcon className="size-3 text-muted-foreground" />
               ) : (

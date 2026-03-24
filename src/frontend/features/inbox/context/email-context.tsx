@@ -28,7 +28,6 @@ type EmailContextValue = {
   selectedEmail: EmailListItem | null;
   orderedIds: string[];
   emailById: Map<string, EmailListItem>;
-  isPending: boolean;
   isError: boolean;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;

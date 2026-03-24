@@ -1,4 +1,5 @@
 export type SyncPreference = {
+  mailboxId: number | null;
   months: 6 | 12 | null;
   cutoffAt: number | null;
 };
@@ -7,13 +8,18 @@ export type UpdateSyncPreferenceResult = SyncPreference & {
   requiresBackfill: boolean;
 };
 
+export type UpdateSyncPreferenceInput = {
+  mailboxId: number;
+  months: 6 | 12 | null;
+};
+
 export async function updateSyncPreference(
-  months: 6 | 12 | null,
+  input: UpdateSyncPreferenceInput,
 ): Promise<UpdateSyncPreferenceResult> {
   const response = await fetch("/api/settings/sync", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ months }),
+    body: JSON.stringify(input),
   });
 
   if (!response.ok) {

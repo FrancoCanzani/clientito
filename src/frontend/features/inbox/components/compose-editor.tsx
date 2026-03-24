@@ -1,5 +1,6 @@
-import { EditorContent } from "@tiptap/react";
+import { cn } from "@/lib/utils";
 import { DotsThreeIcon } from "@phosphor-icons/react";
+import { EditorContent } from "@tiptap/react";
 import { useEffect, useMemo, useState } from "react";
 import { useComposeEditor } from "../hooks/use-compose-editor";
 import {
@@ -7,7 +8,6 @@ import {
   unregisterComposeEditor,
 } from "./compose-bridge";
 import { ComposeBubbleMenu } from "./compose-bubble-menu";
-import { cn } from "@/lib/utils";
 
 type ComposeEditorProps = {
   initialContent: string;
@@ -84,7 +84,7 @@ export function ComposeEditor({
         className={cn(
           hasForwardedContent &&
             !showForwardedContent &&
-            "[&_[data-forwarded-original-body]]:hidden",
+            "**:data-forwarded-original-body:hidden",
         )}
       >
         <EditorContent editor={editor} />

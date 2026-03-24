@@ -16,31 +16,42 @@ import {
 import type { AppRouteEnv } from "../types";
 
 const syncSettingsBodySchema = z.object({
+  mailboxId: z.number().int().positive().optional(),
   months: z.union([z.literal(6), z.literal(12), z.null()]),
 });
 
+const syncSettingsQuerySchema = z.object({
+  mailboxId: z.coerce.number().int().positive().optional(),
+});
+
 export function registerSyncSettings(settingsRoutes: Hono<AppRouteEnv>) {
-  settingsRoutes.get("/sync", async (c) => {
-    const db = c.get("db");
-    const user = c.get("user")!;
+  settingsRoutes.get(
+    "/sync",
+    zValidator("query", syncSettingsQuerySchema),
+    async (c) => {
+      const db = c.get("db");
+      const user = c.get("user")!;
+      const { mailboxId } = c.req.valid("query");
 
-    const mailbox = await resolveMailbox(db, user.id);
-    if (!mailbox) {
-      return c.json({ data: { months: null, cutoffAt: null } });
-    }
+      const mailbox = await resolveMailbox(db, user.id, mailboxId);
+      if (!mailbox) {
+        return c.json({ data: { mailboxId: null, months: null, cutoffAt: null } });
+      }
 
-    const { syncWindowMonths, syncCutoffAt } = await getMailboxSyncPreferences(
-      db,
-      mailbox.id,
-    );
+      const { syncWindowMonths, syncCutoffAt } = await getMailboxSyncPreferences(
+        db,
+        mailbox.id,
+      );
 
-    return c.json({
-      data: {
-        months: syncWindowMonths,
-        cutoffAt: syncCutoffAt,
-      },
-    });
-  });
+      return c.json({
+        data: {
+          mailboxId: mailbox.id,
+          months: syncWindowMonths,
+          cutoffAt: syncCutoffAt,
+        },
+      });
+    },
+  );
 
   settingsRoutes.put(
     "/sync",
@@ -50,7 +61,7 @@ export function registerSyncSettings(settingsRoutes: Hono<AppRouteEnv>) {
       const user = c.get("user")!;
       const body = c.req.valid("json");
 
-      const mailbox = await resolveMailbox(db, user.id);
+      const mailbox = await resolveMailbox(db, user.id, body.mailboxId);
       if (!mailbox) {
         return c.json({ error: "No mailbox found" }, 400);
       }
@@ -67,11 +78,18 @@ export function registerSyncSettings(settingsRoutes: Hono<AppRouteEnv>) {
       if (typeof nextCutoffAt === "number") {
         await db
           .delete(emails)
-          .where(and(eq(emails.userId, user.id), lt(emails.date, nextCutoffAt)));
+          .where(
+            and(
+              eq(emails.userId, user.id),
+              eq(emails.mailboxId, mailbox.id),
+              lt(emails.date, nextCutoffAt),
+            ),
+          );
       }
 
       return c.json({
         data: {
+          mailboxId: mailbox.id,
           months: nextMonths,
           cutoffAt: nextCutoffAt,
           requiresBackfill: requiresBackfillForCutoffChange(

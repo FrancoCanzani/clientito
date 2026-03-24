@@ -6,7 +6,6 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useEmail } from "@/features/inbox/context/email-context";
 import { VIEW_LABELS } from "@/features/inbox/utils/inbox-filters";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -29,7 +28,6 @@ export function EmailList() {
     displayRows,
     sections,
     selectedEmail,
-    isPending,
     hasNextPage,
     isFetchingNextPage,
     loadMoreRef,
@@ -116,24 +114,11 @@ export function EmailList() {
           />
         )}
 
-        {isPending ? (
-          <div className="space-y-2">
-            {Array.from({ length: 10 }).map((_, index) => (
-              <Skeleton
-                key={index}
-                className="h-11 w-full rounded-md animate-in fade-in-0"
-                style={{
-                  animationDelay: `${index * 50}ms`,
-                  animationFillMode: "backwards",
-                }}
-              />
-            ))}
-          </div>
-        ) : displayRows.length > 0 ? (
+        {displayRows.length > 0 ? (
           <div className="space-y-5">
             {sections.map((section) => (
               <section key={section.label} className="space-y-1.5">
-                <div className="sticky top-9 z-10 bg-background py-1 text-xs text-muted-foreground">
+                <div className="sticky top-9 z-10 bg-background py-2 text-xs text-muted-foreground">
                   {section.label}
                 </div>
                 <div className="space-y-1 [&:has(>[data-email-row]:hover)>[data-email-row]:not(:hover)]:opacity-85">

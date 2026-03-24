@@ -1,5 +1,8 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 
+const ACTIVE_SYNC_POLL_MS = 1_000;
+const IDLE_SYNC_POLL_MS = 60_000;
+
 export type MailboxAccount = {
   accountId: string;
   mailboxId: number | null;
@@ -9,6 +12,14 @@ export type MailboxAccount = {
   lastSync: number | null;
   hasSynced: boolean;
   hasValidCredentials: boolean;
+  syncWindowMonths: 6 | 12 | null;
+  syncCutoffAt: number | null;
+  syncState: "needs_reconnect" | "ready_to_sync" | "error" | "syncing" | "ready";
+  phase: string | null;
+  progressCurrent: number | null;
+  progressTotal: number | null;
+  error: string | null;
+  createdAt: number | null;
 };
 
 export function getMailboxDisplayEmail(
@@ -38,7 +49,15 @@ async function fetchAccounts(): Promise<{ accounts: MailboxAccount[] }> {
 const accountsQueryOptions = queryOptions({
   queryKey: ["accounts"] as const,
   queryFn: fetchAccounts,
-  staleTime: 60_000,
+  staleTime: 30_000,
+  refetchOnWindowFocus: true,
+  refetchOnReconnect: true,
+  refetchInterval: (query) => {
+    const accounts = query.state.data?.accounts ?? [];
+    return accounts.some((account) => account.syncState === "syncing")
+      ? ACTIVE_SYNC_POLL_MS
+      : IDLE_SYNC_POLL_MS;
+  },
 });
 
 export function useMailboxes() {

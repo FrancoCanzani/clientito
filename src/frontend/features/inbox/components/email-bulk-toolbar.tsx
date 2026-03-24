@@ -1,13 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  ArchiveIcon,
-  CheckIcon,
-  EnvelopeOpenIcon,
-  EnvelopeSimpleIcon,
-  StarIcon,
-  TrashSimpleIcon,
-} from "@phosphor-icons/react";
 import { useId } from "react";
 
 type EmailBulkToolbarProps = {
@@ -60,7 +52,6 @@ export function EmailBulkToolbar({
       </div>
       <div className="text-muted-foreground text-xs">{count} selected</div>
       <Button size="xs" variant="ghost" onClick={onArchive} disabled={disabled}>
-        <ArchiveIcon className="size-3" />
         Archive
       </Button>
       <Button
@@ -69,7 +60,6 @@ export function EmailBulkToolbar({
         onClick={onMarkRead}
         disabled={disabled}
       >
-        <EnvelopeOpenIcon className="size-3" />
         Read
       </Button>
       <Button
@@ -78,7 +68,6 @@ export function EmailBulkToolbar({
         onClick={onMarkUnread}
         disabled={disabled}
       >
-        <EnvelopeSimpleIcon className="size-3" />
         Unread
       </Button>
       <Button
@@ -87,7 +76,6 @@ export function EmailBulkToolbar({
         onClick={onStarToggle}
         disabled={disabled}
       >
-        <StarIcon className="size-3" />
         Star
       </Button>
       <Button
@@ -96,7 +84,6 @@ export function EmailBulkToolbar({
         onClick={onTrash}
         disabled={disabled}
       >
-        <TrashSimpleIcon className="size-3" />
         Trash
       </Button>
       <span className="ml-auto" />
@@ -106,7 +93,6 @@ export function EmailBulkToolbar({
         onClick={onDeselect}
         disabled={disabled}
       >
-        <CheckIcon className="size-3" />
         Done
       </Button>
     </div>

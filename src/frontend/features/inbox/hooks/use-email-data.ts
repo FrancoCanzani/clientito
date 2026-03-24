@@ -100,7 +100,6 @@ export function useEmailData() {
     selectedEmail,
     orderedIds,
     emailById,
-    isPending: emailsQuery.isPending,
     isError: emailsQuery.isError,
     hasNextPage: hasNextPage ?? false,
     isFetchingNextPage,

@@ -70,8 +70,8 @@ export function EmailRow({
         aria-hidden
       />
 
-      <div className="min-w-0 flex-1 items-center gap-2 overflow-hidden text-sm sm:flex">
-        <span className="shrink-0 truncate font-medium text-foreground sm:max-w-52">
+      <div className="min-w-0 flex-1 items-center gap-2 overflow-hidden text-sm flex">
+        <span className="shrink-0 truncate font-medium max-w-52">
           {participantLabel}
         </span>
         <span className="truncate text-muted-foreground">

@@ -2,10 +2,13 @@ import { ComposePanel } from "@/features/inbox/components/compose-panel";
 import { InboxDesktopView } from "@/features/inbox/components/inbox-desktop-view";
 import { InboxMobileView } from "@/features/inbox/components/inbox-mobile-view";
 import {
+  EmailProvider,
+  useEmail,
+} from "@/features/inbox/context/email-context";
+import {
   useRegisterEmailCommandHandler,
   type EmailCommand,
 } from "@/features/inbox/hooks/use-email-command-state";
-import { EmailProvider, useEmail } from "@/features/inbox/context/email-context";
 import { useEmailInboxKeyboard } from "@/features/inbox/hooks/use-email-inbox-keyboard";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSetPageContext } from "@/hooks/use-page-context";
@@ -103,13 +106,7 @@ function InboxContent() {
             break;
         }
       },
-      [
-        closeEmail,
-        executeEmailAction,
-        goToEmail,
-        selectedEmailId,
-        selection,
-      ],
+      [closeEmail, executeEmailAction, goToEmail, selectedEmailId, selection],
     ),
   );
 
