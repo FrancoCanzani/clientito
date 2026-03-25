@@ -9,9 +9,6 @@ import {
 } from "react";
 
 export type EmailCommand =
-  | { type: "selection-mode"; enabled: boolean }
-  | { type: "select-all-visible" }
-  | { type: "clear-selection" }
   | { type: "open-first-visible" }
   | { type: "navigate-next" }
   | { type: "navigate-prev" }

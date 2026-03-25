@@ -1,6 +1,5 @@
 import { useEmailData } from "@/features/inbox/hooks/use-email-data";
 import { useEmailInboxActions } from "@/features/inbox/hooks/use-email-inbox-actions";
-import { useSelectionStore } from "@/features/inbox/stores/selection-store";
 import type { ComposeInitial, EmailListItem } from "@/features/inbox/types";
 import type { EmailView } from "@/features/inbox/utils/inbox-filters";
 import type { ThreadSection } from "@/features/inbox/utils/build-thread-sections";
@@ -16,7 +15,6 @@ import {
 } from "react";
 import { registerOpenComposeListener } from "../components/compose-bridge";
 
-type Selection = ReturnType<typeof useSelectionStore>;
 type Actions = ReturnType<typeof useEmailInboxActions>;
 
 type EmailContextValue = {
@@ -32,7 +30,6 @@ type EmailContextValue = {
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   loadMoreRef: RefCallback<HTMLDivElement>;
-  selection: Selection;
   openEmail: Actions["openEmail"];
   closeEmail: Actions["closeEmail"];
   executeEmailAction: Actions["executeEmailAction"];
@@ -46,19 +43,11 @@ const EmailContext = createContext<EmailContextValue | null>(null);
 
 export function EmailProvider({ children }: { children: ReactNode }) {
   const emailData = useEmailData();
-  const selection = useSelectionStore(emailData.displayRows);
-
-  const selectedIds = useMemo(
-    () => Array.from(selection.selectedIds),
-    [selection.selectedIds],
-  );
 
   const { openEmail, closeEmail, executeEmailAction } = useEmailInboxActions({
     view: emailData.view,
     mailboxId: emailData.mailboxId,
     selectedEmailId: emailData.selectedEmailId,
-    selectedIds,
-    clearSelection: selection.clearSelection,
   });
 
   const [composeInitial, setComposeInitial] = useState<
@@ -86,7 +75,6 @@ export function EmailProvider({ children }: { children: ReactNode }) {
   const value = useMemo<EmailContextValue>(
     () => ({
       ...emailData,
-      selection,
       openEmail,
       closeEmail,
       executeEmailAction,
@@ -97,7 +85,6 @@ export function EmailProvider({ children }: { children: ReactNode }) {
     }),
     [
       emailData,
-      selection,
       openEmail,
       closeEmail,
       executeEmailAction,

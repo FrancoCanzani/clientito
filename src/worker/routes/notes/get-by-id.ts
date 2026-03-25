@@ -16,6 +16,7 @@ export function registerGetNoteById(api: Hono<AppRouteEnv>) {
         id: notes.id,
         title: notes.title,
         content: notes.content,
+        isPinned: notes.isPinned,
         createdAt: notes.createdAt,
         updatedAt: notes.updatedAt,
       })

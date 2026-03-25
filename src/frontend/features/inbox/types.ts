@@ -6,7 +6,14 @@ export type ContactSuggestion = {
   interactionCount: number;
 };
 
-export type AiLabel = "important" | "later" | "newsletter" | "marketing" | "transactional" | "notification";
+export type AiLabel =
+  | "action_needed"
+  | "important"
+  | "later"
+  | "newsletter"
+  | "marketing"
+  | "transactional"
+  | "notification";
 
 export type EmailListItem = {
   id: string;

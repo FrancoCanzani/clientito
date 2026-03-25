@@ -3,9 +3,11 @@ export type FilterActions = {
   markRead?: boolean;
   star?: boolean;
   applyAiLabel?:
+    | "action_needed"
     | "important"
     | "later"
     | "newsletter"
+    | "marketing"
     | "transactional"
     | "notification";
   trash?: boolean;

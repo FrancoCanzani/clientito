@@ -25,12 +25,40 @@ import type { EmailFilter } from "@/features/filters/types";
 import {
   ArrowRightIcon,
   PencilSimpleIcon,
+  PlusIcon,
   SparkleIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
+
+const NOISE_FILTER_TEMPLATES = [
+  {
+    name: "Archive newsletters",
+    description:
+      "Newsletters, weekly roundups, digest emails, and editorial content from subscriptions",
+    actions: { archive: true, markRead: true } as const,
+  },
+  {
+    name: "Archive marketing",
+    description:
+      "Promotional emails, sales, discounts, flash deals, product offers, and company marketing campaigns",
+    actions: { archive: true, markRead: true } as const,
+  },
+  {
+    name: "Archive notifications",
+    description:
+      "Automated alerts, app notifications, product updates, social media summaries, and system-generated informational emails",
+    actions: { archive: true, markRead: true } as const,
+  },
+  {
+    name: "Archive transactional",
+    description:
+      "Receipts, order confirmations, shipping notifications, password resets, and verification codes",
+    actions: { archive: true, markRead: true } as const,
+  },
+];
 
 const ACTION_LABELS: Record<string, string> = {
   archive: "Archive",
@@ -193,6 +221,36 @@ export default function FiltersPage() {
           )}
         </Button>
       </form>
+
+      {(() => {
+        const existingNames = new Set(filters.map((f) => f.name));
+        const available = NOISE_FILTER_TEMPLATES.filter(
+          (t) => !existingNames.has(t.name),
+        );
+        if (available.length === 0 || isPending) return null;
+        return (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              Suggested
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {available.map((template) => (
+                <Button
+                  key={template.name}
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={createMutation.isPending}
+                  onClick={() => createMutation.mutate(template)}
+                >
+                  <PlusIcon className="mr-1 size-3" />
+                  {template.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {editing && (
         <FilterEditor

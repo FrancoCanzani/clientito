@@ -1,4 +1,3 @@
-import { useEmailCommandActions } from "@/features/inbox/hooks/use-email-command-state";
 import {
   VIEW_LABELS,
   type EmailView,
@@ -48,7 +47,6 @@ export function usePaletteCommands({
   const navigate = useNavigate();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const issueEmailCommand = useEmailCommandActions();
   const logout = useLogout();
   const { resolved: resolvedTheme, toggle: toggleTheme } = useTheme();
 
@@ -184,50 +182,6 @@ export function usePaletteCommands({
         ]
       : [];
 
-    const emailSelectionCommands: PaletteCommand[] = isEmailsRoute
-      ? [
-          {
-            id: "email-selection-mode",
-            label: "Select inbox items",
-            section: "email-selection",
-            icon: React.createElement(CheckSquareIcon, {
-              className: "size-4",
-            }),
-            onSelect: () => {
-              issueEmailCommand({
-                type: "selection-mode",
-                enabled: true,
-              });
-              close();
-            },
-          },
-          {
-            id: "email-select-all",
-            label: "Select all visible",
-            section: "email-selection",
-            icon: React.createElement(CheckSquareIcon, {
-              className: "size-4",
-            }),
-            onSelect: () => {
-              issueEmailCommand({ type: "select-all-visible" });
-              close();
-            },
-          },
-          {
-            id: "email-clear-selection",
-            label: "Clear selection",
-            section: "email-selection",
-            icon: React.createElement(CheckSquareIcon, {
-              className: "size-4",
-            }),
-            onSelect: () => {
-              issueEmailCommand({ type: "clear-selection" });
-              close();
-            },
-          },
-        ]
-      : [];
-
     const taskViewCommands: PaletteCommand[] = isTasksRoute
       ? (
           [
@@ -312,7 +266,6 @@ export function usePaletteCommands({
           close();
         },
       },
-      ...emailSelectionCommands,
       {
         id: "new-task",
         label: "New Task",
@@ -360,7 +313,6 @@ export function usePaletteCommands({
     createNoteMutation,
     isEmailsRoute,
     isTasksRoute,
-    issueEmailCommand,
     logout,
     navigate,
     navigateToInbox,
@@ -383,9 +335,6 @@ export function usePaletteCommands({
   );
   const taskNavigationCommands = commands.filter(
     (command) => command.section === "task-navigation",
-  );
-  const emailSelectionCommands = commands.filter(
-    (command) => command.section === "email-selection",
   );
   const actionCommands = commands.filter(
     (command) => command.section === "actions",
@@ -435,7 +384,6 @@ export function usePaletteCommands({
     visibleNavigationCommands,
     emailNavigationCommands,
     taskNavigationCommands,
-    emailSelectionCommands,
     actionCommands,
     agentSuggestions,
     submitTask,

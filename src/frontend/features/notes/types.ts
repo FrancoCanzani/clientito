@@ -2,6 +2,7 @@ export type Note = {
   id: number;
   title: string;
   content: string;
+  isPinned: boolean;
   createdAt: number;
   updatedAt: number;
 };
@@ -14,4 +15,4 @@ export type NotesListResponse = {
   };
 };
 
-export type NoteSummary = Pick<Note, "id" | "title" | "createdAt" | "updatedAt">;
+export type NoteSummary = Pick<Note, "id" | "title" | "isPinned" | "createdAt" | "updatedAt">;

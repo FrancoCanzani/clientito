@@ -1,3 +1,4 @@
+import { Kbd } from "@/components/ui/kbd";
 import { PageHeader } from "@/components/page-header";
 import {
   Empty,
@@ -7,34 +8,58 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BriefingText } from "@/features/home/components/briefing-text";
-import { TriageCard } from "@/features/home/components/triage-card";
+import { CardStack } from "@/features/home/components/card-stack";
+import { useDecisionKeyboard } from "@/features/home/hooks/use-decision-keyboard";
+import { useDecisionQueue } from "@/features/home/hooks/use-decision-queue";
 import { useBriefingStream } from "@/features/home/hooks/use-briefing-stream";
 import { getGreeting } from "@/features/home/utils";
 import { useAuth } from "@/hooks/use-auth";
-import { getRouteApi } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { getRouteApi, useRouter } from "@tanstack/react-router";
+import { useCallback } from "react";
 
 const homeRoute = getRouteApi("/_dashboard/home");
 
 export default function HomePage() {
   const briefing = homeRoute.useLoaderData();
   const { user } = useAuth();
+  const router = useRouter();
   const greeting = getGreeting(user?.name, briefing);
   const hasItems = briefing.items.length > 0;
   const stream = useBriefingStream(hasItems && !briefing.text);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const briefingText = briefing.text || stream.text;
 
   const shouldShowBriefingSkeleton = hasItems && !briefingText && !stream.error;
   const isAnimating = stream.isStreaming;
 
-  const visibleItems = briefing.items.filter((item) => !dismissed.has(item.id));
-  const showCards = visibleItems.length > 0 && !isAnimating && briefingText;
-  const showCaughtUpState = visibleItems.length === 0 && !isAnimating;
+  const queue = useDecisionQueue(briefing.items);
+  const isHomeRoute = router.state.location.pathname === "/home";
 
-  const handleDismiss = useCallback((id: string) => {
-    setDismissed((prev) => new Set(prev).add(id));
-  }, []);
+  const sendActiveReply = useCallback(() => {
+    if (queue.activeItem) queue.sendReply(queue.activeItem.id);
+  }, [queue]);
+
+  const skipActive = useCallback(() => {
+    if (queue.activeItem) queue.dismiss(queue.activeItem.id);
+  }, [queue]);
+
+  const archiveActive = useCallback(() => {
+    if (queue.activeItem) queue.archiveItem(queue.activeItem.id);
+  }, [queue]);
+
+  useDecisionKeyboard({
+    navigateUp: queue.navigateUp,
+    navigateDown: queue.navigateDown,
+    toggleEditing: queue.toggleEditing,
+    cancelEditing: queue.cancelEditing,
+    sendActiveReply,
+    skipActive,
+    archiveActive,
+    enabled: isHomeRoute,
+  });
+
+  const showCards =
+    queue.visibleItems.length > 0 && !isAnimating && briefingText;
+  const showCaughtUpState = queue.visibleItems.length === 0 && !isAnimating;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col space-y-6">
@@ -68,15 +93,47 @@ export default function HomePage() {
       )}
 
       {showCards && (
-        <div className="space-y-2">
-          {visibleItems.map((item, i) => (
-            <TriageCard
-              key={item.id}
-              item={item}
-              index={i}
-              onDismiss={handleDismiss}
-            />
-          ))}
+        <CardStack
+          items={queue.visibleItems}
+          activeIndex={queue.activeIndex}
+          drafts={queue.drafts}
+          isLoadingDrafts={queue.isLoadingDrafts}
+          editingId={queue.editingId}
+          sendingId={queue.sendingId}
+          onDismiss={queue.dismiss}
+          onSendReply={queue.sendReply}
+          onArchive={queue.archiveItem}
+          onDraftChange={queue.updateDraft}
+          onToggleEdit={queue.toggleEditing}
+        />
+      )}
+
+      {showCards && (
+        <div className="mt-auto flex items-center justify-between pt-4 text-[11px] text-muted-foreground">
+          <span>{queue.visibleItems.length} items remaining</span>
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1">
+              <Kbd>J</Kbd>
+              <Kbd>K</Kbd>
+              navigate
+            </span>
+            <span className="flex items-center gap-1">
+              <Kbd>E</Kbd>
+              edit
+            </span>
+            <span className="flex items-center gap-1">
+              <Kbd>Enter</Kbd>
+              send
+            </span>
+            <span className="flex items-center gap-1">
+              <Kbd>S</Kbd>
+              skip
+            </span>
+            <span className="flex items-center gap-1">
+              <Kbd>A</Kbd>
+              archive
+            </span>
+          </div>
         </div>
       )}
 
@@ -85,7 +142,7 @@ export default function HomePage() {
           <EmptyHeader>
             <EmptyTitle>{greeting.line}</EmptyTitle>
             <EmptyDescription>
-              Everything looks handled. No recent reply-needed threads or
+              Everything looks handled. No recent action-needed threads or
               overdue tasks right now.
             </EmptyDescription>
           </EmptyHeader>

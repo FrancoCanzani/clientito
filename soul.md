@@ -153,9 +153,7 @@ The implementation uses `useAgentChat` from `@cloudflare/ai-chat/react`:
 ```typescript
 const { messages, sendMessage, addToolApprovalResponse } = useAgentChat({
   agent,
-  onToolCall: async ({ toolCall, addToolOutput }) => {
-    // Handle client-side tools if any
-  },
+  onToolCall: async ({ toolCall, addToolOutput }) => {},
 });
 
 // In the render, for approval-required parts:

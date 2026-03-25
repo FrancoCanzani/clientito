@@ -1,7 +1,6 @@
 import { AIChatAgent } from "@cloudflare/ai-chat";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { OnChatMessageOptions } from "@cloudflare/ai-chat";
-import type { Connection, ConnectionContext } from "agents";
 import { getCurrentAgent } from "agents";
 import type { StreamTextOnFinishCallback, ToolSet } from "ai";
 import { convertToModelMessages, stepCountIs, streamText } from "ai";
@@ -116,36 +115,12 @@ If the URL contains a relevant entity ID such as an email ID, note ID, person ID
 Do not claim page-specific context unless it is supported by the current URL or by tool results.`;
 }
 
-type AgentConnectionState = {
-  userId: string | null;
-  userEmail: string | null;
-};
-
 export class Agent extends AIChatAgent<Env> {
-  async onConnect(connection: Connection, ctx: ConnectionContext) {
-    await super.onConnect(connection, ctx);
-
-    const session = await auth(this.env).api.getSession({
-      headers: ctx.request.headers,
-    });
-
-    const currentState =
-      typeof connection.state === "object" && connection.state
-        ? (connection.state as Record<string, unknown>)
-        : {};
-
-    connection.setState({
-      ...currentState,
-      userId: session?.user?.id ?? null,
-      userEmail: session?.user?.email ?? null,
-    } satisfies AgentConnectionState & Record<string, unknown>);
-  }
-
   async onChatMessage(
     onFinish: StreamTextOnFinishCallback<ToolSet>,
     options?: OnChatMessageOptions,
   ) {
-    const { connection, request } = getCurrentAgent<Agent>();
+    const { request } = getCurrentAgent<Agent>();
 
     const session = request
       ? await auth(this.env).api.getSession({
@@ -153,20 +128,8 @@ export class Agent extends AIChatAgent<Env> {
         })
       : null;
 
-    const connState =
-      connection && typeof connection.state === "object" && connection.state
-        ? (connection.state as AgentConnectionState)
-        : null;
-
-    const userId =
-      session?.user.id ??
-      (typeof options?.body?.userId === "string" ? options.body.userId : null) ??
-      (this.name !== "anonymous" ? this.name : null) ??
-      connState?.userId ?? null;
-
-    const userEmail =
-      session?.user.email ??
-      connState?.userEmail ?? null;
+    const userId = session?.user.id ?? null;
+    const userEmail = session?.user.email ?? null;
 
     if (!userId) {
       console.warn("[Agent] Unauthorized chat request");

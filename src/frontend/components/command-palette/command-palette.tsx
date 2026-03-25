@@ -51,7 +51,6 @@ export function CommandPalette() {
     visibleNavigationCommands,
     emailNavigationCommands,
     taskNavigationCommands,
-    emailSelectionCommands,
     actionCommands,
     agentSuggestions,
     submitTask,
@@ -198,7 +197,6 @@ export function CommandPalette() {
                     visibleNavigationCommands={visibleNavigationCommands}
                     emailNavigationCommands={emailNavigationCommands}
                     taskNavigationCommands={taskNavigationCommands}
-                    emailSelectionCommands={emailSelectionCommands}
                     actionCommands={actionCommands}
                     enterAgentMode={state.enterAgentMode}
                   />

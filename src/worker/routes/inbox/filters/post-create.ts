@@ -9,7 +9,15 @@ const actionsSchema = z.object({
   markRead: z.boolean().optional(),
   star: z.boolean().optional(),
   applyAiLabel: z
-    .enum(["important", "later", "newsletter", "transactional", "notification"])
+    .enum([
+      "action_needed",
+      "important",
+      "later",
+      "newsletter",
+      "marketing",
+      "transactional",
+      "notification",
+    ])
     .optional(),
   trash: z.boolean().optional(),
 });

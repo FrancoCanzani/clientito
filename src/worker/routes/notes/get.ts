@@ -17,12 +17,13 @@ export function registerGetNotes(api: Hono<AppRouteEnv>) {
       .select({
         id: notes.id,
         title: notes.title,
+        isPinned: notes.isPinned,
         createdAt: notes.createdAt,
         updatedAt: notes.updatedAt,
       })
       .from(notes)
       .where(and(...conditions))
-      .orderBy(desc(notes.updatedAt), desc(notes.createdAt))
+      .orderBy(desc(notes.isPinned), desc(notes.updatedAt), desc(notes.createdAt))
       .limit(limit)
       .offset(offset);
 

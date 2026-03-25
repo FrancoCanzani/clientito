@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { generateObject } from "ai";
+import { Output, generateText } from "ai";
 import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
 import { emails } from "../../../db/schema";
@@ -54,9 +54,9 @@ export function registerGenerateFilter(app: Hono<AppRouteEnv>) {
 
     const workersAI = createWorkersAI({ binding: c.env.AI });
 
-    const { object: filter } = await generateObject({
+    const { output: filter } = await generateText({
       model: workersAI(MODEL),
-      schema: filterOutputSchema,
+      output: Output.object({ schema: filterOutputSchema }),
       prompt: `You are an email filter generator. The user describes what they want in plain English and you create an email filter.
 
 The filter has three parts:

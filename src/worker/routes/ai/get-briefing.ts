@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm";
 import { createWorkersAI } from "workers-ai-provider";
 import { formatDistanceToNowStrict } from "date-fns";
-import { dailyBriefings, emails, tasks } from "../../db/schema";
+import { dailyBriefings, emails, mailboxes, tasks } from "../../db/schema";
 import { isAutomatedSender, isPublicDomain } from "../../lib/domains";
 import { STANDARD_LABELS } from "../../lib/email/types";
 import type { AppRouteEnv } from "../types";
@@ -31,16 +31,16 @@ function getTodayBounds(now: number): { day: string; start: number; end: number 
 }
 
 function buildFallbackText(input: {
-  needsReplyCount: number;
+  actionNeededCount: number;
   dueTodayCount: number;
   overdueCount: number;
 }): string {
-  if (input.needsReplyCount > 0 && input.overdueCount > 0) {
-    return `${input.needsReplyCount} conversation${input.needsReplyCount === 1 ? "" : "s"} are waiting on your reply, and ${input.overdueCount} task${input.overdueCount === 1 ? " is" : "s are"} overdue.`;
+  if (input.actionNeededCount > 0 && input.overdueCount > 0) {
+    return `${input.actionNeededCount} conversation${input.actionNeededCount === 1 ? "" : "s"} need action, and ${input.overdueCount} task${input.overdueCount === 1 ? " is" : "s are"} overdue.`;
   }
 
-  if (input.needsReplyCount > 0) {
-    return `${input.needsReplyCount} recent conversation${input.needsReplyCount === 1 ? " is" : "s are"} waiting on your reply.`;
+  if (input.actionNeededCount > 0) {
+    return `${input.actionNeededCount} recent conversation${input.actionNeededCount === 1 ? " needs" : "s need"} action.`;
   }
 
   if (input.overdueCount > 0) {
@@ -51,22 +51,29 @@ function buildFallbackText(input: {
     return `${input.dueTodayCount} ${input.dueTodayCount === 1 ? "task is" : "tasks are"} due today.`;
   }
 
-  return "Your replies and tasks look under control.";
+  return "Your email and tasks look under control.";
 }
 
 type BriefingItem = {
   id: string;
-  type: "reply" | "fyi" | "overdue_task" | "due_today_task";
+  type: "action_needed" | "important" | "overdue_task" | "due_today_task";
   title: string;
   reason: string;
   href: string;
+  emailId?: number;
+  draftReply?: string | null;
+  threadId?: string | null;
+  fromAddr?: string;
+  subject?: string | null;
+  mailboxId?: number | null;
+  messageId?: string | null;
 };
 
 type BriefingData = {
   text: string;
   generatedAt: number;
   counts: {
-    needsReply: number;
+    actionNeeded: number;
     dueToday: number;
     overdue: number;
   };
@@ -85,6 +92,7 @@ type LatestThreadRow = {
   isRead: boolean;
   labelIds: string[] | null;
   aiLabel:
+    | "action_needed"
     | "important"
     | "later"
     | "newsletter"
@@ -92,6 +100,9 @@ type LatestThreadRow = {
     | "transactional"
     | "notification"
     | null;
+  draftReply: string | null;
+  messageId: string | null;
+  mailboxId: number | null;
 };
 
 type TaskRow = {
@@ -212,6 +223,10 @@ function isNonActionableBriefingLabel(
   );
 }
 
+function normalizeBriefingLabel(label: LatestThreadRow["aiLabel"]) {
+  return label === "later" ? "important" : label;
+}
+
 function getSenderDomain(email: string) {
   const [, domain = ""] = email.toLowerCase().split("@");
   return domain;
@@ -321,7 +336,7 @@ function buildReplyReason(row: LatestThreadRow) {
   });
 
   if (row.subject?.trim()) {
-    return `"${row.subject.trim()}" came in ${age}.`;
+    return `${row.subject.trim()} came in ${age}.`;
   }
 
   return `Latest inbound message was ${age}.`;
@@ -351,6 +366,15 @@ export async function buildBriefing(input: {
 }): Promise<BriefingData> {
   const now = Date.now();
   const { day, start: dayStart, end: dayEnd } = getTodayBounds(now);
+
+  // Detect first sync: if any mailbox lacks a historyId, only show unread emails
+  const userMailboxes = await input.db
+    .select({ historyId: mailboxes.historyId })
+    .from(mailboxes)
+    .where(eq(mailboxes.userId, input.userId));
+  const isFirstSync =
+    userMailboxes.length > 0 &&
+    userMailboxes.some((m) => !m.historyId);
 
   const existing = await input.db
     .select({
@@ -401,6 +425,9 @@ export async function buildBriefing(input: {
         isRead: emails.isRead,
         labelIds: emails.labelIds,
         aiLabel: emails.aiLabel,
+        draftReply: emails.draftReply,
+        messageId: emails.messageId,
+        mailboxId: emails.mailboxId,
       })
       .from(emails)
       .innerJoin(
@@ -467,58 +494,80 @@ export async function buildBriefing(input: {
 
   const candidateThreads = [...latestByThread.values()]
     .filter((row) => row.direction === "received")
-    .filter((row) => !isNonActionableBriefingLabel(row.aiLabel))
+    .filter((row) => !isNonActionableBriefingLabel(normalizeBriefingLabel(row.aiLabel)))
     .filter((row) => !hasMailboxLabel(row, "CATEGORY_PROMOTIONS"))
     .filter((row) => !isAutomatedSender(row.fromAddr, row.fromName))
     .filter((row) => !isLikelyBulkMessage(row))
     .filter((row) => now - row.date <= ACTIONABLE_REPLY_WINDOW_MS)
+    // First sync pulls historical emails — only surface unread ones to avoid stale noise
+    .filter((row) => !isFirstSync || !row.isRead)
     .sort((left, right) => scoreReplyRow(right, now) - scoreReplyRow(left, now));
 
-  const replyNeededThreads = candidateThreads.filter((row) => isImportantReply(row, now));
-  const fyiThreads = candidateThreads.filter(
-    (row) => !isImportantReply(row, now) && scoreImportantReply(row, now) >= 15,
-  );
+  const actionNeededThreads = candidateThreads.filter((row) => {
+    const label = normalizeBriefingLabel(row.aiLabel);
+    return label === "action_needed" || (!label && isImportantReply(row, now));
+  });
+  const importantThreads = candidateThreads.filter((row) => {
+    const label = normalizeBriefingLabel(row.aiLabel);
+    return (
+      label === "important" ||
+      (!label && !isImportantReply(row, now) && scoreImportantReply(row, now) >= 15)
+    );
+  });
 
   const dueTodayCount = Number(dueTodayCountRows[0]?.count ?? 0);
   const overdueCount = Number(overdueCountRows[0]?.count ?? 0);
-  const needsReplyCount = replyNeededThreads.length;
+  const actionNeededCount = actionNeededThreads.length;
 
   const fallbackText = buildFallbackText({
-    needsReplyCount,
+    actionNeededCount,
     dueTodayCount,
     overdueCount,
   });
 
   const items: BriefingItem[] = [
-    ...replyNeededThreads.slice(0, 3).map((row) => ({
-      id: `reply-${row.id}`,
-      type: "reply" as const,
+    ...actionNeededThreads.map((row) => ({
+      id: `action-needed-${row.id}`,
+      type: "action_needed" as const,
       title: getSenderLabel(row),
       reason: buildReplyReason(row),
       href: `/inbox/all?id=${row.id}`,
+      emailId: row.id,
+      draftReply: row.draftReply,
+      threadId: row.threadId,
+      fromAddr: row.fromAddr,
+      subject: row.subject,
+      mailboxId: row.mailboxId,
+      messageId: row.messageId,
     })),
-    ...fyiThreads.slice(0, 2).map((row) => ({
-      id: `fyi-${row.id}`,
-      type: "fyi" as const,
+    ...importantThreads.slice(0, 5).map((row) => ({
+      id: `important-${row.id}`,
+      type: "important" as const,
       title: getSenderLabel(row),
       reason: buildReplyReason(row),
       href: `/inbox/all?id=${row.id}`,
+      emailId: row.id,
+      threadId: row.threadId,
+      fromAddr: row.fromAddr,
+      subject: row.subject,
+      mailboxId: row.mailboxId,
+      messageId: row.messageId,
     })),
-    ...overdueTaskRows.slice(0, 2).map((task) => ({
+    ...overdueTaskRows.slice(0, 3).map((task) => ({
       id: `overdue-${task.id}`,
       type: "overdue_task" as const,
       title: task.title,
       reason: buildTaskReason(task, "overdue_task"),
       href: "/tasks",
     })),
-    ...dueTodayTaskRows.slice(0, 2).map((task) => ({
+    ...dueTodayTaskRows.slice(0, 3).map((task) => ({
       id: `today-${task.id}`,
       type: "due_today_task" as const,
       title: task.title,
       reason: buildTaskReason(task, "due_today_task"),
       href: "/tasks",
     })),
-  ].slice(0, 7);
+  ];
 
   let text = "";
   if (input.includeNarrative !== false) {
@@ -527,7 +576,7 @@ export async function buildBriefing(input: {
       if (
         existing[0]?.narrative &&
         existing[0].createdAt >= now - BRIEFING_TTL_MS &&
-        Number(existing[0].followUpCount ?? 0) === needsReplyCount &&
+        Number(existing[0].followUpCount ?? 0) === actionNeededCount &&
         Number(existing[0].tasksDueCount ?? 0) === dueTodayCount &&
         Number(existing[0].overdueCount ?? 0) === overdueCount
       ) {
@@ -539,7 +588,7 @@ export async function buildBriefing(input: {
           system: [
             "You are a discreet, highly competent secretary writing a daily briefing.",
             "Write one or two short sentences in plain English.",
-            "Only talk about recent, actually relevant conversations that need a reply.",
+            "Only talk about recent, actually relevant conversations that need action.",
             "Treat promotional mail, newsletters, notifications, receipts, travel deals, and other company-broadcast mail as irrelevant unless it is clearly part of a real human back-and-forth.",
             "Ignore stale or historical threads and never talk about unread counts.",
             "Be calm, practical, neutral, and slightly polished.",
@@ -548,13 +597,13 @@ export async function buildBriefing(input: {
             "No markdown.",
           ].join(" "),
           prompt: [
-            "Treat only the last 3 days as actionable for reply-needed threads.",
+            "Treat only the last 3 days as actionable for action-needed threads.",
             "Exclude anything that reads like marketing, a newsletter, an alert, a receipt, a generic company update, or obvious promotional clutter even if it is recent or unread.",
-            `Actionable reply-needed threads: ${needsReplyCount}`,
+            `Action-needed threads: ${actionNeededCount}`,
             `Overdue tasks: ${overdueCount}`,
             `Tasks due today: ${dueTodayCount}`,
-            "Top reply-needed threads:",
-            ...replyNeededThreads.slice(0, 3).map((row) => {
+            "Top action-needed threads:",
+            ...actionNeededThreads.slice(0, 3).map((row) => {
               const sender = getSenderLabel(row);
               const subject = row.subject?.trim() || "(no subject)";
               const age = formatDistanceToNowStrict(new Date(row.date), {
@@ -591,7 +640,7 @@ export async function buildBriefing(input: {
           date: day,
           narrative: text,
           unreadCount: null,
-          followUpCount: needsReplyCount,
+          followUpCount: actionNeededCount,
           tasksDueCount: dueTodayCount,
           overdueCount,
           createdAt: now,
@@ -601,7 +650,7 @@ export async function buildBriefing(input: {
           set: {
             narrative: text,
             unreadCount: null,
-            followUpCount: needsReplyCount,
+            followUpCount: actionNeededCount,
             tasksDueCount: dueTodayCount,
             overdueCount,
             createdAt: now,
@@ -616,7 +665,7 @@ export async function buildBriefing(input: {
     text,
     generatedAt: now,
     counts: {
-      needsReply: needsReplyCount,
+      actionNeeded: actionNeededCount,
       dueToday: dueTodayCount,
       overdue: overdueCount,
     },
@@ -638,18 +687,18 @@ export function registerGetBriefing(app: Hono<AppRouteEnv>) {
   });
 }
 
-function buildStreamPrompt(items: BriefingItem[], counts: { needsReply: number; dueToday: number; overdue: number }) {
+function buildStreamPrompt(items: BriefingItem[], counts: { actionNeeded: number; dueToday: number; overdue: number }) {
   const itemLines = items.map((item) => {
     const typeLabel =
-      item.type === "reply" ? "needs reply" :
-      item.type === "fyi" ? "FYI" :
+      item.type === "action_needed" ? "action needed" :
+      item.type === "important" ? "important" :
       item.type === "overdue_task" ? "overdue task" :
       "due today";
     return `- ${typeLabel}: title="${item.title}", reason="${item.reason}", link=[[${item.title}|${item.href}]]`;
   });
 
   return [
-    `Reply-needed: ${counts.needsReply}, Overdue tasks: ${counts.overdue}, Due today: ${counts.dueToday}`,
+    `Action-needed: ${counts.actionNeeded}, Overdue tasks: ${counts.overdue}, Due today: ${counts.dueToday}`,
     "",
     "Keep the final paragraph compact. Group similar items together instead of repeating the same phrasing for each one.",
     "Prefer commas, semicolons, or a second sentence over repeated uses of 'and'.",

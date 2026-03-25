@@ -11,8 +11,6 @@ import { VIEW_LABELS } from "@/features/inbox/utils/inbox-filters";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Link, getRouteApi } from "@tanstack/react-router";
-import { useMemo } from "react";
-import { EmailBulkToolbar } from "./email-bulk-toolbar";
 import { EmailContextMenu } from "./email-context-menu";
 import { EmailRow } from "./email-row";
 
@@ -31,21 +29,9 @@ export function EmailList() {
     hasNextPage,
     isFetchingNextPage,
     loadMoreRef,
-    selection,
     openEmail,
     executeEmailAction,
   } = useEmail();
-
-  const selectedIds = useMemo(
-    () => Array.from(selection.selectedIds),
-    [selection.selectedIds],
-  );
-  const selectedEmails = useMemo(
-    () => displayRows.filter((e) => selection.selectedIds.has(e.id)),
-    [displayRows, selection.selectedIds],
-  );
-  const allVisibleSelected =
-    displayRows.length > 0 && selection.count === displayRows.length;
 
   const isSplitView = !isMobile && selectedEmail !== null;
   const pageTitle = VIEW_LABELS[view];
@@ -88,32 +74,6 @@ export function EmailList() {
           </div>
         </header>
 
-        {selection.selectionMode && selection.hasSelection && (
-          <EmailBulkToolbar
-            count={selection.count}
-            allSelected={allVisibleSelected}
-            disabled={false}
-            onToggleAll={(checked) => {
-              if (checked) {
-                selection.selectAll();
-                return;
-              }
-              selection.clearSelection();
-            }}
-            onArchive={() => executeEmailAction("archive", selectedIds)}
-            onTrash={() => executeEmailAction("trash", selectedIds)}
-            onMarkRead={() => executeEmailAction("mark-read", selectedIds)}
-            onMarkUnread={() => executeEmailAction("mark-unread", selectedIds)}
-            onStarToggle={() => {
-              const allStarred = selectedEmails.every((e) =>
-                e.labelIds.includes("STARRED"),
-              );
-              executeEmailAction(allStarred ? "unstar" : "star", selectedIds);
-            }}
-            onDeselect={selection.clearSelection}
-          />
-        )}
-
         {displayRows.length > 0 ? (
           <div className="space-y-5">
             {sections.map((section) => (
@@ -124,53 +84,34 @@ export function EmailList() {
                 <div className="space-y-1 [&:has(>[data-email-row]:hover)>[data-email-row]:not(:hover)]:opacity-85">
                   {section.items.map((group) => {
                     const email = group.representative;
-                    const selected = selection.isSelected(email.id);
                     const isOpen = email.id === selectedEmailId;
-                    const targetEmails =
-                      selected && selection.hasSelection
-                        ? selectedEmails
-                        : [email];
-                    const targetIds = targetEmails.map((item) => item.id);
 
                     return (
                       <EmailContextMenu
                         key={email.id}
-                        email={email}
-                        selected={selected}
-                        targetEmails={targetEmails}
-                        onArchive={() =>
-                          executeEmailAction("archive", targetIds)
-                        }
-                        onTrash={() => executeEmailAction("trash", targetIds)}
-                        onSpam={() => executeEmailAction("spam", targetIds)}
+                        targetEmail={email}
+                        onArchive={() => executeEmailAction("archive", [email.id])}
+                        onTrash={() => executeEmailAction("trash", [email.id])}
+                        onSpam={() => executeEmailAction("spam", [email.id])}
                         onSetRead={(read) =>
                           executeEmailAction(
                             read ? "mark-read" : "mark-unread",
-                            targetIds,
+                            [email.id],
                           )
                         }
                         onSetStarred={(starred) =>
                           executeEmailAction(
                             starred ? "star" : "unstar",
-                            targetIds,
+                            [email.id],
                           )
                         }
-                        onToggleSelect={() =>
-                          selection.toggleSelectionFromMenu(email.id)
-                        }
-                        onSelectAll={selection.selectAll}
                       >
                         <EmailRow
                           email={email}
                           threadCount={group.threadCount}
                           view={view}
-                          isSelected={selected}
                           isOpen={isOpen}
-                          selectionMode={selection.selectionMode}
                           onOpen={() => openEmail(email)}
-                          onToggleSelection={(shiftKey) =>
-                            selection.toggleSelection(email.id, shiftKey)
-                          }
                         />
                       </EmailContextMenu>
                     );

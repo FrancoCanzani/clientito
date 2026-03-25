@@ -73,14 +73,10 @@ export function useEmailInboxActions({
   view,
   mailboxId,
   selectedEmailId,
-  selectedIds,
-  clearSelection,
 }: {
   view: EmailView;
   mailboxId: number | null | undefined;
   selectedEmailId: string | null;
-  selectedIds: string[];
-  clearSelection: () => void;
 }) {
   const navigate = emailsRoute.useNavigate();
   const queryClient = useQueryClient();
@@ -155,11 +151,9 @@ export function useEmailInboxActions({
       const ids =
         explicitIds && explicitIds.length > 0
           ? explicitIds
-          : selectedIds.length > 0
-            ? selectedIds
-            : selectedEmailId
-              ? [selectedEmailId]
-              : [];
+          : selectedEmailId
+            ? [selectedEmailId]
+            : [];
 
       if (ids.length === 0) return;
 
@@ -209,10 +203,6 @@ export function useEmailInboxActions({
         closeEmail();
       }
 
-      if (selectedIds.length > 0) {
-        clearSelection();
-      }
-
       if (IMMEDIATE_ACTIONS.has(action)) {
         void fireMutation(ids, data);
         return;
@@ -249,7 +239,7 @@ export function useEmailInboxActions({
         duration: 5000,
       });
     },
-    [closeEmail, emailsQueryKey, fireMutation, clearSelection, queryClient, selectedEmailId, selectedIds],
+    [closeEmail, emailsQueryKey, fireMutation, queryClient, selectedEmailId],
   );
 
   return { openEmail, closeEmail, executeEmailAction };

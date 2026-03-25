@@ -14,9 +14,14 @@ export async function createNote(input: {
   return json.data;
 }
 
+export async function deleteNote(noteId: number): Promise<void> {
+  const response = await fetch(`/api/notes/${noteId}`, { method: "DELETE" });
+  if (!response.ok) throw new Error("Failed to delete note");
+}
+
 export async function updateNote(
   noteId: number,
-  input: { title?: string; content?: string },
+  input: { title?: string; content?: string; isPinned?: boolean },
 ): Promise<Note> {
   const response = await fetch(`/api/notes/${noteId}`, {
     method: "PATCH",

@@ -7,6 +7,7 @@ const MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
 const BATCH_SIZE = 10;
 
 type AiLabel =
+  | "action_needed"
   | "important"
   | "later"
   | "newsletter"
@@ -15,8 +16,8 @@ type AiLabel =
   | "notification";
 
 const AI_LABELS: AiLabel[] = [
+  "action_needed",
   "important",
-  "later",
   "newsletter",
   "marketing",
   "transactional",
@@ -24,8 +25,8 @@ const AI_LABELS: AiLabel[] = [
 ];
 
 const aiLabelSchema = z.union([
+  z.literal("action_needed"),
   z.literal("important"),
-  z.literal("later"),
   z.literal("newsletter"),
   z.literal("marketing"),
   z.literal("transactional"),
@@ -91,6 +92,25 @@ const NEWSLETTER_HINTS = [
   "top stories",
 ];
 
+const IMPORTANT_HINTS = [
+  "invoice available",
+  "bill available",
+  "billing alert",
+  "payment due",
+  "past due",
+  "service interruption",
+  "service suspension",
+  "credit history",
+  "credit score",
+  "credit report",
+  "factura disponible",
+  "tu factura",
+  "factura de electricidad",
+  "historial crediticio",
+  "pago pendiente",
+  "vencimiento",
+];
+
 const NOTIFICATION_HINTS = [
   "terms and conditions",
   "terms & conditions",
@@ -118,9 +138,9 @@ function includesAny(content: string, hints: string[]): boolean {
   return hints.some((hint) => content.includes(hint));
 }
 
-function classifyImportantOverride(
+function classifyActionNeededOverride(
   email: EmailForClassification,
-): Exclude<AiLabel, "important"> | null {
+): Exclude<AiLabel, "action_needed" | "later"> | null {
   const content = [
     email.from,
     email.fromName,
@@ -132,10 +152,6 @@ function classifyImportantOverride(
     .join(" ")
     .toLowerCase();
 
-  if (includesAny(content, TRANSACTIONAL_HINTS)) {
-    return "transactional";
-  }
-
   if (includesAny(content, MARKETING_HINTS)) {
     return "marketing";
   }
@@ -144,8 +160,16 @@ function classifyImportantOverride(
     return "newsletter";
   }
 
+  if (includesAny(content, IMPORTANT_HINTS)) {
+    return "important";
+  }
+
   if (email.hasUnsubscribe || includesAny(content, NOTIFICATION_HINTS)) {
     return "notification";
+  }
+
+  if (includesAny(content, TRANSACTIONAL_HINTS)) {
+    return "transactional";
   }
 
   return null;
@@ -207,22 +231,24 @@ export async function classifyEmails(
         output: Output.object({ schema }),
         prompt: `Classify each email into exactly one category.
 
-Use a conservative standard for "important". Important should be rare.
+Use a conservative standard for "action_needed". Action-needed emails should be rare.
 
 Decision rules:
 1. First decide whether the email is bulk, automated, or system-generated.
-2. If it is bulk, automated, digest-style, legal/policy-related, product-update mail, social-summary mail, or includes unsubscribe/system disclaimer signals, it must NOT be labeled "important".
-3. Only use "important" for direct human-to-human communication or truly urgent, user-specific operational messages that likely need timely attention.
+2. If it is bulk, automated, digest-style, legal/policy-related, product-update mail, social-summary mail, or includes unsubscribe/system disclaimer signals, it must NOT be labeled "action_needed".
+3. Use "action_needed" only when a human likely expects the user to reply or take a concrete next step.
+4. Use "important" for relevant mail worth reviewing soon even if no reply is expected.
+5. Classify by intent, not keywords, and do this correctly regardless of language.
 
 Categories:
-- important: Direct human-to-human emails, personal outreach, explicit requests from a real person, or truly urgent user-specific operational issues that likely need timely attention
-- later: Non-urgent but relevant - FYI updates, discussions you're CC'd on, low-priority requests
+- action_needed: A human likely expects the user to reply or take a concrete next step
+- important: Relevant and worth reviewing soon, but no clear reply or action is expected
 - newsletter: Curated content the user subscribed to - blog digests, weekly roundups, industry reports, editorial newsletters (e.g. Stratechery, Morning Brew, Substack authors)
 - marketing: Promotional emails, ads, sales, discounts, flash deals, company announcements pushing a product or offer (e.g. Ryanair deals, Amazon promos, SaaS upgrade nudges)
 - transactional: Receipts, order confirmations, shipping notifications, password resets, verification codes
 - notification: Automated alerts from apps/services, product updates, legal/policy notices, account summaries, social media notifications, and system-generated informational mail
 
-Never label these as important:
+Never label these as action_needed:
 - Terms or privacy updates
 - Product or feature announcements
 - LinkedIn/profile view summaries
@@ -232,22 +258,25 @@ Never label these as important:
 Examples:
 - "We updated our Terms and Conditions" -> notification
 - "Your LinkedIn profile got 34 views" -> notification
-- "Your receipt / verification code / invoice" -> transactional
+- "Ya tienes disponible tu factura de electricidad" -> important
+- "Evitá que tu historial crediticio empeore" -> important
+- "Can you review this contract and send edits today?" -> action_needed
+- "Your receipt / verification code" -> transactional
 - "20% off / upgrade now / limited offer" -> marketing
 ${filterSection}
 
 Emails:
 ${emailList}
 
-Return a JSON object with a "results" array. Each item must have "index" (the number in brackets) and "label" (one of: important, later, newsletter, marketing, transactional, notification).${hasFilters ? ' Each item should also have "matchedFilters" - an array of filter IDs that apply to that email (empty array if none match).' : ""}`,
+Return a JSON object with a "results" array. Each item must have "index" (the number in brackets) and "label" (one of: action_needed, important, newsletter, marketing, transactional, notification).${hasFilters ? ' Each item should also have "matchedFilters" - an array of filter IDs that apply to that email (empty array if none match).' : ""}`,
       });
 
       for (const row of output.results) {
         if (AI_LABELS.includes(row.label)) {
           const email = chunk.find((candidate) => candidate.index === row.index);
           const label =
-            row.label === "important" && email
-              ? classifyImportantOverride(email) ?? row.label
+            row.label === "action_needed" && email
+              ? classifyActionNeededOverride(email) ?? row.label
               : row.label;
           result.labels.set(row.index, label);
         }

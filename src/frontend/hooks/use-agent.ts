@@ -15,7 +15,6 @@ export function useAppAgent() {
   const chat = useAgentChat({
     agent,
     body: () => ({
-      userId: user?.id ?? null,
       currentUrl:
         typeof window !== "undefined" ? window.location.href : null,
       pageContext,

@@ -28,7 +28,6 @@ function InboxContent() {
     selectedEmailId,
     orderedIds,
     emailById,
-    selection,
     openEmail,
     closeEmail,
     executeEmailAction,
@@ -69,16 +68,6 @@ function InboxContent() {
     useCallback(
       (command: EmailCommand) => {
         switch (command.type) {
-          case "selection-mode":
-            selection.setSelectionMode(command.enabled);
-            if (!command.enabled) selection.deselectAll();
-            break;
-          case "select-all-visible":
-            selection.selectAll();
-            break;
-          case "clear-selection":
-            selection.clearSelection();
-            break;
           case "open-first-visible":
             if (selectedEmailId) break;
             goToEmail("next");
@@ -98,15 +87,11 @@ function InboxContent() {
           case "escape":
             if (selectedEmailId) {
               closeEmail();
-              break;
-            }
-            if (selection.selectionMode || selection.hasSelection) {
-              selection.clearSelection();
             }
             break;
         }
       },
-      [closeEmail, executeEmailAction, goToEmail, selectedEmailId, selection],
+      [closeEmail, executeEmailAction, goToEmail, selectedEmailId],
     ),
   );
 

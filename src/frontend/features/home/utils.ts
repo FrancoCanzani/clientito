@@ -38,7 +38,7 @@ export function parseBriefingSegments(text: string): BriefingSegment[] {
 }
 
 type GreetingStat = {
-  key: "needsReply" | "overdue" | "dueToday";
+  key: "actionNeeded" | "overdue" | "dueToday";
   label: string;
 };
 
@@ -60,10 +60,10 @@ export function getGreeting(userName?: string | null, briefing?: HomeBriefing): 
 
   const stats: GreetingStat[] = [];
 
-  if (briefing.counts.needsReply > 0) {
+  if (briefing.counts.actionNeeded > 0) {
     stats.push({
-      key: "needsReply",
-      label: `${briefing.counts.needsReply} need${briefing.counts.needsReply === 1 ? "s" : ""} a reply`,
+      key: "actionNeeded",
+      label: `${briefing.counts.actionNeeded} need${briefing.counts.actionNeeded === 1 ? "s" : ""} action`,
     });
   }
 

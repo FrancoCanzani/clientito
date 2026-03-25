@@ -36,6 +36,7 @@ export const notes = sqliteTable(
       .references(() => user.id, { onDelete: "cascade" }),
     title: text("title").notNull().default("Untitled note"),
     content: text("content").notNull(),
+    isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull().default(0),
   },
@@ -68,11 +69,18 @@ export const emails = sqliteTable(
     isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
     labelIds: text("label_ids", { mode: "json" }).$type<string[] | null>(),
     aiLabel: text("ai_label").$type<
-      "important" | "later" | "newsletter" | "marketing" | "transactional" | "notification"
+      | "action_needed"
+      | "important"
+      | "later"
+      | "newsletter"
+      | "marketing"
+      | "transactional"
+      | "notification"
     >(),
     unsubscribeUrl: text("unsubscribe_url"),
     unsubscribeEmail: text("unsubscribe_email"),
     snoozedUntil: integer("snoozed_until"),
+    draftReply: text("draft_reply"),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [
@@ -206,7 +214,14 @@ export type FilterActions = {
   archive?: boolean;
   markRead?: boolean;
   star?: boolean;
-  applyAiLabel?: "important" | "later" | "newsletter" | "marketing" | "transactional" | "notification";
+  applyAiLabel?:
+    | "action_needed"
+    | "important"
+    | "later"
+    | "newsletter"
+    | "marketing"
+    | "transactional"
+    | "notification";
   trash?: boolean;
 };
 

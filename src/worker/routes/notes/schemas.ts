@@ -18,10 +18,15 @@ export const patchNoteBodySchema = z
   .object({
     title: z.string().trim().min(1).max(200).optional(),
     content: z.string().optional(),
+    isPinned: z.boolean().optional(),
   })
-  .refine((value) => value.title !== undefined || value.content !== undefined, {
-    message: "At least one field must be provided",
-  });
+  .refine(
+    (value) =>
+      value.title !== undefined ||
+      value.content !== undefined ||
+      value.isPinned !== undefined,
+    { message: "At least one field must be provided" },
+  );
 
 export const noteImageQuerySchema = z.object({
   key: z.string().trim().min(1),

@@ -15,7 +15,7 @@ export function registerPatchNotes(api: Hono<AppRouteEnv>) {
       const db = c.get("db");
       const user = c.get("user")!;
       const { id } = c.req.valid("param");
-      const { title, content } = c.req.valid("json");
+      const { title, content, isPinned } = c.req.valid("json");
 
       const existing = await db
         .select({ id: notes.id, content: notes.content })
@@ -31,6 +31,7 @@ export function registerPatchNotes(api: Hono<AppRouteEnv>) {
         .set({
           ...(title !== undefined ? { title: title.trim() } : {}),
           ...(content !== undefined ? { content } : {}),
+          ...(isPinned !== undefined ? { isPinned } : {}),
           updatedAt: Date.now(),
         })
         .where(and(eq(notes.id, id), eq(notes.userId, user.id)));
@@ -49,6 +50,7 @@ export function registerPatchNotes(api: Hono<AppRouteEnv>) {
           id: notes.id,
           title: notes.title,
           content: notes.content,
+          isPinned: notes.isPinned,
           createdAt: notes.createdAt,
           updatedAt: notes.updatedAt,
         })

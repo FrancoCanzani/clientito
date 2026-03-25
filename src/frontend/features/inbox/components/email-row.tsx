@@ -1,29 +1,28 @@
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { PaperclipIcon } from "@phosphor-icons/react";
 import type { EmailListItem } from "../types";
 import { formatInboxRowDate } from "../utils/format-inbox-row-date";
 
+function formatAiLabel(label: EmailListItem["aiLabel"]) {
+  if (label === "later") return "important";
+  if (label === "action_needed") return "requires action";
+  return label?.replace(/_/g, " ") ?? null;
+}
+
 type EmailRowProps = {
   email: EmailListItem;
   threadCount: number;
   view: string;
-  isSelected: boolean;
   isOpen: boolean;
-  selectionMode: boolean;
   onOpen: () => void;
-  onToggleSelection: (shiftKey: boolean) => void;
 };
 
 export function EmailRow({
   email,
   threadCount,
   view,
-  isSelected,
   isOpen,
-  selectionMode,
   onOpen,
-  onToggleSelection,
 }: EmailRowProps) {
   const participantLabel =
     view === "sent"
@@ -31,6 +30,7 @@ export function EmailRow({
         ? `To: ${email.toAddr}`
         : "To: (unknown recipient)"
       : email.fromName || email.fromAddr;
+  const visibleAiLabel = formatAiLabel(email.aiLabel);
 
   return (
     <div
@@ -49,19 +49,6 @@ export function EmailRow({
         }
       }}
     >
-      <Checkbox
-        checked={isSelected}
-        className={cn("shrink-0 size-3.5 hidden", selectionMode && "block")}
-        aria-label={`Select email from ${email.fromName || email.fromAddr}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          onToggleSelection(event.shiftKey);
-        }}
-        onKeyDown={(event) => {
-          event.stopPropagation();
-        }}
-      />
-
       <span
         className={cn(
           "size-1.5 shrink-0 rounded-full",
@@ -80,14 +67,16 @@ export function EmailRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-        {email.aiLabel && (
+        {visibleAiLabel && (
           <span
             className={cn(
               "capitalize hidden",
-              email.aiLabel === "important" && "block italic",
+              (visibleAiLabel === "important" ||
+                visibleAiLabel === "requires action") &&
+                "block italic",
             )}
           >
-            {email.aiLabel}
+            {visibleAiLabel}
           </span>
         )}
         {email.hasAttachment && (

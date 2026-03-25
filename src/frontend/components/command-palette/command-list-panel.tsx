@@ -35,14 +35,12 @@ export function CommandListPanel({
   visibleNavigationCommands,
   emailNavigationCommands,
   taskNavigationCommands,
-  emailSelectionCommands,
   actionCommands,
   enterAgentMode,
 }: {
   visibleNavigationCommands: PaletteCommand[];
   emailNavigationCommands: PaletteCommand[];
   taskNavigationCommands: PaletteCommand[];
-  emailSelectionCommands: PaletteCommand[];
   actionCommands: PaletteCommand[];
   enterAgentMode: (initialQuery?: string) => void;
 }) {
@@ -55,7 +53,6 @@ export function CommandListPanel({
 
         <CommandGroup heading="Mailbox" commands={emailNavigationCommands} />
         <CommandGroup heading="Task Views" commands={taskNavigationCommands} />
-        <CommandGroup heading="Select" commands={emailSelectionCommands} />
         <CommandGroup
           heading="Navigation"
           commands={visibleNavigationCommands}

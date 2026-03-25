@@ -80,6 +80,11 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
         | undefined;
 
       if (input.attachments && input.attachments.length > 0) {
+        const attachmentKeyPrefix = `attachments/${user.id}/`;
+        if (input.attachments.some((att) => !att.key.startsWith(attachmentKeyPrefix))) {
+          return c.json({ error: "Forbidden attachment key" }, 403);
+        }
+
         attachments = await Promise.all(
           input.attachments.map(async (att) => ({
             filename: att.filename,

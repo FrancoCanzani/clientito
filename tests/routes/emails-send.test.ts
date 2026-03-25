@@ -140,4 +140,28 @@ describe("POST /api/send", () => {
     expect(json.error).toBe("Selected sender account not found.");
     expect(mocks.send).not.toHaveBeenCalled();
   });
+
+  it("rejects attachment keys outside the current user's namespace", async () => {
+    await seedMailbox({ email: "solo@gmail.com" });
+
+    const { status, json } = await testRequest(app, "POST", "/api/send", {
+      body: {
+        to: "hello@example.com",
+        subject: "Test",
+        body: "<p>Hello</p>",
+        attachments: [
+          {
+            key: `attachments/${TEST_USER_2.id}/leaked/file.pdf`,
+            filename: "file.pdf",
+            mimeType: "application/pdf",
+          },
+        ],
+      },
+    });
+
+    expect(status).toBe(403);
+    expect(json.error).toBe("Forbidden attachment key");
+    expect(mocks.getAttachmentContent).not.toHaveBeenCalled();
+    expect(mocks.send).not.toHaveBeenCalled();
+  });
 });
