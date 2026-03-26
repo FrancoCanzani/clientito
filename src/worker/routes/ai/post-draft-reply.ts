@@ -5,6 +5,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
 import { emails } from "../../db/schema";
+import { sleep } from "../../lib/utils";
 import type { AppRouteEnv } from "../types";
 
 const PRIMARY_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
@@ -13,7 +14,7 @@ const MAX_RETRIES = 2;
 
 const draftReplyBodySchema = z.object({
   emailId: z.coerce.number().int().positive(),
-  instructions: z.string().trim().optional(),
+  instructions: z.string().trim().max(1000).optional(),
 });
 
 function truncate(value: string, maxLength: number) {
@@ -128,6 +129,9 @@ export async function generateDraftForEmail(input: {
           emailId,
           error,
         });
+        if (attempt < MAX_RETRIES) {
+          await sleep(1000 * (attempt + 1));
+        }
       }
     }
   }

@@ -143,9 +143,12 @@ export default function HomePage() {
           <EmptyHeader>
             <EmptyTitle>{greeting.line}</EmptyTitle>
             <EmptyDescription>
-              Everything looks handled. No recent action-needed threads or
-              overdue tasks right now.
+              No action-needed threads or overdue tasks right now. Anything
+              that needs attention will show up here as a card.
             </EmptyDescription>
+            <div className="mt-3 flex flex-col gap-1 text-[11px] text-muted-foreground">
+              <span>Reply, skip, or archive with the keyboard. Threads, tasks, and events are pulled from your email automatically.</span>
+            </div>
           </EmptyHeader>
         </Empty>
       )}

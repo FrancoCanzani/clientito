@@ -28,7 +28,6 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
 
     const now = Date.now();
 
-    // Wake up expired snoozes
     await db
       .update(emails)
       .set({ snoozedUntil: null })
@@ -40,7 +39,11 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
       );
 
     if (offset === 0) {
-      await syncAllMailboxes(db, c.env, user.id);
+      c.executionCtx.waitUntil(
+        syncAllMailboxes(db, c.env, user.id).catch((err) => {
+          console.error("Background sync failed (email list)", err);
+        }),
+      );
     }
 
     const conditions = [eq(emails.userId, user.id)];
@@ -69,7 +72,6 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
     switch (view) {
       case "inbox":
         conditions.push(hasEmailLabel(STANDARD_LABELS.INBOX));
-        // Hide snoozed emails from inbox
         conditions.push(
           or(isNull(emails.snoozedUntil), lte(emails.snoozedUntil, now))!,
         );

@@ -204,6 +204,49 @@ CREATE TABLE IF NOT EXISTS \`daily_briefings\` (
   \`created_at\` integer NOT NULL,
   FOREIGN KEY (\`user_id\`) REFERENCES \`user\`(\`id\`) ON DELETE cascade
 );
+
+CREATE TABLE IF NOT EXISTS \`scheduled_emails\` (
+  \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  \`user_id\` text NOT NULL,
+  \`mailbox_id\` integer NOT NULL,
+  \`to\` text NOT NULL,
+  \`cc\` text,
+  \`bcc\` text,
+  \`subject\` text DEFAULT '' NOT NULL,
+  \`body\` text NOT NULL,
+  \`in_reply_to\` text,
+  \`references\` text,
+  \`thread_id\` text,
+  \`attachment_keys\` text,
+  \`scheduled_for\` integer NOT NULL,
+  \`status\` text DEFAULT 'pending' NOT NULL,
+  \`retry_count\` integer DEFAULT 0 NOT NULL,
+  \`error\` text,
+  \`created_at\` integer NOT NULL,
+  FOREIGN KEY (\`user_id\`) REFERENCES \`user\`(\`id\`) ON DELETE cascade,
+  FOREIGN KEY (\`mailbox_id\`) REFERENCES \`mailboxes\`(\`id\`) ON DELETE cascade
+);
+CREATE INDEX IF NOT EXISTS \`scheduled_emails_pending_idx\` ON \`scheduled_emails\` (\`status\`,\`scheduled_for\`);
+CREATE INDEX IF NOT EXISTS \`scheduled_emails_user_idx\` ON \`scheduled_emails\` (\`user_id\`,\`status\`);
+
+CREATE TABLE IF NOT EXISTS \`proposed_events\` (
+  \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  \`user_id\` text NOT NULL,
+  \`mailbox_id\` integer,
+  \`email_id\` integer,
+  \`title\` text NOT NULL,
+  \`description\` text,
+  \`location\` text,
+  \`start_at\` integer NOT NULL,
+  \`end_at\` integer NOT NULL,
+  \`attendees\` text,
+  \`google_event_id\` text,
+  \`status\` text DEFAULT 'pending' NOT NULL,
+  \`created_at\` integer NOT NULL,
+  \`updated_at\` integer NOT NULL,
+  FOREIGN KEY (\`user_id\`) REFERENCES \`user\`(\`id\`) ON DELETE cascade,
+  FOREIGN KEY (\`mailbox_id\`) REFERENCES \`mailboxes\`(\`id\`) ON DELETE cascade
+);
 `;
 
 export const TEST_USER = {
@@ -245,6 +288,8 @@ export async function seedTestUser(
 
 async function cleanDb(): Promise<void> {
   const tables = [
+    "proposed_events",
+    "scheduled_emails",
     "sync_jobs",
     "daily_briefings",
     "email_subscriptions",

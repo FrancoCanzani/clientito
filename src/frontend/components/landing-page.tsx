@@ -170,7 +170,7 @@ export default function LandingPage() {
                     </p>
                     <div className="mt-3 space-y-3">
                       {PREVIEW_TASKS.map((task) => (
-                        <TaskLine key={task} text={task} />
+                        <InlineNote key={task} text={task} />
                       ))}
                     </div>
                   </aside>
@@ -298,12 +298,6 @@ function PreviewChip(props: { label: string }) {
 }
 
 function InlineNote(props: { text: string }) {
-  return (
-    <p className="text-[0.9rem] leading-6 text-foreground/58">{props.text}</p>
-  );
-}
-
-function TaskLine(props: { text: string }) {
   return (
     <p className="text-[0.9rem] leading-6 text-foreground/58">{props.text}</p>
   );

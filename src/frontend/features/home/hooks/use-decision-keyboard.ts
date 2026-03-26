@@ -21,13 +21,13 @@ function guard(enabled: boolean, event: KeyboardEvent, fn: () => void) {
 export function useDecisionKeyboard(actions: DecisionKeyboardActions) {
   const opts = { preventDefault: false, stopPropagation: false, enabled: actions.enabled };
 
-  useHotkey("j", (e) => guard(actions.enabled, e, actions.navigateDown), opts);
+  useHotkey("J", (e) => guard(actions.enabled, e, actions.navigateDown), opts);
   useHotkey("ArrowDown", (e) => guard(actions.enabled, e, actions.navigateDown), opts);
-  useHotkey("k", (e) => guard(actions.enabled, e, actions.navigateUp), opts);
+  useHotkey("K", (e) => guard(actions.enabled, e, actions.navigateUp), opts);
   useHotkey("ArrowUp", (e) => guard(actions.enabled, e, actions.navigateUp), opts);
-  useHotkey("e", (e) => guard(actions.enabled, e, actions.toggleEditing), opts);
+  useHotkey("E", (e) => guard(actions.enabled, e, actions.toggleEditing), opts);
   useHotkey("Enter", (e) => guard(actions.enabled, e, actions.sendActiveReply), opts);
-  useHotkey("s", (e) => guard(actions.enabled, e, actions.skipActive), opts);
-  useHotkey("a", (e) => guard(actions.enabled, e, actions.archiveActive), opts);
+  useHotkey("S", (e) => guard(actions.enabled, e, actions.skipActive), opts);
+  useHotkey("A", (e) => guard(actions.enabled, e, actions.archiveActive), opts);
   useHotkey("Escape", (e) => { if (actions.enabled) { e.preventDefault(); actions.cancelEditing(); } }, opts);
 }

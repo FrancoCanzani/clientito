@@ -10,7 +10,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import type { EmailAttachment } from "../types";
-import { formatBytes } from "../utils/format-bytes";
+import { formatBytes } from "../utils/formatters";
 
 async function downloadAttachment(attachment: EmailAttachment) {
   const response = await fetch(attachment.downloadUrl);

@@ -1,7 +1,7 @@
 import { Output, generateText } from "ai";
 import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
-import { chunkArray } from "../utils";
+import { chunkArray, withRetry } from "../utils";
 
 const MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
 const BATCH_SIZE = 10;
@@ -226,7 +226,8 @@ export async function classifyEmails(
         filterSection = `\n\nUser filter rules (return matching filter IDs in "matchedFilters" for each email):\n${filterList}`;
       }
 
-      const { output } = await generateText({
+      const { output } = await withRetry(
+        () => generateText({
         model: workersAI(MODEL),
         output: Output.object({ schema }),
         prompt: `Classify each email into exactly one category.
@@ -269,7 +270,9 @@ Emails:
 ${emailList}
 
 Return a JSON object with a "results" array. Each item must have "index" (the number in brackets) and "label" (one of: action_needed, important, newsletter, marketing, transactional, notification).${hasFilters ? ' Each item should also have "matchedFilters" - an array of filter IDs that apply to that email (empty array if none match).' : ""}`,
-      });
+      }),
+        { maxRetries: 1, baseDelayMs: 2000, label: "email-classification" },
+      );
 
       for (const row of output.results) {
         if (AI_LABELS.includes(row.label)) {

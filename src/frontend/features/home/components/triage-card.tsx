@@ -165,7 +165,6 @@ export function TriageCard({
         </div>
       </div>
 
-      {/* Draft reply section */}
       {isEmail && !isTask && (
         <>
           {isLoadingDraft && !hasDraft && (

@@ -16,7 +16,7 @@ import {
   SpinnerGapIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -105,22 +105,6 @@ export default function GetStartedPage() {
   const showStartSync = status?.state === "ready_to_sync";
   const showError = status?.state === "error";
   const showSyncing = status?.state === "syncing";
-
-  const progressPercent =
-    showSyncing &&
-    typeof status?.progressCurrent === "number" &&
-    typeof status?.progressTotal === "number" &&
-    status.progressTotal > 0
-      ? Math.min(
-          Math.round((status.progressCurrent / status.progressTotal) * 100),
-          100,
-        )
-      : null;
-
-  const progressLabel =
-    typeof status?.progressCurrent === "number"
-      ? new Intl.NumberFormat().format(status.progressCurrent)
-      : null;
 
   return (
     <div className="mx-auto flex-1 flex flex-col items-center justify-center gap-10">

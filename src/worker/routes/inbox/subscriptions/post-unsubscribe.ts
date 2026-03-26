@@ -51,8 +51,12 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
               200,
             );
           }
-        } catch {
-          // one-click failed, fall through to mailto or return the URL for manual
+        } catch (error) {
+          console.warn("One-click unsubscribe failed, falling back", {
+            fromAddr,
+            url: unsubscribeUrl,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
 
         await markEmailSubscriptionStatus(db, user.id, {

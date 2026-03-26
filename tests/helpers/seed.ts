@@ -126,6 +126,36 @@ export async function seedAccount(
   return id;
 }
 
+export async function seedScheduledEmail(
+  mailboxId: number,
+  overrides: Partial<{
+    userId: string;
+    to: string;
+    subject: string;
+    body: string;
+    scheduledFor: number;
+    status: "pending" | "sent" | "failed" | "cancelled";
+  }> = {},
+): Promise<number> {
+  const now = Date.now();
+  const result = await env.DB.prepare(
+    `INSERT INTO scheduled_emails (user_id, mailbox_id, "to", subject, body, scheduled_for, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      overrides.userId ?? TEST_USER.id,
+      mailboxId,
+      overrides.to ?? "recipient@example.com",
+      overrides.subject ?? "Scheduled test",
+      overrides.body ?? "<p>Scheduled body</p>",
+      overrides.scheduledFor ?? now + 86400000,
+      overrides.status ?? "pending",
+      now,
+    )
+    .run();
+  return result.meta.last_row_id as number;
+}
+
 export function resetEmailCounter() {
   emailCounter = 0;
 }

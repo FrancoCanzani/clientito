@@ -55,8 +55,8 @@ export function registerPostApproveProposed(api: Hono<AppRouteEnv>) {
       }
 
       const token = await getGmailTokenForMailbox(db, mbId, {
-        clientId: env.GOOGLE_CLIENT_ID,
-        clientSecret: env.GOOGLE_CLIENT_SECRET,
+        GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
       });
 
       const googleEvent = await createEvent(token, {

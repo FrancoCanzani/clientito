@@ -8,7 +8,6 @@ import {
   syncEmailSubscriptions,
 } from "../../subscriptions";
 import {
-  CHUNK_DELAY_MS,
   MESSAGE_CHUNK_SIZE,
   fetchMessage,
   fetchMessagesBatch,
@@ -16,7 +15,7 @@ import {
   getGmailTokenForMailbox,
   listHistoryPage,
   listMessagesPage,
-  sleep,
+
 } from "./client";
 import {
   GmailHistoryExpiredError,
@@ -55,6 +54,7 @@ import type {
   SyncProgressFn,
 } from "./types";
 import { classifyEmails } from "../../ai-classifier";
+import { extractEventsFromEmails } from "../../ai-event-extractor";
 import { getUserFilters } from "../../user-filters";
 import { STANDARD_LABELS } from "../../types";
 
@@ -469,6 +469,58 @@ async function processMessageIds({
         .where(and(eq(emails.userId, userId), eq(emails.providerMessageId, gmailId)));
     }
 
+    // Extract calendar events from action_needed/important emails
+    if (env?.AI) {
+      const eventCandidateGmailIds: string[] = [];
+      for (const [gmailId, updates] of postInsertUpdates) {
+        const label = updates.aiLabel as string | undefined;
+        if (label === "action_needed" || label === "important") {
+          eventCandidateGmailIds.push(gmailId);
+        }
+      }
+
+      if (eventCandidateGmailIds.length > 0) {
+        try {
+          const candidateRows = await db
+            .select({
+              id: emails.id,
+              mailboxId: emails.mailboxId,
+              fromAddr: emails.fromAddr,
+              fromName: emails.fromName,
+              subject: emails.subject,
+              snippet: emails.snippet,
+              bodyText: emails.bodyText,
+              date: emails.date,
+            })
+            .from(emails)
+            .where(
+              and(
+                eq(emails.userId, userId),
+                inArray(emails.providerMessageId, eventCandidateGmailIds),
+              ),
+            );
+
+          await extractEventsFromEmails(
+            env.AI,
+            db,
+            userId,
+            candidateRows.map((row) => ({
+              emailId: row.id,
+              mailboxId: row.mailboxId!,
+              from: row.fromAddr,
+              fromName: row.fromName,
+              subject: row.subject,
+              snippet: row.snippet,
+              bodyText: row.bodyText,
+              date: row.date,
+            })),
+          );
+        } catch (error) {
+          console.error("Event extraction failed, skipping", error);
+        }
+      }
+    }
+
     await syncEmailSubscriptions(db, userId, mailboxId, subscriptionEvents);
 
     if (onProgress) {
@@ -476,10 +528,6 @@ async function processMessageIds({
     }
 
     await onHeartbeat?.();
-
-    if (result.processed < total) {
-      await sleep(CHUNK_DELAY_MS);
-    }
   }
 
   return result;

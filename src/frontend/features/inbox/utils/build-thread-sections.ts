@@ -1,4 +1,4 @@
-import { formatInboxSectionDate } from "./format-inbox-section-date";
+import { formatInboxSectionDate } from "./formatters";
 import type { ThreadGroup } from "./group-emails-by-thread";
 
 export type ThreadSection = {

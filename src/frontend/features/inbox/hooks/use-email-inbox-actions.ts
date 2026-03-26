@@ -224,20 +224,21 @@ export function useEmailInboxActions({
         }
       };
 
+      const toastId = toast(message, {
+        action: { label: "Undo", onClick: rollback },
+        duration: 5000,
+      });
+
       const timer = setTimeout(() => {
         if (pendingRef.current?.timer === timer) {
           const pending = pendingRef.current;
           pendingRef.current = null;
+          toast.dismiss(toastId);
           void fireMutation(pending.ids, pending.data);
         }
       }, 5000);
 
       pendingRef.current = { ids, data, timer };
-
-      toast(message, {
-        action: { label: "Undo", onClick: rollback },
-        duration: 5000,
-      });
     },
     [closeEmail, emailsQueryKey, fireMutation, queryClient, selectedEmailId],
   );

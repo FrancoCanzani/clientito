@@ -2,9 +2,10 @@ import { zValidator } from "@hono/zod-validator";
 import type { Hono } from "hono";
 import { createEmailProvider } from "../../../lib/email";
 import { resolveOutgoingMailbox } from "../../../lib/email/mailbox-state";
+import { appendSignature } from "../../../lib/email/signature";
 import { sleep } from "../../../lib/utils";
 import { and, eq } from "drizzle-orm";
-import { emails, mailboxes } from "../../../db/schema";
+import { emails, mailboxes, scheduledEmails } from "../../../db/schema";
 import type { Database } from "../../../db/client";
 import type { AppRouteEnv } from "../../types";
 import { sendEmailBodySchema } from "./schemas";
@@ -74,6 +75,34 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
       return c.json({ error: message }, status);
     }
 
+    // Schedule for later instead of sending immediately
+    if (input.scheduledFor && input.scheduledFor > Date.now()) {
+      const rows = await db
+        .insert(scheduledEmails)
+        .values({
+          userId: user.id,
+          mailboxId: mailbox.id,
+          to: input.to,
+          cc: input.cc ?? null,
+          bcc: input.bcc ?? null,
+          subject: input.subject,
+          body: input.body,
+          inReplyTo: input.inReplyTo ?? null,
+          references: input.references ?? null,
+          threadId: input.threadId ?? null,
+          attachmentKeys: input.attachments ?? null,
+          scheduledFor: input.scheduledFor,
+          status: "pending",
+          createdAt: Date.now(),
+        })
+        .returning({ id: scheduledEmails.id });
+
+      return c.json(
+        { data: { scheduledId: rows[0].id, scheduledFor: input.scheduledFor } },
+        201,
+      );
+    }
+
     try {
       let attachments:
         | Array<{ filename: string; mimeType: string; content: ArrayBuffer }>
@@ -94,16 +123,12 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
         );
       }
 
-      // Append mailbox signature if configured
       const mbRow = await db
         .select({ signature: mailboxes.signature })
         .from(mailboxes)
         .where(eq(mailboxes.id, mailbox.id))
         .limit(1);
-      const signature = mbRow[0]?.signature?.trim();
-      const bodyWithSignature = signature
-        ? `${input.body}<div style="margin-top:16px;border-top:1px solid #dadce0;padding-top:12px;color:#5f6368;font-size:13px;white-space:pre-wrap">${signature}</div>`
-        : input.body;
+      const bodyWithSignature = appendSignature(input.body, mbRow[0]?.signature);
 
       const provider = await createEmailProvider(db, env, mailbox.id);
       const result = await provider.send(

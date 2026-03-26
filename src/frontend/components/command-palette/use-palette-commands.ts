@@ -62,7 +62,7 @@ export function usePaletteCommands({
   }, [close, navigate, activeInboxId]);
 
   const runNavigation = useCallback(
-    (to: "/home" | "/notes" | "/tasks" | "/docs" | "/settings") => {
+    (to: "/home" | "/notes" | "/tasks" | "/docs" | "/settings" | "/agenda") => {
       navigate({ to });
       close();
     },

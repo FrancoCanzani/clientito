@@ -48,12 +48,20 @@ async function applyDbUpdates(
     return;
   }
 
+  const grouped = new Map<string, number[]>();
+  for (const { id, state } of updates) {
+    const key = JSON.stringify(state.dbUpdates);
+    const ids = grouped.get(key);
+    if (ids) ids.push(id);
+    else grouped.set(key, [id]);
+  }
+
   await Promise.all(
-    updates.map(({ id, state }) =>
+    Array.from(grouped.entries()).map(([key, ids]) =>
       db
         .update(emails)
-        .set(state.dbUpdates)
-        .where(and(eq(emails.userId, userId), eq(emails.id, id))),
+        .set(JSON.parse(key))
+        .where(and(eq(emails.userId, userId), inArray(emails.id, ids))),
     ),
   );
 }

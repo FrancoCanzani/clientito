@@ -290,6 +290,42 @@ export const syncJobs = sqliteTable(
   ],
 );
 
+export const scheduledEmails = sqliteTable(
+  "scheduled_emails",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mailboxId: integer("mailbox_id")
+      .notNull()
+      .references(() => mailboxes.id, { onDelete: "cascade" }),
+    to: text("to").notNull(),
+    cc: text("cc"),
+    bcc: text("bcc"),
+    subject: text("subject").notNull().default(""),
+    body: text("body").notNull(),
+    inReplyTo: text("in_reply_to"),
+    references: text("references"),
+    threadId: text("thread_id"),
+    attachmentKeys: text("attachment_keys", { mode: "json" }).$type<
+      Array<{ key: string; filename: string; mimeType: string }>
+    >(),
+    scheduledFor: integer("scheduled_for").notNull(),
+    status: text("status")
+      .$type<"pending" | "sent" | "failed" | "cancelled">()
+      .notNull()
+      .default("pending"),
+    retryCount: integer("retry_count").notNull().default(0),
+    error: text("error"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    index("scheduled_emails_pending_idx").on(table.status, table.scheduledFor),
+    index("scheduled_emails_user_idx").on(table.userId, table.status),
+  ],
+);
+
 export const proposedEvents = sqliteTable(
   "proposed_events",
   {

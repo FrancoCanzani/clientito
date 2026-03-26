@@ -276,6 +276,45 @@ export function useComposeEmail(
     undoSend.trigger();
   }, [draft, attachments, undoSend, options]);
 
+  const scheduleSend = useCallback(
+    async (scheduledFor: number) => {
+      try {
+        setSendPending(true);
+        await sendEmail({
+          mailboxId: draft.mailboxId ?? undefined,
+          to: draft.to,
+          cc: draft.cc.trim().length > 0 ? draft.cc.trim() : undefined,
+          bcc: draft.bcc.trim().length > 0 ? draft.bcc.trim() : undefined,
+          subject: draft.subject,
+          body: combineComposeBody(bodyRef.current, draft.forwardedContent),
+          attachments:
+            attachments.files.length > 0
+              ? attachments.getAttachmentKeys()
+              : undefined,
+          scheduledFor,
+        });
+        clearDraft();
+        const timeStr = new Intl.DateTimeFormat(undefined, {
+          weekday: "short",
+          hour: "numeric",
+          minute: "2-digit",
+        }).format(new Date(scheduledFor));
+        toast.success(`Email scheduled for ${timeStr}`);
+        setSendPending(false);
+        setDraft(createComposeDraft());
+        attachments.clear();
+        void queryClient.invalidateQueries({ queryKey: ["scheduled-emails"] });
+        options?.onSent?.();
+      } catch (error) {
+        setSendPending(false);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to schedule email",
+        );
+      }
+    },
+    [draft, attachments, clearDraft, queryClient, options],
+  );
+
   const canSend = useMemo(() => {
     const hasDraftBody =
       body.trim().length > 0 && body !== "<p></p>" && body !== "<p><br></p>";
@@ -300,6 +339,7 @@ export function useComposeEmail(
     forwardedContent,
     canSend,
     send,
+    scheduleSend,
     isPending: sendPending,
     attachments,
     clearDraft,

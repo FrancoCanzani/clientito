@@ -8,12 +8,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getMailboxDisplayEmail } from "@/hooks/use-mailboxes";
+import { ClockIcon } from "@phosphor-icons/react";
 import DOMPurify from "dompurify";
 import { useMemo, useState } from "react";
 import { AttachmentBar } from "./attachment-bar";
 import { ComposeEditor } from "./compose-editor";
 import { useComposeEmail } from "./compose-email-state";
 import { RecipientInput } from "./recipient-input";
+import { ScheduleSendPicker } from "./schedule-send-picker";
 
 type ComposeEmailFieldsProps = {
   compose: ReturnType<typeof useComposeEmail>;
@@ -71,6 +73,7 @@ export function ComposeEmailFields({
     canSend,
     availableMailboxes,
     send,
+    scheduleSend,
     isPending,
     attachments,
   } = compose;
@@ -208,13 +211,27 @@ export function ComposeEmailFields({
             onAddFiles={(files) => attachments.addFiles(files)}
             onRemoveFile={attachments.removeFile}
           />
-          <Button
-            variant={"secondary"}
-            onClick={() => send()}
-            disabled={!canSend}
-          >
-            {isPending ? "Sending..." : "Send"}
-          </Button>
+          <div className="flex items-center gap-1">
+            <ScheduleSendPicker
+              onSchedule={(timestamp) => void scheduleSend(timestamp)}
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                disabled={!canSend}
+              >
+                <ClockIcon className="size-4" />
+              </Button>
+            </ScheduleSendPicker>
+            <Button
+              variant="secondary"
+              onClick={() => send()}
+              disabled={!canSend || isPending}
+            >
+              {isPending ? "Sending..." : "Send"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

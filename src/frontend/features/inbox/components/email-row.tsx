@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { PaperclipIcon } from "@phosphor-icons/react";
 import type { EmailListItem } from "../types";
-import { formatInboxRowDate } from "../utils/format-inbox-row-date";
+import { formatInboxRowDate } from "../utils/formatters";
 
 function formatAiLabel(label: EmailListItem["aiLabel"]) {
   if (label === "later") return "important";

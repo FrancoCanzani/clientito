@@ -26,7 +26,11 @@ export function registerGetEmail(api: Hono<AppRouteEnv>) {
       const { emailId } = c.req.valid("param");
       const { refreshLive } = c.req.valid("query");
 
-      await syncAllMailboxes(db, c.env, user.id);
+      c.executionCtx.waitUntil(
+        syncAllMailboxes(db, c.env, user.id).catch((err) => {
+          console.error("Background sync failed (email detail)", err);
+        }),
+      );
 
       const row = await db
         .select({

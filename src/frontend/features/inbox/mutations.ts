@@ -66,11 +66,14 @@ type SendEmailInput = {
   references?: string;
   threadId?: string;
   attachments?: Array<{ key: string; filename: string; mimeType: string }>;
+  scheduledFor?: number;
 };
 
 type SendEmailResult = {
-  providerMessageId: string;
-  threadId: string;
+  providerMessageId?: string;
+  threadId?: string;
+  scheduledId?: number;
+  scheduledFor?: number;
 };
 
 export async function sendEmail(
@@ -91,6 +94,35 @@ export async function sendEmail(
 
   const json = (await response.json()) as { data: SendEmailResult };
   return json.data;
+}
+
+export type ScheduledEmail = {
+  id: number;
+  to: string;
+  subject: string;
+  scheduledFor: number;
+  status: "pending" | "sent" | "failed" | "cancelled";
+  error: string | null;
+  createdAt: number;
+};
+
+export async function fetchScheduledEmails(): Promise<ScheduledEmail[]> {
+  const response = await fetch("/api/inbox/emails/scheduled");
+  if (!response.ok) throw new Error("Failed to fetch scheduled emails");
+  const json = (await response.json()) as { data: ScheduledEmail[] };
+  return json.data;
+}
+
+export async function cancelScheduledEmail(id: number): Promise<void> {
+  const response = await fetch(`/api/inbox/emails/scheduled/${id}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const json = await response.json().catch(() => ({}));
+    throw new Error(
+      (json as { error?: string }).error ?? "Failed to cancel scheduled email",
+    );
+  }
 }
 
 export async function uploadAttachments(

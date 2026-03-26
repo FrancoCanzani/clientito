@@ -68,8 +68,8 @@ export function registerGetCalendarEvents(api: Hono<AppRouteEnv>) {
       if (!mb.historyId || mb.authState !== "ok") continue;
       try {
         const token = await getGmailTokenForMailbox(db, mb.id, {
-          clientId: env.GOOGLE_CLIENT_ID,
-          clientSecret: env.GOOGLE_CLIENT_SECRET,
+          GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
+          GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
         });
         const events = await listEvents(token, from, to);
         googleEvents.push(...events.map(googleEventToAgenda));

@@ -24,7 +24,7 @@ const actionsSchema = z.object({
 
 const createSchema = z.object({
   name: z.string().min(1).max(200),
-  description: z.string().min(1).max(500),
+  description: z.string().trim().min(1).max(500),
   actions: actionsSchema,
   enabled: z.boolean().optional(),
   priority: z.number().int().optional(),
