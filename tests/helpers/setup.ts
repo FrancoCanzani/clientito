@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS \`mailboxes\` (
   \`account_id\` text,
   \`provider\` text DEFAULT 'google' NOT NULL,
   \`email\` text,
+  \`signature\` text,
   \`history_id\` text,
   \`sync_window_months\` integer,
   \`sync_cutoff_at\` integer,

@@ -4,7 +4,7 @@ import { createEmailProvider } from "../../../lib/email";
 import { resolveOutgoingMailbox } from "../../../lib/email/mailbox-state";
 import { sleep } from "../../../lib/utils";
 import { and, eq } from "drizzle-orm";
-import { emails } from "../../../db/schema";
+import { emails, mailboxes } from "../../../db/schema";
 import type { Database } from "../../../db/client";
 import type { AppRouteEnv } from "../../types";
 import { sendEmailBodySchema } from "./schemas";
@@ -94,6 +94,17 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
         );
       }
 
+      // Append mailbox signature if configured
+      const mbRow = await db
+        .select({ signature: mailboxes.signature })
+        .from(mailboxes)
+        .where(eq(mailboxes.id, mailbox.id))
+        .limit(1);
+      const signature = mbRow[0]?.signature?.trim();
+      const bodyWithSignature = signature
+        ? `${input.body}<div style="margin-top:16px;border-top:1px solid #dadce0;padding-top:12px;color:#5f6368;font-size:13px;white-space:pre-wrap">${signature}</div>`
+        : input.body;
+
       const provider = await createEmailProvider(db, env, mailbox.id);
       const result = await provider.send(
         mailbox.email ?? user.email,
@@ -102,7 +113,7 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
           cc: input.cc,
           bcc: input.bcc,
           subject: input.subject,
-          body: input.body,
+          body: bodyWithSignature,
           inReplyTo: input.inReplyTo,
           references: input.references,
           threadId: input.threadId,

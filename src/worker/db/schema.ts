@@ -237,6 +237,7 @@ export const mailboxes = sqliteTable(
     }),
     provider: text("provider").$type<"google" | "outlook">().notNull().default("google"),
     email: text("email"),
+    signature: text("signature"),
     historyId: text("history_id"),
     syncWindowMonths: integer("sync_window_months"),
     syncCutoffAt: integer("sync_cutoff_at"),
@@ -286,5 +287,35 @@ export const syncJobs = sqliteTable(
   (table) => [
     index("sync_jobs_mailbox_created_idx").on(table.mailboxId, table.createdAt),
     index("sync_jobs_mailbox_status_idx").on(table.mailboxId, table.status),
+  ],
+);
+
+export const proposedEvents = sqliteTable(
+  "proposed_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mailboxId: integer("mailbox_id").references(() => mailboxes.id, {
+      onDelete: "cascade",
+    }),
+    emailId: integer("email_id"),
+    title: text("title").notNull(),
+    description: text("description"),
+    location: text("location"),
+    startAt: integer("start_at").notNull(),
+    endAt: integer("end_at").notNull(),
+    attendees: text("attendees", { mode: "json" }).$type<string[]>(),
+    status: text("status")
+      .$type<"pending" | "approved" | "dismissed">()
+      .notNull()
+      .default("pending"),
+    googleEventId: text("google_event_id"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("proposed_events_user_status_idx").on(table.userId, table.status),
   ],
 );

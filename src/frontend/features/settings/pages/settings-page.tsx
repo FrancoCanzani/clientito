@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   beginGmailConnection,
   runIncrementalSync,
@@ -9,12 +10,14 @@ import {
 } from "@/features/home/mutations";
 import {
   deleteAccount,
+  updateMailboxSignature,
   updateSyncPreference,
 } from "@/features/settings/mutations";
 import { useAuth } from "@/hooks/use-auth";
 import {
   getMailboxDisplayEmail,
   removeAccount,
+  type MailboxAccount,
   useMailboxes,
 } from "@/hooks/use-mailboxes";
 import { useTheme } from "@/hooks/use-theme";
@@ -45,7 +48,7 @@ function formatImportHistoryHint(
   cutoffAt: number | null,
 ): string {
   if (months === null || cutoffAt === null) {
-    return "No cutoff. Petit can import your full mailbox.";
+    return "New imports can include your full Gmail history.";
   }
 
   const date = new Date(cutoffAt).toLocaleDateString(undefined, {
@@ -54,7 +57,139 @@ function formatImportHistoryHint(
     day: "numeric",
   });
 
-  return `Hard limit set to ${months === 6 ? "the last 6 months" : "the last year"} from ${date}.`;
+  return `New imports currently include mail from ${date} onward (${months === 6 ? "last 6 months" : "last year"}).`;
+}
+
+function formatRelativeTime(value: number | null): string | null {
+  if (!value) return null;
+  return formatDistanceToNow(new Date(value), { addSuffix: true });
+}
+
+function humanizeSyncError(
+  error: string | null,
+  hasSynced: boolean,
+): string | null {
+  if (!error) return null;
+
+  const normalized = error.toLowerCase();
+
+  if (normalized.includes("stalled or timed out")) {
+    return hasSynced
+      ? "The latest sync stopped before finishing."
+      : "The first import stopped before finishing.";
+  }
+
+  if (
+    normalized.includes("history is too old") ||
+    normalized.includes("full sync again") ||
+    normalized.includes("full sync first")
+  ) {
+    return "Petit needs a fresh full import to catch up with Gmail.";
+  }
+
+  if (normalized.includes("no sync state found")) {
+    return "This mailbox has not completed its first import yet.";
+  }
+
+  if (normalized.includes("sync already in progress")) {
+    return "Another sync is already running for this mailbox.";
+  }
+
+  if (
+    normalized.includes("invalid_grant") ||
+    normalized.includes("reconnect")
+  ) {
+    return "Google needs you to reconnect this account.";
+  }
+
+  return error;
+}
+
+function formatSyncProgress(account: MailboxAccount): string {
+  if (account.phase === "listing") {
+    return "Looking through Gmail to see what needs to be imported.";
+  }
+
+  if (
+    typeof account.progressCurrent === "number" &&
+    typeof account.progressTotal === "number" &&
+    account.progressTotal > 0
+  ) {
+    return `${new Intl.NumberFormat().format(account.progressCurrent)} of ${new Intl.NumberFormat().format(account.progressTotal)} emails imported.`;
+  }
+
+  if (typeof account.progressCurrent === "number") {
+    return `${new Intl.NumberFormat().format(account.progressCurrent)} emails imported so far.`;
+  }
+
+  return "Import in progress.";
+}
+
+function getMailboxStatusCopy(account: MailboxAccount, isBusy: boolean) {
+  const lastSuccess = formatRelativeTime(account.lastSync);
+  const humanizedError = humanizeSyncError(account.error, account.hasSynced);
+
+  if (account.syncState === "needs_reconnect") {
+    return {
+      badge: "Reconnect Gmail",
+      badgeTone: "bg-amber-500",
+      detail: "Google access expired. Reconnect this account to resume email and calendar sync.",
+      sectionTitle: "Connection status",
+      primaryLabel: "Reconnect Gmail",
+      reimportHint: "Run a fresh full import after reconnecting if this mailbox still looks incomplete.",
+    };
+  }
+
+  if (isBusy) {
+    return {
+      badge: "Import in progress",
+      badgeTone: "bg-sky-500",
+      detail: formatSyncProgress(account),
+      sectionTitle: "Current import",
+      primaryLabel: account.hasSynced ? "Sync now" : "Start import",
+      reimportHint: "Run a fresh full import using the history window above.",
+    };
+  }
+
+  if (account.syncState === "error") {
+    const detail = [
+      humanizedError,
+      lastSuccess ? `Last completed sync was ${lastSuccess}.` : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return {
+      badge: account.hasSynced ? "Sync needs attention" : "Import needs attention",
+      badgeTone: "bg-amber-500",
+      detail,
+      sectionTitle: account.hasSynced ? "Latest sync" : "Import status",
+      primaryLabel: account.hasSynced ? "Try sync again" : "Start import again",
+      reimportHint: "Run a fresh full import using the history window above.",
+    };
+  }
+
+  if (!account.hasSynced) {
+    return {
+      badge: "Ready to import",
+      badgeTone: "bg-zinc-400",
+      detail: "Your account is connected. Start the first import when you're ready.",
+      sectionTitle: "Import status",
+      primaryLabel: "Start import",
+      reimportHint: "Run a fresh full import using the history window above.",
+    };
+  }
+
+  return {
+    badge: "Up to date",
+    badgeTone: "bg-green-500",
+    detail: lastSuccess
+      ? `Last completed sync was ${lastSuccess}.`
+      : "Your mailbox is connected and syncing normally.",
+    sectionTitle: "Last completed sync",
+    primaryLabel: "Sync now",
+    reimportHint: "Run a fresh full import using the history window above.",
+  };
 }
 
 export default function SettingsPage() {
@@ -183,6 +318,16 @@ export default function SettingsPage() {
     },
   });
 
+  const signatureMutation = useMutation({
+    mutationFn: async ({ mailboxId, signature }: { mailboxId: number; signature: string }) =>
+      updateMailboxSignature(mailboxId, signature),
+    onSuccess: async () => {
+      toast.success("Signature saved");
+      await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+    },
+    onError: () => toast.error("Failed to save signature"),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: deleteAccount,
     onSuccess: () => {
@@ -299,53 +444,7 @@ export default function SettingsPage() {
               account.mailboxId != null &&
               account.hasValidCredentials &&
               account.syncState !== "needs_reconnect";
-
-            const statusText =
-              account.syncState === "needs_reconnect"
-                ? "Reconnect required"
-                : account.syncState === "error"
-                  ? account.hasSynced
-                    ? "Last sync failed"
-                    : "Import failed"
-                  : isBusy
-                    ? "Syncing..."
-                    : account.hasSynced
-                      ? account.lastSync
-                        ? `Synced ${formatDistanceToNow(new Date(account.lastSync), { addSuffix: true })}`
-                        : "Synced"
-                      : "Not synced";
-
-            const statusTone =
-              account.syncState === "error" ||
-              account.syncState === "needs_reconnect"
-                ? "bg-amber-500"
-                : account.syncState === "syncing"
-                  ? "bg-sky-500"
-                  : "bg-green-500";
-
-            const activityHint =
-              account.syncState === "needs_reconnect"
-                ? "Reconnect Gmail to resume syncing."
-                : account.syncState === "error" && account.error
-                  ? account.error
-                  : isBusy
-                    ? typeof account.progressCurrent === "number"
-                      ? `${new Intl.NumberFormat().format(account.progressCurrent)} emails processed`
-                      : account.phase === "listing"
-                        ? "Scanning your mailbox..."
-                        : "Import in progress"
-                    : account.lastSync
-                      ? formatDistanceToNow(new Date(account.lastSync), {
-                          addSuffix: true,
-                        })
-                      : "Never";
-
-            const primaryLabel =
-              account.syncState === "needs_reconnect"
-                ? "Reconnect needed"
-                : account.hasSynced
-                  ? "Sync now"
-                  : "Start import";
+            const statusCopy = getMailboxStatusCopy(account, isBusy);
 
             return (
               <div key={account.accountId}>
@@ -356,9 +455,9 @@ export default function SettingsPage() {
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span
-                        className={`inline-block size-1.5 rounded-full ${statusTone}`}
+                        className={`inline-block size-1.5 rounded-full ${statusCopy.badgeTone}`}
                       />
-                      {statusText}
+                      {statusCopy.badge}
                     </div>
                   </div>
                   {accounts.length > 1 ? (
@@ -380,7 +479,7 @@ export default function SettingsPage() {
                 <div className="border-t border-border/60">
                   <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-0.5">
-                      <p className="text-sm font-medium">Import history</p>
+                      <p className="text-sm font-medium">History window</p>
                       <p className="text-xs text-muted-foreground">
                         {formatImportHistoryHint(
                           account.syncWindowMonths,
@@ -427,11 +526,9 @@ export default function SettingsPage() {
 
                   <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-0.5">
-                      <p className="text-sm font-medium">
-                        {isBusy ? "Syncing" : "Last synced"}
-                      </p>
+                      <p className="text-sm font-medium">{statusCopy.sectionTitle}</p>
                       <p className="text-xs text-muted-foreground">
-                        {activityHint}
+                        {statusCopy.detail}
                       </p>
                     </div>
                     <div className="min-w-0 sm:max-w-[60%]">
@@ -456,7 +553,7 @@ export default function SettingsPage() {
                           disabled={!canSync || isUpdatingSyncWindow}
                         >
                           <ArrowClockwiseIcon className="mr-1.5 size-3.5" />
-                          {primaryLabel}
+                          {statusCopy.primaryLabel}
                         </Button>
                       )}
                     </div>
@@ -466,9 +563,9 @@ export default function SettingsPage() {
 
                   <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-0.5">
-                      <p className="text-sm font-medium">Full re-import</p>
+                      <p className="text-sm font-medium">Fresh full import</p>
                       <p className="text-xs text-muted-foreground">
-                        Re-download this mailbox from Gmail.
+                        {statusCopy.reimportHint}
                       </p>
                     </div>
                     <div className="min-w-0 sm:max-w-[60%]">
@@ -484,13 +581,22 @@ export default function SettingsPage() {
                         }}
                         disabled={!canSync || isBusy || isUpdatingSyncWindow}
                       >
-                        Re-import
+                        Run full import
                       </Button>
                     </div>
                   </div>
                 </div>
 
                 <div className="border-t border-border/60" />
+
+                <SignatureField
+                  mailboxId={account.mailboxId}
+                  initialSignature={account.signature ?? ""}
+                  isSaving={signatureMutation.isPending}
+                  onSave={(mailboxId, signature) =>
+                    signatureMutation.mutate({ mailboxId, signature })
+                  }
+                />
               </div>
             );
           })}
@@ -594,6 +700,54 @@ export default function SettingsPage() {
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function SignatureField({
+  mailboxId,
+  initialSignature,
+  isSaving,
+  onSave,
+}: {
+  mailboxId: number | null;
+  initialSignature: string;
+  isSaving: boolean;
+  onSave: (mailboxId: number, signature: string) => void;
+}) {
+  const [value, setValue] = useState(initialSignature);
+  const isDirty = value !== initialSignature;
+
+  if (mailboxId == null) return null;
+
+  return (
+    <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="space-y-0.5">
+        <p className="text-sm font-medium">Signature</p>
+        <p className="text-xs text-muted-foreground">
+          Appended to outgoing emails.
+        </p>
+      </div>
+      <div className="min-w-0 space-y-2 sm:max-w-[60%]">
+        <Textarea
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Your email signature..."
+          rows={3}
+          className="text-sm"
+        />
+        {isDirty && (
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => onSave(mailboxId, value)}
+              disabled={isSaving}
+            >
+              {isSaving ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

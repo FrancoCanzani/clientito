@@ -17,6 +17,7 @@ import {
   MagnifyingGlassIcon,
   MoonIcon,
   NewspaperIcon,
+  CalendarDotsIcon,
   NoteBlankIcon,
   PaperPlaneTiltIcon,
   SignOutIcon,
@@ -239,6 +240,14 @@ export function usePaletteCommands({
         to: "/notes",
         icon: React.createElement(NoteBlankIcon, { className: "size-4" }),
         onSelect: () => runNavigation("/notes"),
+      },
+      {
+        id: "agenda",
+        label: "Agenda",
+        section: "navigation",
+        to: "/agenda",
+        icon: React.createElement(CalendarDotsIcon, { className: "size-4" }),
+        onSelect: () => runNavigation("/agenda"),
       },
       {
         id: "settings",

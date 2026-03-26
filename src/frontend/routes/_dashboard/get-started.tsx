@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_dashboard/get-started")({
       throw error;
     }
 
-    if (status.state === "ready") {
+    if (status.state === "ready" || status.state === "syncing") {
       throw redirect({ to: "/home" });
     }
   },

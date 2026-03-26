@@ -1,5 +1,6 @@
 import { routeAgentRequest } from "agents";
 import { Hono } from "hono";
+import { handleScheduled } from "./scheduled";
 import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
 import { HTTPException } from "hono/http-exception";
@@ -18,6 +19,7 @@ import settingsRoutes from "./routes/settings/router";
 import searchRoutes from "./routes/inbox/search/router";
 import subscriptionsRoutes from "./routes/inbox/subscriptions/router";
 import syncRoutes from "./routes/inbox/sync/router";
+import calendarRoutes from "./routes/calendar/router";
 import tasksRoutes from "./routes/tasks/router";
 import type { AppRouteEnv } from "./routes/types";
 
@@ -68,6 +70,7 @@ app.route("/api/emails", emailsRoutes);
 app.route("/api/ai", aiRoutes);
 
 app.route("/api/tasks", tasksRoutes);
+app.route("/api/calendar", calendarRoutes);
 app.route("/api/notes", notesRoutes);
 app.route("/api/settings", settingsRoutes);
 app.route("/api/search", searchRoutes);
@@ -81,5 +84,8 @@ export default {
     const agentResponse = await routeAgentRequest(request, env);
     if (agentResponse) return agentResponse;
     return app.fetch(request, env, ctx);
+  },
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(handleScheduled(env));
   },
 };

@@ -63,7 +63,17 @@ export async function testRequest(
     init.body = JSON.stringify(options.body);
   }
 
-  const res = await app.request(url.pathname + url.search, init);
+  const executionCtx = {
+    waitUntil() {},
+    passThroughOnException() {},
+  } as ExecutionContext;
+
+  const res = await app.request(
+    url.pathname + url.search,
+    init,
+    undefined,
+    executionCtx,
+  );
   const text = await res.text();
   let json: any = null;
   try {

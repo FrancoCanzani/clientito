@@ -7,6 +7,7 @@ export type MailboxAccount = {
   accountId: string;
   mailboxId: number | null;
   email: string | null;
+  signature: string | null;
   gmailEmail?: string | null;
   authState: string;
   lastSync: number | null;

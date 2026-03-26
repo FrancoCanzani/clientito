@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { mailboxes } from "../../../db/schema";
 import {
+  ensureGoogleMailboxesForUser,
   getMailboxSyncSnapshot,
   getUserMailboxes,
 } from "../../../lib/email/mailbox-state";
@@ -20,6 +21,8 @@ export function registerGetSync(api: Hono<AppRouteEnv>) {
   api.get("/status", async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
+
+    await ensureGoogleMailboxesForUser(db, user.id);
 
     const userMailboxes = await getUserMailboxes(db, user.id);
     const firstMailbox = userMailboxes[0] ?? null;

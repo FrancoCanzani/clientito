@@ -28,6 +28,7 @@ export const Route = createFileRoute("/_dashboard/home")({
       throw redirect({ to: "/get-started" });
     }
 
+    // Briefing works during sync — may have fewer items but that's fine
     return fetchBriefing();
   },
   staleTime: 30 * 60 * 1000,

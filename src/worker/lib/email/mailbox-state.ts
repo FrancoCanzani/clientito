@@ -30,6 +30,60 @@ export async function getUserMailboxes(db: Database, userId: string) {
   return db.select().from(mailboxes).where(eq(mailboxes.userId, userId));
 }
 
+function toTimestamp(value: Date | number | null | undefined): number | null {
+  if (value instanceof Date) return value.getTime();
+  return typeof value === "number" ? value : null;
+}
+
+export async function getCurrentGoogleAccounts(db: Database, userId: string) {
+  const allGoogleAccounts = await db
+    .select({
+      id: account.id,
+      accountId: account.accountId,
+      accessToken: account.accessToken,
+      accessTokenExpiresAt: account.accessTokenExpiresAt,
+      refreshToken: account.refreshToken,
+      scope: account.scope,
+      createdAt: account.createdAt,
+    })
+    .from(account)
+    .where(and(eq(account.userId, userId), eq(account.providerId, "google")));
+
+  const seen = new Map<string, (typeof allGoogleAccounts)[number]>();
+  for (const googleAccount of allGoogleAccounts) {
+    const existing = seen.get(googleAccount.accountId);
+    const isNewer =
+      toTimestamp(googleAccount.createdAt) !== null &&
+      toTimestamp(existing?.createdAt) !== null &&
+      toTimestamp(googleAccount.createdAt)! > toTimestamp(existing?.createdAt)!;
+
+    if (
+      !existing ||
+      (googleAccount.refreshToken && !existing.refreshToken) ||
+      isNewer
+    ) {
+      seen.set(googleAccount.accountId, googleAccount);
+    }
+  }
+
+  return [...seen.values()].sort(
+    (a, b) => (toTimestamp(b.createdAt) ?? 0) - (toTimestamp(a.createdAt) ?? 0),
+  );
+}
+
+export async function ensureGoogleMailboxesForUser(
+  db: Database,
+  userId: string,
+) {
+  const googleAccounts = await getCurrentGoogleAccounts(db, userId);
+
+  for (const googleAccount of googleAccounts) {
+    await ensureMailbox(db, userId, googleAccount.id);
+  }
+
+  return googleAccounts;
+}
+
 /**
  * Resolve a specific mailbox by id (with ownership check) or fall back to
  * the user's first mailbox, creating one if none exists.

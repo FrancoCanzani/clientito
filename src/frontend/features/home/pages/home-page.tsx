@@ -7,6 +7,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AgendaPanel } from "@/features/calendar/components/agenda-panel";
 import { BriefingText } from "@/features/home/components/briefing-text";
 import { CardStack } from "@/features/home/components/card-stack";
 import { useDecisionKeyboard } from "@/features/home/hooks/use-decision-keyboard";
@@ -138,7 +139,7 @@ export default function HomePage() {
       )}
 
       {showCaughtUpState && (
-        <Empty className="min-h-[60vh] border-0 p-0">
+        <Empty className="min-h-32 border-0 p-0">
           <EmptyHeader>
             <EmptyTitle>{greeting.line}</EmptyTitle>
             <EmptyDescription>
@@ -148,6 +149,8 @@ export default function HomePage() {
           </EmptyHeader>
         </Empty>
       )}
+
+      <AgendaPanel days={3} showEmptyState={false} />
     </div>
   );
 }

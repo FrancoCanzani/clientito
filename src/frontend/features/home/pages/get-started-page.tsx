@@ -10,13 +10,14 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import {
   ArrowRightIcon,
+  CalendarDotsIcon,
   EnvelopeSimpleIcon,
   ShieldCheckIcon,
   SpinnerGapIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const IMPORT_OPTIONS = [
@@ -39,6 +40,7 @@ const IMPORT_OPTIONS = [
 
 export default function GetStartedPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [selectedMonths, setSelectedMonths] = useState<number>(12);
   const { user } = useAuth();
 
@@ -46,6 +48,14 @@ export default function GetStartedPage() {
     staleTime: 0,
     refetchOnMount: "always",
   });
+
+  // Auto-navigate to home once syncing starts (or is already ready)
+  useEffect(() => {
+    const state = syncStatusQuery.data?.state;
+    if (state === "syncing" || state === "ready") {
+      void navigate({ to: "/home" });
+    }
+  }, [syncStatusQuery.data?.state, navigate]);
 
   const reconnectMutation = useMutation({
     mutationFn: async () => {
@@ -129,11 +139,20 @@ export default function GetStartedPage() {
             <div className="flex items-start gap-3">
               <EnvelopeSimpleIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
               <div className="space-y-1">
-                <p className="text-sm font-medium">Gmail access</p>
+                <p className="text-sm font-medium">Email</p>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   {showReconnect
                     ? "Your connection expired. Reconnect to resume syncing."
-                    : "We'll import your inbox so you can search, take notes, and manage tasks from one place."}
+                    : "Import your inbox to search, triage, and reply from one place."}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <CalendarDotsIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Calendar</p>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  See your upcoming events alongside email so nothing slips.
                 </p>
               </div>
             </div>
@@ -199,43 +218,9 @@ export default function GetStartedPage() {
       )}
 
       {showSyncing && (
-        <div className="space-y-10">
-          <div className="space-y-4 text-center">
-            <SpinnerGapIcon className="mx-auto size-5 animate-spin text-muted-foreground" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium">
-                {status?.phase === "listing"
-                  ? "Scanning your mailbox..."
-                  : "Importing your emails..."}
-              </p>
-              {progressLabel && (
-                <p className="text-sm font-medium tabular-nums tracking-tight">
-                  {progressLabel}
-                  <span className="text-sm font-normal text-muted-foreground">
-                    {" "}
-                    emails imported
-                  </span>
-                </p>
-              )}
-            </div>
-          </div>
-
-          {progressPercent !== null && (
-            <div className="h-1 overflow-hidden rounded-full bg-border">
-              <div
-                className="h-full rounded-xl bg-foreground transition-all duration-500"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-          )}
-
-          <p className="text-center text-xs text-muted-foreground">
-            This runs in the background. You can start using the app now.
-          </p>
-
-          <Button asChild className="w-full">
-            <Link to="/inbox/$id" params={{ id: "all" }}>Go to inbox</Link>
-          </Button>
+        <div className="space-y-6 text-center">
+          <SpinnerGapIcon className="mx-auto size-5 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Setting things up...</p>
         </div>
       )}
 
