@@ -1,37 +1,17 @@
-import type { HomeBriefingItem } from "@/features/home/queries";
 import { TriageCard } from "@/features/home/components/triage-card";
+import type { useDecisionQueue } from "@/features/home/hooks/use-decision-queue";
 import { AnimatePresence, motion } from "motion/react";
 
 export function CardStack({
-  items,
-  activeIndex,
-  drafts,
-  isLoadingDrafts,
-  editingId,
-  sendingId,
-  onDismiss,
-  onSendReply,
-  onArchive,
-  onDraftChange,
-  onToggleEdit,
+  queue,
 }: {
-  items: HomeBriefingItem[];
-  activeIndex: number;
-  drafts: Record<string, string>;
-  isLoadingDrafts: boolean;
-  editingId: string | null;
-  sendingId: string | null;
-  onDismiss: (id: string) => void;
-  onSendReply: (id: string) => void;
-  onArchive: (id: string) => void;
-  onDraftChange: (id: string, text: string) => void;
-  onToggleEdit: () => void;
+  queue: ReturnType<typeof useDecisionQueue>;
 }) {
   return (
     <div className="space-y-2">
       <AnimatePresence mode="popLayout">
-        {items.map((item, i) => {
-          const isActive = i === activeIndex;
+        {queue.visibleItems.map((item, i) => {
+          const isActive = i === queue.activeIndex;
 
           return (
             <motion.div
@@ -54,15 +34,17 @@ export function CardStack({
               <TriageCard
                 item={item}
                 isActive={isActive}
-                draft={drafts[item.id]}
-                isLoadingDraft={isLoadingDrafts}
-                isEditing={editingId === item.id}
-                isSending={sendingId === item.id}
-                onDismiss={onDismiss}
-                onSendReply={onSendReply}
-                onArchive={onArchive}
-                onDraftChange={onDraftChange}
-                onToggleEdit={onToggleEdit}
+                draft={queue.drafts[item.id]}
+                isLoadingDraft={queue.isLoadingDrafts}
+                isEditing={queue.editingId === item.id}
+                isSending={queue.sendingId === item.id}
+                onDismiss={queue.dismiss}
+                onSendReply={queue.sendReply}
+                onArchive={queue.archiveItem}
+                onDraftChange={queue.updateDraft}
+                onToggleEdit={queue.toggleEditing}
+                onApproveEvent={queue.approveEvent}
+                onDismissEvent={queue.dismissEvent}
               />
             </motion.div>
           );

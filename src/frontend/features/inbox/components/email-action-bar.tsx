@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
@@ -20,11 +19,9 @@ import {
   WarningIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 import { unsubscribe } from "../../subscriptions/queries";
-import { useUndoSend } from "../hooks/use-undo-send";
-import { patchEmail, sendEmail } from "../mutations";
+import { patchEmail } from "../mutations";
 import type { ComposeInitial, EmailDetailItem } from "../types";
 import { SnoozePicker } from "./snooze-picker";
 
@@ -32,6 +29,7 @@ type ActionBarProps = {
   email: EmailDetailItem;
   onClose?: () => void;
   onForward?: (initial: ComposeInitial) => void;
+  onReply?: () => void;
 };
 
 function ActionButton({
@@ -118,12 +116,9 @@ function buildForwardedEmailHtml(email: EmailDetailItem) {
   ].join("");
 }
 
-export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
+export function EmailActionBar({ email, onClose, onForward, onReply }: ActionBarProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [replyOpen, setReplyOpen] = useState(false);
-  const [replyBody, setReplyBody] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isStarred = email.labelIds.includes("STARRED");
 
@@ -213,53 +208,6 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
     onError: (error) => toast.error(error.message),
   });
 
-  const replyBodySnapshotRef = useRef("");
-  const [replySendPending, setReplySendPending] = useState(false);
-
-  const undoReplySend = useUndoSend({
-    onSend: () => {
-      const body = replyBodySnapshotRef.current;
-      const originalFrom = email.fromName
-        ? `${email.fromName} <${email.fromAddr}>`
-        : email.fromAddr;
-      const originalDate = new Date(email.date).toLocaleString();
-      const originalText = (email.resolvedBodyText ?? email.bodyText ?? "")
-        .split("\n")
-        .map((line) => `> ${line}`)
-        .join("\n");
-      const quotedBody = `${body}\n\nOn ${originalDate}, ${originalFrom} wrote:\n${originalText}`;
-
-      return sendEmail({
-        mailboxId: email.mailboxId ?? undefined,
-        to: email.fromAddr,
-        subject: email.subject
-          ? email.subject.startsWith("Re:")
-            ? email.subject
-            : `Re: ${email.subject}`
-          : "Re:",
-        body: quotedBody,
-        inReplyTo: email.providerMessageId,
-        threadId: email.threadId ?? undefined,
-      });
-    },
-    onSuccess: () => {
-      toast.success("Reply sent");
-      setReplySendPending(false);
-      invalidateEmails();
-    },
-    onError: (error) => {
-      setReplySendPending(false);
-      toast.error(error.message);
-    },
-  });
-
-  const triggerReplySend = useCallback(() => {
-    replyBodySnapshotRef.current = replyBody;
-    setReplySendPending(true);
-    setReplyBody("");
-    setReplyOpen(false);
-    undoReplySend.trigger();
-  }, [replyBody, undoReplySend]);
 
   const handleForward = () => {
     const subject = email.subject
@@ -321,78 +269,13 @@ export function EmailActionBar({ email, onClose, onForward }: ActionBarProps) {
 
   return (
     <div className="space-y-3">
-      {replyOpen && (
-        <div className="border-l border-border/80 pl-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-medium text-foreground">Quick reply</p>
-              <p className="text-xs text-muted-foreground">
-                Send with Cmd+Enter
-              </p>
-            </div>
-            <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Reply
-            </span>
-          </div>
-          <Textarea
-            ref={textareaRef}
-            value={replyBody}
-            onChange={(e) => setReplyBody(e.target.value)}
-            placeholder="Write your reply..."
-            className="min-h-28 resize-none rounded-none border-x-0 border-t-0 border-b border-border/70 bg-transparent px-0 py-0 text-sm leading-7 shadow-none focus-visible:ring-0"
-            onKeyDown={(e) => {
-              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                e.preventDefault();
-                if (replyBody.trim().length > 0 && !replySendPending) {
-                  triggerReplySend();
-                }
-              }
-              if (e.key === "Escape") {
-                e.preventDefault();
-                setReplyOpen(false);
-                setReplyBody("");
-              }
-            }}
-          />
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              Esc closes the draft
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="rounded-full px-3"
-                onClick={() => {
-                  setReplyOpen(false);
-                  setReplyBody("");
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                className="rounded-full px-3"
-                onClick={() => triggerReplySend()}
-                disabled={replySendPending || replyBody.trim().length === 0}
-              >
-                {replySendPending ? "Sending..." : "Send"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <Button
-            variant={replyOpen ? "default" : "secondary"}
+            variant="secondary"
             size="sm"
             className="h-8 rounded-full px-3 text-xs shadow-none"
-            onClick={() => {
-              setReplyOpen(true);
-              setTimeout(() => textareaRef.current?.focus(), 0);
-            }}
+            onClick={() => onReply?.()}
           >
             <ArrowBendUpLeftIcon className="size-3.5" />
             Reply

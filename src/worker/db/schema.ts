@@ -7,25 +7,6 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { account, user } from "./auth-schema";
 
-export const dailyBriefings = sqliteTable(
-  "daily_briefings",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    date: text("date").notNull(),
-    narrative: text("narrative"),
-    unreadCount: integer("unread_count"),
-    followUpCount: integer("follow_up_count"),
-    tasksDueCount: integer("tasks_due_count"),
-    overdueCount: integer("overdue_count"),
-    createdAt: integer("created_at").notNull(),
-  },
-  (table) => [
-    uniqueIndex("daily_briefings_user_date_idx").on(table.userId, table.date),
-  ],
-);
 
 export const notes = sqliteTable(
   "notes",
@@ -152,7 +133,6 @@ export const tasks = sqliteTable(
     title: text("title").notNull(),
     description: text("description"),
     dueAt: integer("due_at"),
-    dueTime: text("due_time"),
     priority: text("priority")
       .$type<"urgent" | "high" | "medium" | "low">()
       .notNull()
@@ -163,8 +143,6 @@ export const tasks = sqliteTable(
       .default("todo"),
     completedAt: integer("completed_at"),
     position: integer("position").notNull().default(0),
-    labels: text("labels", { mode: "json" }).$type<string[]>().notNull().default([]),
-    recurrence: text("recurrence", { mode: "json" }).$type<RecurrenceRule | null>(),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [
@@ -172,12 +150,6 @@ export const tasks = sqliteTable(
     index("tasks_user_due_idx").on(table.userId, table.dueAt),
   ],
 );
-
-export type RecurrenceRule = {
-  freq: "daily" | "weekly" | "monthly";
-  interval: number;
-  endAt?: number;
-};
 
 
 export const emailFilters = sqliteTable(
@@ -353,5 +325,37 @@ export const proposedEvents = sqliteTable(
   },
   (table) => [
     index("proposed_events_user_status_idx").on(table.userId, table.status),
+  ],
+);
+
+export const briefingDecisions = sqliteTable(
+  "briefing_decisions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    itemType: text("item_type")
+      .$type<"email" | "task" | "proposed_event">()
+      .notNull(),
+    referenceId: integer("reference_id").notNull(),
+    decision: text("decision")
+      .$type<"pending" | "dismissed" | "replied" | "archived" | "approved">()
+      .notNull()
+      .default("pending"),
+    draftReply: text("draft_reply"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("briefing_decisions_user_type_ref_idx").on(
+      table.userId,
+      table.itemType,
+      table.referenceId,
+    ),
+    index("briefing_decisions_user_decision_idx").on(
+      table.userId,
+      table.decision,
+    ),
   ],
 );

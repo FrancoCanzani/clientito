@@ -4,31 +4,19 @@ import { generateText } from "ai";
 import { and, asc, eq } from "drizzle-orm";
 import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
-import { emails } from "../../db/schema";
-import { sleep } from "../../lib/utils";
+import { briefingDecisions, emails } from "../../db/schema";
+import { withRetry } from "../../lib/utils";
+import { AI_MODELS } from "../../lib/constants";
+import { truncate } from "../../lib/utils";
 import type { AppRouteEnv } from "../types";
-
-const PRIMARY_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
-const FALLBACK_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
-const MAX_RETRIES = 2;
 
 const draftReplyBodySchema = z.object({
   emailId: z.coerce.number().int().positive(),
   instructions: z.string().trim().max(1000).optional(),
 });
 
-function truncate(value: string, maxLength: number) {
-  if (value.length <= maxLength) return value;
-  return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
-}
-
-type DraftReplyDb = {
-  select: AppRouteEnv["Variables"]["db"]["select"];
-  update: AppRouteEnv["Variables"]["db"]["update"];
-};
-
 export async function generateDraftForEmail(input: {
-  db: DraftReplyDb;
+  db: AppRouteEnv["Variables"]["db"];
   ai: Ai;
   userId: string;
   emailId: number;
@@ -104,35 +92,45 @@ export async function generateDraftForEmail(input: {
   ].join("\n");
 
   const workersAI = createWorkersAI({ binding: ai });
-  const models = [PRIMARY_MODEL, FALLBACK_MODEL];
 
-  for (const model of models) {
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        const result = await generateText({
+  for (const model of AI_MODELS) {
+    try {
+      const result = await withRetry(
+        () => generateText({
           model: workersAI(model),
           system: systemPrompt,
           prompt: userPrompt,
           maxOutputTokens: 300,
-        });
+        }),
+        { maxRetries: 2, baseDelayMs: 1000, label: "draft-reply" },
+      );
 
-        const draft = (result.text ?? "").trim();
-        if (draft.length > 0) {
-          await db
-            .update(emails)
-            .set({ draftReply: draft })
-            .where(eq(emails.id, emailId));
-          return draft;
-        }
-      } catch (error) {
-        console.error(`Draft generation attempt ${attempt + 1} failed (model: ${model})`, {
-          emailId,
-          error,
-        });
-        if (attempt < MAX_RETRIES) {
-          await sleep(1000 * (attempt + 1));
-        }
+      const draft = (result.text ?? "").trim();
+      if (draft.length > 0) {
+        const now = Date.now();
+        await db
+          .insert(briefingDecisions)
+          .values({
+            userId,
+            itemType: "email",
+            referenceId: emailId,
+            decision: "pending",
+            draftReply: draft,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: [
+              briefingDecisions.userId,
+              briefingDecisions.itemType,
+              briefingDecisions.referenceId,
+            ],
+            set: { draftReply: draft, updatedAt: now },
+          });
+        return draft;
       }
+    } catch (error) {
+      console.error(`Draft generation failed (model: ${model})`, { emailId, error });
     }
   }
 

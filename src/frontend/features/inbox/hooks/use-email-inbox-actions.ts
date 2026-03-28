@@ -1,9 +1,9 @@
 import {
   batchPatchEmails,
-  markEmailRead,
   patchEmail,
 } from "@/features/inbox/mutations";
 import type { EmailListItem, EmailListResponse } from "@/features/inbox/types";
+import { openEmail as openInboxEmail } from "@/features/inbox/utils/open-email";
 import type { EmailView } from "@/features/inbox/utils/inbox-filters";
 import {
   useQueryClient,
@@ -72,13 +72,12 @@ type PendingAction = {
 export function useEmailInboxActions({
   view,
   mailboxId,
-  selectedEmailId,
 }: {
   view: EmailView;
   mailboxId: number | null | undefined;
-  selectedEmailId: string | null;
 }) {
   const navigate = emailsRoute.useNavigate();
+  const params = emailsRoute.useParams();
   const queryClient = useQueryClient();
   const pendingRef = useRef<PendingAction | null>(null);
 
@@ -89,40 +88,16 @@ export function useEmailInboxActions({
 
   const closeEmail = useCallback(() => {
     navigate({
-      search: (prev) => ({ ...prev, id: undefined }),
-      replace: true,
+      to: "/inbox/$id",
+      params: { id: params.id },
     });
-  }, [navigate]);
+  }, [navigate, params.id]);
 
   const openEmail = useCallback(
     (email: EmailListItem) => {
-      navigate({
-        search: (prev) => ({ ...prev, id: email.id }),
-        replace: true,
-      });
-
-      if (!email.isRead) {
-        queryClient.setQueryData(
-          emailsQueryKey,
-          (old: InfiniteData<EmailListResponse> | undefined) => {
-            if (!old) return old;
-            return {
-              ...old,
-              pages: old.pages.map((page) => ({
-                ...page,
-                data: page.data.map((current) =>
-                  current.id === email.id ? { ...current, isRead: true } : current,
-                ),
-              })),
-            };
-          },
-        );
-        markEmailRead(email.id).catch(() => {
-          void queryClient.invalidateQueries({ queryKey: emailsQueryKey });
-        });
-      }
+      openInboxEmail(queryClient, navigate, params.id, email);
     },
-    [emailsQueryKey, navigate, queryClient],
+    [navigate, params.id, queryClient],
   );
 
   const fireMutation = useCallback(
@@ -151,9 +126,7 @@ export function useEmailInboxActions({
       const ids =
         explicitIds && explicitIds.length > 0
           ? explicitIds
-          : selectedEmailId
-            ? [selectedEmailId]
-            : [];
+          : [];
 
       if (ids.length === 0) return;
 
@@ -199,10 +172,6 @@ export function useEmailInboxActions({
         },
       );
 
-      if (removesFromList && selectedEmailId && idSet.has(selectedEmailId)) {
-        closeEmail();
-      }
-
       if (IMMEDIATE_ACTIONS.has(action)) {
         void fireMutation(ids, data);
         return;
@@ -240,7 +209,7 @@ export function useEmailInboxActions({
 
       pendingRef.current = { ids, data, timer };
     },
-    [closeEmail, emailsQueryKey, fireMutation, queryClient, selectedEmailId],
+    [closeEmail, emailsQueryKey, fireMutation, queryClient],
   );
 
   return { openEmail, closeEmail, executeEmailAction };

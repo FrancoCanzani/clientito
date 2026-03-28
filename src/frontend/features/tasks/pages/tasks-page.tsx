@@ -4,14 +4,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { PageHeader } from "@/components/page-header";
-import { PomodoroPill } from "@/features/tasks/components/pomodoro-pill";
 import { TaskBoard } from "@/features/tasks/components/task-board";
 import {
   TaskEditor,
   type TaskEditorSubmitValue,
 } from "@/features/tasks/components/task-editor";
 import { TaskListView } from "@/features/tasks/components/task-list-view";
-import { usePomodoro } from "@/features/tasks/hooks/use-pomodoro";
 import { TaskActionsProvider } from "@/features/tasks/hooks/use-task-actions";
 import { createTask, deleteTask, updateTask } from "@/features/tasks/mutations";
 import type {
@@ -67,8 +65,6 @@ export default function TasksPage() {
       navigate({ search: (prev) => ({ ...prev, completed: v || undefined }) }),
     [navigate],
   );
-
-  const pomodoro = usePomodoro();
 
   const tasks = taskResponse.data;
 
@@ -230,9 +226,6 @@ export default function TasksPage() {
               >
                 Add task
               </Button>
-              <Button size="sm" variant="outline" onClick={() => pomodoro.start()}>
-                {pomodoro.state.status !== "idle" ? "Focusing..." : "Focus"}
-              </Button>
             </>
           }
         />
@@ -313,7 +306,6 @@ export default function TasksPage() {
               createTaskMutation.mutate({
                 ...value,
                 dueAt: value.dueAt ?? undefined,
-                dueTime: value.dueTime ?? undefined,
               })
             }
           />
@@ -323,7 +315,6 @@ export default function TasksPage() {
           <TaskBoard
             tasks={tasks}
             onEdit={(taskId) => setEditor({ mode: "edit", taskId })}
-            onPomodoro={(taskId, title) => pomodoro.start(taskId, title)}
           />
         ) : (
           <TaskListView
@@ -361,7 +352,6 @@ export default function TasksPage() {
                   createTaskMutation.mutate({
                     ...value,
                     dueAt: value.dueAt ?? undefined,
-                    dueTime: value.dueTime ?? undefined,
                   })
                 }
               />
@@ -385,13 +375,6 @@ export default function TasksPage() {
           </SheetContent>
         </Sheet>
 
-        <PomodoroPill
-          state={pomodoro.state}
-          onStart={() => pomodoro.start()}
-          onPause={pomodoro.pause}
-          onStop={pomodoro.stop}
-          onSkip={pomodoro.skip}
-        />
       </div>
     </TaskActionsProvider>
   );

@@ -1,8 +1,11 @@
 import { tool } from "ai";
-import { and, asc, desc, eq, gt, isNotNull, isNull, like, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, isNotNull, isNull, like, lte, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
-import { emails, tasks } from "../../db/schema";
+import { emails, proposedEvents, tasks } from "../../db/schema";
+import { listEvents } from "../../lib/calendar/google";
+import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
+import { getUserMailboxes } from "../../lib/email/mailbox-state";
 import { syncAllMailboxes } from "../../lib/email/sync";
 import { STANDARD_LABELS } from "../../lib/email/types";
 import { getDayBoundsUtc } from "../../lib/utils";
@@ -195,6 +198,49 @@ export function makeReadTools(
         };
       },
     }),
+    getEmail: tool({
+      description:
+        "Fetch a specific email by ID. Returns subject, sender, recipients, date, body text, and thread ID. Use when you need to read the full content of a known email.",
+      inputSchema: z.object({
+        emailId: z
+          .number()
+          .int()
+          .positive()
+          .describe("Numeric internal email ID."),
+      }),
+      execute: async ({ emailId }) => {
+        const rows = await db
+          .select({
+            id: emails.id,
+            subject: emails.subject,
+            fromAddr: emails.fromAddr,
+            fromName: emails.fromName,
+            toAddr: emails.toAddr,
+            ccAddr: emails.ccAddr,
+            snippet: emails.snippet,
+            bodyText: emails.bodyText,
+            date: emails.date,
+            isRead: emails.isRead,
+            threadId: emails.threadId,
+            mailboxId: emails.mailboxId,
+            messageId: emails.messageId,
+            aiLabel: emails.aiLabel,
+            draftReply: emails.draftReply,
+          })
+          .from(emails)
+          .where(and(eq(emails.id, emailId), eq(emails.userId, userId)))
+          .limit(1);
+
+        const email = rows[0];
+        if (!email) return { error: "Email not found" };
+
+        return {
+          ...email,
+          bodyText: (email.bodyText ?? "").replace(/\s+/g, " ").trim().slice(0, 3000),
+          ...formatEmailDate(email.date),
+        };
+      },
+    }),
     getBriefing: tool({
       description:
         "Build a short briefing from the signed-in user's email and task state. Use this when the user asks for a briefing, summary of what needs attention, or an overview of their inbox.",
@@ -205,6 +251,79 @@ export function makeReadTools(
           env,
           userId,
         });
+      },
+    }),
+    getAgenda: tool({
+      description:
+        "Get the user's calendar events and proposed events. Defaults to today. Use when the user asks about their agenda, schedule, calendar, meetings, or what they have coming up.",
+      inputSchema: z.object({
+        from: z.string().optional().describe("Start date as ISO string. Defaults to start of today."),
+        to: z.string().optional().describe("End date as ISO string. Defaults to end of today."),
+      }),
+      execute: async ({ from, to }) => {
+        const now = new Date();
+        const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const dayEnd = new Date(dayStart);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+
+        const fromIso = from ?? dayStart.toISOString();
+        const toIso = to ?? dayEnd.toISOString();
+        const fromMs = new Date(fromIso).getTime();
+        const toMs = new Date(toIso).getTime();
+
+        const calendarEvents: { title: string; startAt: number; endAt: number; location?: string; isAllDay: boolean }[] = [];
+        const allMailboxes = await getUserMailboxes(db, userId);
+        for (const mb of allMailboxes) {
+          if (!mb.historyId || mb.authState !== "ok") continue;
+          try {
+            const token = await getGmailTokenForMailbox(db, mb.id, {
+              GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
+              GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
+            });
+            const events = await listEvents(token, fromIso, toIso);
+            for (const e of events) {
+              const isAllDay = !e.start.dateTime;
+              calendarEvents.push({
+                title: e.summary || "(No title)",
+                startAt: isAllDay ? new Date(e.start.date!).getTime() : new Date(e.start.dateTime!).getTime(),
+                endAt: isAllDay ? new Date(e.end.date!).getTime() : new Date(e.end.dateTime!).getTime(),
+                location: e.location,
+                isAllDay,
+              });
+            }
+          } catch {
+            // skip mailbox on error
+          }
+        }
+        calendarEvents.sort((a, b) => a.startAt - b.startAt);
+
+        const proposed = await db
+          .select({
+            id: proposedEvents.id,
+            title: proposedEvents.title,
+            description: proposedEvents.description,
+            location: proposedEvents.location,
+            startAt: proposedEvents.startAt,
+            endAt: proposedEvents.endAt,
+            status: proposedEvents.status,
+          })
+          .from(proposedEvents)
+          .where(
+            and(
+              eq(proposedEvents.userId, userId),
+              eq(proposedEvents.status, "pending"),
+              gte(proposedEvents.startAt, fromMs),
+              lte(proposedEvents.startAt, toMs),
+            ),
+          );
+
+        return {
+          from: fromIso,
+          to: toIso,
+          events: calendarEvents,
+          proposedEvents: proposed,
+          count: calendarEvents.length + proposed.length,
+        };
       },
     }),
     listTasks: tool({

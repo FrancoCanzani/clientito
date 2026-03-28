@@ -1,11 +1,5 @@
 import { Kbd } from "@/components/ui/kbd";
 import { PageHeader } from "@/components/page-header";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AgendaPanel } from "@/features/calendar/components/agenda-panel";
 import { BriefingText } from "@/features/home/components/briefing-text";
@@ -16,6 +10,7 @@ import { useBriefingStream } from "@/features/home/hooks/use-briefing-stream";
 import { getGreeting } from "@/features/home/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { getRouteApi, useRouter } from "@tanstack/react-router";
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback } from "react";
 
 const homeRoute = getRouteApi("/_dashboard/home");
@@ -24,7 +19,7 @@ export default function HomePage() {
   const briefing = homeRoute.useLoaderData();
   const { user } = useAuth();
   const router = useRouter();
-  const greeting = getGreeting(user?.name, briefing);
+  const greeting = getGreeting(user?.name);
   const hasItems = briefing.items.length > 0;
   const stream = useBriefingStream(hasItems && !briefing.text);
   const briefingText = briefing.text || stream.text;
@@ -36,11 +31,21 @@ export default function HomePage() {
   const isHomeRoute = router.state.location.pathname === "/home";
 
   const sendActiveReply = useCallback(() => {
-    if (queue.activeItem) queue.sendReply(queue.activeItem.id);
+    if (!queue.activeItem) return;
+    if (queue.activeItem.type === "proposed_event") {
+      queue.approveEvent(queue.activeItem.id);
+    } else {
+      queue.sendReply(queue.activeItem.id);
+    }
   }, [queue]);
 
   const skipActive = useCallback(() => {
-    if (queue.activeItem) queue.dismiss(queue.activeItem.id);
+    if (!queue.activeItem) return;
+    if (queue.activeItem.type === "proposed_event") {
+      queue.dismissEvent(queue.activeItem.id);
+    } else {
+      queue.dismiss(queue.activeItem.id);
+    }
   }, [queue]);
 
   const archiveActive = useCallback(() => {
@@ -63,50 +68,60 @@ export default function HomePage() {
   const showCaughtUpState = queue.visibleItems.length === 0 && !isAnimating;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col space-y-6">
-      {!showCaughtUpState && <PageHeader title={greeting.line} />}
+    <div className="mx-auto flex w-full max-w-3xl flex-col space-y-6">
+      {!showCaughtUpState && <PageHeader title={greeting} />}
 
       {!showCaughtUpState && (
-        <div className="space-y-3">
+        <AnimatePresence mode="wait">
           {shouldShowBriefingSkeleton ? (
-            <div className="space-y-2 pt-1">
+            <motion.div
+              key="skeleton"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-2 pt-1"
+            >
               <Skeleton className="h-4 w-[88%]" />
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-[76%]" />
               <Skeleton className="h-4 w-[50%]" />
-              <Skeleton className="h-4 w-[89%]" />
-              <Skeleton className="h-4 w-[98%]" />
-              <Skeleton className="h-4 w-[72%]" />
-            </div>
+            </motion.div>
           ) : briefingText ? (
-            <BriefingText text={briefingText} animate={isAnimating} />
+            <motion.div
+              key="briefing"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4 }}
+            >
+              <BriefingText text={briefingText} animate={isAnimating} />
+            </motion.div>
           ) : stream.error ? (
-            <Empty className="min-h-52 border-0 p-0">
-              <EmptyHeader>
-                <EmptyTitle>{greeting.line}</EmptyTitle>
-                <EmptyDescription>
-                  Today&apos;s briefing couldn&apos;t load right now.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
+            <motion.p
+              key="error"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-sm text-muted-foreground"
+            >
+              Today&apos;s briefing couldn&apos;t load right now.
+            </motion.p>
           ) : null}
+        </AnimatePresence>
+      )}
+
+      {showCaughtUpState && (
+        <div className="space-y-2 pt-2">
+          <h2 className="text-lg font-medium">{greeting}</h2>
+          <p className="text-sm text-muted-foreground">
+            Nothing needs attention right now. Items will show up here as cards.
+          </p>
         </div>
       )}
 
+      <AgendaPanel days={1} showEmptyState={false} hideProposed showHeader />
+
       {showCards && (
-        <CardStack
-          items={queue.visibleItems}
-          activeIndex={queue.activeIndex}
-          drafts={queue.drafts}
-          isLoadingDrafts={queue.isLoadingDrafts}
-          editingId={queue.editingId}
-          sendingId={queue.sendingId}
-          onDismiss={queue.dismiss}
-          onSendReply={queue.sendReply}
-          onArchive={queue.archiveItem}
-          onDraftChange={queue.updateDraft}
-          onToggleEdit={queue.toggleEditing}
-        />
+        <CardStack queue={queue} />
       )}
 
       {showCards && (
@@ -137,23 +152,6 @@ export default function HomePage() {
           </div>
         </div>
       )}
-
-      {showCaughtUpState && (
-        <Empty className="min-h-32 border-0 p-0">
-          <EmptyHeader>
-            <EmptyTitle>{greeting.line}</EmptyTitle>
-            <EmptyDescription>
-              No action-needed threads or overdue tasks right now. Anything
-              that needs attention will show up here as a card.
-            </EmptyDescription>
-            <div className="mt-3 flex flex-col gap-1 text-[11px] text-muted-foreground">
-              <span>Reply, skip, or archive with the keyboard. Threads, tasks, and events are pulled from your email automatically.</span>
-            </div>
-          </EmptyHeader>
-        </Empty>
-      )}
-
-      <AgendaPanel days={3} showEmptyState={false} />
     </div>
   );
 }

@@ -1,5 +1,7 @@
+import { approveProposedEvent } from "@/features/calendar/mutations";
 import {
   fetchDraftReplies,
+  postBriefingDecision,
   type HomeBriefingItem,
 } from "@/features/home/queries";
 import { patchEmail, sendEmail } from "@/features/inbox/mutations";
@@ -18,13 +20,12 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
   const fetchedRef = useRef(false);
 
   const visibleItems = useMemo(
-    () => items.filter((item) => !dismissed.has(item.id)),
+    () => items.filter((item) => item.type !== "calendar_event" && !dismissed.has(item.id)),
     [items, dismissed],
   );
 
   const activeItem = visibleItems[activeIndex] ?? null;
 
-  // Pre-populate drafts from cached values and fetch missing ones
   useEffect(() => {
     if (items.length === 0 || fetchedRef.current) return;
     fetchedRef.current = true;
@@ -37,7 +38,7 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
         initial[item.id] = item.draftReply;
       } else if (
         item.emailId &&
-        (item.type === "action_needed" || item.type === "important")
+        item.type === "action_needed"
       ) {
         missingIds.push(item.emailId);
       }
@@ -59,19 +60,36 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
             return next;
           });
         })
-        .catch(() => {
-          // Drafts are best-effort — don't block the queue
-        })
+        .catch(() => {})
         .finally(() => setIsLoadingDrafts(false));
     }
   }, [items]);
 
-  const dismiss = useCallback(
-    (id: string) => {
-      setDismissed((prev) => new Set(prev).add(id));
+  const markDone = useCallback(
+    (item: HomeBriefingItem, decision: "dismissed" | "replied" | "archived" | "approved") => {
+      setDismissed((prev) => new Set(prev).add(item.id));
       setEditingId(null);
+      let ref: { itemType: "email" | "task" | "proposed_event"; referenceId: number } | null = null;
+      if (item.proposedEventId) {
+        ref = { itemType: "proposed_event", referenceId: item.proposedEventId };
+      } else if (item.emailId) {
+        ref = { itemType: "email", referenceId: item.emailId };
+      } else {
+        const match = item.id.match(/^(?:overdue|today)-(\d+)$/);
+        if (match) ref = { itemType: "task", referenceId: Number(match[1]) };
+      }
+      if (ref) postBriefingDecision({ ...ref, decision }).catch(() => {});
     },
     [],
+  );
+
+  const dismiss = useCallback(
+    (id: string) => {
+      const item = items.find((i) => i.id === id);
+      if (!item) return;
+      markDone(item, "dismissed");
+    },
+    [items, markDone],
   );
 
   const navigateUp = useCallback(() => {
@@ -106,13 +124,43 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
           isRead: true,
         });
         queryClient.invalidateQueries({ queryKey: ["emails"] });
-        dismiss(id);
+        markDone(item, "archived");
         toast.success("Archived");
       } catch {
         toast.error("Failed to archive");
       }
     },
-    [items, dismiss, queryClient],
+    [items, queryClient, markDone],
+  );
+
+  const approveEvent = useCallback(
+    async (id: string) => {
+      const item = items.find((i) => i.id === id);
+      if (!item?.proposedEventId) return;
+      try {
+        await approveProposedEvent(item.proposedEventId);
+        queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+        markDone(item, "approved");
+        toast.success("Event added to calendar");
+      } catch {
+        toast.error("Failed to add event");
+      }
+    },
+    [items, queryClient, markDone],
+  );
+
+  const dismissEvent = useCallback(
+    async (id: string) => {
+      const item = items.find((i) => i.id === id);
+      if (!item?.proposedEventId) return;
+      try {
+        markDone(item, "dismissed");
+        queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+      } catch {
+        toast.error("Failed to dismiss event");
+      }
+    },
+    [items, queryClient, markDone],
   );
 
   const sendReply = useCallback(
@@ -138,7 +186,7 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
         });
 
         queryClient.invalidateQueries({ queryKey: ["emails"] });
-        dismiss(id);
+        markDone(item, "replied");
         toast.success(`Reply sent to ${item.title}`);
       } catch {
         toast.error("Failed to send reply");
@@ -146,7 +194,7 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
         setSendingId(null);
       }
     },
-    [items, drafts, dismiss, queryClient],
+    [items, drafts, queryClient, markDone],
   );
 
   return {
@@ -166,5 +214,7 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
     cancelEditing,
     archiveItem,
     sendReply,
+    approveEvent,
+    dismissEvent,
   };
 }

@@ -1,28 +1,42 @@
+import { Button } from "@/components/ui/button";
+import {
+  getComposerBody,
+  isComposerOpen,
+  setComposerBody,
+} from "@/features/inbox/components/compose-bridge";
 import { fetchEmailDetail } from "@/features/inbox/queries";
 import type { EmailDetailItem } from "@/features/inbox/types";
-import DOMPurify from "dompurify";
-import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { CheckIcon, XIcon } from "@phosphor-icons/react";
-import {
-  getToolName,
-  isReasoningUIPart,
-  isToolUIPart,
-  type UIMessage,
-} from "ai";
-import { useMemo, type ReactNode } from "react";
+import { normalizeAgentText } from "@/lib/normalize-agent-text";
 import { cn } from "@/lib/utils";
+import { CheckIcon, PencilSimpleIcon } from "@phosphor-icons/react";
+import { useQuery } from "@tanstack/react-query";
+import { isReasoningUIPart, isToolUIPart, type UIMessage } from "ai";
+import { diffWords } from "diff";
+import DOMPurify from "dompurify";
+import { useMemo, useState, type ReactNode } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const toolLabels: Record<string, string> = {
   createTask: "Create task",
   createNote: "Create note",
+  updateNote: "Update note",
+  deleteNote: "Delete note",
   archiveEmail: "Archive email",
+  batchArchive: "Archive emails",
+  trashEmail: "Trash email",
+  batchTrash: "Trash emails",
+  snoozeEmail: "Snooze email",
+  unsubscribeEmail: "Unsubscribe",
   sendEmail: "Send email",
   composeEmail: "Compose email",
   searchEmails: "Search emails",
   resolveContact: "Look up contact",
   listTasks: "List tasks",
   summarizeEmail: "Summarize email",
+  getEmail: "Read email",
+  approveProposedEvent: "Approve event",
+  dismissProposedEvent: "Dismiss event",
 };
 
 function humanizeToolName(toolName: string): string {
@@ -33,61 +47,6 @@ function humanizeToolName(toolName: string): string {
     .trim()
     .replace(/^./, (char) => char.toUpperCase());
 }
-
-const toolActivityLabels: Record<
-  string,
-  {
-    pending: string;
-    complete: string;
-    error: string;
-    denied?: string;
-  }
-> = {
-  createTask: {
-    pending: "Preparing task",
-    complete: "Prepared task",
-    error: "Couldn't prepare task",
-    denied: "Skipped task creation",
-  },
-  createNote: {
-    pending: "Preparing note",
-    complete: "Prepared note",
-    error: "Couldn't prepare note",
-    denied: "Skipped note creation",
-  },
-  archiveEmail: {
-    pending: "Preparing archive action",
-    complete: "Archived email",
-    error: "Couldn't archive email",
-    denied: "Skipped archive action",
-  },
-  composeEmail: {
-    pending: "Preparing draft",
-    complete: "Prepared draft",
-    error: "Couldn't prepare draft",
-    denied: "Skipped draft",
-  },
-  searchEmails: {
-    pending: "Checking inbox",
-    complete: "Checked inbox",
-    error: "Couldn't check inbox",
-  },
-  resolveContact: {
-    pending: "Looking up contact",
-    complete: "Found contact",
-    error: "Couldn't find contact",
-  },
-  listTasks: {
-    pending: "Checking tasks",
-    complete: "Checked tasks",
-    error: "Couldn't check tasks",
-  },
-  summarizeEmail: {
-    pending: "Reading email",
-    complete: "Read email",
-    error: "Couldn't read email",
-  },
-};
 
 function isPresent(value: unknown) {
   if (value === null || value === undefined) return false;
@@ -124,7 +83,13 @@ function ToolField({
       <p className="shrink-0 text-[11px] font-medium text-muted-foreground">
         {label}
       </p>
-      <div className={multiline ? "text-xs text-foreground" : "min-w-0 text-xs text-foreground"}>
+      <div
+        className={
+          multiline
+            ? "text-xs text-foreground"
+            : "min-w-0 text-xs text-foreground"
+        }
+      >
         {value}
       </div>
     </div>
@@ -200,7 +165,9 @@ function buildForwardedEmailPreviewHtml(email: EmailDetailItem) {
 
 function EmailActionArgs({ args }: { args: Record<string, unknown> }) {
   const forwardEmailId =
-    typeof args.forwardEmailId === "number" ? String(args.forwardEmailId) : null;
+    typeof args.forwardEmailId === "number"
+      ? String(args.forwardEmailId)
+      : null;
   const forwardEmailQuery = useQuery({
     queryKey: ["email-detail", forwardEmailId, "agent-approval"],
     queryFn: () => fetchEmailDetail(forwardEmailId!),
@@ -215,9 +182,9 @@ function EmailActionArgs({ args }: { args: Record<string, unknown> }) {
   const resolvedSubject = isPresent(args.subject)
     ? String(args.subject)
     : forwardEmailQuery.data
-      ? (forwardEmailQuery.data.subject?.startsWith("Fwd:")
-          ? forwardEmailQuery.data.subject
-          : `Fwd: ${forwardEmailQuery.data.subject ?? ""}`.trim())
+      ? forwardEmailQuery.data.subject?.startsWith("Fwd:")
+        ? forwardEmailQuery.data.subject
+        : `Fwd: ${forwardEmailQuery.data.subject ?? ""}`.trim()
       : null;
   const resolvedBody = forwardEmailQuery.data
     ? prefaceHtml
@@ -247,9 +214,7 @@ function EmailActionArgs({ args }: { args: Record<string, unknown> }) {
           value={<p className="text-balance">{resolvedSubject}</p>}
         />
       ) : null}
-      {resolvedBody ? (
-        <ToolBodyPreview text={resolvedBody} />
-      ) : null}
+      {resolvedBody ? <ToolBodyPreview text={resolvedBody} /> : null}
       {forwardEmailId && forwardEmailQuery.isPending ? (
         <ToolField label="Forward" value="Loading forwarded email preview..." />
       ) : null}
@@ -318,19 +283,66 @@ function ToolArgs({
       );
     }
     case "deleteTask":
+    case "deleteNote":
     case "archiveEmail":
     case "trashEmail":
+    case "snoozeEmail":
+    case "unsubscribeEmail":
     case "markEmailRead":
     case "markEmailUnread":
     case "starEmail":
-    case "unstarEmail": {
-      const fieldLabel = toolName.includes("Task") ? "Task ID" : "Email ID";
-      const idValue = args.taskId ?? args.emailId;
+    case "unstarEmail":
+    case "approveProposedEvent":
+    case "dismissProposedEvent": {
+      const fieldLabel = toolName.includes("Task")
+        ? "Task ID"
+        : toolName.includes("Note")
+          ? "Note ID"
+          : toolName.includes("Proposed") || toolName.includes("Event")
+            ? "Event ID"
+            : "Email ID";
+      const idValue =
+        args.taskId ?? args.emailId ?? args.noteId ?? args.proposedId;
 
       return (
         <div className="space-y-3">
           {isPresent(idValue) ? (
             <ToolField label={fieldLabel} value={String(idValue)} />
+          ) : null}
+        </div>
+      );
+    }
+    case "batchArchive":
+    case "batchTrash": {
+      const ids = Array.isArray(args.emailIds) ? args.emailIds : [];
+      return (
+        <div className="space-y-3">
+          <ToolField
+            label="Emails"
+            value={`${ids.length} email${ids.length === 1 ? "" : "s"}`}
+          />
+        </div>
+      );
+    }
+    case "updateNote": {
+      return (
+        <div className="space-y-3">
+          {isPresent(args.noteId) ? (
+            <ToolField label="Note ID" value={String(args.noteId)} />
+          ) : null}
+          {isPresent(args.title) ? (
+            <ToolField
+              label="Title"
+              value={<p className="text-balance">{String(args.title)}</p>}
+            />
+          ) : null}
+          {typeof args.content === "string" &&
+          args.content.trim().length > 0 ? (
+            <ToolField
+              label="Content"
+              multiline
+              value={<ToolBodyPreview text={args.content.trim()} />}
+            />
           ) : null}
         </div>
       );
@@ -360,7 +372,9 @@ function ToolArgs({
       );
     }
     default: {
-      const entries = Object.entries(args).filter(([, value]) => isPresent(value));
+      const entries = Object.entries(args).filter(([, value]) =>
+        isPresent(value),
+      );
 
       return (
         <div className="space-y-3">
@@ -414,7 +428,7 @@ function buildKeyedMessageParts(messageId: string, parts: UIMessage["parts"]) {
 
 function getMessagePartSignature(part: UIMessage["parts"][number]) {
   if (part.type === "text") {
-    return `text:${part.text}`;
+    return `text:${normalizeAgentText(part.text)}`;
   }
 
   if (isReasoningUIPart(part)) {
@@ -428,13 +442,15 @@ function getMessagePartSignature(part: UIMessage["parts"][number]) {
   return part.type;
 }
 
-function MessagePart({
-  part,
-}: {
-  part: UIMessage["parts"][number];
-}) {
+function MessagePart({ part }: { part: UIMessage["parts"][number] }) {
   if (part.type === "text") {
-    return <p className="whitespace-pre-wrap">{part.text}</p>;
+    return (
+      <div className="prose prose-xs max-w-none text-xs prose-p:my-0.5 prose-ul:my-0.5 prose-ol:my-0.5 prose-li:my-0 prose-headings:my-1.5 prose-headings:text-xs prose-hr:my-1.5">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {normalizeAgentText(part.text)}
+        </ReactMarkdown>
+      </div>
+    );
   }
 
   if (isReasoningUIPart(part)) {
@@ -442,56 +458,105 @@ function MessagePart({
   }
 
   if (isToolUIPart(part)) {
-    const toolName = getToolName(part);
-
-    if (part.state === "approval-requested") {
-      return null;
-    }
-
-    if (part.state === "output-error") {
-      return (
-        <ToolActivity
-          tone="error"
-          text={getToolActivityText(toolName, part.state)}
-        />
-      );
-    }
-
-    return <ToolActivity text={getToolActivityText(toolName, part.state)} />;
+    return null;
   }
 
   return null;
 }
 
-function getToolActivityText(toolName: string, state: string) {
-  const labels = toolActivityLabels[toolName] ?? {
-    pending: "Working",
-    complete: "Done",
-    error: "Something went wrong",
-    denied: "Skipped",
-  };
+function InlineDiff({
+  oldText,
+  newText,
+}: {
+  oldText: string;
+  newText: string;
+}) {
+  const parts = useMemo(() => diffWords(oldText, newText), [oldText, newText]);
 
-  if (state === "approval-requested") return labels.pending;
-  if (state === "output-available") return labels.complete;
-  if (state === "output-error") return labels.error;
-  if (state === "output-denied") return labels.denied ?? "Skipped";
-  return labels.pending;
+  return (
+    <div className="max-h-40 overflow-y-auto rounded-md border border-border/60 bg-background px-3 py-2 text-xs leading-relaxed">
+      {parts.map((part, i) => {
+        if (part.added) {
+          return (
+            <span
+              key={i}
+              className="bg-green-500/20 text-green-700 dark:text-green-400"
+            >
+              {part.value}
+            </span>
+          );
+        }
+        if (part.removed) {
+          return (
+            <span
+              key={i}
+              className="bg-red-500/20 text-red-700 line-through dark:text-red-400"
+            >
+              {part.value}
+            </span>
+          );
+        }
+        return <span key={i}>{part.value}</span>;
+      })}
+    </div>
+  );
 }
 
-function ToolActivity({
-  tone = "muted",
-  text,
-}: {
-  tone?: "muted" | "error";
-  text: string;
-}) {
+function MessageActions({ text }: { text: string }) {
+  const [showDiff, setShowDiff] = useState(false);
+  const [applied, setApplied] = useState(false);
+  const composerBody = showDiff ? getComposerBody() : null;
+  const composerOpen = isComposerOpen();
+
   return (
-    <div
-      className={`flex items-center gap-2 text-[10px] ${
-        tone === "error" ? "text-destructive" : "text-muted-foreground/50"
-      }`}
-    >
-      <span>{text}</span>
+    <div className="space-y-2">
+      <div className="flex gap-1.5">
+        {composerOpen && !applied && (
+          <Button
+            size="xs"
+            variant="ghost"
+            className="h-6 text-[10px] text-muted-foreground"
+            onClick={() => setShowDiff(true)}
+          >
+            <PencilSimpleIcon className="mr-1 size-3" />
+            Apply to composer
+          </Button>
+        )}
+        {applied && (
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <CheckIcon className="size-3" />
+            Applied
+          </span>
+        )}
+      </div>
+
+      {showDiff && composerBody != null && (
+        <div className="space-y-2">
+          <InlineDiff oldText={composerBody} newText={text} />
+          <div className="flex gap-1.5">
+            <Button
+              size="xs"
+              variant="default"
+              className="h-6 text-[10px]"
+              onClick={() => {
+                setComposerBody(text);
+                setShowDiff(false);
+                setApplied(true);
+              }}
+            >
+              Confirm
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              className="h-6 text-[10px]"
+              onClick={() => setShowDiff(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -500,16 +565,27 @@ export function AgentMessage({ message }: { message: UIMessage }) {
   const isUser = message.role === "user";
   const keyedParts = buildKeyedMessageParts(message.id, message.parts);
 
+  const lastTextPart = !isUser
+    ? [...message.parts].reverse().find((p) => p.type === "text")
+    : null;
+  const lastText =
+    lastTextPart?.type === "text"
+      ? normalizeAgentText(lastTextPart.text)
+      : null;
+
   return (
-    <div className={`px-3 py-2 text-xs ${isUser ? "flex justify-end" : ""}`}>
+    <div
+      className={`px-3 py-2 text-xs ${isUser ? "flex justify-end" : "font-mono"}`}
+    >
       <div
         className={`space-y-2 ${
-          isUser ? "max-w-[85%] rounded-md bg-muted/40 px-3 py-2" : "w-full"
+          isUser ? "max-w-[85%] rounded-md bg-muted/40 px-2 py-1" : "w-full"
         }`}
       >
         {keyedParts.map(({ key, part }) => (
           <MessagePart key={key} part={part} />
         ))}
+        {lastText && <MessageActions text={lastText} />}
       </div>
     </div>
   );
@@ -544,17 +620,15 @@ export function ToolApprovalCard({
             onDiscard(toolCallId);
           }}
         >
-          <XIcon className="mr-1 size-3" />
           Discard
         </Button>
         <Button
           size="sm"
-          variant="default"
+          variant="secondary"
           onClick={() => {
             onApprove(toolCallId);
           }}
         >
-          <CheckIcon className="mr-1 size-3" />
           Approve
         </Button>
       </div>
@@ -562,12 +636,27 @@ export function ToolApprovalCard({
   );
 }
 
-export function AgentThinking({ label = "Thinking..." }: { label?: string }) {
+export function AgentThinking() {
+  const synonyms = [
+    "reflecting",
+    "contemplating",
+    "considering",
+    "pondering",
+    "reasoning",
+    "deliberating",
+    "analyzing",
+    "meditating",
+    "musing",
+    "cogitating",
+  ];
+
+  const word = useMemo(() => {
+    return synonyms[Math.floor(Math.random() * synonyms.length)];
+  }, []);
+
   return (
-    <div className="flex items-center gap-1.5 px-3 py-1.5">
-      <span className="text-[10px] animate-pulse text-muted-foreground">
-        {label}
-      </span>
-    </div>
+    <span className="text-xs capitalize text-muted-foreground px-3">
+      {word}...
+    </span>
   );
 }

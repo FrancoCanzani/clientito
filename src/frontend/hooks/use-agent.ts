@@ -1,5 +1,6 @@
 import { useAgentChat } from "@cloudflare/ai-chat/react";
 import { useAgent } from "agents/react";
+import { getComposerBody, isComposerOpen } from "@/features/inbox/components/compose-bridge";
 import { useAuth } from "./use-auth";
 import { usePageContext } from "./use-page-context";
 
@@ -14,11 +15,17 @@ export function useAppAgent() {
 
   const chat = useAgentChat({
     agent,
-    body: () => ({
-      currentUrl:
-        typeof window !== "undefined" ? window.location.href : null,
-      pageContext,
-    }),
+    body: () => {
+      const composerBody = isComposerOpen() ? getComposerBody() : null;
+      const ctxWithComposer = pageContext
+        ? { ...pageContext, composer: composerBody ? { body: composerBody } : null }
+        : pageContext;
+      return {
+        currentUrl:
+          typeof window !== "undefined" ? window.location.href : null,
+        pageContext: ctxWithComposer,
+      };
+    },
   });
 
   return {

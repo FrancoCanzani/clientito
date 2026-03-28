@@ -15,6 +15,8 @@ type PageEntity =
         fromAddr: string;
         threadId: string | null;
         mailboxId: number | null;
+        bodyPreview?: string | null;
+        draftReply?: string | null;
       }
   | { type: "person"; id: string; name: string | null; email: string | null }
   | { type: "note"; id: string; title: string | null }
@@ -23,6 +25,7 @@ type PageEntity =
 export type PageContext = {
   route: string;
   entity?: PageEntity;
+  composer?: { body: string } | null;
 };
 
 type PageContextState = {

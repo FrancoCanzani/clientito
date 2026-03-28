@@ -11,7 +11,7 @@ export function registerPostTasks(api: Hono<AppRouteEnv>) {
     const db = c.get("db");
     const user = c.get("user")!;
 
-    const { title, description, dueAt, dueTime, priority, status } =
+    const { title, description, dueAt, priority, status } =
       c.req.valid("json");
 
     const inserted = await db
@@ -21,7 +21,6 @@ export function registerPostTasks(api: Hono<AppRouteEnv>) {
         title,
         description: description ?? null,
         dueAt: dueAt ?? null,
-        dueTime: dueTime ?? null,
         priority: priority ?? "low",
         status: status ?? "todo",
         createdAt: Date.now(),

@@ -21,7 +21,6 @@ export const postTaskBodySchema = z.object({
   title: z.string().trim().min(1),
   description: z.string().trim().max(4000).nullable().optional(),
   dueAt: z.number().int().optional(),
-  dueTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   priority: taskPrioritySchema.optional(),
   status: taskStatusSchema.optional(),
 });
@@ -31,7 +30,6 @@ export const patchTaskBodySchema = z
     title: z.string().trim().min(1).optional(),
     description: z.string().trim().max(4000).nullable().optional(),
     dueAt: z.number().int().nullable().optional(),
-    dueTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
     priority: taskPrioritySchema.optional(),
     status: taskStatusSchema.optional(),
     position: z.number().int().optional(),

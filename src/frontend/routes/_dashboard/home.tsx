@@ -1,9 +1,5 @@
 import HomePage from "@/features/home/pages/home-page";
-import {
-  ApiError,
-  fetchBriefing,
-  fetchSyncStatus,
-} from "@/features/home/queries";
+import { fetchBriefing, fetchSyncStatus } from "@/features/home/queries";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/home")({
@@ -13,7 +9,7 @@ export const Route = createFileRoute("/_dashboard/home")({
     try {
       status = await fetchSyncStatus();
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
+      if (error && typeof error === "object" && "status" in error && error.status === 401) {
         throw redirect({ to: "/login" });
       }
       throw error;
@@ -28,10 +24,9 @@ export const Route = createFileRoute("/_dashboard/home")({
       throw redirect({ to: "/get-started" });
     }
 
-    // Briefing works during sync — may have fewer items but that's fine
     return fetchBriefing();
   },
-  staleTime: 30 * 60 * 1000,
-  gcTime: 60 * 60 * 1000,
+  staleTime: 5 * 60 * 1000,
+  gcTime: 10 * 60 * 1000,
   component: HomePage,
 });

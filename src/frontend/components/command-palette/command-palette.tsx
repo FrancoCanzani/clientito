@@ -9,12 +9,11 @@ import { Command } from "cmdk";
 import { useHotkey } from "@tanstack/react-hotkeys";
 import { useRouter } from "@tanstack/react-router";
 import { AnimatePresence, LazyMotion, domAnimation, m } from "motion/react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { AgentPanel } from "./agent-panel";
 import { CommandListPanel } from "./command-list-panel";
 import { NewTaskPanel } from "./new-task-panel";
 import { SearchPanel } from "./search-panel";
-import { Button } from "@/components/ui/button";
 import { getToolName, isToolUIPart } from "ai";
 import { useCommandPaletteState } from "./use-command-palette-state";
 import { usePaletteCommands } from "./use-palette-commands";
@@ -56,6 +55,17 @@ export function CommandPalette() {
     submitTask,
     createTaskMutation,
   } = usePaletteCommands({ close: state.close, setMode: state.setMode });
+
+  const prevStatusRef = useRef(state.status);
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = state.status;
+    if ((prev === "streaming" || prev === "submitted") && state.status === "ready") {
+      void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      void queryClient.invalidateQueries({ queryKey: ["emails"] });
+      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+    }
+  }, [state.status, queryClient]);
 
   const normalizedQuery = state.query.trim();
   const firstPendingApproval = useMemo(() => {
@@ -221,19 +231,22 @@ export function CommandPalette() {
                 }}
                 placeholder={
                   state.hasPendingApprovals
-                    ? "Approve, discard, or describe how to revise it..."
+                    ? "Approve, discard, or revise..."
                     : "Ask the agent..."
                 }
                 className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               />
-              <Button
-                size="sm"
-                className="h-8 px-3 text-xs"
-                onClick={state.handleAgentSubmit}
-                disabled={state.agentInput.trim().length === 0}
-              >
-                Send
-              </Button>
+              {state.agentInput.trim() ? (
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 px-2 text-xs"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={state.handleAgentSubmit}
+                >
+                  <KeyReturnIcon className="size-4" />
+                  Send
+                </button>
+              ) : null}
             </>
           ) : (
             <Command.Input

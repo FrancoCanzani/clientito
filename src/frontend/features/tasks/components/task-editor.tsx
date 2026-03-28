@@ -29,12 +29,7 @@ function toInitialDate(
 ): Date | undefined {
   const ts = task?.dueAt ?? defaultDueAt;
   if (!ts) return undefined;
-  const d = new Date(ts);
-  if (task?.dueTime) {
-    const [h, m] = task.dueTime.split(":").map(Number);
-    d.setHours(h, m, 0, 0);
-  }
-  return d;
+  return new Date(ts);
 }
 
 function getInitialState(
@@ -54,7 +49,6 @@ export type TaskEditorSubmitValue = {
   title: string;
   description: string | null;
   dueAt: number | null;
-  dueTime: string | null;
   priority: TaskPriority;
   status: TaskStatus;
 };
@@ -119,24 +113,6 @@ export function TaskEditor({
     update("dueAt", newDate);
   };
 
-  const submitDueAt = form.dueAt
-    ? new Date(
-        form.dueAt.getFullYear(),
-        form.dueAt.getMonth(),
-        form.dueAt.getDate(),
-        12,
-        0,
-        0,
-        0,
-      ).getTime()
-    : null;
-
-  const submitDueTime =
-    form.dueAt &&
-    (form.dueAt.getHours() !== 12 || form.dueAt.getMinutes() !== 0)
-      ? timeValue
-      : null;
-
   return (
     <form
       className={cn(
@@ -148,8 +124,7 @@ export function TaskEditor({
         onSubmit({
           title: form.title.trim(),
           description: form.description.trim() || null,
-          dueAt: submitDueAt,
-          dueTime: submitDueTime,
+          dueAt: form.dueAt ? form.dueAt.getTime() : null,
           priority: form.priority,
           status: form.status,
         });

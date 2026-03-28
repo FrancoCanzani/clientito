@@ -10,11 +10,9 @@ import { TaskBoardColumn } from "./task-board-column";
 export function TaskBoard({
   tasks,
   onEdit,
-  onPomodoro,
 }: {
   tasks: Task[];
   onEdit: (taskId: number) => void;
-  onPomodoro: (taskId: number, title: string) => void;
 }) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -54,7 +52,6 @@ export function TaskBoard({
           status={status}
           tasks={grouped.get(status) ?? []}
           onEdit={onEdit}
-          onPomodoro={onPomodoro}
         />
       ))}
     </div>

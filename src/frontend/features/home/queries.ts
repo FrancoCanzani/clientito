@@ -1,13 +1,3 @@
-export class ApiError extends Error {
-  status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-  }
-}
-
 export type SyncStatus = {
   state:
     | "needs_mailbox_connect"
@@ -29,7 +19,13 @@ export type SyncStatus = {
 
 export type HomeBriefingItem = {
   id: string;
-  type: "action_needed" | "important" | "overdue_task" | "due_today_task";
+  type:
+    | "action_needed"
+    | "important"
+    | "overdue_task"
+    | "due_today_task"
+    | "proposed_event"
+    | "calendar_event";
   title: string;
   reason: string;
   href: string;
@@ -40,6 +36,11 @@ export type HomeBriefingItem = {
   subject?: string | null;
   mailboxId?: number | null;
   messageId?: string | null;
+  proposedEventId?: number;
+  eventStart?: number;
+  eventEnd?: number;
+  eventLocation?: string | null;
+  eventDescription?: string | null;
 };
 
 export type HomeBriefing = {
@@ -55,9 +56,7 @@ export type HomeBriefing = {
 
 export async function fetchBriefing(): Promise<HomeBriefing> {
   const response = await fetch("/api/ai/briefing");
-  if (!response.ok) {
-    throw new ApiError("Failed to fetch home briefing.", response.status);
-  }
+  if (!response.ok) throw { status: response.status };
   const json = await response.json();
   return json.data;
 }
@@ -70,18 +69,27 @@ export async function fetchDraftReplies(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ emailIds }),
   });
-  if (!response.ok) {
-    throw new ApiError("Failed to fetch draft replies", response.status);
-  }
+  if (!response.ok) throw { status: response.status };
   const json = await response.json();
-  return (json as { data: Record<number, string> }).data;
+  return json.data;
+}
+
+export async function postBriefingDecision(body: {
+  itemType: "email" | "task" | "proposed_event";
+  referenceId: number;
+  decision: "dismissed" | "replied" | "archived" | "approved";
+}): Promise<void> {
+  const response = await fetch("/api/ai/briefing/decision", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw { status: response.status };
 }
 
 export async function fetchSyncStatus(): Promise<SyncStatus> {
   const response = await fetch("/api/inbox/sync/status");
-  if (!response.ok) {
-    throw new ApiError("Failed to fetch sync status.", response.status);
-  }
+  if (!response.ok) throw { status: response.status };
   const json = await response.json();
   return json.data;
 }

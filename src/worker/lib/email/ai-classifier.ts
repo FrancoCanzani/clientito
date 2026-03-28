@@ -2,36 +2,21 @@ import { Output, generateText } from "ai";
 import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
 import { chunkArray, withRetry } from "../utils";
+import { AI_MODELS } from "../constants";
 
-const MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
 const BATCH_SIZE = 10;
 
-type AiLabel =
-  | "action_needed"
-  | "important"
-  | "later"
-  | "newsletter"
-  | "marketing"
-  | "transactional"
-  | "notification";
-
-const AI_LABELS: AiLabel[] = [
+const AI_LABELS = [
   "action_needed",
   "important",
   "newsletter",
   "marketing",
   "transactional",
   "notification",
-];
+] as const;
 
-const aiLabelSchema = z.union([
-  z.literal("action_needed"),
-  z.literal("important"),
-  z.literal("newsletter"),
-  z.literal("marketing"),
-  z.literal("transactional"),
-  z.literal("notification"),
-]);
+type AiLabel = (typeof AI_LABELS)[number];
+const aiLabelSchema = z.enum(AI_LABELS);
 
 type EmailForClassification = {
   index: number;
@@ -202,35 +187,32 @@ export async function classifyEmails(
     ),
   });
 
+  const models = AI_MODELS;
+
   for (const chunk of chunkArray(emailBatch, BATCH_SIZE)) {
-    try {
-      const emailList = chunk
-        .map(
-          (email) =>
-            [
-              `[${email.index}]`,
-              `From: ${email.fromName ? `${email.fromName} <${email.from}>` : email.from}`,
-              `Subject: ${email.subject ?? "(no subject)"}`,
-              `Preview: ${compactText(email.snippet, 180) || "(empty)"}`,
-              `Body excerpt: ${compactText(email.bodyText, 260) || "(empty)"}`,
-              `Has unsubscribe signals: ${email.hasUnsubscribe ? "yes" : "no"}`,
-            ].join(" | "),
-        )
+    const emailList = chunk
+      .map(
+        (email) =>
+          [
+            `[${email.index}]`,
+            `From: ${email.fromName ? `${email.fromName} <${email.from}>` : email.from}`,
+            `Subject: ${email.subject ?? "(no subject)"}`,
+            `Preview: ${compactText(email.snippet, 180) || "(empty)"}`,
+            `Body excerpt: ${compactText(email.bodyText, 260) || "(empty)"}`,
+            `Has unsubscribe signals: ${email.hasUnsubscribe ? "yes" : "no"}`,
+          ].join(" | "),
+      )
+      .join("\n");
+
+    let filterSection = "";
+    if (hasFilters) {
+      const filterList = userFilters
+        .map((filter) => `  Filter #${filter.id}: ${filter.description}`)
         .join("\n");
+      filterSection = `\n\nUser filter rules (return matching filter IDs in "matchedFilters" for each email):\n${filterList}`;
+    }
 
-      let filterSection = "";
-      if (hasFilters) {
-        const filterList = userFilters
-          .map((filter) => `  Filter #${filter.id}: ${filter.description}`)
-          .join("\n");
-        filterSection = `\n\nUser filter rules (return matching filter IDs in "matchedFilters" for each email):\n${filterList}`;
-      }
-
-      const { output } = await withRetry(
-        () => generateText({
-        model: workersAI(MODEL),
-        output: Output.object({ schema }),
-        prompt: `Classify each email into exactly one category.
+    const prompt = `Classify each email into exactly one category.
 
 Use a conservative standard for "action_needed". Action-needed emails should be rare.
 
@@ -269,27 +251,43 @@ ${filterSection}
 Emails:
 ${emailList}
 
-Return a JSON object with a "results" array. Each item must have "index" (the number in brackets) and "label" (one of: action_needed, important, newsletter, marketing, transactional, notification).${hasFilters ? ' Each item should also have "matchedFilters" - an array of filter IDs that apply to that email (empty array if none match).' : ""}`,
-      }),
-        { maxRetries: 1, baseDelayMs: 2000, label: "email-classification" },
-      );
+Return a JSON object with a "results" array. Each item must have "index" (the number in brackets) and "label" (one of: action_needed, important, newsletter, marketing, transactional, notification).${hasFilters ? ' Each item should also have "matchedFilters" - an array of filter IDs that apply to that email (empty array if none match).' : ""}`;
 
-      for (const row of output.results) {
-        if (AI_LABELS.includes(row.label)) {
+    let classified = false;
+
+    for (const model of models) {
+      try {
+        const { output } = await withRetry(
+          () => generateText({
+            model: workersAI(model),
+            output: Output.object({ schema }),
+            prompt,
+          }),
+          { maxRetries: 1, baseDelayMs: 2000, label: "email-classification" },
+        );
+
+        for (const row of output.results) {
           const email = chunk.find((candidate) => candidate.index === row.index);
           const label =
             row.label === "action_needed" && email
               ? classifyActionNeededOverride(email) ?? row.label
               : row.label;
           result.labels.set(row.index, label);
+          const matched = (row as { matchedFilters?: number[] }).matchedFilters;
+          if (matched && matched.length > 0) {
+            result.filterMatches.set(row.index, matched);
+          }
         }
-        const matched = (row as { matchedFilters?: number[] }).matchedFilters;
-        if (matched && matched.length > 0) {
-          result.filterMatches.set(row.index, matched);
-        }
+
+        classified = true;
+        break;
+      } catch (error) {
+        console.error(`Email classification failed (model: ${model})`, error);
       }
-    } catch (error) {
-      console.error("Email classification failed for batch", error);
+    }
+
+    if (!classified) {
+      console.error("Email classification failed for batch after all models");
     }
   }
 

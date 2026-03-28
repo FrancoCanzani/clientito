@@ -5,7 +5,6 @@ export const TASK_COLUMNS = {
   title: tasks.title,
   description: tasks.description,
   dueAt: tasks.dueAt,
-  dueTime: tasks.dueTime,
   priority: tasks.priority,
   status: tasks.status,
   completedAt: tasks.completedAt,

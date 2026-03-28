@@ -8,8 +8,6 @@ import {
 } from "@/components/ui/empty";
 import { useEmail } from "@/features/inbox/context/email-context";
 import { VIEW_LABELS } from "@/features/inbox/utils/inbox-filters";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
 import { Link, getRouteApi } from "@tanstack/react-router";
 import { EmailContextMenu } from "./email-context-menu";
 import { EmailRow } from "./email-row";
@@ -17,15 +15,12 @@ import { EmailRow } from "./email-row";
 const emailsRoute = getRouteApi("/_dashboard/inbox/$id/");
 
 export function EmailList() {
-  const isMobile = useIsMobile();
   const search = emailsRoute.useSearch();
   const {
     view,
     mailboxId,
-    selectedEmailId,
     displayRows,
     sections,
-    selectedEmail,
     hasNextPage,
     isFetchingNextPage,
     loadMoreRef,
@@ -33,24 +28,11 @@ export function EmailList() {
     executeEmailAction,
   } = useEmail();
 
-  const isSplitView = !isMobile && selectedEmail !== null;
   const pageTitle = VIEW_LABELS[view];
 
   return (
-    <div
-      className={cn(
-        "flex min-w-0 flex-col",
-        isSplitView
-          ? "h-full w-full overflow-hidden p-4"
-          : "mx-auto w-full max-w-3xl",
-      )}
-    >
-      <div
-        className={cn(
-          "min-h-0 flex-1 space-y-6",
-          isSplitView && "overflow-y-auto",
-        )}
-      >
+    <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-col">
+      <div className="min-h-0 flex-1 space-y-6">
         <header className="sticky top-0 z-20 flex items-center justify-between bg-background py-2">
           <h2 className="text-xl font-medium">{pageTitle}</h2>
           <div className="flex items-center justify-end gap-2">
@@ -63,9 +45,6 @@ export function EmailList() {
                 search={{
                   view: search.view,
                   compose: true,
-                  id: search.id,
-                  emailId: search.emailId,
-                  threadId: search.threadId,
                 }}
               >
                 New Email
@@ -84,7 +63,6 @@ export function EmailList() {
                 <div className="space-y-1 [&:has(>[data-email-row]:hover)>[data-email-row]:not(:hover)]:opacity-85">
                   {section.items.map((group) => {
                     const email = group.representative;
-                    const isOpen = email.id === selectedEmailId;
 
                     return (
                       <EmailContextMenu
@@ -110,7 +88,7 @@ export function EmailList() {
                           email={email}
                           threadCount={group.threadCount}
                           view={view}
-                          isOpen={isOpen}
+                          isOpen={false}
                           onOpen={() => openEmail(email)}
                         />
                       </EmailContextMenu>

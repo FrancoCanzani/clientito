@@ -5,18 +5,13 @@ import { and, asc, eq } from "drizzle-orm";
 import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
 import { emails } from "../../db/schema";
+import { PRIMARY_MODEL } from "../../lib/constants";
+import { truncate } from "../../lib/utils";
 import type { AppRouteEnv } from "../types";
-
-const MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
 
 const summarizeEmailBodySchema = z.object({
   emailId: z.coerce.number().int().positive(),
 });
-
-function truncate(value: string, maxLength: number) {
-  if (value.length <= maxLength) return value;
-  return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
-}
 
 export function registerPostSummarizeEmail(app: Hono<AppRouteEnv>) {
   app.post(
@@ -89,7 +84,7 @@ export function registerPostSummarizeEmail(app: Hono<AppRouteEnv>) {
       try {
         const workersAI = createWorkersAI({ binding: c.env.AI });
         const result = streamText({
-          model: workersAI(MODEL),
+          model: workersAI(PRIMARY_MODEL),
           system: systemPrompt,
           prompt: userPrompt,
         });

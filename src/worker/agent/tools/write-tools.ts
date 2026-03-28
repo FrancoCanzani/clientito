@@ -2,11 +2,12 @@ import { tool } from "ai";
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
-import { emails, notes, tasks } from "../../db/schema";
+import { emails, notes, proposedEvents, tasks } from "../../db/schema";
 import { createEmailProvider } from "../../lib/email";
 import { STANDARD_LABELS } from "../../lib/email/types";
 import { chunkArray } from "../../lib/utils";
-import { resolveOutgoingMailbox } from "../../lib/email/mailbox-state";
+import { resolveOutgoingMailbox, getUserMailboxes, ensureMailbox } from "../../lib/email/mailbox-state";
+import { markEmailSubscriptionStatus, normalizeUnsubscribeUrl, normalizeUnsubscribeEmail } from "../../lib/email/subscriptions";
 import { applyEmailPatch } from "../../routes/inbox/emails/internal/mutation";
 import { hasEmailLabel } from "../../routes/inbox/emails/utils";
 
@@ -349,7 +350,6 @@ export function makeWriteTools(
           .optional()
           .describe("Due date as Unix timestamp in milliseconds."),
       }),
-      needsApproval: true,
       execute: async ({ title, dueAt }) => {
         const result = await db
           .insert(tasks)
@@ -433,7 +433,6 @@ export function makeWriteTools(
       inputSchema: z.object({
         emailId: z.number().int().positive().describe("Email ID to archive."),
       }),
-      needsApproval: true,
       execute: async ({ emailId }) => {
         return patchEmailLabels(db, env, userId, emailId, { archived: true });
       },
@@ -486,7 +485,6 @@ export function makeWriteTools(
       inputSchema: z.object({
         emailId: z.number().int().positive().describe("Email ID."),
       }),
-      needsApproval: true,
       execute: async ({ emailId }) => {
         return patchEmailLabels(db, env, userId, emailId, { starred: true });
       },
@@ -676,6 +674,222 @@ export function makeWriteTools(
           subject: resolvedSubject,
           body: resolvedBody,
         };
+      },
+    }),
+
+    updateNote: tool({
+      description: "Update an existing note's title or content.",
+      inputSchema: z.object({
+        noteId: z.number().int().positive().describe("Note ID to update."),
+        title: z.string().optional().describe("New note title."),
+        content: z.string().optional().describe("New note content."),
+      }),
+      needsApproval: true,
+      execute: async ({ noteId, title, content }) => {
+        const existing = await db
+          .select({ id: notes.id })
+          .from(notes)
+          .where(and(eq(notes.id, noteId), eq(notes.userId, userId)))
+          .limit(1);
+        if (!existing[0]) return { error: "Note not found" };
+
+        const updates: Record<string, unknown> = { updatedAt: Date.now() };
+        if (title !== undefined) updates.title = title;
+        if (content !== undefined) updates.content = content;
+
+        await db
+          .update(notes)
+          .set(updates)
+          .where(and(eq(notes.id, noteId), eq(notes.userId, userId)));
+        return { updated: true, noteId };
+      },
+    }),
+
+    deleteNote: tool({
+      description: "Delete a note permanently.",
+      inputSchema: z.object({
+        noteId: z.number().int().positive().describe("Note ID to delete."),
+      }),
+      needsApproval: true,
+      execute: async ({ noteId }) => {
+        await db
+          .delete(notes)
+          .where(and(eq(notes.id, noteId), eq(notes.userId, userId)));
+        return { deleted: true, noteId };
+      },
+    }),
+
+    batchArchive: tool({
+      description: "Archive multiple emails at once. Use for bulk operations like 'archive all newsletters'.",
+      inputSchema: z.object({
+        emailIds: z.array(z.number().int().positive()).min(1).max(50).describe("Email IDs to archive."),
+      }),
+      needsApproval: true,
+      execute: async ({ emailIds }) => {
+        const results = await Promise.allSettled(
+          emailIds.map((id) => patchEmailLabels(db, env, userId, id, { archived: true })),
+        );
+        const succeeded = results.filter((r) => r.status === "fulfilled").length;
+        return { archived: succeeded, total: emailIds.length };
+      },
+    }),
+
+    batchTrash: tool({
+      description: "Move multiple emails to trash at once.",
+      inputSchema: z.object({
+        emailIds: z.array(z.number().int().positive()).min(1).max(50).describe("Email IDs to trash."),
+      }),
+      needsApproval: true,
+      execute: async ({ emailIds }) => {
+        const results = await Promise.allSettled(
+          emailIds.map((id) => patchEmailLabels(db, env, userId, id, { trashed: true })),
+        );
+        const succeeded = results.filter((r) => r.status === "fulfilled").length;
+        return { trashed: succeeded, total: emailIds.length };
+      },
+    }),
+
+    snoozeEmail: tool({
+      description: "Snooze an email until a specific time. The email will reappear in the inbox after the snooze period.",
+      inputSchema: z.object({
+        emailId: z.number().int().positive().describe("Email ID to snooze."),
+        until: z.number().describe("Unix timestamp in milliseconds for when the email should reappear."),
+      }),
+      execute: async ({ emailId, until }) => {
+        const email = await getEmailForUser(db, userId, emailId);
+        if (!email) return { error: "Email not found" };
+
+        await db
+          .update(emails)
+          .set({ snoozedUntil: until })
+          .where(and(eq(emails.id, emailId), eq(emails.userId, userId)));
+
+        return { snoozed: true, emailId, until: new Date(until).toISOString() };
+      },
+    }),
+
+    unsubscribeEmail: tool({
+      description: "Unsubscribe from an email sender. Uses the email's unsubscribe headers when available.",
+      inputSchema: z.object({
+        emailId: z.number().int().positive().describe("Email ID to unsubscribe from."),
+      }),
+      needsApproval: true,
+      execute: async ({ emailId }) => {
+        const rows = await db
+          .select({
+            id: emails.id,
+            fromAddr: emails.fromAddr,
+            unsubscribeUrl: emails.unsubscribeUrl,
+            unsubscribeEmail: emails.unsubscribeEmail,
+            mailboxId: emails.mailboxId,
+          })
+          .from(emails)
+          .where(and(eq(emails.id, emailId), eq(emails.userId, userId)))
+          .limit(1);
+
+        const email = rows[0];
+        if (!email) return { error: "Email not found" };
+
+        const unsubUrl = normalizeUnsubscribeUrl(email.unsubscribeUrl ?? undefined);
+        const unsubEmail = normalizeUnsubscribeEmail(email.unsubscribeEmail ?? undefined);
+
+        if (!unsubUrl && !unsubEmail) {
+          return { error: "No unsubscribe method available for this email" };
+        }
+
+        if (unsubUrl) {
+          try {
+            const res = await fetch(unsubUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: "List-Unsubscribe=One-Click-Unsubscribe",
+            });
+            if (res.ok || res.status === 204 || res.status === 302) {
+              await markEmailSubscriptionStatus(db, userId, {
+                fromAddr: email.fromAddr,
+                unsubscribeUrl: unsubUrl,
+                unsubscribeEmail: unsubEmail,
+                status: "unsubscribed",
+                method: "one-click",
+              });
+              return { unsubscribed: true, method: "one-click", fromAddr: email.fromAddr };
+            }
+          } catch {
+            // fall through to mailto
+          }
+        }
+
+        if (unsubEmail) {
+          const mailboxes = await getUserMailboxes(db, userId);
+          const mailbox = mailboxes[0] ?? await ensureMailbox(db, userId, null);
+          if (!mailbox) return { error: "No mailbox configured" };
+
+          const provider = await createEmailProvider(db, env, mailbox.id);
+          await provider.send(mailbox.email ?? userEmail ?? "", {
+            to: unsubEmail,
+            subject: "Unsubscribe",
+            body: "Unsubscribe",
+          });
+          await markEmailSubscriptionStatus(db, userId, {
+            fromAddr: email.fromAddr,
+            unsubscribeUrl: unsubUrl,
+            unsubscribeEmail: unsubEmail,
+            status: "unsubscribed",
+            method: "mailto",
+          });
+          return { unsubscribed: true, method: "mailto", fromAddr: email.fromAddr };
+        }
+
+        await markEmailSubscriptionStatus(db, userId, {
+          fromAddr: email.fromAddr,
+          unsubscribeUrl: unsubUrl,
+          unsubscribeEmail: unsubEmail,
+          status: "pending_manual",
+          method: "manual",
+        });
+        return { unsubscribed: false, method: "manual", fromAddr: email.fromAddr, message: "Automatic unsubscribe failed. The user may need to unsubscribe manually." };
+      },
+    }),
+
+    approveProposedEvent: tool({
+      description: "Approve a proposed calendar event extracted from an email.",
+      inputSchema: z.object({
+        proposedId: z.number().int().positive().describe("Proposed event ID to approve."),
+      }),
+      execute: async ({ proposedId }) => {
+        const rows = await db
+          .select({ id: proposedEvents.id, title: proposedEvents.title })
+          .from(proposedEvents)
+          .where(and(eq(proposedEvents.id, proposedId), eq(proposedEvents.userId, userId)))
+          .limit(1);
+        if (!rows[0]) return { error: "Proposed event not found" };
+
+        await db
+          .update(proposedEvents)
+          .set({ status: "approved", updatedAt: Date.now() })
+          .where(and(eq(proposedEvents.id, proposedId), eq(proposedEvents.userId, userId)));
+        return { approved: true, proposedId, title: rows[0].title };
+      },
+    }),
+
+    dismissProposedEvent: tool({
+      description: "Dismiss a proposed calendar event.",
+      inputSchema: z.object({
+        proposedId: z.number().int().positive().describe("Proposed event ID to dismiss."),
+      }),
+      execute: async ({ proposedId }) => {
+        const rows = await db
+          .select({ id: proposedEvents.id, title: proposedEvents.title })
+          .from(proposedEvents)
+          .where(and(eq(proposedEvents.id, proposedId), eq(proposedEvents.userId, userId)))
+          .limit(1);
+        if (!rows[0]) return { error: "Proposed event not found" };
+
+        await db
+          .update(proposedEvents)
+          .set({ status: "dismissed", updatedAt: Date.now() })
+          .where(and(eq(proposedEvents.id, proposedId), eq(proposedEvents.userId, userId)));
+        return { dismissed: true, proposedId, title: rows[0].title };
       },
     }),
 

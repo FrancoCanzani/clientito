@@ -13,12 +13,10 @@ export function TaskBoardColumn({
   status,
   tasks,
   onEdit,
-  onPomodoro,
 }: {
   status: TaskStatus;
   tasks: Task[];
   onEdit: (taskId: number) => void;
-  onPomodoro: (taskId: number, title: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [isDragOver, dispatchDragOver] = useReducer(dragOverReducer, false);
@@ -58,7 +56,6 @@ export function TaskBoardColumn({
             key={task.id}
             task={task}
             onEdit={() => onEdit(task.id)}
-            onPomodoro={() => onPomodoro(task.id, task.title)}
           />
         ))}
       </div>

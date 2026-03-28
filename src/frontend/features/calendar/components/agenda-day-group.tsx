@@ -25,12 +25,14 @@ export function AgendaDayGroup({
   events,
   onApprove,
   onDismiss,
+  onEdit,
   approvingId,
 }: {
   date: Date;
   events: AgendaEvent[];
   onApprove?: (proposedId: number) => void;
   onDismiss?: (proposedId: number) => void;
+  onEdit?: (proposedId: number, data: { title?: string; location?: string; startAt?: number; endAt?: number }) => void;
   approvingId?: number | null;
 }) {
   return (
@@ -45,6 +47,7 @@ export function AgendaDayGroup({
             event={event}
             onApprove={onApprove}
             onDismiss={onDismiss}
+            onEdit={onEdit}
             isApproving={approvingId === event.proposedId}
           />
         ))}

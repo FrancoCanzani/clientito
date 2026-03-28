@@ -1,7 +1,8 @@
 import { useAppAgent } from "@/hooks/use-agent";
-import { isToolUIPart } from "ai";
 import { useHotkey } from "@tanstack/react-hotkeys";
+import { isToolUIPart } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { discardPendingApprovalParts } from "./agent-approval-utils";
 import type { PaletteMode } from "./types";
 
 export function useCommandPaletteState() {
@@ -26,6 +27,7 @@ export function useCommandPaletteState() {
     addToolApprovalResponse,
     clearHistory,
     isConnected,
+    setMessages,
   } = useAppAgent();
 
   const hasPendingApprovals = messages.some((message) =>
@@ -57,20 +59,20 @@ export function useCommandPaletteState() {
   }, []);
 
   const submitAgentMessage = useCallback(
-    (text: string) => {
+    async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
 
       if (pendingApprovalIds.length > 0) {
-        for (const id of pendingApprovalIds) {
-          addToolApprovalResponse({ id, approved: false });
-        }
+        setMessages((currentMessages) =>
+          discardPendingApprovalParts(currentMessages),
+        );
       }
 
       setAgentHasSubmitted(true);
-      sendMessage({ text: trimmed });
+      await sendMessage({ text: trimmed });
     },
-    [addToolApprovalResponse, pendingApprovalIds, sendMessage],
+    [pendingApprovalIds.length, sendMessage, setMessages],
   );
 
   const enterAgentMode = useCallback(
@@ -84,7 +86,7 @@ export function useCommandPaletteState() {
       setAgentHasSubmitted(false);
       setTimeout(() => agentInputRef.current?.focus(), 0);
       if (text) {
-        submitAgentMessage(text);
+        void submitAgentMessage(text);
       }
     },
     [clearHistory, submitAgentMessage],
@@ -107,7 +109,7 @@ export function useCommandPaletteState() {
   const handleAgentSubmit = useCallback(() => {
     const text = agentInput.trim();
     if (!text) return;
-    submitAgentMessage(text);
+    void submitAgentMessage(text);
     setAgentInput("");
   }, [agentInput, submitAgentMessage]);
 

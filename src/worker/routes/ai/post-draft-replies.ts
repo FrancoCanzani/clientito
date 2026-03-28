@@ -2,7 +2,7 @@ import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { emails } from "../../db/schema";
+import { briefingDecisions } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 import { generateDraftForEmail } from "./post-draft-reply";
 
@@ -19,19 +19,27 @@ export function registerPostDraftReplies(app: Hono<AppRouteEnv>) {
     const { emailIds } = c.req.valid("json");
 
     const cached = await db
-      .select({ id: emails.id, draftReply: emails.draftReply })
-      .from(emails)
-      .where(and(eq(emails.userId, user.id), inArray(emails.id, emailIds)));
+      .select({
+        referenceId: briefingDecisions.referenceId,
+        draftReply: briefingDecisions.draftReply,
+      })
+      .from(briefingDecisions)
+      .where(
+        and(
+          eq(briefingDecisions.userId, user.id),
+          eq(briefingDecisions.itemType, "email"),
+          inArray(briefingDecisions.referenceId, emailIds),
+        ),
+      );
 
     const result: Record<number, string> = {};
-    const needsGeneration: number[] = [];
+    const cachedMap = new Map(cached.map((r) => [r.referenceId, r.draftReply]));
+    const needsGeneration = emailIds.filter(
+      (id) => !cachedMap.has(id) || !cachedMap.get(id),
+    );
 
-    for (const row of cached) {
-      if (row.draftReply) {
-        result[row.id] = row.draftReply;
-      } else {
-        needsGeneration.push(row.id);
-      }
+    for (const [id, draft] of cachedMap) {
+      if (draft) result[id] = draft;
     }
 
     if (needsGeneration.length > 0) {

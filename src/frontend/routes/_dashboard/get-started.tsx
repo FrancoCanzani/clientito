@@ -1,5 +1,5 @@
 import GetStartedPage from "@/features/home/pages/get-started-page";
-import { ApiError, fetchSyncStatus } from "@/features/home/queries";
+import { fetchSyncStatus } from "@/features/home/queries";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/get-started")({
@@ -9,7 +9,7 @@ export const Route = createFileRoute("/_dashboard/get-started")({
     try {
       status = await fetchSyncStatus();
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
+      if (error && typeof error === "object" && "status" in error && error.status === 401) {
         throw redirect({ to: "/login" });
       }
       throw error;

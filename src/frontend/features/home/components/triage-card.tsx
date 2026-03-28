@@ -9,8 +9,8 @@ import {
 import type { HomeBriefingItem } from "@/features/home/queries";
 import {
   ArchiveIcon,
+  CalendarPlusIcon,
   CheckCircleIcon,
-  EnvelopeOpenIcon,
   PaperPlaneRightIcon,
   PencilSimpleIcon,
   XIcon,
@@ -30,6 +30,8 @@ export function TriageCard({
   onArchive,
   onDraftChange,
   onToggleEdit,
+  onApproveEvent,
+  onDismissEvent,
 }: {
   item: HomeBriefingItem;
   isActive?: boolean;
@@ -42,11 +44,14 @@ export function TriageCard({
   onArchive?: (id: string) => void;
   onDraftChange?: (id: string, text: string) => void;
   onToggleEdit?: () => void;
+  onApproveEvent?: (id: string) => void;
+  onDismissEvent?: (id: string) => void;
 }) {
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isTask = item.type === "overdue_task" || item.type === "due_today_task";
-  const isEmail = !isTask && !!item.emailId;
+  const isProposedEvent = item.type === "proposed_event";
+  const isEmail = !isTask && !isProposedEvent && !!item.emailId;
   const hasDraft = !!draft;
 
   useEffect(() => {
@@ -89,6 +94,11 @@ export function TriageCard({
                 Today
               </span>
             )}
+            {item.type === "proposed_event" && (
+              <span className="inline-flex items-center rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                Proposed event
+              </span>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">{item.reason}</p>
         </button>
@@ -100,19 +110,6 @@ export function TriageCard({
         >
           {isEmail && (
             <>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 active:scale-95"
-                    onClick={() => navigate({ to: item.href })}
-                  >
-                    <EnvelopeOpenIcon className="size-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Open</TooltipContent>
-              </Tooltip>
               {onArchive && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -162,8 +159,55 @@ export function TriageCard({
               <TooltipContent side="bottom">View task</TooltipContent>
             </Tooltip>
           )}
+          {isProposedEvent && (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 active:scale-95"
+                    onClick={() => onApproveEvent?.(item.id)}
+                  >
+                    <CalendarPlusIcon className="size-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Add to calendar <Kbd>Enter</Kbd>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 active:scale-95"
+                    onClick={() => onDismissEvent?.(item.id)}
+                  >
+                    <XIcon className="size-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Dismiss <Kbd>S</Kbd>
+                </TooltipContent>
+              </Tooltip>
+            </>
+          )}
         </div>
       </div>
+
+      {isProposedEvent && (
+        <div className="mt-2 space-y-1 border-t border-border pt-2">
+          {item.eventLocation && (
+            <p className="text-xs text-muted-foreground">{item.eventLocation}</p>
+          )}
+          {item.eventDescription && (
+            <p className="line-clamp-2 text-xs text-muted-foreground">
+              {item.eventDescription}
+            </p>
+          )}
+        </div>
+      )}
 
       {isEmail && !isTask && (
         <>

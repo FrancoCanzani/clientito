@@ -19,9 +19,16 @@ export function auth(env: Env) {
         clientId: env.GOOGLE_CLIENT_ID,
         clientSecret: env.GOOGLE_CLIENT_SECRET,
         accessType: "offline",
-        disableDefaultScope: true,
         prompt: "consent",
-        scope: ["openid", "email", "profile"],
+        scope: [
+          "openid",
+          "email",
+          "profile",
+          "https://www.googleapis.com/auth/gmail.readonly",
+          "https://www.googleapis.com/auth/gmail.modify",
+          "https://www.googleapis.com/auth/gmail.send",
+          "https://www.googleapis.com/auth/calendar.events",
+        ],
       },
     },
     account: {

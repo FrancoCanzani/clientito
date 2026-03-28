@@ -9,7 +9,6 @@ export type Task = {
   title: string;
   description: string | null;
   dueAt: number | null;
-  dueTime: string | null;
   priority: TaskPriority;
   status: TaskStatus;
   completedAt: number | null;

@@ -4,7 +4,6 @@ export async function createTask(input: {
   title: string;
   description?: string | null;
   dueAt?: number;
-  dueTime?: string;
   priority?: TaskPriority;
   status?: TaskStatus;
 }): Promise<Task> {
@@ -24,7 +23,6 @@ export async function updateTask(
     title?: string;
     description?: string | null;
     dueAt?: number | null;
-    dueTime?: string | null;
     priority?: TaskPriority;
     status?: TaskStatus;
     position?: number;

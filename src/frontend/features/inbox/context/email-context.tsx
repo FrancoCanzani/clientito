@@ -19,11 +19,9 @@ type Actions = ReturnType<typeof useEmailInboxActions>;
 
 type EmailContextValue = {
   view: EmailView;
-  selectedEmailId: string | null;
   mailboxId: number | null;
   displayRows: EmailListItem[];
   sections: ThreadSection[];
-  selectedEmail: EmailListItem | null;
   orderedIds: string[];
   emailById: Map<string, EmailListItem>;
   isError: boolean;
@@ -47,7 +45,6 @@ export function EmailProvider({ children }: { children: ReactNode }) {
   const { openEmail, closeEmail, executeEmailAction } = useEmailInboxActions({
     view: emailData.view,
     mailboxId: emailData.mailboxId,
-    selectedEmailId: emailData.selectedEmailId,
   });
 
   const [composeInitial, setComposeInitial] = useState<

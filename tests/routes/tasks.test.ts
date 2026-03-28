@@ -63,26 +63,18 @@ describe("Tasks API", () => {
           priority: "high",
           status: "in_progress",
           dueAt: 1700000000000,
-          dueTime: "14:30",
         },
       });
       expect(status).toBe(201);
       expect(json.data.priority).toBe("high");
       expect(json.data.status).toBe("in_progress");
       expect(json.data.description).toBe("Ship it");
-      expect(json.data.dueTime).toBe("14:30");
+      expect(json.data.dueAt).toBe(1700000000000);
     });
 
     it("rejects invalid priority", async () => {
       const { status } = await testRequest(app, "POST", "/api", {
         body: { title: "Test", priority: "mega-urgent" },
-      });
-      expect(status).toBe(400);
-    });
-
-    it("rejects invalid dueTime format", async () => {
-      const { status } = await testRequest(app, "POST", "/api", {
-        body: { title: "Test", dueTime: "2pm" },
       });
       expect(status).toBe(400);
     });

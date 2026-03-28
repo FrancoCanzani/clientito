@@ -41,17 +41,17 @@ export function AgentPanel({
 
   return (
     <div className="flex h-96 flex-col md:h-116">
-      <div className="flex items-start justify-between gap-3 border-b border-border/70 p-2.5">
-        <div className="min-w-0">
-          <p className="font-medium text-sm">Agent</p>
-          {agentStatusLabel ? (
+      <div className="flex items-start justify-between gap-3 border-b border-border/25 p-2.5">
+        <div className="min-w-0 flex gap-1">
+          <p className="text-sm">Agent</p>
+          {agentStatusLabel && (
             <div className="mt-1 text-[11px] text-muted-foreground">
-              {agentStatusLabel}
+              {agentStatusLabel}...
             </div>
-          ) : null}
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button size="xs" variant={"outline"} onClick={startFreshChat}>
+          <Button size="sm" variant={"secondary"} onClick={startFreshChat}>
             New chat
           </Button>
         </div>
@@ -65,8 +65,7 @@ export function AgentPanel({
               {message.parts
                 .filter(
                   (part) =>
-                    isToolUIPart(part) &&
-                    part.state === "approval-requested",
+                    isToolUIPart(part) && part.state === "approval-requested",
                 )
                 .map((part) => {
                   return (
@@ -100,7 +99,7 @@ export function AgentPanel({
             <div className="flex flex-col gap-2">
               {agentSuggestions.map((suggestion) => (
                 <Button
-                  variant={"secondary"}
+                  variant={"outline"}
                   key={suggestion}
                   type="button"
                   onClick={() => submitAgentMessage(suggestion)}
@@ -113,11 +112,18 @@ export function AgentPanel({
         )}
 
         {(status === "streaming" || status === "submitted") && (
-          <AgentThinking label={"Working on it..."} />
+          <AgentThinking />
         )}
         {hasPendingApprovals && (
-          <p className="px-3 py-2 text-xs text-muted-foreground">
-            Approve, discard, or send a follow-up message to revise the pending action.
+          <p className="px-3 py-2 text-[10px] text-muted-foreground">
+            <kbd className="rounded border border-border px-1 py-0.5 text-[9px]">
+              Y
+            </kbd>{" "}
+            approve ·{" "}
+            <kbd className="rounded border border-border px-1 py-0.5 text-[9px]">
+              N
+            </kbd>{" "}
+            discard · or type to revise
           </p>
         )}
         {status === "error" && messages.length === 0 && agentHasSubmitted && (

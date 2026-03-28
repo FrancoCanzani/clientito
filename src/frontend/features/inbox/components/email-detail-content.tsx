@@ -1,15 +1,30 @@
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEmail } from "@/features/inbox/context/email-context";
 import { fetchEmailDetail, fetchEmailThread } from "@/features/inbox/queries";
 import { cn } from "@/lib/utils";
 import {
+  ArrowBendUpLeftIcon,
   CaretDownIcon,
   CaretRightIcon,
+  DotsThreeIcon,
+  PaperPlaneTiltIcon,
   PaperclipIcon,
 } from "@phosphor-icons/react";
-import { useQuery } from "@tanstack/react-query";
-import { type ReactNode, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type ReactNode,
+  forwardRef,
+  useCallback,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { toast } from "sonner";
 import type { EmailDetailItem, EmailListItem } from "../types";
+import { sendEmail } from "../mutations";
+import { useAttachmentUpload } from "../hooks/use-attachment-upload";
+import { AttachmentBar } from "./attachment-bar";
 import { prepareEmailHtml } from "../utils/prepare-email-html";
 import { AttachmentItem } from "./attachment-item";
 import { EmailActionBar } from "./email-action-bar";
@@ -170,8 +185,12 @@ function ThreadMessageCard({
         {expanded && (
           <div className="border-t border-border/50 pb-4 pt-4">
             <div className="ml-11 space-y-4">
+              <div className="min-w-0">
+                <MessageBody detail={detail} previewText={preview} />
+              </div>
+
               {showAttachments && (
-                <section className="space-y-1">
+                <section className="space-y-1 border-t border-border/50 pt-4">
                   <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                     <PaperclipIcon className="size-3" />
                     Attachments
@@ -198,10 +217,6 @@ function ThreadMessageCard({
                   ) : null}
                 </section>
               )}
-
-              <div className="min-w-0">
-                <MessageBody detail={detail} previewText={preview} />
-              </div>
             </div>
           </div>
         )}
@@ -210,17 +225,195 @@ function ThreadMessageCard({
   );
 }
 
+export type QuickReplyHandle = {
+  scrollIntoViewAndFocus: () => void;
+};
+
+function buildQuotedText(email: EmailListItem, detail?: EmailDetailItem | null) {
+  const bodyText = detail?.resolvedBodyText ?? detail?.bodyText ?? email.snippet ?? "";
+  const from = email.fromName
+    ? `${email.fromName} <${email.fromAddr}>`
+    : email.fromAddr;
+  const date = new Date(email.date).toLocaleString();
+  return `On ${date}, ${from} wrote:\n${bodyText}`;
+}
+
+const QuickReply = forwardRef<
+  QuickReplyHandle,
+  { email: EmailListItem; detail?: EmailDetailItem | null }
+>(function QuickReply({ email, detail }, ref) {
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [showQuoted, setShowQuoted] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+  const attachments = useAttachmentUpload();
+
+  useImperativeHandle(ref, () => ({
+    scrollIntoViewAndFocus: () => {
+      setFocused(true);
+      containerRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      setTimeout(() => textareaRef.current?.focus(), 300);
+    },
+  }));
+
+  const handleSend = useCallback(async () => {
+    const trimmed = body.trim();
+    if (!trimmed || sending) return;
+
+    setSending(true);
+    try {
+      const subject = email.subject
+        ? `Re: ${email.subject.replace(/^Re:\s*/i, "")}`
+        : "Re:";
+      const attachmentKeys = attachments.files.length > 0
+        ? attachments.getAttachmentKeys()
+        : undefined;
+      await sendEmail({
+        mailboxId: email.mailboxId ?? undefined,
+        to: email.fromAddr,
+        subject,
+        body: `<div style="white-space:pre-wrap">${trimmed.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`,
+        threadId: email.threadId ?? undefined,
+        attachments: attachmentKeys,
+      });
+      setBody("");
+      setFocused(false);
+      attachments.clear();
+      toast.success("Reply sent");
+      void queryClient.invalidateQueries({ queryKey: ["emails"] });
+      void queryClient.invalidateQueries({ queryKey: ["email-thread", email.threadId] });
+    } catch {
+      toast.error("Failed to send reply");
+    } finally {
+      setSending(false);
+    }
+  }, [body, sending, email, queryClient, attachments]);
+
+  const quotedText = buildQuotedText(email, detail);
+
+  if (!focused) {
+    return (
+      <div ref={containerRef} className="mt-6">
+        <button
+          type="button"
+          onClick={() => {
+            setFocused(true);
+            setTimeout(() => textareaRef.current?.focus(), 0);
+          }}
+          className="flex w-full items-center gap-2 rounded-lg border border-border/50 px-4 py-3 text-sm text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+        >
+          <ArrowBendUpLeftIcon className="size-4 shrink-0" />
+          Click here to reply
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="mt-6">
+      <div className="rounded-lg border border-border bg-background">
+        <div className="flex items-center gap-2 border-b border-border/50 px-4 py-2">
+          <ArrowBendUpLeftIcon className="size-3.5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">
+            to {email.fromName || email.fromAddr}
+          </span>
+        </div>
+
+        <div className="px-4 py-3">
+          <textarea
+            ref={textareaRef}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                handleSend();
+              }
+              if (e.key === "Escape") {
+                if (!body.trim()) {
+                  setFocused(false);
+                } else {
+                  e.currentTarget.blur();
+                }
+              }
+            }}
+            placeholder="Write your reply..."
+            rows={4}
+            className="w-full resize-none bg-transparent text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
+          />
+
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() => setShowQuoted(!showQuoted)}
+              className="inline-flex items-center justify-center rounded border border-border/60 px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+              title={showQuoted ? "Hide quoted text" : "Show quoted text"}
+            >
+              <DotsThreeIcon className="size-4" weight="bold" />
+            </button>
+
+            {showQuoted && (
+              <div className="mt-2 whitespace-pre-wrap border-l-2 border-border/60 pl-3 text-xs leading-relaxed text-muted-foreground">
+                {quotedText}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-border/30 px-4 py-2">
+          <AttachmentBar
+            files={attachments.files}
+            uploading={attachments.uploading}
+            onAddFiles={(files) => attachments.addFiles(files)}
+            onRemoveFile={attachments.removeFile}
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => {
+                setFocused(false);
+                setBody("");
+                setShowQuoted(false);
+                attachments.clear();
+              }}
+            >
+              Discard
+            </Button>
+            <Button
+              size="sm"
+              className="h-7 px-3"
+              disabled={!body.trim() || sending}
+              onClick={handleSend}
+            >
+              <PaperPlaneTiltIcon className="mr-1 size-3" />
+              {sending ? "Sending..." : "Send"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export function EmailDetailContent({
   email,
   onClose,
   headerActions,
+  onForward,
 }: {
   email: EmailListItem;
   onClose?: () => void;
   headerActions?: ReactNode;
+  onForward: (initial: import("../types").ComposeInitial) => void;
 }) {
-  const { forward } = useEmail();
+  const forward = onForward;
   const formattedDate = formatDateTime(email.date);
+  const quickReplyRef = useRef<QuickReplyHandle>(null);
   const [threadExpansionOverrides, setThreadExpansionOverrides] = useState<
     Map<string, boolean>
   >(() => new Map());
@@ -336,6 +529,7 @@ export function EmailDetailContent({
                 email={detail}
                 onClose={onClose}
                 onForward={forward}
+                onReply={() => quickReplyRef.current?.scrollIntoViewAndFocus()}
               />
             </div>
           )}
@@ -401,8 +595,15 @@ export function EmailDetailContent({
               </section>
             ) : (
               <div>
+                <div className="min-w-0">
+                  <MessageBody
+                    detail={detail}
+                    previewText={buildPreview(email, detail)}
+                  />
+                </div>
+
                 {hasSelectedAttachments && (
-                  <section className="space-y-3 border-b border-border/70 pb-5">
+                  <section className="space-y-3 border-t border-border/70 pt-5 mt-5">
                     <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                       <PaperclipIcon className="size-3" />
                       Attachments
@@ -429,19 +630,12 @@ export function EmailDetailContent({
                     ) : null}
                   </section>
                 )}
-
-                <div
-                  className={cn("min-w-0", hasSelectedAttachments && "pt-5")}
-                >
-                  <MessageBody
-                    detail={detail}
-                    previewText={buildPreview(email, detail)}
-                  />
-                </div>
               </div>
             )}
           </div>
         )}
+
+        {detail && <QuickReply ref={quickReplyRef} email={email} detail={detail} />}
       </div>
     </div>
   );

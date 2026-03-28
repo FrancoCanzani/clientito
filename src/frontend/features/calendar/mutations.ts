@@ -17,3 +17,15 @@ export async function dismissProposedEvent(
   });
   if (!response.ok) throw new Error("Failed to dismiss event");
 }
+
+export async function editProposedEvent(
+  proposedId: number,
+  data: { title?: string; location?: string; startAt?: number; endAt?: number },
+): Promise<void> {
+  const response = await fetch(`/api/calendar/proposed/${proposedId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error("Failed to update event");
+}

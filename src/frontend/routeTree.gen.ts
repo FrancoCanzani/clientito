@@ -25,6 +25,7 @@ import { Route as DashboardNotesNoteIdRouteImport } from './routes/_dashboard/no
 import { Route as DashboardInboxIdIndexRouteImport } from './routes/_dashboard/inbox/$id/index'
 import { Route as DashboardInboxIdSubscriptionsRouteImport } from './routes/_dashboard/inbox/$id/subscriptions'
 import { Route as DashboardInboxIdFiltersRouteImport } from './routes/_dashboard/inbox/$id/filters'
+import { Route as DashboardInboxIdEmailEmailIdRouteImport } from './routes/_dashboard/inbox/$id/email.$emailId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -106,6 +107,12 @@ const DashboardInboxIdFiltersRoute = DashboardInboxIdFiltersRouteImport.update({
   path: '/inbox/$id/filters',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardInboxIdEmailEmailIdRoute =
+  DashboardInboxIdEmailEmailIdRouteImport.update({
+    id: '/inbox/$id/email/$emailId',
+    path: '/inbox/$id/email/$emailId',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -123,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/inbox/$id/filters': typeof DashboardInboxIdFiltersRoute
   '/inbox/$id/subscriptions': typeof DashboardInboxIdSubscriptionsRoute
   '/inbox/$id/': typeof DashboardInboxIdIndexRoute
+  '/inbox/$id/email/$emailId': typeof DashboardInboxIdEmailEmailIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -139,6 +147,7 @@ export interface FileRoutesByTo {
   '/inbox/$id/filters': typeof DashboardInboxIdFiltersRoute
   '/inbox/$id/subscriptions': typeof DashboardInboxIdSubscriptionsRoute
   '/inbox/$id': typeof DashboardInboxIdIndexRoute
+  '/inbox/$id/email/$emailId': typeof DashboardInboxIdEmailEmailIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -158,6 +167,7 @@ export interface FileRoutesById {
   '/_dashboard/inbox/$id/filters': typeof DashboardInboxIdFiltersRoute
   '/_dashboard/inbox/$id/subscriptions': typeof DashboardInboxIdSubscriptionsRoute
   '/_dashboard/inbox/$id/': typeof DashboardInboxIdIndexRoute
+  '/_dashboard/inbox/$id/email/$emailId': typeof DashboardInboxIdEmailEmailIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/inbox/$id/filters'
     | '/inbox/$id/subscriptions'
     | '/inbox/$id/'
+    | '/inbox/$id/email/$emailId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/inbox/$id/filters'
     | '/inbox/$id/subscriptions'
     | '/inbox/$id'
+    | '/inbox/$id/email/$emailId'
   id:
     | '__root__'
     | '/'
@@ -211,6 +223,7 @@ export interface FileRouteTypes {
     | '/_dashboard/inbox/$id/filters'
     | '/_dashboard/inbox/$id/subscriptions'
     | '/_dashboard/inbox/$id/'
+    | '/_dashboard/inbox/$id/email/$emailId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -334,6 +347,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardInboxIdFiltersRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/inbox/$id/email/$emailId': {
+      id: '/_dashboard/inbox/$id/email/$emailId'
+      path: '/inbox/$id/email/$emailId'
+      fullPath: '/inbox/$id/email/$emailId'
+      preLoaderRoute: typeof DashboardInboxIdEmailEmailIdRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
   }
 }
 
@@ -348,6 +368,7 @@ interface DashboardRouteRouteChildren {
   DashboardInboxIdFiltersRoute: typeof DashboardInboxIdFiltersRoute
   DashboardInboxIdSubscriptionsRoute: typeof DashboardInboxIdSubscriptionsRoute
   DashboardInboxIdIndexRoute: typeof DashboardInboxIdIndexRoute
+  DashboardInboxIdEmailEmailIdRoute: typeof DashboardInboxIdEmailEmailIdRoute
 }
 
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
@@ -361,6 +382,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardInboxIdFiltersRoute: DashboardInboxIdFiltersRoute,
   DashboardInboxIdSubscriptionsRoute: DashboardInboxIdSubscriptionsRoute,
   DashboardInboxIdIndexRoute: DashboardInboxIdIndexRoute,
+  DashboardInboxIdEmailEmailIdRoute: DashboardInboxIdEmailEmailIdRoute,
 }
 
 const DashboardRouteRouteWithChildren = DashboardRouteRoute._addFileChildren(

@@ -71,17 +71,24 @@ export async function getCurrentGoogleAccounts(db: Database, userId: string) {
   );
 }
 
+const GMAIL_SCOPE_PREFIX = "https://www.googleapis.com/auth/gmail.";
+
+function hasGmailScopes(scope: string | null | undefined): boolean {
+  return typeof scope === "string" && scope.includes(GMAIL_SCOPE_PREFIX);
+}
+
 export async function ensureGoogleMailboxesForUser(
   db: Database,
   userId: string,
 ) {
   const googleAccounts = await getCurrentGoogleAccounts(db, userId);
+  const gmailAccounts = googleAccounts.filter((a) => hasGmailScopes(a.scope));
 
-  for (const googleAccount of googleAccounts) {
+  for (const googleAccount of gmailAccounts) {
     await ensureMailbox(db, userId, googleAccount.id);
   }
 
-  return googleAccounts;
+  return gmailAccounts;
 }
 
 /**
