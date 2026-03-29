@@ -1,8 +1,8 @@
 import { useEmailData } from "@/features/inbox/hooks/use-email-data";
 import { useEmailInboxActions } from "@/features/inbox/hooks/use-email-inbox-actions";
 import type { ComposeInitial, EmailListItem } from "@/features/inbox/types";
-import type { EmailView } from "@/features/inbox/utils/inbox-filters";
 import type { ThreadSection } from "@/features/inbox/utils/build-thread-sections";
+import type { EmailView } from "@/features/inbox/utils/inbox-filters";
 import {
   createContext,
   useCallback,
