@@ -1,50 +1,30 @@
-import { openCompose } from "@/features/inbox/components/compose-bridge";
-import { cn, parseMailboxId } from "@/lib/utils";
+import { getSearchMailboxId } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
   CaretDownIcon,
   CaretRightIcon,
   KeyReturnIcon,
 } from "@phosphor-icons/react";
 import { Command } from "cmdk";
-import { useHotkey } from "@tanstack/react-hotkeys";
 import { useRouter } from "@tanstack/react-router";
 import { AnimatePresence, LazyMotion, domAnimation, m } from "motion/react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { AgentPanel } from "./agent-panel";
 import { CommandListPanel } from "./command-list-panel";
 import { NewTaskPanel } from "./new-task-panel";
 import { SearchPanel } from "./search-panel";
-import { getToolName, isToolUIPart } from "ai";
+import { useAgentInvalidation } from "./use-agent-invalidation";
+import { useApprovalHandler } from "./use-approval-handler";
 import { useCommandPaletteState } from "./use-command-palette-state";
 import { usePaletteCommands } from "./use-palette-commands";
-
-function shouldIgnoreApprovalHotkeyTarget(target: EventTarget | null) {
-  const element =
-    target instanceof HTMLElement
-      ? target
-      : target instanceof Node
-        ? target.parentElement
-        : null;
-
-  if (!element) {
-    return false;
-  }
-
-  if (element.isContentEditable) {
-    return true;
-  }
-
-  return Boolean(element.closest("textarea, [role='textbox']"));
-}
 
 export function CommandPalette() {
   const state = useCommandPaletteState();
   const router = useRouter();
-  const searchMailboxId = useMemo(() => {
-    const pathname = router.state.location.pathname;
-    const match = pathname.match(/^\/inbox\/([^/]+)/);
-    return match ? parseMailboxId(match[1]) : undefined;
-  }, [router.state.location.pathname]);
+  const searchMailboxId = useMemo(
+    () => getSearchMailboxId(router.state.location.pathname),
+    [router.state.location.pathname],
+  );
   const {
     queryClient,
     visibleNavigationCommands,
@@ -56,102 +36,17 @@ export function CommandPalette() {
     createTaskMutation,
   } = usePaletteCommands({ close: state.close, setMode: state.setMode });
 
-  const prevStatusRef = useRef(state.status);
-  useEffect(() => {
-    const prev = prevStatusRef.current;
-    prevStatusRef.current = state.status;
-    if ((prev === "streaming" || prev === "submitted") && state.status === "ready") {
-      void queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      void queryClient.invalidateQueries({ queryKey: ["emails"] });
-      void queryClient.invalidateQueries({ queryKey: ["notes"] });
-    }
-  }, [state.status, queryClient]);
+  useAgentInvalidation(state.status, queryClient);
+
+  const { handleApprove, handleDiscard } = useApprovalHandler({
+    messages: state.messages,
+    mode: state.mode,
+    addToolApprovalResponse: state.addToolApprovalResponse,
+    close: state.close,
+    queryClient,
+  });
 
   const normalizedQuery = state.query.trim();
-  const firstPendingApproval = useMemo(() => {
-    for (const message of state.messages) {
-      for (const part of message.parts) {
-        if (isToolUIPart(part) && part.state === "approval-requested") {
-          return {
-            id: part.approval.id,
-            toolName: getToolName(part),
-            args: part.input as Record<string, unknown>,
-          };
-        }
-      }
-    }
-    return null;
-  }, [state.messages]);
-
-  const handleApprove = useCallback(
-    (
-      toolCallId: string,
-      toolName?: string,
-      args?: Record<string, unknown>,
-    ) => {
-      state.addToolApprovalResponse({ id: toolCallId, approved: true });
-      void queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      void queryClient.invalidateQueries({ queryKey: ["emails"] });
-      void queryClient.invalidateQueries({ queryKey: ["notes"] });
-
-      if (toolName === "composeEmail" && args) {
-        openCompose({
-          mailboxId:
-            typeof args.mailboxId === "number" ? args.mailboxId : undefined,
-          to: args.to as string | undefined,
-          subject: args.subject as string | undefined,
-          bodyHtml: args.body as string | undefined,
-        });
-        state.close();
-      }
-    },
-    [state.addToolApprovalResponse, state.close, queryClient],
-  );
-
-  const handleDiscard = useCallback(
-    (toolCallId: string) => {
-      state.addToolApprovalResponse({ id: toolCallId, approved: false });
-    },
-    [state.addToolApprovalResponse],
-  );
-
-  useHotkey(
-    "Y",
-    (event) => {
-      if (
-        state.mode !== "agent" ||
-        !firstPendingApproval ||
-        shouldIgnoreApprovalHotkeyTarget(event.target)
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      handleApprove(
-        firstPendingApproval.id,
-        firstPendingApproval.toolName,
-        firstPendingApproval.args,
-      );
-    },
-    { preventDefault: false, stopPropagation: false },
-  );
-
-  useHotkey(
-    "N",
-    (event) => {
-      if (
-        state.mode !== "agent" ||
-        !firstPendingApproval ||
-        shouldIgnoreApprovalHotkeyTarget(event.target)
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      handleDiscard(firstPendingApproval.id);
-    },
-    { preventDefault: false, stopPropagation: false },
-  );
 
   return (
     <div
@@ -260,9 +155,7 @@ export function CommandPalette() {
                 }
 
                 const text = state.query.trim();
-                if (!text) {
-                  return;
-                }
+                if (!text) return;
 
                 const hasVisibleCommand = Boolean(
                   state.containerRef.current?.querySelector(
@@ -270,9 +163,7 @@ export function CommandPalette() {
                   ),
                 );
 
-                if (hasVisibleCommand) {
-                  return;
-                }
+                if (hasVisibleCommand) return;
 
                 event.preventDefault();
                 state.enterAgentMode(text);

@@ -5,6 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { discardPendingApprovalParts } from "./agent-approval-utils";
 import type { PaletteMode } from "./types";
 
+function focusDelayed(ref: React.RefObject<HTMLElement | null>) {
+  setTimeout(() => ref.current?.focus(), 0);
+}
+
 export function useCommandPaletteState() {
   const inputRef = useRef<HTMLInputElement>(null);
   const agentInputRef = useRef<HTMLInputElement>(null);
@@ -84,7 +88,7 @@ export function useCommandPaletteState() {
       setQuery("");
       setAgentInput("");
       setAgentHasSubmitted(false);
-      setTimeout(() => agentInputRef.current?.focus(), 0);
+      focusDelayed(agentInputRef);
       if (text) {
         void submitAgentMessage(text);
       }
@@ -97,13 +101,13 @@ export function useCommandPaletteState() {
     setOpen(true);
     setQuery("");
     setSearchInput("");
-    setTimeout(() => searchInputRef.current?.focus(), 0);
+    focusDelayed(searchInputRef);
   }, []);
 
   const startFreshChat = useCallback(() => {
     setAgentHasSubmitted(false);
     clearHistory();
-    setTimeout(() => agentInputRef.current?.focus(), 0);
+    focusDelayed(agentInputRef);
   }, [clearHistory]);
 
   const handleAgentSubmit = useCallback(() => {
@@ -115,7 +119,7 @@ export function useCommandPaletteState() {
 
   useHotkey("Mod+K", () => {
     setOpen(true);
-    setTimeout(() => inputRef.current?.focus(), 0);
+    focusDelayed(inputRef);
   });
 
   useHotkey(
@@ -124,7 +128,7 @@ export function useCommandPaletteState() {
       if (mode === "agent" || mode === "search") {
         setMode("commands");
         setSearchInput("");
-        setTimeout(() => inputRef.current?.focus(), 0);
+        focusDelayed(inputRef);
         return;
       }
       close();

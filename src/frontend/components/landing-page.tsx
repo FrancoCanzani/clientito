@@ -1,9 +1,12 @@
 import { Link } from "@tanstack/react-router";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "./ui/button";
 
 const FOOTER_LINKS = ["Privacy", "Terms", "Security"];
 
 export default function LandingPage() {
+  const { isAuthenticated } = useAuth();
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-background text-foreground antialiased">
       <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 sm:px-7 lg:px-8">
@@ -18,7 +21,13 @@ export default function LandingPage() {
               size={"lg"}
               className="text-xl capitalize"
             >
-              <Link to="/login">Get started</Link>
+              {isAuthenticated ? (
+                <Link to="/inbox/$id" params={{ id: "all" }}>
+                  Go to inbox
+                </Link>
+              ) : (
+                <Link to="/login">Get started</Link>
+              )}
             </Button>
           </div>
         </header>
@@ -31,11 +40,11 @@ export default function LandingPage() {
               A calmer way to get your life back under control.
             </h2>
 
-            <div className="mt-10 w-full max-w-5xl overflow-hidden rounded-[1.75rem] border border-foreground/10 p-2 shadow-[0_30px_80px_rgba(0,0,0,0.08)]">
+            <div className="mt-10 w-full max-w-5xl overflow-hidden rounded-xl border border-foreground/10 p-2">
               <img
                 src="/ascii-art.png"
                 alt="Petit landing preview"
-                className="block h-auto w-full rounded-[1.15rem] object-cover"
+                className="block h-auto w-full rounded-xl object-cover"
               />
             </div>
           </div>

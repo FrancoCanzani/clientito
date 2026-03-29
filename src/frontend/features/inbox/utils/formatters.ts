@@ -11,6 +11,29 @@ export function formatInboxRowDate(timestamp: number): string {
   return format(new Date(timestamp), "p");
 }
 
+export function formatEmailDetailDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleString([], {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+export function formatEmailThreadDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+export function formatQuotedDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleString([], {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 export function formatBytes(size: number | null): string {
   if (!size || size <= 0) {
     return "Unknown size";

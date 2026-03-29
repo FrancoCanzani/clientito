@@ -7,6 +7,7 @@ import { createTask } from "@/features/tasks/mutations";
 import { parseTaskInput } from "@/features/tasks/utils";
 import { useLogout } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
+import { getActiveInboxId } from "@/lib/utils";
 import {
   ArchiveIcon,
   CheckSquareIcon,
@@ -33,9 +34,173 @@ import React, { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import type { PaletteCommand, PaletteMode } from "./types";
 
-function getActiveInboxId(pathname: string): string {
-  const match = pathname.match(/^\/inbox\/([^/]+)/);
-  return match?.[1] ?? "all";
+function paletteIcon(Icon: React.ComponentType<{ className?: string }>) {
+  return React.createElement(Icon, { className: "size-4" });
+}
+
+const VIEW_ICONS: Record<string, React.ComponentType<{ className?: string }>> =
+  {
+    inbox: TrayIcon,
+    sent: PaperPlaneTiltIcon,
+    spam: WarningIcon,
+    trash: TrashIcon,
+    archived: ArchiveIcon,
+    starred: StarIcon,
+  };
+
+function buildNavigationCommands(
+  runNavigation: (to: "/home" | "/notes" | "/tasks" | "/docs" | "/settings" | "/agenda") => void,
+  navigateToInbox: () => void,
+): PaletteCommand[] {
+  return [
+    { id: "home", label: "Home", section: "navigation", to: "/home", icon: paletteIcon(HouseSimpleIcon), onSelect: () => runNavigation("/home") },
+    { id: "inbox", label: "Inbox", section: "navigation", to: "/inbox/$id", icon: paletteIcon(TrayIcon), onSelect: navigateToInbox },
+    { id: "tasks", label: "Tasks", section: "navigation", to: "/tasks", icon: paletteIcon(CheckSquareIcon), onSelect: () => runNavigation("/tasks") },
+    { id: "notes", label: "Notes", section: "navigation", to: "/notes", icon: paletteIcon(NoteBlankIcon), onSelect: () => runNavigation("/notes") },
+    { id: "agenda", label: "Agenda", section: "navigation", to: "/agenda", icon: paletteIcon(CalendarDotsIcon), onSelect: () => runNavigation("/agenda") },
+    { id: "settings", label: "Settings", section: "navigation", to: "/settings", icon: paletteIcon(GearIcon), onSelect: () => runNavigation("/settings") },
+  ];
+}
+
+function buildMailboxCommands(
+  isEmailsRoute: boolean,
+  activeInboxId: string,
+  navigate: ReturnType<typeof useNavigate>,
+  close: () => void,
+  setMode: (mode: PaletteMode) => void,
+): PaletteCommand[] {
+  if (!isEmailsRoute) return [];
+
+  const emailViews: EmailView[] = ["inbox", "sent", "archived", "starred", "spam", "trash"];
+  const viewCommands: PaletteCommand[] = emailViews.map((view) => ({
+    id: `email-view-${view}`,
+    label: VIEW_LABELS[view],
+    section: "email-navigation",
+    icon: paletteIcon(VIEW_ICONS[view] ?? TrayIcon),
+    onSelect: () => {
+      navigate({
+        to: "/inbox/$id",
+        params: { id: activeInboxId },
+        search: (prev) => ({
+          ...prev,
+          view: view === "inbox" ? undefined : view,
+          id: undefined,
+        }),
+      });
+      close();
+    },
+  }));
+
+  return [
+    ...viewCommands,
+    {
+      id: "search-emails",
+      label: "Search",
+      section: "email-navigation",
+      icon: paletteIcon(MagnifyingGlassIcon),
+      onSelect: () => setMode("search"),
+    },
+    {
+      id: "subscriptions",
+      label: "Subscriptions",
+      section: "email-navigation",
+      icon: paletteIcon(NewspaperIcon),
+      onSelect: () => {
+        navigate({ to: "/inbox/$id/subscriptions", params: { id: activeInboxId } });
+        close();
+      },
+    },
+    {
+      id: "filters",
+      label: "Filters",
+      section: "email-navigation",
+      icon: paletteIcon(FunnelIcon),
+      onSelect: () => {
+        navigate({ to: "/inbox/$id/filters", params: { id: activeInboxId } });
+        close();
+      },
+    },
+  ];
+}
+
+function buildTaskViewCommands(
+  isTasksRoute: boolean,
+  navigate: ReturnType<typeof useNavigate>,
+  close: () => void,
+): PaletteCommand[] {
+  if (!isTasksRoute) return [];
+
+  return ([
+    { view: "all", label: "All Tasks" },
+    { view: "today", label: "Due Today" },
+    { view: "upcoming", label: "Upcoming" },
+  ] as const).map(({ view, label }) => ({
+    id: `task-view-${view}`,
+    label,
+    section: "task-navigation",
+    icon: paletteIcon(CheckSquareIcon),
+    onSelect: () => {
+      navigate({
+        to: "/tasks",
+        search: (prev) => ({ ...prev, view: view === "all" ? undefined : view }),
+      });
+      close();
+    },
+  }));
+}
+
+function buildActionCommands(opts: {
+  activeInboxId: string;
+  navigate: ReturnType<typeof useNavigate>;
+  close: () => void;
+  setMode: (mode: PaletteMode) => void;
+  createNoteMutation: { mutate: () => void };
+  resolvedTheme: string | undefined;
+  toggleTheme: () => void;
+  logout: { mutate: () => void };
+}): PaletteCommand[] {
+  const { activeInboxId, navigate, close, setMode, createNoteMutation, resolvedTheme, toggleTheme, logout } = opts;
+
+  return [
+    {
+      id: "compose",
+      label: "New Email",
+      section: "actions",
+      icon: paletteIcon(EnvelopeSimpleIcon),
+      onSelect: () => {
+        navigate({ to: "/inbox/$id", params: { id: activeInboxId }, search: { compose: true } });
+        close();
+      },
+    },
+    {
+      id: "new-task",
+      label: "New Task",
+      section: "actions",
+      icon: paletteIcon(CheckSquareIcon),
+      onSelect: () => setMode("new-task"),
+    },
+    {
+      id: "new-note",
+      label: "New Note",
+      section: "actions",
+      icon: paletteIcon(NoteBlankIcon),
+      onSelect: () => createNoteMutation.mutate(),
+    },
+    {
+      id: "toggle-theme",
+      label: resolvedTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode",
+      section: "actions",
+      icon: paletteIcon(resolvedTheme === "dark" ? SunIcon : MoonIcon),
+      onSelect: () => { toggleTheme(); close(); },
+    },
+    {
+      id: "sign-out",
+      label: "Sign out",
+      section: "actions",
+      icon: paletteIcon(SignOutIcon),
+      onSelect: () => { logout.mutate(); close(); },
+    },
+  ];
 }
 
 export function usePaletteCommands({
@@ -83,270 +248,42 @@ export function usePaletteCommands({
 
   const createNoteMutation = useMutation({
     mutationFn: async () =>
-      createNote({
-        title: "Untitled note",
-        content: "",
-      }),
+      createNote({ title: "Untitled note", content: "" }),
     onSuccess: (created) => {
-      navigate({
-        to: "/notes/$noteId",
-        params: { noteId: created.id },
-      });
+      navigate({ to: "/notes/$noteId", params: { noteId: created.id } });
       close();
     },
     onError: () => toast.error("Failed to create note"),
   });
 
-  const commands: PaletteCommand[] = useMemo(() => {
-    const viewIcons: Record<
-      string,
-      React.ComponentType<{ className?: string }>
-    > = {
-      inbox: TrayIcon,
-      sent: PaperPlaneTiltIcon,
-      spam: WarningIcon,
-      trash: TrashIcon,
-      archived: ArchiveIcon,
-      starred: StarIcon,
-    };
-
-    const emailViewCommands: PaletteCommand[] = isEmailsRoute
-      ? (
-          [
-            "inbox",
-            "sent",
-            "archived",
-            "starred",
-            "spam",
-            "trash",
-          ] as EmailView[]
-        ).map((view) => ({
-          id: `email-view-${view}`,
-          label: VIEW_LABELS[view],
-          section: "email-navigation",
-          icon: React.createElement(viewIcons[view] ?? TrayIcon, {
-            className: "size-4",
-          }),
-          onSelect: () => {
-            navigate({
-              to: "/inbox/$id",
-              params: { id: activeInboxId },
-              search: (prev) => ({
-                ...prev,
-                view: view === "inbox" ? undefined : view,
-                id: undefined,
-              }),
-            });
-            close();
-          },
-        }))
-      : [];
-
-    const mailboxCommands: PaletteCommand[] = isEmailsRoute
-      ? [
-          ...emailViewCommands,
-          {
-            id: "search-emails",
-            label: "Search",
-            section: "email-navigation",
-            icon: React.createElement(MagnifyingGlassIcon, {
-              className: "size-4",
-            }),
-            onSelect: () => setMode("search"),
-          },
-          {
-            id: "subscriptions",
-            label: "Subscriptions",
-            section: "email-navigation",
-            icon: React.createElement(NewspaperIcon, { className: "size-4" }),
-            onSelect: () => {
-              navigate({
-                to: "/inbox/$id/subscriptions",
-                params: { id: activeInboxId },
-              });
-              close();
-            },
-          },
-          {
-            id: "filters",
-            label: "Filters",
-            section: "email-navigation",
-            icon: React.createElement(FunnelIcon, { className: "size-4" }),
-            onSelect: () => {
-              navigate({
-                to: "/inbox/$id/filters",
-                params: { id: activeInboxId },
-              });
-              close();
-            },
-          },
-        ]
-      : [];
-
-    const taskViewCommands: PaletteCommand[] = isTasksRoute
-      ? (
-          [
-            { view: "all", label: "All Tasks" },
-            { view: "today", label: "Due Today" },
-            { view: "upcoming", label: "Upcoming" },
-          ] as const
-        ).map(({ view, label }) => ({
-          id: `task-view-${view}`,
-          label,
-          section: "task-navigation",
-          icon: React.createElement(CheckSquareIcon, { className: "size-4" }),
-          onSelect: () => {
-            navigate({
-              to: "/tasks",
-              search: (prev) => ({
-                ...prev,
-                view: view === "all" ? undefined : view,
-              }),
-            });
-            close();
-          },
-        }))
-      : [];
-
-    return [
-      {
-        id: "home",
-        label: "Home",
-        section: "navigation",
-        to: "/home",
-        icon: React.createElement(HouseSimpleIcon, { className: "size-4" }),
-        onSelect: () => runNavigation("/home"),
-      },
-      {
-        id: "inbox",
-        label: "Inbox",
-        section: "navigation",
-        to: "/inbox/$id",
-        icon: React.createElement(TrayIcon, { className: "size-4" }),
-        onSelect: navigateToInbox,
-      },
-      {
-        id: "tasks",
-        label: "Tasks",
-        section: "navigation",
-        to: "/tasks",
-        icon: React.createElement(CheckSquareIcon, { className: "size-4" }),
-        onSelect: () => runNavigation("/tasks"),
-      },
-      {
-        id: "notes",
-        label: "Notes",
-        section: "navigation",
-        to: "/notes",
-        icon: React.createElement(NoteBlankIcon, { className: "size-4" }),
-        onSelect: () => runNavigation("/notes"),
-      },
-      {
-        id: "agenda",
-        label: "Agenda",
-        section: "navigation",
-        to: "/agenda",
-        icon: React.createElement(CalendarDotsIcon, { className: "size-4" }),
-        onSelect: () => runNavigation("/agenda"),
-      },
-      {
-        id: "settings",
-        label: "Settings",
-        section: "navigation",
-        to: "/settings",
-        icon: React.createElement(GearIcon, { className: "size-4" }),
-        onSelect: () => runNavigation("/settings"),
-      },
-      ...mailboxCommands,
-      ...taskViewCommands,
-      {
-        id: "compose",
-        label: "New Email",
-        section: "actions",
-        icon: React.createElement(EnvelopeSimpleIcon, {
-          className: "size-4",
-        }),
-        onSelect: () => {
-          navigate({
-            to: "/inbox/$id",
-            params: { id: activeInboxId },
-            search: { compose: true },
-          });
-          close();
-        },
-      },
-      {
-        id: "new-task",
-        label: "New Task",
-        section: "actions",
-        icon: React.createElement(CheckSquareIcon, { className: "size-4" }),
-        onSelect: () => setMode("new-task"),
-      },
-      {
-        id: "new-note",
-        label: "New Note",
-        section: "actions",
-        icon: React.createElement(NoteBlankIcon, { className: "size-4" }),
-        onSelect: () => createNoteMutation.mutate(),
-      },
-      {
-        id: "toggle-theme",
-        label:
-          resolvedTheme === "dark"
-            ? "Switch to Light Mode"
-            : "Switch to Dark Mode",
-        section: "actions",
-        icon:
-          resolvedTheme === "dark"
-            ? React.createElement(SunIcon, { className: "size-4" })
-            : React.createElement(MoonIcon, { className: "size-4" }),
-        onSelect: () => {
-          toggleTheme();
-          close();
-        },
-      },
-      {
-        id: "sign-out",
-        label: "Sign out",
-        section: "actions",
-        icon: React.createElement(SignOutIcon, { className: "size-4" }),
-        onSelect: () => {
-          logout.mutate();
-          close();
-        },
-      },
-    ];
-  }, [
-    activeInboxId,
-    close,
-    createNoteMutation,
-    isEmailsRoute,
-    isTasksRoute,
-    logout,
-    navigate,
-    navigateToInbox,
-    resolvedTheme,
-    runNavigation,
-    setMode,
-    toggleTheme,
-  ]);
-
-  const navigationCommands = commands.filter(
-    (command) => command.section === "navigation",
+  const navigationCommands = useMemo(
+    () => {
+      const all = buildNavigationCommands(runNavigation, navigateToInbox);
+      return all.filter((cmd) => {
+        if (isEmailsRoute && cmd.id === "inbox") return false;
+        if (isTasksRoute && cmd.id === "tasks") return false;
+        return true;
+      });
+    },
+    [runNavigation, navigateToInbox, isEmailsRoute, isTasksRoute],
   );
-  const visibleNavigationCommands = navigationCommands.filter((command) => {
-    if (isEmailsRoute && command.id === "inbox") return false;
-    if (isTasksRoute && command.id === "tasks") return false;
-    return true;
-  });
-  const emailNavigationCommands = commands.filter(
-    (command) => command.section === "email-navigation",
+
+  const mailboxCommands = useMemo(
+    () => buildMailboxCommands(isEmailsRoute, activeInboxId, navigate, close, setMode),
+    [isEmailsRoute, activeInboxId, navigate, close, setMode],
   );
-  const taskNavigationCommands = commands.filter(
-    (command) => command.section === "task-navigation",
+
+  const taskViewCommands = useMemo(
+    () => buildTaskViewCommands(isTasksRoute, navigate, close),
+    [isTasksRoute, navigate, close],
   );
-  const actionCommands = commands.filter(
-    (command) => command.section === "actions",
+
+  const actionCommands = useMemo(
+    () => buildActionCommands({
+      activeInboxId, navigate, close, setMode,
+      createNoteMutation, resolvedTheme, toggleTheme, logout,
+    }),
+    [activeInboxId, navigate, close, setMode, createNoteMutation, resolvedTheme, toggleTheme, logout],
   );
 
   const agentSuggestions = useMemo(() => {
@@ -390,9 +327,9 @@ export function usePaletteCommands({
 
   return {
     queryClient,
-    visibleNavigationCommands,
-    emailNavigationCommands,
-    taskNavigationCommands,
+    visibleNavigationCommands: navigationCommands,
+    emailNavigationCommands: mailboxCommands,
+    taskNavigationCommands: taskViewCommands,
     actionCommands,
     agentSuggestions,
     submitTask,

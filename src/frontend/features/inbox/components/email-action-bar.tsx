@@ -1,28 +1,36 @@
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useAuth } from "@/hooks/use-auth";
+import { useMailboxes } from "@/hooks/use-mailboxes";
 import {
   ArchiveIcon,
+  ArrowBendDoubleUpLeftIcon,
   ArrowBendUpLeftIcon,
   ArrowBendUpRightIcon,
   BellSlashIcon,
   ClockIcon,
+  DotsThreeIcon,
   EnvelopeSimpleIcon,
   EnvelopeSimpleOpenIcon,
   StarIcon,
   TrashIcon,
-  UsersThreeIcon,
   WarningIcon,
 } from "@phosphor-icons/react";
+import type { Icon } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { toast } from "sonner";
 import { unsubscribe } from "../../subscriptions/queries";
 import { patchEmail } from "../mutations";
 import type { ComposeInitial, EmailDetailItem } from "../types";
+import { buildForwardedEmailHtml } from "../utils/build-forwarded-html";
+import { formatQuotedDate } from "../utils/formatters";
+import { buildReplyAllRecipients } from "../utils/reply-recipients";
 import { SnoozePicker } from "./snooze-picker";
 
 type ActionBarProps = {
@@ -32,95 +40,25 @@ type ActionBarProps = {
   onReply?: () => void;
 };
 
-function ActionButton({
-  label,
-  onClick,
-  disabled,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={onClick}
-          disabled={disabled}
-          className="flex size-8 items-center justify-center text-muted-foreground transition-[transform,color,background-color] duration-150 ease-out hover:bg-muted/50 hover:text-foreground active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40"
-          aria-label={label}
-        >
-          {children}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="text-xs">
-        {label}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function extractEmailAddress(raw: string): string {
-  const match = raw.match(/<([^>]+)>/);
-  return (match?.[1] ?? raw).trim().toLowerCase();
-}
-
-function parseRecipientList(raw: string | null): string[] {
-  if (!raw) return [];
-  return raw
-    .split(",")
-    .map((s) => extractEmailAddress(s))
-    .filter((s) => s.length > 0);
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function buildForwardedEmailHtml(email: EmailDetailItem) {
-  const fromLine = email.fromName
-    ? `${escapeHtml(email.fromName)} &lt;${escapeHtml(email.fromAddr)}&gt;`
-    : escapeHtml(email.fromAddr);
-  const dateLine = new Date(email.date).toLocaleString();
-  const subjectLine = escapeHtml(email.subject ?? "(no subject)");
-  const toLine = email.toAddr?.trim() ? escapeHtml(email.toAddr) : null;
-  const ccLine = email.ccAddr?.trim() ? escapeHtml(email.ccAddr) : null;
-  const originalBody = email.resolvedBodyHtml?.trim().length
-    ? email.resolvedBodyHtml
-    : email.bodyHtml?.trim().length
-      ? email.bodyHtml
-      : `<div style="white-space:pre-wrap">${escapeHtml(
-          email.resolvedBodyText ?? email.bodyText ?? "",
-        )}</div>`;
-
-  return [
-    "<p><br></p>",
-    '<div data-forwarded-message="true" style="border-top:1px solid #dadce0;margin-top:16px;padding-top:16px;color:#5f6368;font-size:13px">',
-    '<div data-forwarded-header="true">---------- Forwarded message ---------</div>',
-    `<div><strong>From:</strong> ${fromLine}</div>`,
-    `<div><strong>Date:</strong> ${escapeHtml(dateLine)}</div>`,
-    `<div><strong>Subject:</strong> ${subjectLine}</div>`,
-    ...(toLine ? [`<div><strong>To:</strong> ${toLine}</div>`] : []),
-    ...(ccLine ? [`<div><strong>Cc:</strong> ${ccLine}</div>`] : []),
-    "<br>",
-    `<div data-forwarded-original-body="true">${originalBody}</div>`,
-    "</div>",
-  ].join("");
-}
-
-export function EmailActionBar({ email, onClose, onForward, onReply }: ActionBarProps) {
+export function EmailActionBar({
+  email,
+  onClose,
+  onForward,
+  onReply,
+}: ActionBarProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const mailboxesQuery = useMailboxes();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const availableMailboxes = (mailboxesQuery.data?.accounts ?? []).filter(
+    (account) => account.mailboxId != null,
+  );
+  const showReplyAll = availableMailboxes.length > 1;
 
   const isStarred = email.labelIds.includes("STARRED");
+  const isSnoozed =
+    email.snoozedUntil != null && email.snoozedUntil > Date.now();
+  const hasUnsubscribe = !!(email.unsubscribeUrl || email.unsubscribeEmail);
 
   const invalidateEmails = () => {
     void queryClient.invalidateQueries({ queryKey: ["emails"] });
@@ -129,55 +67,44 @@ export function EmailActionBar({ email, onClose, onForward, onReply }: ActionBar
     });
   };
 
-  const archiveMutation = useMutation({
-    mutationFn: () => patchEmail(email.id, { archived: true }),
-    onSuccess: () => {
-      toast.success("Archived");
-      invalidateEmails();
-      onClose?.();
+  const useEmailPatch = (
+    payload: Parameters<typeof patchEmail>[1],
+    opts: {
+      successMessage?: string;
+      errorMessage: string;
+      closeAfter?: boolean;
     },
-    onError: () => toast.error("Failed to archive"),
-  });
+  ) =>
+    useMutation({
+      mutationFn: () => patchEmail(email.id, payload),
+      onSuccess: () => {
+        if (opts.successMessage) toast.success(opts.successMessage);
+        invalidateEmails();
+        if (opts.closeAfter) onClose?.();
+      },
+      onError: () => toast.error(opts.errorMessage),
+    });
 
-  const trashMutation = useMutation({
-    mutationFn: () => patchEmail(email.id, { trashed: true }),
-    onSuccess: () => {
-      toast.success("Moved to trash");
-      invalidateEmails();
-      onClose?.();
-    },
-    onError: () => toast.error("Failed to delete"),
-  });
-
-  const spamMutation = useMutation({
-    mutationFn: () => patchEmail(email.id, { spam: true }),
-    onSuccess: () => {
-      toast.success("Moved to spam");
-      invalidateEmails();
-      onClose?.();
-    },
-    onError: () => toast.error("Failed to move to spam"),
-  });
-
-  const starMutation = useMutation({
-    mutationFn: () => patchEmail(email.id, { starred: !isStarred }),
-    onSuccess: () => {
-      invalidateEmails();
-    },
-    onError: () => toast.error("Failed to update"),
-  });
-
-  const readMutation = useMutation({
-    mutationFn: () => patchEmail(email.id, { isRead: !email.isRead }),
-    onSuccess: () => {
-      invalidateEmails();
-    },
-    onError: () => toast.error("Failed to update"),
-  });
-
-  const isSnoozed =
-    email.snoozedUntil != null && email.snoozedUntil > Date.now();
-
+  const archiveMutation = useEmailPatch(
+    { archived: true },
+    { successMessage: "Archived", errorMessage: "Failed to archive", closeAfter: true },
+  );
+  const trashMutation = useEmailPatch(
+    { trashed: true },
+    { successMessage: "Moved to trash", errorMessage: "Failed to delete", closeAfter: true },
+  );
+  const spamMutation = useEmailPatch(
+    { spam: true },
+    { successMessage: "Moved to spam", errorMessage: "Failed to move to spam", closeAfter: true },
+  );
+  const starMutation = useEmailPatch(
+    { starred: !isStarred },
+    { errorMessage: "Failed to update" },
+  );
+  const readMutation = useEmailPatch(
+    { isRead: !email.isRead },
+    { errorMessage: "Failed to update" },
+  );
   const snoozeMutation = useMutation({
     mutationFn: (timestamp: number | null) =>
       patchEmail(email.id, { snoozedUntil: timestamp }),
@@ -187,8 +114,6 @@ export function EmailActionBar({ email, onClose, onForward, onReply }: ActionBar
     },
     onError: () => toast.error("Failed to snooze"),
   });
-
-  const hasUnsubscribe = !!(email.unsubscribeUrl || email.unsubscribeEmail);
 
   const unsubscribeMutation = useMutation({
     mutationFn: () =>
@@ -208,7 +133,6 @@ export function EmailActionBar({ email, onClose, onForward, onReply }: ActionBar
     onError: (error) => toast.error(error.message),
   });
 
-
   const handleForward = () => {
     const subject = email.subject
       ? email.subject.startsWith("Fwd:")
@@ -216,24 +140,17 @@ export function EmailActionBar({ email, onClose, onForward, onReply }: ActionBar
         : `Fwd: ${email.subject}`
       : "Fwd:";
     const bodyHtml = buildForwardedEmailHtml(email);
-
     onForward?.({ mailboxId: email.mailboxId, subject, bodyHtml });
   };
 
   const handleReplyAll = () => {
     const myEmail = user?.email?.toLowerCase() ?? "";
-    const toRecipients = parseRecipientList(email.toAddr);
-    const ccRecipients = parseRecipientList(email.ccAddr);
-    const fromAddr = extractEmailAddress(email.fromAddr);
-
-    // "To" is the original sender
-    const replyTo = fromAddr;
-
-    // "CC" is everyone else from To + CC, excluding the user and the original sender
-    const allOthers = [...toRecipients, ...ccRecipients].filter(
-      (addr) => addr !== myEmail && addr !== fromAddr,
+    const { replyTo, cc } = buildReplyAllRecipients(
+      email.fromAddr,
+      email.toAddr,
+      email.ccAddr,
+      myEmail,
     );
-    const uniqueCc = [...new Set(allOthers)].join(", ");
 
     const subject = email.subject
       ? email.subject.startsWith("Re:")
@@ -244,7 +161,7 @@ export function EmailActionBar({ email, onClose, onForward, onReply }: ActionBar
     const originalFrom = email.fromName
       ? `${email.fromName} &lt;${email.fromAddr}&gt;`
       : email.fromAddr;
-    const originalDate = new Date(email.date).toLocaleString();
+    const originalDate = formatQuotedDate(email.date);
     const originalBody =
       email.resolvedBodyHtml ?? email.resolvedBodyText ?? email.bodyText ?? "";
     const quotedHtml = `<br><br><div style="border-left:2px solid #ccc;padding-left:12px;margin-left:0;color:#555">On ${originalDate}, ${originalFrom} wrote:<br>${originalBody}</div>`;
@@ -252,7 +169,7 @@ export function EmailActionBar({ email, onClose, onForward, onReply }: ActionBar
     onForward?.({
       mailboxId: email.mailboxId,
       to: replyTo,
-      cc: uniqueCc || undefined,
+      cc,
       subject,
       body: quotedHtml,
     });
@@ -267,112 +184,145 @@ export function EmailActionBar({ email, onClose, onForward, onReply }: ActionBar
     snoozeMutation.isPending ||
     unsubscribeMutation.isPending;
 
+  const menuItemClassName =
+    "flex min-h-7 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs/relaxed text-foreground outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50";
+
+  const handleMenuAction = (action: () => void) => {
+    setMoreOpen(false);
+    action();
+  };
+
+  type MenuItem = {
+    icon: Icon;
+    iconWeight?: "fill" | "regular";
+    label: string;
+    action: () => void;
+    visible?: boolean;
+  };
+
+  const menuItems: MenuItem[] = [
+    { icon: ArchiveIcon, label: "Archive", action: () => archiveMutation.mutate() },
+    { icon: TrashIcon, label: "Move to trash", action: () => trashMutation.mutate() },
+    { icon: WarningIcon, label: "Move to spam", action: () => spamMutation.mutate() },
+    {
+      icon: StarIcon,
+      iconWeight: isStarred ? "fill" : "regular",
+      label: isStarred ? "Unstar" : "Star",
+      action: () => starMutation.mutate(),
+    },
+    {
+      icon: email.isRead ? EnvelopeSimpleIcon : EnvelopeSimpleOpenIcon,
+      label: email.isRead ? "Mark as unread" : "Mark as read",
+      action: () => readMutation.mutate(),
+    },
+  ];
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex gap-2 items-center justify-end">
+        <div className="flex flex-wrap items-center gap-0.5">
           <Button
-            variant="secondary"
+            type="button"
+            variant="ghost"
             size="sm"
-            className="h-8 rounded-full px-3 text-xs shadow-none"
+            className="gap-1.5 px-2 text-muted-foreground"
             onClick={() => onReply?.()}
           >
             <ArrowBendUpLeftIcon className="size-3.5" />
             Reply
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 rounded-full px-3 text-xs"
-            onClick={handleReplyAll}
-          >
-            <UsersThreeIcon className="size-3.5" />
-            Reply all
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 rounded-full px-3 text-xs"
-            onClick={handleForward}
-          >
+          {showReplyAll ? (
+            <IconButton label="Reply all" onClick={handleReplyAll}>
+              <ArrowBendDoubleUpLeftIcon className="size-3.5" />
+            </IconButton>
+          ) : null}
+          <IconButton label="Forward" onClick={handleForward}>
             <ArrowBendUpRightIcon className="size-3.5" />
-            Forward
-          </Button>
+          </IconButton>
         </div>
 
-        <div className="flex flex-wrap items-center gap-0.5">
-          <ActionButton
-            label="Archive"
-            onClick={() => archiveMutation.mutate()}
-            disabled={actionsPending}
-          >
-            <ArchiveIcon className="size-4" />
-          </ActionButton>
-          <ActionButton
-            label="Delete"
-            onClick={() => trashMutation.mutate()}
-            disabled={actionsPending}
-          >
-            <TrashIcon className="size-4" />
-          </ActionButton>
-          <ActionButton
-            label="Move to spam"
-            onClick={() => spamMutation.mutate()}
-            disabled={actionsPending}
-          >
-            <WarningIcon className="size-4" />
-          </ActionButton>
-          <ActionButton
-            label={isStarred ? "Unstar" : "Star"}
-            onClick={() => starMutation.mutate()}
-            disabled={actionsPending}
-          >
-            <StarIcon
-              className="size-4"
-              weight={isStarred ? "fill" : "regular"}
-            />
-          </ActionButton>
-          <ActionButton
-            label={email.isRead ? "Mark unread" : "Mark read"}
-            onClick={() => readMutation.mutate()}
-            disabled={actionsPending}
-          >
-            {email.isRead ? (
-              <EnvelopeSimpleIcon className="size-4" />
-            ) : (
-              <EnvelopeSimpleOpenIcon className="size-4" />
-            )}
-          </ActionButton>
-          {isSnoozed ? (
-            <ActionButton
-              label="Unsnooze"
-              onClick={() => snoozeMutation.mutate(null)}
-              disabled={actionsPending}
-            >
-              <ClockIcon className="size-4" weight="fill" />
-            </ActionButton>
-          ) : (
-            <SnoozePicker onSnooze={(ts) => snoozeMutation.mutate(ts)}>
-              <span>
-                <ActionButton
-                  label="Snooze"
-                  onClick={() => {}}
+        <div className="flex items-center">
+          <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-lg"
+                disabled={actionsPending}
+                aria-label="More actions"
+              >
+                <DotsThreeIcon className="size-3.5" weight="bold" />
+              </Button>
+            </PopoverTrigger>
+
+            <PopoverContent align="end" className="w-52 gap-0 p-1">
+              {menuItems.map((item) => {
+                if (item.visible === false) return null;
+                const IconComponent = item.icon;
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    className={menuItemClassName}
+                    disabled={actionsPending}
+                    onClick={() => handleMenuAction(item.action)}
+                  >
+                    <IconComponent
+                      className="size-3.5 text-muted-foreground"
+                      weight={item.iconWeight}
+                    />
+                    {item.label}
+                  </button>
+                );
+              })}
+
+              {isSnoozed ? (
+                <button
+                  type="button"
+                  className={menuItemClassName}
                   disabled={actionsPending}
+                  onClick={() =>
+                    handleMenuAction(() => snoozeMutation.mutate(null))
+                  }
                 >
-                  <ClockIcon className="size-4" />
-                </ActionButton>
-              </span>
-            </SnoozePicker>
-          )}
-          {hasUnsubscribe && (
-            <ActionButton
-              label="Unsubscribe"
-              onClick={() => unsubscribeMutation.mutate()}
-              disabled={actionsPending}
-            >
-              <BellSlashIcon className="size-4" />
-            </ActionButton>
-          )}
+                  <ClockIcon
+                    className="size-3.5 text-muted-foreground"
+                    weight="fill"
+                  />
+                  Unsnooze
+                </button>
+              ) : (
+                <SnoozePicker
+                  onSnooze={(timestamp) => {
+                    setMoreOpen(false);
+                    snoozeMutation.mutate(timestamp);
+                  }}
+                >
+                  <button
+                    type="button"
+                    className={menuItemClassName}
+                    disabled={actionsPending}
+                  >
+                    <ClockIcon className="size-3.5 text-muted-foreground" />
+                    Snooze
+                  </button>
+                </SnoozePicker>
+              )}
+              {hasUnsubscribe && (
+                <button
+                  type="button"
+                  className={menuItemClassName}
+                  disabled={actionsPending}
+                  onClick={() =>
+                    handleMenuAction(() => unsubscribeMutation.mutate())
+                  }
+                >
+                  <BellSlashIcon className="size-3.5 text-muted-foreground" />
+                  Unsubscribe
+                </button>
+              )}
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </div>

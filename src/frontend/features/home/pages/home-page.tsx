@@ -1,4 +1,11 @@
 import { Kbd } from "@/components/ui/kbd";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AgendaPanel } from "@/features/calendar/components/agenda-panel";
@@ -9,6 +16,7 @@ import { useDecisionQueue } from "@/features/home/hooks/use-decision-queue";
 import { useBriefingStream } from "@/features/home/hooks/use-briefing-stream";
 import { getGreeting } from "@/features/home/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { CheckIcon } from "@phosphor-icons/react";
 import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback } from "react";
@@ -110,12 +118,21 @@ export default function HomePage() {
       )}
 
       {showCaughtUpState && (
-        <div className="space-y-2 pt-2">
-          <h2 className="text-lg font-medium">{greeting}</h2>
-          <p className="text-sm text-muted-foreground">
-            Nothing needs attention right now. Items will show up here as cards.
-          </p>
-        </div>
+        <>
+          <PageHeader title={greeting} />
+          <Empty className="min-h-[50vh] flex-1 border-0">
+            <EmptyMedia variant="icon">
+              <CheckIcon className="size-5" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>You're all caught up</EmptyTitle>
+              <EmptyDescription>
+                Nothing needs your attention right now. Items will show up here
+                when they need action.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        </>
       )}
 
       <AgendaPanel days={1} showEmptyState={false} hideProposed showHeader />

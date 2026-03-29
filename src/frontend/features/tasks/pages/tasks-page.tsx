@@ -11,7 +11,11 @@ import {
 } from "@/features/tasks/components/task-editor";
 import { TaskListView } from "@/features/tasks/components/task-list-view";
 import { TaskActionsProvider } from "@/features/tasks/hooks/use-task-actions";
-import { createTask, deleteTask, updateTask } from "@/features/tasks/mutations";
+import {
+  createTask,
+  deleteTask,
+  updateTask,
+} from "@/features/tasks/mutations";
 import type {
   TaskLayout,
   TaskPriority,

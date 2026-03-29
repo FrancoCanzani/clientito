@@ -7,6 +7,7 @@ import { useLocalDraft } from "../hooks/use-local-draft";
 import { useUndoSend } from "../hooks/use-undo-send";
 import { sendEmail } from "../mutations";
 import type { ComposeInitial } from "../types";
+import { buildPlainForwardedHtml } from "../utils/build-forwarded-html";
 
 type UseComposeEmailOptions = {
   onSent?: () => void;
@@ -21,25 +22,6 @@ type ComposeDraft = {
   body: string;
   forwardedContent: string;
 };
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function buildPlainForwardedHtml(content: string) {
-  return [
-    '<div data-forwarded-message="true" style="border-top:1px solid #dadce0;margin-top:16px;padding-top:16px;color:#5f6368;font-size:13px">',
-    '<div data-forwarded-original-body="true" style="white-space:pre-wrap">',
-    escapeHtml(content),
-    "</div>",
-    "</div>",
-  ].join("");
-}
 
 function splitPlainForwardedContent(content: string) {
   const marker = /-{5,}\s*Forwarded message\s*-{5,}/i;
