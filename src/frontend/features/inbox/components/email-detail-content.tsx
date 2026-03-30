@@ -118,7 +118,7 @@ export function EmailDetailContent({
 
   return (
     <div className="flex w-full min-w-0 flex-col">
-      <div className="sticky top-0 z-10 w-full bg-background pb-4 pt-5">
+      <div className="sticky top-0 z-10 w-full bg-background pb-3 pt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-0.5">
             <Button
@@ -156,40 +156,40 @@ export function EmailDetailContent({
             />
           ) : null}
         </div>
+      </div>
 
-        <div className="mt-5">
-          <h1 className="min-w-0 text-lg font-medium text-foreground sm:text-xl">
-            {subject}
-          </h1>
+      <div className="mb-5">
+        <h1 className="min-w-0 text-lg font-medium text-foreground sm:text-xl">
+          {subject}
+        </h1>
 
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="min-w-0 space-y-1">
-                <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {email.fromName || email.fromAddr}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
+                <p className="truncate text-sm font-medium text-foreground">
+                  {email.fromName || email.fromAddr}
+                </p>
+                <span className="truncate text-sm text-muted-foreground">
+                  {email.fromAddr}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                {recipientRows.map((row) => (
+                  <p key={row.label} className="min-w-0">
+                    <span className="mr-1 font-medium text-foreground/70">
+                      {row.label}
+                    </span>
+                    <span>{row.value}</span>
                   </p>
-                  <span className="truncate text-sm text-muted-foreground">
-                    {email.fromAddr}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  {recipientRows.map((row) => (
-                    <p key={row.label} className="min-w-0">
-                      <span className="mr-1 font-medium text-foreground/70">
-                        {row.label}
-                      </span>
-                      <span>{row.value}</span>
-                    </p>
-                  ))}
-                </div>
+                ))}
               </div>
             </div>
-
-            <span className="shrink-0 text-xs font-mono tracking-tight font-medium text-muted-foreground">
-              {formattedDate}
-            </span>
           </div>
+
+          <span className="shrink-0 text-xs font-mono tracking-tight font-medium text-muted-foreground">
+            {formattedDate}
+          </span>
         </div>
       </div>
 

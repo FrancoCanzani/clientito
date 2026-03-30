@@ -238,8 +238,8 @@ export function usePaletteCommands({
     mutationFn: async (input: { title: string; dueAt?: number }) =>
       createTask(input),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      void router.invalidate();
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      router.invalidate();
       toast.success("Task created");
       close();
     },

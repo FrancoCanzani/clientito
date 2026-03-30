@@ -12,7 +12,7 @@ export function useTaskMutations({
   const router = useRouter();
 
   const invalidateTasks = () => {
-    void router.invalidate();
+    router.invalidate();
   };
 
   const createTaskMutation = useMutation({

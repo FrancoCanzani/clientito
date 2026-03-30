@@ -14,9 +14,9 @@ export function useAgentInvalidation(
       (prev === "streaming" || prev === "submitted") &&
       status === "ready"
     ) {
-      void queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      void queryClient.invalidateQueries({ queryKey: ["emails"] });
-      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["emails"] });
+      queryClient.invalidateQueries({ queryKey: ["notes"] });
     }
   }, [status, queryClient]);
 }

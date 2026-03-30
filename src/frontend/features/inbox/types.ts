@@ -75,4 +75,5 @@ export type ComposeInitial = {
   subject?: string;
   body?: string;
   bodyHtml?: string;
+  threadId?: string;
 };

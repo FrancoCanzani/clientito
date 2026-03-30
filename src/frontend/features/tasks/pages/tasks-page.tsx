@@ -11,11 +11,7 @@ import {
 } from "@/features/tasks/components/task-editor";
 import { TaskListView } from "@/features/tasks/components/task-list-view";
 import { TaskActionsProvider } from "@/features/tasks/hooks/use-task-actions";
-import {
-  createTask,
-  deleteTask,
-  updateTask,
-} from "@/features/tasks/mutations";
+import { useTaskMutations } from "@/features/tasks/hooks/use-task-mutations";
 import type {
   TaskLayout,
   TaskPriority,
@@ -30,9 +26,7 @@ import {
 } from "@/features/tasks/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { KanbanIcon, ListIcon } from "@phosphor-icons/react";
-import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { getRouteApi, useRouter } from "@tanstack/react-router";
+import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 
 const tasksRouteApi = getRouteApi("/_dashboard/tasks");
@@ -46,7 +40,6 @@ export default function TasksPage() {
   const taskResponse = tasksRouteApi.useLoaderData();
   const search = tasksRouteApi.useSearch();
   const navigate = tasksRouteApi.useNavigate();
-  const router = useRouter();
   const isMobile = useIsMobile();
   const [editor, setEditor] = useState<EditorState>(null);
 
@@ -87,61 +80,14 @@ export default function TasksPage() {
       : null;
 
   const closeEditor = useCallback(() => setEditor(null), []);
-  const invalidateTasks = () => {
-    void router.invalidate();
-  };
 
-  const createTaskMutation = useMutation({
-    mutationFn: createTask,
-    onSuccess: () => {
-      closeEditor();
-      invalidateTasks();
-    },
-    onError: () => toast.error("Failed to create task"),
-  });
-
-  const updateTaskMutation = useMutation({
-    mutationFn: async ({
-      taskId,
-      input,
-    }: {
-      taskId: number;
-      input: Parameters<typeof updateTask>[1];
-    }) => updateTask(taskId, input),
-    onSuccess: () => {
-      closeEditor();
-      invalidateTasks();
-    },
-    onError: () => toast.error("Failed to update task"),
-  });
-
-  const statusMutation = useMutation({
-    mutationFn: ({ taskId, status }: { taskId: number; status: TaskStatus }) =>
-      updateTask(taskId, { status }),
-    onSuccess: invalidateTasks,
-    onError: () => toast.error("Failed to update status"),
-  });
-
-  const priorityMutation = useMutation({
-    mutationFn: ({
-      taskId,
-      priority,
-    }: {
-      taskId: number;
-      priority: TaskPriority;
-    }) => updateTask(taskId, { priority }),
-    onSuccess: invalidateTasks,
-    onError: () => toast.error("Failed to update priority"),
-  });
-
-  const deleteTaskMutation = useMutation({
-    mutationFn: deleteTask,
-    onSuccess: () => {
-      closeEditor();
-      invalidateTasks();
-    },
-    onError: () => toast.error("Failed to delete task"),
-  });
+  const {
+    createTaskMutation,
+    updateTaskMutation,
+    statusMutation,
+    priorityMutation,
+    deleteTaskMutation,
+  } = useTaskMutations({ closeEditor });
 
   const setView = useCallback(
     (v: TaskView) => {

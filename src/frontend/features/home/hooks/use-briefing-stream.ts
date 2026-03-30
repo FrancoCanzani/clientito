@@ -13,7 +13,7 @@ export function useBriefingStream(enabled = false) {
   useEffect(() => {
     if (!enabled || hasTriggered.current) return;
     hasTriggered.current = true;
-    void complete("");
+    complete("");
   }, [enabled, complete]);
 
   return {

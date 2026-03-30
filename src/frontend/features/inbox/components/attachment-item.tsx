@@ -162,7 +162,7 @@ export function AttachmentItem({
             className="size-8 shrink-0 text-muted-foreground"
             onClick={(event) => {
               event.stopPropagation();
-              void handleDownload();
+              handleDownload();
             }}
             disabled={isDownloading}
             aria-label={
@@ -190,7 +190,7 @@ export function AttachmentItem({
               className="h-7 px-2 text-destructive"
               onClick={(event) => {
                 event.stopPropagation();
-                void handleDownload();
+                handleDownload();
               }}
               disabled={isDownloading}
             >

@@ -100,25 +100,30 @@ export function useEmailInboxActions({
     [navigate, params.id, queryClient],
   );
 
+  const inflightRef = useRef(0);
+
   const fireMutation = useCallback(
     async (ids: string[], data: typeof actionPayloads[EmailInboxAction]) => {
+      inflightRef.current++;
       try {
         if (ids.length === 1) {
           await patchEmail(ids[0]!, data);
         } else {
           await batchPatchEmails(ids, data);
         }
-        void queryClient.invalidateQueries({ queryKey: ["emails"] });
         for (const id of ids) {
-          void queryClient.invalidateQueries({ queryKey: ["email-detail", id] });
+          queryClient.invalidateQueries({ queryKey: ["email-detail", id] });
         }
       } catch (error) {
-        queryClient.setQueryData(emailsQueryKey, queryClient.getQueryData(emailsQueryKey));
-        void queryClient.invalidateQueries({ queryKey: ["emails"] });
         toast.error(error instanceof Error ? error.message : "Action failed");
+      } finally {
+        inflightRef.current--;
+        if (inflightRef.current === 0 && !pendingRef.current) {
+          queryClient.invalidateQueries({ queryKey: ["emails"] });
+        }
       }
     },
-    [emailsQueryKey, queryClient],
+    [queryClient],
   );
 
   const executeEmailAction = useCallback(
@@ -134,14 +139,14 @@ export function useEmailInboxActions({
         clearTimeout(pendingRef.current.timer);
         const prev = pendingRef.current;
         pendingRef.current = null;
-        void fireMutation(prev.ids, prev.data);
+        fireMutation(prev.ids, prev.data);
       }
 
       const data = actionPayloads[action];
       const idSet = new Set(ids);
       const removesFromList = REMOVES_FROM_LIST.has(action);
 
-      void queryClient.cancelQueries({ queryKey: emailsQueryKey });
+      queryClient.cancelQueries({ queryKey: emailsQueryKey });
 
       const snapshot = queryClient.getQueryData<InfiniteData<EmailListResponse>>(emailsQueryKey);
 
@@ -173,7 +178,7 @@ export function useEmailInboxActions({
       );
 
       if (IMMEDIATE_ACTIONS.has(action)) {
-        void fireMutation(ids, data);
+        fireMutation(ids, data);
         return;
       }
 
@@ -189,7 +194,7 @@ export function useEmailInboxActions({
         if (snapshot) {
           queryClient.setQueryData(emailsQueryKey, snapshot);
         } else {
-          void queryClient.invalidateQueries({ queryKey: ["emails"] });
+          queryClient.invalidateQueries({ queryKey: ["emails"] });
         }
       };
 
@@ -203,7 +208,7 @@ export function useEmailInboxActions({
           const pending = pendingRef.current;
           pendingRef.current = null;
           toast.dismiss(toastId);
-          void fireMutation(pending.ids, pending.data);
+          fireMutation(pending.ids, pending.data);
         }
       }, 5000);
 

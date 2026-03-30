@@ -76,34 +76,34 @@ export function SnoozePicker({ onSnooze, children }: SnoozePickerProps) {
           <div className="flex flex-col gap-0.5 p-1">
             <button
               type="button"
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors duration-100 hover:bg-muted"
+              className="flex min-h-7 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs/relaxed text-foreground outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground"
               onClick={() => handlePreset(getLaterToday())}
             >
-              <ClockIcon className="size-4 text-muted-foreground" />
+              <ClockIcon className="size-3.5 text-muted-foreground" />
               Later today
             </button>
             <button
               type="button"
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors duration-100 hover:bg-muted"
+              className="flex min-h-7 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs/relaxed text-foreground outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground"
               onClick={() => handlePreset(getTomorrowMorning())}
             >
-              <SunIcon className="size-4 text-muted-foreground" />
+              <SunIcon className="size-3.5 text-muted-foreground" />
               Tomorrow morning
             </button>
             <button
               type="button"
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors duration-100 hover:bg-muted"
+              className="flex min-h-7 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs/relaxed text-foreground outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground"
               onClick={() => handlePreset(getNextMondayMorning())}
             >
-              <CalendarIcon className="size-4 text-muted-foreground" />
+              <CalendarIcon className="size-3.5 text-muted-foreground" />
               Next week
             </button>
             <button
               type="button"
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors duration-100 hover:bg-muted"
+              className="flex min-h-7 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs/relaxed text-foreground outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground"
               onClick={() => setShowCustom(true)}
             >
-              <CalendarDotsIcon className="size-4 text-muted-foreground" />
+              <CalendarDotsIcon className="size-3.5 text-muted-foreground" />
               Pick date & time
             </button>
           </div>

@@ -61,8 +61,8 @@ export function EmailActionBar({
   const hasUnsubscribe = !!(email.unsubscribeUrl || email.unsubscribeEmail);
 
   const invalidateEmails = () => {
-    void queryClient.invalidateQueries({ queryKey: ["emails"] });
-    void queryClient.invalidateQueries({
+    queryClient.invalidateQueries({ queryKey: ["emails"] });
+    queryClient.invalidateQueries({
       queryKey: ["email-detail", email.id],
     });
   };

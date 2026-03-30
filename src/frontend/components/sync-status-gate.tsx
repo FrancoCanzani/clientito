@@ -28,7 +28,7 @@ export function SyncStatusGate() {
       status.state === "ready_to_sync"
     ) {
       if (pathname === "/get-started") return;
-      void navigate({ to: "/get-started", replace: true });
+      navigate({ to: "/get-started", replace: true });
       return;
     }
   }, [navigate, pathname, status]);

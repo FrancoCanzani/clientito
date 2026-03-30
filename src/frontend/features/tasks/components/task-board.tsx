@@ -30,9 +30,9 @@ export function TaskBoard({
         const task = tasks.find((t) => t.id === taskId);
         if (!task || task.status === newStatus) return;
 
-        void updateTask(taskId, { status: newStatus }).then(() => {
-          void queryClient.invalidateQueries({ queryKey: ["tasks"] });
-          void router.invalidate();
+        updateTask(taskId, { status: newStatus }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["tasks"] });
+          router.invalidate();
         });
       },
     });

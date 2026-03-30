@@ -70,7 +70,7 @@ export function useEmailData() {
     onChange: (isIntersecting) => {
       if (!isIntersecting || !hasNextPage || isFetchingNextPage || isFetching)
         return;
-      void fetchNextPage();
+      fetchNextPage();
     },
   });
 

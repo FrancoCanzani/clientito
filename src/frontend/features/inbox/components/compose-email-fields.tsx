@@ -213,7 +213,7 @@ export function ComposeEmailFields({
           />
           <div className="flex items-center gap-1">
             <ScheduleSendPicker
-              onSchedule={(timestamp) => void scheduleSend(timestamp)}
+              onSchedule={(timestamp) => { scheduleSend(timestamp); }}
             >
               <Button
                 variant="ghost"

@@ -90,7 +90,7 @@ export function useCommandPaletteState() {
       setAgentHasSubmitted(false);
       focusDelayed(agentInputRef);
       if (text) {
-        void submitAgentMessage(text);
+        submitAgentMessage(text);
       }
     },
     [clearHistory, submitAgentMessage],
@@ -113,7 +113,7 @@ export function useCommandPaletteState() {
   const handleAgentSubmit = useCallback(() => {
     const text = agentInput.trim();
     if (!text) return;
-    void submitAgentMessage(text);
+    submitAgentMessage(text);
     setAgentInput("");
   }, [agentInput, submitAgentMessage]);
 

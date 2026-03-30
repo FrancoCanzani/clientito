@@ -45,8 +45,8 @@ export function openEmail(
       old ? { ...old, isRead: true } : old,
   );
 
-  void markEmailRead(email.id).catch(() => {
-    void queryClient.invalidateQueries({ queryKey: ["emails"] });
-    void queryClient.invalidateQueries({ queryKey: ["email-detail", email.id] });
+  markEmailRead(email.id).catch(() => {
+    queryClient.invalidateQueries({ queryKey: ["emails"] });
+    queryClient.invalidateQueries({ queryKey: ["email-detail", email.id] });
   });
 }

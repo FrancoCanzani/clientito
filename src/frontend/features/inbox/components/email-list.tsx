@@ -93,6 +93,18 @@ export function EmailList() {
                           view={view}
                           isOpen={false}
                           onOpen={() => openEmail(email)}
+                          onArchive={() =>
+                            executeEmailAction("archive", [email.id])
+                          }
+                          onTrash={() =>
+                            executeEmailAction("trash", [email.id])
+                          }
+                          onToggleRead={() =>
+                            executeEmailAction(
+                              email.isRead ? "mark-unread" : "mark-read",
+                              [email.id],
+                            )
+                          }
                         />
                       </EmailContextMenu>
                     );

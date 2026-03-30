@@ -165,6 +165,7 @@ export function useComposeEmail(
   const bodyRef = useRef(draft.body);
   const [sendPending, setSendPending] = useState(false);
 
+  const threadId = initial?.threadId;
   const { mailboxId, to, cc, bcc, subject, body, forwardedContent } = draft;
   const availableMailboxes = useMemo(
     () =>
@@ -228,6 +229,7 @@ export function useComposeEmail(
         bcc: snap.bcc.trim().length > 0 ? snap.bcc.trim() : undefined,
         subject: snap.subject,
         body: combineComposeBody(bodyRef.current, snap.forwardedContent),
+        threadId: threadId ?? undefined,
         attachments: attSnap,
       });
     },
@@ -237,7 +239,10 @@ export function useComposeEmail(
       setSendPending(false);
       setDraft(createComposeDraft());
       attachments.clear();
-      void queryClient.invalidateQueries({ queryKey: ["emails"] });
+      queryClient.invalidateQueries({ queryKey: ["emails"] });
+      if (threadId) {
+        queryClient.invalidateQueries({ queryKey: ["email-thread", threadId] });
+      }
       options?.onSent?.();
     },
     onError: (error) => {
@@ -269,6 +274,7 @@ export function useComposeEmail(
           bcc: draft.bcc.trim().length > 0 ? draft.bcc.trim() : undefined,
           subject: draft.subject,
           body: combineComposeBody(bodyRef.current, draft.forwardedContent),
+          threadId: threadId ?? undefined,
           attachments:
             attachments.files.length > 0
               ? attachments.getAttachmentKeys()
@@ -285,7 +291,7 @@ export function useComposeEmail(
         setSendPending(false);
         setDraft(createComposeDraft());
         attachments.clear();
-        void queryClient.invalidateQueries({ queryKey: ["scheduled-emails"] });
+        queryClient.invalidateQueries({ queryKey: ["scheduled-emails"] });
         options?.onSent?.();
       } catch (error) {
         setSendPending(false);

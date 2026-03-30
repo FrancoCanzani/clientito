@@ -1,5 +1,11 @@
 import { cn } from "@/lib/utils";
-import { PaperclipIcon } from "@phosphor-icons/react";
+import {
+  ArchiveIcon,
+  EnvelopeSimpleIcon,
+  EnvelopeSimpleOpenIcon,
+  PaperclipIcon,
+  TrashIcon,
+} from "@phosphor-icons/react";
 import type { EmailListItem } from "../types";
 import { formatInboxRowDate } from "../utils/formatters";
 
@@ -15,6 +21,9 @@ type EmailRowProps = {
   view: string;
   isOpen: boolean;
   onOpen: () => void;
+  onArchive: () => void;
+  onTrash: () => void;
+  onToggleRead: () => void;
 };
 
 export function EmailRow({
@@ -23,6 +32,9 @@ export function EmailRow({
   view,
   isOpen,
   onOpen,
+  onArchive,
+  onTrash,
+  onToggleRead,
 }: EmailRowProps) {
   const participantLabel =
     view === "sent"
@@ -85,7 +97,41 @@ export function EmailRow({
         {threadCount > 1 && (
           <span className="font-mono tabular-nums">[{threadCount}]</span>
         )}
-        <span className="font-mono">{formatInboxRowDate(email.date)}</span>
+        <div className="grid [grid-template-areas:'stack'] items-center">
+          <span className="[grid-area:stack] font-mono group-hover:invisible">
+            {formatInboxRowDate(email.date)}
+          </span>
+          <div className="[grid-area:stack] invisible group-hover:visible flex items-center justify-end gap-0.5">
+            <button
+              type="button"
+              className="rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+              onClick={(e) => { e.stopPropagation(); onArchive(); }}
+              aria-label="Archive"
+            >
+              <ArchiveIcon className="size-4" />
+            </button>
+            <button
+              type="button"
+              className="rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+              onClick={(e) => { e.stopPropagation(); onToggleRead(); }}
+              aria-label={email.isRead ? "Mark as unread" : "Mark as read"}
+            >
+              {email.isRead ? (
+                <EnvelopeSimpleIcon className="size-4" />
+              ) : (
+                <EnvelopeSimpleOpenIcon className="size-4" />
+              )}
+            </button>
+            <button
+              type="button"
+              className="rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+              onClick={(e) => { e.stopPropagation(); onTrash(); }}
+              aria-label="Delete"
+            >
+              <TrashIcon className="size-4" />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

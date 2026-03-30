@@ -72,7 +72,7 @@ export function AgendaPanel({
     onMutate: (proposedId) => setApprovingId(proposedId),
     onSuccess: () => {
       toast.success("Event added to calendar");
-      void queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
     },
     onError: () => toast.error("Failed to add event"),
     onSettled: () => setApprovingId(null),
@@ -81,7 +81,7 @@ export function AgendaPanel({
   const dismissMutation = useMutation({
     mutationFn: dismissProposedEvent,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
     },
     onError: () => toast.error("Failed to dismiss event"),
   });
@@ -90,7 +90,7 @@ export function AgendaPanel({
     mutationFn: ({ id, data }: { id: number; data: { title?: string; location?: string; startAt?: number; endAt?: number } }) =>
       editProposedEvent(id, data),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
     },
     onError: () => toast.error("Failed to update event"),
   });

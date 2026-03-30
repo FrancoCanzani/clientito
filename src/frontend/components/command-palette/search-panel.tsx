@@ -107,7 +107,7 @@ export function SearchPanel({
     onChange: (isIntersecting) => {
       if (!isIntersecting || !hasNextPage || isFetchingNextPage || isFetching)
         return;
-      void fetchNextPage();
+      fetchNextPage();
     },
   });
 
