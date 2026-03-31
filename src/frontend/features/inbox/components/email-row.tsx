@@ -9,10 +9,14 @@ import {
 import type { EmailListItem } from "../types";
 import { formatInboxRowDate } from "../utils/formatters";
 
-function formatAiLabel(label: EmailListItem["aiLabel"]) {
-  if (label === "later") return "important";
-  if (label === "action_needed") return "requires action";
-  return label?.replace(/_/g, " ") ?? null;
+function getBadgeLabel(email: EmailListItem) {
+  const category = email.intelligence?.category;
+  const urgency = email.intelligence?.urgency;
+
+  if (category === "action_needed") return "action";
+  if (category === "important") return urgency === "high" ? "urgent" : "important";
+  if (urgency === "high") return "urgent";
+  return null;
 }
 
 type EmailRowProps = {
@@ -42,7 +46,7 @@ export function EmailRow({
         ? `To: ${email.toAddr}`
         : "To: (unknown recipient)"
       : email.fromName || email.fromAddr;
-  const visibleAiLabel = formatAiLabel(email.aiLabel);
+  const visibleBadge = getBadgeLabel(email);
 
   return (
     <div
@@ -79,16 +83,17 @@ export function EmailRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-        {visibleAiLabel && (
+        {visibleBadge && (
           <span
             className={cn(
               "capitalize hidden",
-              (visibleAiLabel === "important" ||
-                visibleAiLabel === "requires action") &&
+              (visibleBadge === "important" ||
+                visibleBadge === "action" ||
+                visibleBadge === "urgent") &&
                 "block italic",
             )}
           >
-            {visibleAiLabel}
+            {visibleBadge}
           </span>
         )}
         {email.hasAttachment && (

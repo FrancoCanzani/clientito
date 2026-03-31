@@ -50,7 +50,7 @@ export function TriageCard({
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isTask = item.type === "overdue_task" || item.type === "due_today_task";
-  const isProposedEvent = item.type === "proposed_event";
+  const isProposedEvent = item.type === "calendar_suggestion";
   const isEmail = !isTask && !isProposedEvent && !!item.emailId;
   const hasDraft = !!draft;
 
@@ -74,14 +74,9 @@ export function TriageCard({
         >
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium">{item.title}</span>
-            {item.type === "action_needed" && (
+            {item.type === "email_action" && (
               <span className="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                Action needed
-              </span>
-            )}
-            {item.type === "important" && (
-              <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                Important
+                {item.actionType?.replace(/_/g, " ") ?? "Action"}
               </span>
             )}
             {item.type === "overdue_task" && (
@@ -94,9 +89,9 @@ export function TriageCard({
                 Today
               </span>
             )}
-            {item.type === "proposed_event" && (
+            {item.type === "calendar_suggestion" && (
               <span className="inline-flex items-center rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
-                Proposed event
+                Suggested event
               </span>
             )}
           </div>

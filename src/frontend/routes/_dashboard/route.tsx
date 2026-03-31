@@ -1,15 +1,35 @@
 import { CommandPalette } from "@/components/command-palette/command-palette";
 import { Loading } from "@/components/loading";
 import { AppProviders } from "@/components/providers";
-import { SyncStatusGate } from "@/components/sync-status-gate";
+import { fetchSyncStatus } from "@/features/home/queries";
 import { authClient } from "@/lib/auth-client";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard")({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     const session = await authClient.getSession();
     if (!session.data?.user) {
       throw redirect({ to: "/login" });
+    }
+
+    let syncStatus;
+    try {
+      syncStatus = await fetchSyncStatus();
+    } catch {
+      return;
+    }
+
+    const needsOnboarding =
+      !syncStatus.hasSynced &&
+      (syncStatus.state === "needs_mailbox_connect" ||
+        syncStatus.state === "ready_to_sync");
+
+    if (needsOnboarding && location.pathname !== "/get-started") {
+      throw redirect({ to: "/get-started" });
+    }
+
+    if (!needsOnboarding && location.pathname === "/get-started") {
+      throw redirect({ to: "/home" });
     }
   },
   component: DashboardLayout,
@@ -27,7 +47,6 @@ function DashboardLayout() {
         </main>
         <CommandPalette />
       </div>
-      <SyncStatusGate />
     </AppProviders>
   );
 }

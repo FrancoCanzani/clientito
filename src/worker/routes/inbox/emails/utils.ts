@@ -1,6 +1,10 @@
 import { sql } from "drizzle-orm";
-import { emails } from "../../../db/schema";
+import { emailIntelligence, emails } from "../../../db/schema";
 import type { AttachmentMeta } from "../../../lib/email";
+import {
+  getIntelligenceStatus,
+  getPersistedEmailIntelligence,
+} from "../../../lib/email/intelligence/store";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
 
@@ -19,11 +23,19 @@ export const emailSummarySelection = {
   direction: emails.direction,
   isRead: emails.isRead,
   labelIds: emails.labelIds,
-  aiLabel: emails.aiLabel,
   createdAt: emails.createdAt,
   unsubscribeUrl: emails.unsubscribeUrl,
   unsubscribeEmail: emails.unsubscribeEmail,
   snoozedUntil: emails.snoozedUntil,
+} as const;
+
+export const emailIntelligenceSelection = {
+  intelligenceStatus: emailIntelligence.status,
+  intelligenceCategory: emailIntelligence.category,
+  intelligenceUrgency: emailIntelligence.urgency,
+  intelligenceBriefingSentence: emailIntelligence.briefingSentence,
+  intelligenceActionsJson: emailIntelligence.actionsJson,
+  intelligenceCalendarEventsJson: emailIntelligence.calendarEventsJson,
 } as const;
 
 export function hasEmailLabel(label: string) {
@@ -49,11 +61,16 @@ export function toEmailListResponse(row: {
   direction: "sent" | "received" | null;
   isRead: boolean;
   labelIds: string[] | null;
-  aiLabel: string | null;
   createdAt: number;
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
   snoozedUntil: number | null;
+  intelligenceStatus: "pending" | "ready" | "error" | null;
+  intelligenceCategory: import("../../../db/schema").EmailIntelligenceCategory | null;
+  intelligenceUrgency: import("../../../db/schema").EmailIntelligenceUrgency | null;
+  intelligenceBriefingSentence: string | null;
+  intelligenceActionsJson: import("../../../db/schema").EmailAction[] | null;
+  intelligenceCalendarEventsJson: import("../../../db/schema").CalendarSuggestion[] | null;
 }) {
   const labelIds = row.labelIds ?? [];
   return {
@@ -71,12 +88,26 @@ export function toEmailListResponse(row: {
     direction: row.direction,
     isRead: row.isRead,
     labelIds,
-    aiLabel: row.aiLabel,
     hasAttachment: labelIds.includes(HAS_ATTACHMENT_LABEL),
     createdAt: row.createdAt,
     unsubscribeUrl: row.unsubscribeUrl,
     unsubscribeEmail: row.unsubscribeEmail,
     snoozedUntil: row.snoozedUntil,
+    intelligenceStatus: getIntelligenceStatus(
+      row.intelligenceStatus ? { status: row.intelligenceStatus } : null,
+    ),
+    intelligence: getPersistedEmailIntelligence(
+      row.intelligenceStatus
+        ? {
+            status: row.intelligenceStatus,
+            category: row.intelligenceCategory,
+            urgency: row.intelligenceUrgency,
+            briefingSentence: row.intelligenceBriefingSentence,
+            actionsJson: row.intelligenceActionsJson ?? [],
+            calendarEventsJson: row.intelligenceCalendarEventsJson ?? [],
+          }
+        : null,
+    ),
   };
 }
 
@@ -97,11 +128,16 @@ export function toEmailDetailResponse(row: {
   direction: "sent" | "received" | null;
   isRead: boolean;
   labelIds: string[] | null;
-  aiLabel: string | null;
   createdAt: number;
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
   snoozedUntil: number | null;
+  intelligenceStatus: "pending" | "ready" | "error" | null;
+  intelligenceCategory: import("../../../db/schema").EmailIntelligenceCategory | null;
+  intelligenceUrgency: import("../../../db/schema").EmailIntelligenceUrgency | null;
+  intelligenceBriefingSentence: string | null;
+  intelligenceActionsJson: import("../../../db/schema").EmailAction[] | null;
+  intelligenceCalendarEventsJson: import("../../../db/schema").CalendarSuggestion[] | null;
 }) {
   return {
     ...toEmailListResponse(row),

@@ -8,7 +8,7 @@ import {
   startFullSync,
 } from "@/features/home/mutations";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowRightIcon, SpinnerGapIcon } from "@phosphor-icons/react";
+import { SpinnerGapIcon } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -95,14 +95,12 @@ export default function GetStartedPage() {
             Your connection expired. Reconnect to resume syncing.
           </p>
           <Button
-            className="w-full"
             onClick={() => reconnectMutation.mutate()}
             disabled={reconnectMutation.isPending}
           >
             {reconnectMutation.isPending
               ? "Opening Google..."
               : "Reconnect Gmail"}
-            <ArrowRightIcon className="ml-1.5 size-4" />
           </Button>
         </div>
       )}

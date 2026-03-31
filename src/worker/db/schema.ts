@@ -7,6 +7,76 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { account, user } from "./auth-schema";
 
+export type EmailIntelligenceCategory =
+  | "important"
+  | "action_needed"
+  | "newsletter"
+  | "notification"
+  | "transactional";
+
+export type EmailIntelligenceUrgency = "high" | "medium" | "low";
+
+export type EmailActionType =
+  | "reply"
+  | "archive"
+  | "label"
+  | "snooze"
+  | "forward"
+  | "delegate";
+
+export type EmailActionTrustLevel = "auto" | "approve";
+
+export type EmailActionStatus =
+  | "pending"
+  | "executed"
+  | "dismissed"
+  | "failed";
+
+export type CalendarSuggestionConfidence = "high" | "low";
+
+export type CalendarSuggestionStatus = "pending" | "approved" | "dismissed";
+
+export type EmailAction = {
+  id: string;
+  type: EmailActionType;
+  label: string;
+  payload: Record<string, unknown>;
+  trustLevel: EmailActionTrustLevel;
+  status: EmailActionStatus;
+  error: string | null;
+  executedAt: number | null;
+  updatedAt: number;
+};
+
+export type CalendarSuggestion = {
+  id: number;
+  title: string;
+  proposedDate: string;
+  startAt: number;
+  endAt: number;
+  isAllDay: boolean;
+  confidence: CalendarSuggestionConfidence;
+  sourceText: string;
+  status: CalendarSuggestionStatus;
+  location: string | null;
+  attendees: string[] | null;
+  googleEventId: string | null;
+  updatedAt: number;
+};
+
+export type EmailIntelligenceStatus = "pending" | "ready" | "error";
+
+export type PersistedEmailIntelligence = {
+  category: EmailIntelligenceCategory;
+  urgency: EmailIntelligenceUrgency;
+  summary: string;
+  briefingSentence: string | null;
+  actions: EmailAction[];
+  calendarEvents: CalendarSuggestion[];
+  autoExecute: string[];
+  requiresApproval: string[];
+};
+
 
 export const notes = sqliteTable(
   "notes",
@@ -49,19 +119,9 @@ export const emails = sqliteTable(
     direction: text("direction").$type<"sent" | "received">(),
     isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
     labelIds: text("label_ids", { mode: "json" }).$type<string[] | null>(),
-    aiLabel: text("ai_label").$type<
-      | "action_needed"
-      | "important"
-      | "later"
-      | "newsletter"
-      | "marketing"
-      | "transactional"
-      | "notification"
-    >(),
     unsubscribeUrl: text("unsubscribe_url"),
     unsubscribeEmail: text("unsubscribe_email"),
     snoozedUntil: integer("snoozed_until"),
-    draftReply: text("draft_reply"),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [
@@ -121,6 +181,52 @@ export const emailSubscriptions = sqliteTable(
   ],
 );
 
+export const emailIntelligence = sqliteTable(
+  "email_intelligence",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    emailId: integer("email_id")
+      .notNull()
+      .references(() => emails.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mailboxId: integer("mailbox_id").references(() => mailboxes.id, {
+      onDelete: "cascade",
+    }),
+    category: text("category").$type<EmailIntelligenceCategory>(),
+    urgency: text("urgency").$type<EmailIntelligenceUrgency>(),
+    summary: text("summary"),
+    briefingSentence: text("briefing_sentence"),
+    actionsJson: text("actions_json", { mode: "json" })
+      .$type<EmailAction[]>()
+      .notNull()
+      .default([]),
+    calendarEventsJson: text("calendar_events_json", { mode: "json" })
+      .$type<CalendarSuggestion[]>()
+      .notNull()
+      .default([]),
+    status: text("status")
+      .$type<EmailIntelligenceStatus>()
+      .notNull()
+      .default("pending"),
+    sourceHash: text("source_hash"),
+    model: text("model"),
+    schemaVersion: integer("schema_version").notNull().default(1),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    error: text("error"),
+    lastProcessedAt: integer("last_processed_at"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("email_intelligence_email_idx").on(table.emailId),
+    index("email_intelligence_user_status_idx").on(table.userId, table.status),
+    index("email_intelligence_user_updated_idx").on(table.userId, table.updatedAt),
+    index("email_intelligence_mailbox_idx").on(table.mailboxId),
+  ],
+);
+
 export type TaskStatus = "backlog" | "todo" | "in_progress" | "done";
 
 export const tasks = sqliteTable(
@@ -177,7 +283,7 @@ export const emailFilters = sqliteTable(
 );
 
 export type FilterCondition = {
-  field: "from" | "to" | "subject" | "aiLabel";
+  field: "from" | "to" | "subject" | "category";
   operator: "contains" | "equals" | "startsWith" | "endsWith";
   value: string;
 };
@@ -186,12 +292,10 @@ export type FilterActions = {
   archive?: boolean;
   markRead?: boolean;
   star?: boolean;
-  applyAiLabel?:
+  applyCategory?:
     | "action_needed"
     | "important"
-    | "later"
     | "newsletter"
-    | "marketing"
     | "transactional"
     | "notification";
   trash?: boolean;
@@ -298,36 +402,6 @@ export const scheduledEmails = sqliteTable(
   ],
 );
 
-export const proposedEvents = sqliteTable(
-  "proposed_events",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    mailboxId: integer("mailbox_id").references(() => mailboxes.id, {
-      onDelete: "cascade",
-    }),
-    emailId: integer("email_id"),
-    title: text("title").notNull(),
-    description: text("description"),
-    location: text("location"),
-    startAt: integer("start_at").notNull(),
-    endAt: integer("end_at").notNull(),
-    attendees: text("attendees", { mode: "json" }).$type<string[]>(),
-    status: text("status")
-      .$type<"pending" | "approved" | "dismissed">()
-      .notNull()
-      .default("pending"),
-    googleEventId: text("google_event_id"),
-    createdAt: integer("created_at").notNull(),
-    updatedAt: integer("updated_at").notNull(),
-  },
-  (table) => [
-    index("proposed_events_user_status_idx").on(table.userId, table.status),
-  ],
-);
-
 export const briefingDecisions = sqliteTable(
   "briefing_decisions",
   {
@@ -335,15 +409,12 @@ export const briefingDecisions = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    itemType: text("item_type")
-      .$type<"email" | "task" | "proposed_event">()
-      .notNull(),
+    itemType: text("item_type").$type<"task">().notNull(),
     referenceId: integer("reference_id").notNull(),
     decision: text("decision")
       .$type<"pending" | "dismissed" | "replied" | "archived" | "approved">()
       .notNull()
       .default("pending"),
-    draftReply: text("draft_reply"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },

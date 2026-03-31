@@ -110,4 +110,44 @@ export function useAppShortcuts() {
     },
     { preventDefault: false, stopPropagation: false },
   );
+
+  useHotkey(
+    "R",
+    (event) => {
+      if (!isInboxRoute || shouldIgnoreHotkeyTarget(event.target)) return;
+      event.preventDefault();
+      issueEmailCommand({ type: "reply" });
+    },
+    { preventDefault: false, stopPropagation: false },
+  );
+
+  useHotkey(
+    "F",
+    (event) => {
+      if (!isInboxRoute || shouldIgnoreHotkeyTarget(event.target)) return;
+      event.preventDefault();
+      issueEmailCommand({ type: "forward" });
+    },
+    { preventDefault: false, stopPropagation: false },
+  );
+
+  useHotkey(
+    "U",
+    (event) => {
+      if (!isInboxRoute || shouldIgnoreHotkeyTarget(event.target)) return;
+      event.preventDefault();
+      issueEmailCommand({ type: "toggle-read" });
+    },
+    { preventDefault: false, stopPropagation: false },
+  );
+
+  useHotkey(
+    "S",
+    (event) => {
+      if (!isInboxRoute || shouldIgnoreHotkeyTarget(event.target)) return;
+      event.preventDefault();
+      issueEmailCommand({ type: "toggle-star" });
+    },
+    { preventDefault: false, stopPropagation: false },
+  );
 }

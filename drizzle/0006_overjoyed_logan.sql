@@ -1,1 +1,0 @@
-ALTER TABLE `scheduled_emails` ADD `retry_count` integer DEFAULT 0 NOT NULL;

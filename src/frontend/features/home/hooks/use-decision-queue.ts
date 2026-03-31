@@ -1,79 +1,71 @@
 import { approveProposedEvent } from "@/features/calendar/mutations";
 import {
-  fetchDraftReplies,
   postBriefingDecision,
   type HomeBriefingItem,
 } from "@/features/home/queries";
 import { patchEmail, sendEmail } from "@/features/inbox/mutations";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 export function useDecisionQueue(items: HomeBriefingItem[]) {
   const queryClient = useQueryClient();
   const [activeIndex, setActiveIndex] = useState(0);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [isLoadingDrafts, setIsLoadingDrafts] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      items
+        .filter((item) => item.draftReply)
+        .map((item) => [item.id, item.draftReply ?? ""]),
+    ),
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
-  const fetchedRef = useRef(false);
 
   const visibleItems = useMemo(
-    () => items.filter((item) => item.type !== "calendar_event" && !dismissed.has(item.id)),
+    () =>
+      items.filter(
+        (item) =>
+          item.type !== "calendar_event" &&
+          item.type !== "briefing_email" &&
+          !dismissed.has(item.id),
+      ),
     [items, dismissed],
   );
 
   const activeItem = visibleItems[activeIndex] ?? null;
 
   useEffect(() => {
-    if (items.length === 0 || fetchedRef.current) return;
-    fetchedRef.current = true;
-
-    const initial: Record<string, string> = {};
-    const missingIds: number[] = [];
-
-    for (const item of items) {
-      if (item.draftReply) {
-        initial[item.id] = item.draftReply;
-      } else if (
-        item.emailId &&
-        item.type === "action_needed"
-      ) {
-        missingIds.push(item.emailId);
+    setDrafts((current) => {
+      const next = { ...current };
+      for (const item of items) {
+        if (item.draftReply && !next[item.id]) {
+          next[item.id] = item.draftReply;
+        }
       }
-    }
-
-    setDrafts(initial);
-
-    if (missingIds.length > 0) {
-      setIsLoadingDrafts(true);
-      fetchDraftReplies(missingIds)
-        .then((result) => {
-          setDrafts((prev) => {
-            const next = { ...prev };
-            for (const item of items) {
-              if (item.emailId && result[item.emailId]) {
-                next[item.id] = result[item.emailId];
-              }
-            }
-            return next;
-          });
-        })
-        .catch(() => {})
-        .finally(() => setIsLoadingDrafts(false));
-    }
+      return next;
+    });
   }, [items]);
 
   const markDone = useCallback(
     (item: HomeBriefingItem, decision: "dismissed" | "replied" | "archived" | "approved") => {
       setDismissed((prev) => new Set(prev).add(item.id));
       setEditingId(null);
-      let ref: { itemType: "email" | "task" | "proposed_event"; referenceId: number } | null = null;
+      let ref:
+        | {
+            itemType: "email_action" | "task" | "calendar_suggestion";
+            referenceId: number;
+            actionId?: string;
+          }
+        | null = null;
       if (item.proposedEventId) {
-        ref = { itemType: "proposed_event", referenceId: item.proposedEventId };
-      } else if (item.emailId) {
-        ref = { itemType: "email", referenceId: item.emailId };
+        ref = { itemType: "calendar_suggestion", referenceId: item.proposedEventId };
+      } else if (item.emailId && item.actionId) {
+        ref = {
+          itemType: "email_action",
+          referenceId: item.emailId,
+          actionId: item.actionId,
+        };
       } else {
         const match = item.id.match(/^(?:overdue|today)-(\d+)$/);
         if (match) ref = { itemType: "task", referenceId: Number(match[1]) };
@@ -104,11 +96,20 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
     setDrafts((prev) => ({ ...prev, [id]: text }));
   }, []);
 
-  const toggleEditing = useCallback(() => {
-    if (!activeItem) return;
-    if (!drafts[activeItem.id]) return;
-    setEditingId((prev) => (prev === activeItem.id ? null : activeItem.id));
-  }, [activeItem, drafts]);
+  const toggleEditing = useCallback(
+    (id?: string) => {
+      const targetId = id ?? activeItem?.id;
+      if (!targetId || !drafts[targetId]) return;
+
+      if (id) {
+        const nextIndex = visibleItems.findIndex((item) => item.id === id);
+        if (nextIndex >= 0) setActiveIndex(nextIndex);
+      }
+
+      setEditingId((prev) => (prev === targetId ? null : targetId));
+    },
+    [activeItem?.id, drafts, visibleItems],
+  );
 
   const cancelEditing = useCallback(() => {
     setEditingId(null);
@@ -166,7 +167,7 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
   const sendReply = useCallback(
     async (id: string) => {
       const item = items.find((i) => i.id === id);
-      const draft = drafts[id];
+      const draft = drafts[id] ?? item?.draftReply ?? "";
       if (!item?.fromAddr || !draft) return;
 
       setSendingId(id);
@@ -202,7 +203,7 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
     activeIndex,
     activeItem,
     drafts,
-    isLoadingDrafts,
+    isLoadingDrafts: false,
     editingId,
     sendingId,
     setActiveIndex,

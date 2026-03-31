@@ -1,6 +1,5 @@
 import { routeAgentRequest } from "agents";
 import { Hono } from "hono";
-import { handleScheduled } from "./scheduled";
 import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
 import { HTTPException } from "hono/http-exception";
@@ -8,20 +7,27 @@ import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { auth } from "../../auth";
 import { authMiddleware } from "./middleware/auth";
-import { authLimiter, strictLimiter, standardLimiter } from "./middleware/rate-limit";
+import {
+  authLimiter,
+  standardLimiter,
+  strictLimiter,
+} from "./middleware/rate-limit";
 import aiRoutes from "./routes/ai/router";
+import calendarRoutes from "./routes/calendar/router";
 import healthRoutes from "./routes/health/router";
-import inboxRoutes from "./routes/inbox/router";
 import emailsRoutes from "./routes/inbox/emails/router";
 import filtersRoutes from "./routes/inbox/filters/router";
-import notesRoutes from "./routes/notes/router";
-import settingsRoutes from "./routes/settings/router";
+import inboxRoutes from "./routes/inbox/router";
 import searchRoutes from "./routes/inbox/search/router";
 import subscriptionsRoutes from "./routes/inbox/subscriptions/router";
 import syncRoutes from "./routes/inbox/sync/router";
-import calendarRoutes from "./routes/calendar/router";
+import notesRoutes from "./routes/notes/router";
+import settingsRoutes from "./routes/settings/router";
 import tasksRoutes from "./routes/tasks/router";
 import type { AppRouteEnv } from "./routes/types";
+import { handleScheduled } from "./scheduled";
+
+export { Agent } from "./agent/agent";
 
 const app = new Hono<AppRouteEnv>();
 
@@ -76,8 +82,6 @@ app.route("/api/settings", settingsRoutes);
 app.route("/api/search", searchRoutes);
 app.route("/api/subscriptions", subscriptionsRoutes);
 app.route("/api/filters", filtersRoutes);
-
-export { Agent } from "./agent/agent";
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {

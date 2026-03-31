@@ -1,8 +1,8 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { z } from "zod";
-import { proposedEvents } from "../../db/schema";
+import { emailIntelligence } from "../../db/schema";
 import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
 import { getUserMailboxes } from "../../lib/email/mailbox-state";
 import { listEvents, type GoogleCalendarEvent } from "../../lib/calendar/google";
@@ -81,32 +81,36 @@ export function registerGetCalendarEvents(api: Hono<AppRouteEnv>) {
       }
     }
 
-    // Fetch pending proposed events
-    const proposed = await db
-      .select()
-      .from(proposedEvents)
-      .where(
-        and(
-          eq(proposedEvents.userId, user.id),
-          eq(proposedEvents.status, "pending"),
-          gte(proposedEvents.startAt, fromMs),
-          lte(proposedEvents.startAt, toMs),
-        ),
-      );
+    const intelligenceRows = await db
+      .select({
+        emailId: emailIntelligence.emailId,
+        calendarEventsJson: emailIntelligence.calendarEventsJson,
+      })
+      .from(emailIntelligence)
+      .where(eq(emailIntelligence.userId, user.id));
 
-    const proposedAgenda: AgendaEvent[] = proposed.map((p) => ({
-      id: `proposed-${p.id}`,
-      source: "proposed",
-      title: p.title,
-      startAt: p.startAt,
-      endAt: p.endAt,
-      location: p.location ?? undefined,
-      isAllDay: false,
-      status: "pending",
-      proposedId: p.id,
-      emailId: p.emailId ?? undefined,
-      description: p.description ?? undefined,
-    }));
+    const proposedAgenda: AgendaEvent[] = intelligenceRows.flatMap((row) =>
+      (row.calendarEventsJson ?? [])
+        .filter(
+          (event) =>
+            event.status === "pending" &&
+            event.startAt >= fromMs &&
+            event.startAt <= toMs,
+        )
+        .map((event) => ({
+          id: `proposed-${event.id}`,
+          source: "proposed" as const,
+          title: event.title,
+          startAt: event.startAt,
+          endAt: event.endAt,
+          location: event.location ?? undefined,
+          isAllDay: event.isAllDay,
+          status: "pending" as const,
+          proposedId: event.id,
+          emailId: row.emailId,
+          description: event.sourceText,
+        })),
+    );
 
     // Merge and sort chronologically
     const allEvents = [...googleEvents, ...proposedAgenda].sort(

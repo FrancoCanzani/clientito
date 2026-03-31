@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import {
   Tooltip,
   TooltipContent,
@@ -11,11 +12,13 @@ type IconButtonProps = React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
     label: string;
+    shortcut?: string;
     tooltipSide?: React.ComponentProps<typeof TooltipContent>["side"];
   };
 
 function IconButton({
   label,
+  shortcut,
   tooltipSide = "top",
   variant = "ghost",
   size = "icon-lg",
@@ -34,8 +37,9 @@ function IconButton({
           {children}
         </Button>
       </TooltipTrigger>
-      <TooltipContent side={tooltipSide} className="text-xs">
+      <TooltipContent side={tooltipSide} className="flex items-center gap-2 text-xs">
         {label}
+        {shortcut && <Kbd>{shortcut}</Kbd>}
       </TooltipContent>
     </Tooltip>
   );

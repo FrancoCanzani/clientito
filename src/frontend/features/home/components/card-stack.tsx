@@ -17,6 +17,8 @@ export function CardStack({
             <motion.div
               key={item.id}
               layout
+              onMouseDown={() => queue.setActiveIndex(i)}
+              onFocusCapture={() => queue.setActiveIndex(i)}
               initial={{ opacity: 0, scale: 0.97 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.97, x: -40 }}
@@ -42,7 +44,7 @@ export function CardStack({
                 onSendReply={queue.sendReply}
                 onArchive={queue.archiveItem}
                 onDraftChange={queue.updateDraft}
-                onToggleEdit={queue.toggleEditing}
+                onToggleEdit={() => queue.toggleEditing(item.id)}
                 onApproveEvent={queue.approveEvent}
                 onDismissEvent={queue.dismissEvent}
               />

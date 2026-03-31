@@ -9,13 +9,11 @@ const actionsSchema = z.object({
   archive: z.boolean().optional(),
   markRead: z.boolean().optional(),
   star: z.boolean().optional(),
-  applyAiLabel: z
+  applyCategory: z
     .enum([
       "action_needed",
       "important",
-      "later",
       "newsletter",
-      "marketing",
       "transactional",
       "notification",
     ])

@@ -2,8 +2,14 @@ import { tool } from "ai";
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
-import { emails, notes, proposedEvents, tasks } from "../../db/schema";
+import { emails, notes, tasks } from "../../db/schema";
+import { createEvent } from "../../lib/calendar/google";
 import { createEmailProvider } from "../../lib/email";
+import {
+  findCalendarSuggestionById,
+  updateCalendarSuggestion,
+} from "../../lib/email/intelligence/store";
+import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
 import { STANDARD_LABELS } from "../../lib/email/types";
 import { chunkArray } from "../../lib/utils";
 import { resolveOutgoingMailbox, getUserMailboxes, ensureMailbox } from "../../lib/email/mailbox-state";
@@ -852,44 +858,74 @@ export function makeWriteTools(
     }),
 
     approveProposedEvent: tool({
-      description: "Approve a proposed calendar event extracted from an email.",
+      description: "Approve a pending calendar suggestion extracted from an email and add it to Google Calendar.",
       inputSchema: z.object({
         proposedId: z.number().int().positive().describe("Proposed event ID to approve."),
       }),
       execute: async ({ proposedId }) => {
-        const rows = await db
-          .select({ id: proposedEvents.id, title: proposedEvents.title })
-          .from(proposedEvents)
-          .where(and(eq(proposedEvents.id, proposedId), eq(proposedEvents.userId, userId)))
-          .limit(1);
-        if (!rows[0]) return { error: "Proposed event not found" };
+        const match = await findCalendarSuggestionById(db, userId, proposedId);
+        if (!match || match.suggestion.status !== "pending") {
+          return { error: "Calendar suggestion not found" };
+        }
 
-        await db
-          .update(proposedEvents)
-          .set({ status: "approved", updatedAt: Date.now() })
-          .where(and(eq(proposedEvents.id, proposedId), eq(proposedEvents.userId, userId)));
-        return { approved: true, proposedId, title: rows[0].title };
+        const mailboxId = match.row.mailboxId;
+        let resolvedMailboxId = mailboxId;
+
+        if (!resolvedMailboxId) {
+          const mailboxes = await getUserMailboxes(db, userId);
+          const usable = mailboxes.find((mb) => mb.historyId && mb.authState === "ok");
+          if (!usable) return { error: "No connected account available" };
+          resolvedMailboxId = usable.id;
+        }
+
+        const token = await getGmailTokenForMailbox(db, resolvedMailboxId, {
+          GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
+          GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
+        });
+
+        const start = match.suggestion.isAllDay
+          ? { date: new Date(match.suggestion.startAt).toISOString().slice(0, 10) }
+          : { dateTime: new Date(match.suggestion.startAt).toISOString() };
+        const end = match.suggestion.isAllDay
+          ? { date: new Date(match.suggestion.endAt).toISOString().slice(0, 10) }
+          : { dateTime: new Date(match.suggestion.endAt).toISOString() };
+
+        const googleEvent = await createEvent(token, {
+          summary: match.suggestion.title,
+          description: match.suggestion.sourceText,
+          location: match.suggestion.location ?? undefined,
+          start,
+          end,
+          attendees: match.suggestion.attendees?.map((email) => ({ email })),
+        });
+
+        await updateCalendarSuggestion(db, match, {
+          status: "approved",
+          googleEventId: googleEvent.id,
+        });
+
+        return {
+          approved: true,
+          proposedId,
+          title: match.suggestion.title,
+          googleEventId: googleEvent.id,
+        };
       },
     }),
 
     dismissProposedEvent: tool({
-      description: "Dismiss a proposed calendar event.",
+      description: "Dismiss a pending calendar suggestion extracted from an email.",
       inputSchema: z.object({
         proposedId: z.number().int().positive().describe("Proposed event ID to dismiss."),
       }),
       execute: async ({ proposedId }) => {
-        const rows = await db
-          .select({ id: proposedEvents.id, title: proposedEvents.title })
-          .from(proposedEvents)
-          .where(and(eq(proposedEvents.id, proposedId), eq(proposedEvents.userId, userId)))
-          .limit(1);
-        if (!rows[0]) return { error: "Proposed event not found" };
+        const match = await findCalendarSuggestionById(db, userId, proposedId);
+        if (!match || match.suggestion.status !== "pending") {
+          return { error: "Calendar suggestion not found" };
+        }
 
-        await db
-          .update(proposedEvents)
-          .set({ status: "dismissed", updatedAt: Date.now() })
-          .where(and(eq(proposedEvents.id, proposedId), eq(proposedEvents.userId, userId)));
-        return { dismissed: true, proposedId, title: rows[0].title };
+        await updateCalendarSuggestion(db, match, { status: "dismissed" });
+        return { dismissed: true, proposedId, title: match.suggestion.title };
       },
     }),
 

@@ -49,8 +49,12 @@ export async function createEvent(
     summary: string;
     description?: string;
     location?: string;
-    start: { dateTime: string; timeZone?: string };
-    end: { dateTime: string; timeZone?: string };
+    start:
+      | { dateTime: string; timeZone?: string }
+      | { date: string; timeZone?: string };
+    end:
+      | { dateTime: string; timeZone?: string }
+      | { date: string; timeZone?: string };
     attendees?: Array<{ email: string }>;
   },
 ): Promise<GoogleCalendarEvent> {

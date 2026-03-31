@@ -73,7 +73,7 @@ function formatActions(actions: Record<string, unknown>) {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(actions)) {
     if (!value) continue;
-    if (key === "applyAiLabel") {
+    if (key === "applyCategory") {
       parts.push(`Label as ${value}`);
     } else if (ACTION_LABELS[key]) {
       parts.push(ACTION_LABELS[key]);

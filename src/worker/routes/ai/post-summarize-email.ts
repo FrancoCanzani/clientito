@@ -1,12 +1,9 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { streamText } from "ai";
-import { and, asc, eq } from "drizzle-orm";
-import { createWorkersAI } from "workers-ai-provider";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { emails } from "../../db/schema";
-import { PRIMARY_MODEL } from "../../lib/constants";
-import { truncate } from "../../lib/utils";
+import { generateEmailDetailIntelligence } from "../../lib/email/intelligence/detail";
 import type { AppRouteEnv } from "../types";
 
 const summarizeEmailBodySchema = z.object({
@@ -20,94 +17,23 @@ export function registerPostSummarizeEmail(app: Hono<AppRouteEnv>) {
     async (c) => {
       const db = c.get("db");
       const user = c.get("user")!;
-
       const { emailId } = c.req.valid("json");
 
       const emailRow = await db
-        .select({
-          id: emails.id,
-          threadId: emails.threadId,
-          fromAddr: emails.fromAddr,
-          fromName: emails.fromName,
-          subject: emails.subject,
-          bodyText: emails.bodyText,
-        })
+        .select({ id: emails.id })
         .from(emails)
         .where(and(eq(emails.id, emailId), eq(emails.userId, user.id)))
         .limit(1);
 
-      const email = emailRow[0];
-      if (!email) return c.json({ error: "Email not found" }, 404);
+      if (!emailRow[0]) return c.json({ error: "Email not found" }, 404);
 
-      let context = "";
-      if (email.threadId) {
-        const threadMessages = await db
-          .select({
-            fromAddr: emails.fromAddr,
-            fromName: emails.fromName,
-            bodyText: emails.bodyText,
-            date: emails.date,
-          })
-          .from(emails)
-          .where(
-            and(eq(emails.threadId, email.threadId), eq(emails.userId, user.id)),
-          )
-          .orderBy(asc(emails.date))
-          .limit(10);
+      const intelligence = await generateEmailDetailIntelligence(db, c.env, emailId);
 
-        context = threadMessages
-          .map((msg, i) => {
-            const from = msg.fromName || msg.fromAddr;
-            const body = truncate(
-              (msg.bodyText ?? "").replace(/\s+/g, " ").trim(),
-              800,
-            );
-            return `--- Message ${i + 1} from ${from} ---\n${body}`;
-          })
-          .join("\n\n");
-      } else {
-        context = truncate(
-          (email.bodyText ?? "").replace(/\s+/g, " ").trim(),
-          2000,
-        );
+      if (!intelligence) {
+        return c.json({ error: "AI summary unavailable" }, 503 as never);
       }
 
-      const systemPrompt =
-        "You are a helpful email assistant. Summarize the email thread concisely in 2-4 bullet points. Focus on key information, action items, and decisions. Be brief.";
-
-      const userPrompt = [
-        `Subject: ${email.subject ?? "(no subject)"}`,
-        "",
-        context,
-      ].join("\n");
-
-      try {
-        const workersAI = createWorkersAI({ binding: c.env.AI });
-        const result = streamText({
-          model: workersAI(PRIMARY_MODEL),
-          system: systemPrompt,
-          prompt: userPrompt,
-        });
-
-        let fullText = "";
-        for await (const chunk of result.textStream) {
-          fullText += chunk;
-        }
-
-        const summary = fullText.trim();
-        if (summary.length === 0) {
-          return c.json({ error: "AI returned an empty summary" }, 500 as never);
-        }
-
-        return c.json({ data: { summary } }, 200);
-      } catch (error) {
-        console.error("Failed to summarize email", {
-          userId: user.id,
-          emailId,
-          error,
-        });
-        return c.json({ error: "AI service unavailable" }, 500 as never);
-      }
+      return c.json({ data: { summary: intelligence.summary } }, 200);
     },
   );
 }

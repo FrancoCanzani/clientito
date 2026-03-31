@@ -6,7 +6,6 @@ import { registerCreateFilter } from "./post-create";
 import { registerUpdateFilter } from "./put-update";
 import { registerDeleteFilter } from "./delete";
 import { registerGenerateFilter } from "./post-generate";
-import { registerTestFilter } from "./post-test";
 
 const filtersRoutes = new Hono<AppRouteEnv>();
 
@@ -15,7 +14,6 @@ registerGetFilters(filtersRoutes);
 registerCreateFilter(filtersRoutes);
 registerUpdateFilter(filtersRoutes);
 registerDeleteFilter(filtersRoutes);
-registerTestFilter(filtersRoutes);
 registerGenerateFilter(filtersRoutes);
 
 export default filtersRoutes;

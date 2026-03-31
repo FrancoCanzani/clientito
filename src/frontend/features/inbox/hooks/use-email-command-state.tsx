@@ -14,7 +14,11 @@ export type EmailCommand =
   | { type: "navigate-prev" }
   | { type: "archive" }
   | { type: "trash" }
-  | { type: "escape" };
+  | { type: "escape" }
+  | { type: "reply" }
+  | { type: "forward" }
+  | { type: "toggle-read" }
+  | { type: "toggle-star" };
 
 type EmailCommandContextValue = {
   issueCommand: (command: EmailCommand) => void;

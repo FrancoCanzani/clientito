@@ -53,9 +53,10 @@ import type {
   GmailSyncResult,
   SyncProgressFn,
 } from "./types";
-import { classifyEmails } from "../../ai-classifier";
-import { extractEventsFromEmails } from "../../ai-event-extractor";
-import { getUserFilters } from "../../user-filters";
+import {
+  enqueueEmailIntelligence,
+  processInlineEmailIntelligence,
+} from "../../intelligence/triage";
 import { STANDARD_LABELS } from "../../types";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
@@ -92,7 +93,6 @@ type ProcessMessagesInput = {
   messageIds: string[];
   env?: Env;
   refreshExisting?: boolean;
-  applyFilters?: boolean;
   onProgress?: SyncProgressFn;
   onHeartbeat?: () => Promise<void> | Promise<boolean>;
   progressOffset?: number;
@@ -108,7 +108,6 @@ async function processMessageIds({
   messageIds,
   env,
   refreshExisting = false,
-  applyFilters: shouldApplyFilters = false,
   onProgress,
   onHeartbeat,
   progressOffset = 0,
@@ -148,15 +147,7 @@ async function processMessageIds({
     const batchResults = await fetchMessagesBatch(accessToken, messageIdsToFetch, format as "full" | "minimal");
 
     const pendingInserts: Array<typeof emails.$inferInsert> = [];
-    const classificationInputs: Array<{
-      messageId: string;
-      from: string;
-      fromName: string | null;
-      subject: string | null;
-      snippet: string | null;
-      bodyText: string | null;
-      hasUnsubscribe: boolean;
-    }> = [];
+    const intelligenceCandidateMessageIds: string[] = [];
     const subscriptionEvents: Array<{
       fromAddr: string;
       fromName: string | null;
@@ -342,6 +333,9 @@ async function processMessageIds({
             .update(emails)
             .set(emailValues)
             .where(eq(emails.id, existingEmailId));
+          if (direction === "received") {
+            intelligenceCandidateMessageIds.push(message.id!);
+          }
         } else {
           pendingInserts.push({
             userId,
@@ -351,15 +345,7 @@ async function processMessageIds({
             createdAt: Date.now(),
           });
           if (direction === "received") {
-            classificationInputs.push({
-              messageId: message.id!,
-              from: fromAddr,
-              fromName,
-              subject,
-              snippet: message.snippet ?? null,
-              bodyText: bodyText || null,
-              hasUnsubscribe: Boolean(unsubscribeUrl || unsubscribeEmail),
-            });
+            intelligenceCandidateMessageIds.push(message.id!);
           }
           result.inserted += 1;
         }
@@ -377,147 +363,31 @@ async function processMessageIds({
       }
     }
 
-    const postInsertUpdates = new Map<string, Record<string, unknown>>();
-
-    if (env?.AI && classificationInputs.length > 0) {
+    if (intelligenceCandidateMessageIds.length > 0) {
       try {
-        const userFilters = shouldApplyFilters
-          ? await getUserFilters(db, userId)
-          : [];
-        const filterRules = userFilters.map((f) => ({
-          id: f.id,
-          description: f.description,
-        }));
+        const candidateRows = await db
+          .select({ id: emails.id })
+          .from(emails)
+          .where(
+            and(
+              eq(emails.userId, userId),
+              inArray(
+                emails.providerMessageId,
+                [...new Set(intelligenceCandidateMessageIds)],
+              ),
+            ),
+          );
 
-        const batch = classificationInputs.map((e, i) => ({
-          index: i,
-          from: e.from,
-          fromName: e.fromName,
-          subject: e.subject,
-          snippet: e.snippet,
-          bodyText: e.bodyText,
-          hasUnsubscribe: e.hasUnsubscribe,
-        }));
-
-        const { labels, filterMatches } = await classifyEmails(
-          env.AI,
-          batch,
-          filterRules,
+        const intelligenceEmailIds = await enqueueEmailIntelligence(
+          db,
+          candidateRows.map((row) => row.id),
         );
 
-        const filtersById = new Map(userFilters.map((f) => [f.id, f]));
-
-        for (const [idx, label] of labels) {
-          const gmailId = classificationInputs[idx]?.messageId;
-          if (!gmailId) continue;
-          const existing = postInsertUpdates.get(gmailId) ?? {};
-          existing.aiLabel = label;
-          postInsertUpdates.set(gmailId, existing);
-        }
-
-        for (const [idx, matchedIds] of filterMatches) {
-          const gmailId = classificationInputs[idx]?.messageId;
-          if (!gmailId) continue;
-          const insert = pendingInserts.find((p) => p.providerMessageId === gmailId);
-
-          for (const filterId of matchedIds) {
-            const filter = filtersById.get(filterId);
-            if (!filter) continue;
-            const actions = filter.actions;
-            const existing = postInsertUpdates.get(gmailId) ?? {};
-
-            if (actions.markRead) existing.isRead = true;
-            if (actions.applyAiLabel) existing.aiLabel = actions.applyAiLabel;
-            if (actions.archive || actions.trash || actions.star) {
-              const currentLabels =
-                (existing.labelIds as string[]) ??
-                (insert?.labelIds as string[]) ??
-                [];
-              const newLabels = [...currentLabels];
-              if (actions.archive) {
-                const i = newLabels.indexOf(STANDARD_LABELS.INBOX);
-                if (i !== -1) newLabels.splice(i, 1);
-              }
-              if (
-                actions.trash &&
-                !newLabels.includes(STANDARD_LABELS.TRASH)
-              ) {
-                newLabels.push(STANDARD_LABELS.TRASH);
-              }
-              if (
-                actions.star &&
-                !newLabels.includes(STANDARD_LABELS.STARRED)
-              ) {
-                newLabels.push(STANDARD_LABELS.STARRED);
-              }
-              existing.labelIds = newLabels;
-            }
-            postInsertUpdates.set(gmailId, existing);
-            break;
-          }
+        if (env && intelligenceEmailIds.length > 0) {
+          await processInlineEmailIntelligence(db, env, intelligenceEmailIds);
         }
       } catch (error) {
-        console.error("AI classification failed, skipping", error);
-      }
-      classificationInputs.length = 0;
-    }
-
-    for (const [gmailId, updates] of postInsertUpdates) {
-      await db
-        .update(emails)
-        .set(updates)
-        .where(and(eq(emails.userId, userId), eq(emails.providerMessageId, gmailId)));
-    }
-
-    // Extract calendar events from action_needed/important emails
-    if (env?.AI) {
-      const eventCandidateGmailIds: string[] = [];
-      for (const [gmailId, updates] of postInsertUpdates) {
-        const label = updates.aiLabel as string | undefined;
-        if (label === "action_needed" || label === "important") {
-          eventCandidateGmailIds.push(gmailId);
-        }
-      }
-
-      if (eventCandidateGmailIds.length > 0) {
-        try {
-          const candidateRows = await db
-            .select({
-              id: emails.id,
-              mailboxId: emails.mailboxId,
-              fromAddr: emails.fromAddr,
-              fromName: emails.fromName,
-              subject: emails.subject,
-              snippet: emails.snippet,
-              bodyText: emails.bodyText,
-              date: emails.date,
-            })
-            .from(emails)
-            .where(
-              and(
-                eq(emails.userId, userId),
-                inArray(emails.providerMessageId, eventCandidateGmailIds),
-              ),
-            );
-
-          await extractEventsFromEmails(
-            env.AI,
-            db,
-            userId,
-            candidateRows.map((row) => ({
-              emailId: row.id,
-              mailboxId: row.mailboxId!,
-              from: row.fromAddr,
-              fromName: row.fromName,
-              subject: row.subject,
-              snippet: row.snippet,
-              bodyText: row.bodyText,
-              date: row.date,
-            })),
-          );
-        } catch (error) {
-          console.error("Event extraction failed, skipping", error);
-        }
+        console.error("Email intelligence enqueue failed, skipping", error);
       }
     }
 
@@ -743,7 +613,6 @@ async function runIncrementalGmailSyncWithAccessToken({
       messageIds: pageChangedMessageIds,
       env,
       refreshExisting: true,
-      applyFilters: true,
       onHeartbeat: heartbeat,
       minDateMs: syncCutoffAt,
     });

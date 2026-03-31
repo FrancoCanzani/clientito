@@ -20,16 +20,18 @@ export type SyncStatus = {
 export type HomeBriefingItem = {
   id: string;
   type:
-    | "action_needed"
-    | "important"
+    | "email_action"
+    | "briefing_email"
     | "overdue_task"
     | "due_today_task"
-    | "proposed_event"
+    | "calendar_suggestion"
     | "calendar_event";
   title: string;
   reason: string;
   href: string;
   emailId?: number;
+  actionId?: string;
+  actionType?: string;
   draftReply?: string | null;
   threadId?: string | null;
   fromAddr?: string;
@@ -61,23 +63,11 @@ export async function fetchBriefing(): Promise<HomeBriefing> {
   return json.data;
 }
 
-export async function fetchDraftReplies(
-  emailIds: number[],
-): Promise<Record<number, string>> {
-  const response = await fetch("/api/ai/draft-replies", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ emailIds }),
-  });
-  if (!response.ok) throw { status: response.status };
-  const json = await response.json();
-  return json.data;
-}
-
 export async function postBriefingDecision(body: {
-  itemType: "email" | "task" | "proposed_event";
+  itemType: "email_action" | "task" | "calendar_suggestion";
   referenceId: number;
   decision: "dismissed" | "replied" | "archived" | "approved";
+  actionId?: string;
 }): Promise<void> {
   const response = await fetch("/api/ai/briefing/decision", {
     method: "POST",

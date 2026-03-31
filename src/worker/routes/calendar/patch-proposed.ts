@@ -1,8 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { z } from "zod";
-import { proposedEvents } from "../../db/schema";
+import {
+  findCalendarSuggestionById,
+  updateCalendarSuggestion,
+} from "../../lib/email/intelligence/store";
 import type { AppRouteEnv } from "../types";
 
 const paramsSchema = z.object({
@@ -29,36 +31,19 @@ export function registerPatchProposed(api: Hono<AppRouteEnv>) {
       const { id } = c.req.valid("param");
       const input = c.req.valid("json");
 
-      const rows = await db
-        .select({ id: proposedEvents.id })
-        .from(proposedEvents)
-        .where(
-          and(
-            eq(proposedEvents.id, id),
-            eq(proposedEvents.userId, user.id),
-            eq(proposedEvents.status, "pending"),
-          ),
-        )
-        .limit(1);
+      const match = await findCalendarSuggestionById(db, user.id, id);
+      if (!match || match.suggestion.status !== "pending") {
+        return c.json({ error: "Proposed event not found" }, 404);
+      }
 
-      if (!rows[0]) return c.json({ error: "Proposed event not found" }, 404);
-
-      await db
-        .update(proposedEvents)
-        .set({
-          ...(input.title !== undefined ? { title: input.title } : {}),
-          ...(input.description !== undefined
-            ? { description: input.description }
-            : {}),
-          ...(input.location !== undefined ? { location: input.location } : {}),
-          ...(input.startAt !== undefined ? { startAt: input.startAt } : {}),
-          ...(input.endAt !== undefined ? { endAt: input.endAt } : {}),
-          ...(input.attendees !== undefined
-            ? { attendees: input.attendees }
-            : {}),
-          updatedAt: Date.now(),
-        })
-        .where(eq(proposedEvents.id, id));
+      await updateCalendarSuggestion(db, match, {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.location !== undefined ? { location: input.location } : {}),
+        ...(input.startAt !== undefined ? { startAt: input.startAt } : {}),
+        ...(input.endAt !== undefined ? { endAt: input.endAt } : {}),
+        ...(input.attendees !== undefined ? { attendees: input.attendees } : {}),
+        ...(input.description !== undefined ? { sourceText: input.description } : {}),
+      });
 
       return c.json({ data: { updated: true } }, 200);
     },

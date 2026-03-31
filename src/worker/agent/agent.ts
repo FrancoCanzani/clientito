@@ -36,11 +36,11 @@ Do not repeat the same answer in consecutive turns.
 If a tool result, approval, or continuation resumes an in-progress answer, do not restate text you already showed earlier in that same answer. Only add the new information needed to finish it.
 If you already drafted a reply in the current answer, do not print the same draft again.
 If the user asks for help writing a reply, drafting a reply, or improving reply wording, write the reply directly in chat unless they explicitly ask you to open a draft in the app, reply in the UI, or send it.
-When the entity context includes a body preview or draft reply, use that information directly instead of calling summarizeEmail or getEmail — you already have the content.
+When the entity context includes a body preview, use that information directly instead of calling summarizeEmail or getEmail unless you need more detail.
 Use getEmail when you need to read a specific email's full content by ID. Use summarizeEmail only when the user explicitly asks for an AI summary.
 For batch operations like "archive all newsletters" or "trash all marketing emails", use batchArchive or batchTrash with multiple IDs instead of calling archiveEmail/trashEmail repeatedly.
 When the user asks to snooze an email, use snoozeEmail. When they ask to unsubscribe, use unsubscribeEmail.
-For proposed calendar events, use approveProposedEvent or dismissProposedEvent.
+For pending calendar suggestions, use approveProposedEvent or dismissProposedEvent.
 If the user asks to reply to an email in the app, open a compose window with a pre-filled reply using composeEmail.
 If the user asks to forward an email to someone, use sendEmail with forwardEmailId so the forwarded message content is included automatically and can be approved before sending. Use composeEmail only when they explicitly want a draft or compose window.
 If the user asks to "mark all as read", use markAllEmailsRead instead of calling markEmailRead repeatedly.
@@ -56,7 +56,7 @@ The user may have multiple Gmail accounts connected. Email searches return resul
 You have persistent memory. When the user shares preferences, tells you about contacts, or asks you to remember something, use rememberThis to save it. Your memories are automatically included in the context so you can personalize responses. Use recallMemories if you need to check what you know.`;
 
 type EntityContext =
-  | { type: "email"; id: string; subject: string | null; fromName: string | null; fromAddr: string; threadId: string | null; mailboxId: number | null; bodyPreview?: string | null; draftReply?: string | null }
+  | { type: "email"; id: string; subject: string | null; fromName: string | null; fromAddr: string; threadId: string | null; mailboxId: number | null; bodyPreview?: string | null }
   | { type: "person"; id: string; name: string | null; email: string | null }
   | { type: "note"; id: string; title: string | null }
   | { type: "task"; id: string; title: string };
@@ -81,7 +81,6 @@ function describeEntity(entity: EntityContext): string {
       if (entity.threadId) lines.push(`Thread ID: ${entity.threadId}`);
       if (entity.mailboxId) lines.push(`Mailbox ID: ${entity.mailboxId}`);
       if (entity.bodyPreview) lines.push(`Body preview:\n${entity.bodyPreview}`);
-      if (entity.draftReply) lines.push(`Existing draft reply:\n${entity.draftReply}`);
       return `an email:\n${lines.join("\n")}`;
     }
     case "person": {

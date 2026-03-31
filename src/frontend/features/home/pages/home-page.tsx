@@ -38,7 +38,7 @@ export default function HomePage() {
 
   const sendActiveReply = useCallback(() => {
     if (!queue.activeItem) return;
-    if (queue.activeItem.type === "proposed_event") {
+    if (queue.activeItem.type === "calendar_suggestion") {
       queue.approveEvent(queue.activeItem.id);
     } else {
       queue.sendReply(queue.activeItem.id);
@@ -47,7 +47,7 @@ export default function HomePage() {
 
   const skipActive = useCallback(() => {
     if (!queue.activeItem) return;
-    if (queue.activeItem.type === "proposed_event") {
+    if (queue.activeItem.type === "calendar_suggestion") {
       queue.dismissEvent(queue.activeItem.id);
     } else {
       queue.dismiss(queue.activeItem.id);
@@ -71,7 +71,7 @@ export default function HomePage() {
 
   const showCards =
     queue.visibleItems.length > 0 && !isAnimating && briefingText;
-  const showCaughtUpState = queue.visibleItems.length === 0 && !isAnimating;
+  const showCaughtUpState = briefing.items.length === 0 && !isAnimating;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col space-y-6">

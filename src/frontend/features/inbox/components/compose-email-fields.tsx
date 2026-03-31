@@ -26,6 +26,7 @@ type ComposeEmailFieldsProps = {
 };
 
 function ForwardedMessagePreview({ html }: { html: string }) {
+  const [expanded, setExpanded] = useState(false);
   const sanitized = useMemo(
     () =>
       DOMPurify.sanitize(html, {
@@ -35,16 +36,25 @@ function ForwardedMessagePreview({ html }: { html: string }) {
   );
 
   return (
-    <div className="mt-8 pt-4">
-      <div
-        className={cn(
-          "prose prose-sm max-w-none text-xs text-foreground",
-          "[&_[data-forwarded-message]]:mt-0 [&_[data-forwarded-message]]:border-0 [&_[data-forwarded-message]]:p-0",
-          "[&_[data-forwarded-header]]:mb-2 [&_[data-forwarded-header]]:font-medium [&_[data-forwarded-header]]:text-foreground/80",
-          "[&_[data-forwarded-original-body]]:mt-3 [&_[data-forwarded-original-body]]:border-t [&_[data-forwarded-original-body]]:border-border/40 [&_[data-forwarded-original-body]]:pt-3",
-        )}
-        dangerouslySetInnerHTML={{ __html: sanitized }}
-      />
+    <div className="mt-4 pt-2">
+      <button
+        type="button"
+        className="flex h-5 items-center rounded bg-muted px-2 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        &hellip;
+      </button>
+      {expanded && (
+        <div
+          className={cn(
+            "prose prose-sm max-w-none pt-3 text-xs text-foreground",
+            "[&_[data-forwarded-message]]:mt-0 [&_[data-forwarded-message]]:border-0 [&_[data-forwarded-message]]:p-0",
+            "[&_[data-forwarded-header]]:mb-2 [&_[data-forwarded-header]]:font-medium [&_[data-forwarded-header]]:text-foreground/80",
+            "[&_[data-forwarded-original-body]]:mt-3 [&_[data-forwarded-original-body]]:border-t [&_[data-forwarded-original-body]]:border-border/40 [&_[data-forwarded-original-body]]:pt-3",
+          )}
+          dangerouslySetInnerHTML={{ __html: sanitized }}
+        />
+      )}
     </div>
   );
 }

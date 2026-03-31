@@ -114,10 +114,10 @@ export function SearchPanel({
   const showInitialSpinner = isPending && isFetching && hasQuery;
 
   function openEmail(email: EmailListItem) {
+    const routeMailboxId = mailboxId != null ? String(mailboxId) : "all";
     navigate({
-      to: "/inbox/$id",
-      params: { id: "all" },
-      search: { id: email.id },
+      to: "/inbox/$id/email/$emailId",
+      params: { id: routeMailboxId, emailId: email.id },
     });
     close();
   }

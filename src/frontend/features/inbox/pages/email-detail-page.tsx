@@ -1,28 +1,31 @@
-import { Skeleton } from "@/components/ui/skeleton";
 import { ComposePanel } from "@/features/inbox/components/compose-panel";
 import { EmailDetailContent } from "@/features/inbox/components/email-detail-content";
-import { fetchEmailDetail } from "@/features/inbox/queries";
 import type {
   ComposeInitial,
   EmailListItem,
   EmailListResponse,
 } from "@/features/inbox/types";
 import { openEmail as openInboxEmail } from "@/features/inbox/utils/open-email";
+import { useRegisterEmailCommandHandler } from "@/features/inbox/hooks/use-email-command-state";
 import { useSetPageContext } from "@/hooks/use-page-context";
 import { parseMailboxId } from "@/lib/utils";
+import { patchEmail } from "@/features/inbox/mutations";
+import { buildForwardedEmailHtml } from "@/features/inbox/utils/build-forwarded-html";
 import {
-  useQuery,
+  useMutation,
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
-import { getRouteApi, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 const detailRoute = getRouteApi("/_dashboard/inbox/$id/email/$emailId");
 
 export default function EmailDetailPage() {
   const params = detailRoute.useParams();
+  const { email } = detailRoute.useLoaderData();
   const navigate = useNavigate();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const mailboxId = parseMailboxId(params.id);
 
@@ -31,30 +34,16 @@ export default function EmailDetailPage() {
   >();
   const [forwardOpen, setForwardOpen] = useState(false);
 
-  const forward = (initial: ComposeInitial) => {
-    setComposeInitial(initial);
-    setForwardOpen(true);
-  };
-
   const closeForward = () => {
     setForwardOpen(false);
     setComposeInitial(undefined);
   };
 
-  const emailQuery = useQuery({
-    queryKey: ["email-detail", params.emailId],
-    queryFn: () => fetchEmailDetail(params.emailId),
-    staleTime: 60_000,
-  });
-
-  const emailData = emailQuery.data;
-
   useSetPageContext(
     useMemo(() => {
-      if (!emailData) return { route: "inbox" };
       const bodyPreview = (
-        emailData.resolvedBodyText ??
-        emailData.bodyText ??
+        email.resolvedBodyText ??
+        email.bodyText ??
         ""
       )
         .replace(/\s+/g, " ")
@@ -64,16 +53,16 @@ export default function EmailDetailPage() {
         route: "inbox",
         entity: {
           type: "email" as const,
-          id: emailData.id,
-          subject: emailData.subject,
-          fromName: emailData.fromName,
-          fromAddr: emailData.fromAddr,
-          threadId: emailData.threadId,
-          mailboxId: emailData.mailboxId,
+          id: email.id,
+          subject: email.subject,
+          fromName: email.fromName,
+          fromAddr: email.fromAddr,
+          threadId: email.threadId,
+          mailboxId: email.mailboxId,
           bodyPreview: bodyPreview || null,
         },
       };
-    }, [emailData]),
+    }, [email]),
   );
 
   const orderedEmails = useMemo(() => {
@@ -125,40 +114,109 @@ export default function EmailDetailPage() {
     navigate({ to: "/inbox/$id", params: { id: params.id } });
   };
 
-  if (emailQuery.isPending) {
-    return (
-      <div className="mx-auto w-full max-w-3xl space-y-4 py-6">
-        <Skeleton className="h-6 w-48" />
-        <Skeleton className="h-4 w-72" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
-  }
+  const quickReplyRef = useRef<{ trigger: () => void } | null>(null);
 
-  if (emailQuery.isError) {
-    throw emailQuery.error;
-  }
+  const invalidateEmail = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["emails"] });
+    queryClient.invalidateQueries({ queryKey: ["email-detail", params.emailId] });
+    queryClient.invalidateQueries({ queryKey: ["email-ai-detail", params.emailId] });
+    void router.invalidate();
+  }, [queryClient, params.emailId, router]);
 
-  if (!emailQuery.data) {
-    return null;
-  }
+  const archiveMutation = useMutation({
+    mutationFn: () => patchEmail(params.emailId, { archived: true }),
+    onSuccess: () => { invalidateEmail(); goBack(); },
+  });
 
-  const email = emailQuery.data;
+  const trashMutation = useMutation({
+    mutationFn: () => patchEmail(params.emailId, { trashed: true }),
+    onSuccess: () => { invalidateEmail(); goBack(); },
+  });
+
+  const toggleReadMutation = useMutation({
+    mutationFn: () =>
+      patchEmail(params.emailId, { isRead: !email.isRead }),
+    onSuccess: invalidateEmail,
+  });
+
+  const toggleStarMutation = useMutation({
+    mutationFn: () => {
+      const starred = email.labelIds.includes("STARRED");
+      return patchEmail(params.emailId, { starred: !starred });
+    },
+    onSuccess: invalidateEmail,
+  });
+
+  const handleForward = useCallback(
+    (initial?: ComposeInitial) => {
+      if (initial) {
+        setComposeInitial(initial);
+        setForwardOpen(true);
+        return;
+      }
+
+      const subject = email.subject
+        ? email.subject.startsWith("Fwd:")
+          ? email.subject
+          : `Fwd: ${email.subject}`
+        : "Fwd:";
+      const bodyHtml = buildForwardedEmailHtml(email);
+      setComposeInitial({ mailboxId: email.mailboxId, subject, bodyHtml });
+      setForwardOpen(true);
+    },
+    [email],
+  );
+
+  useRegisterEmailCommandHandler(
+    useCallback(
+      (command) => {
+        switch (command.type) {
+          case "navigate-next":
+            goToEmail("next");
+            break;
+          case "navigate-prev":
+            goToEmail("prev");
+            break;
+          case "archive":
+            archiveMutation.mutate();
+            break;
+          case "trash":
+            trashMutation.mutate();
+            break;
+          case "escape":
+            goBack();
+            break;
+          case "reply":
+            quickReplyRef.current?.trigger();
+            break;
+          case "forward":
+            handleForward();
+            break;
+          case "toggle-read":
+            toggleReadMutation.mutate();
+            break;
+          case "toggle-star":
+            toggleStarMutation.mutate();
+            break;
+        }
+      },
+      [archiveMutation, trashMutation, toggleReadMutation, toggleStarMutation, handleForward],
+    ),
+  );
 
   return (
     <>
       <div className="mx-auto w-full max-w-3xl">
         <div className="min-w-0">
           <EmailDetailContent
-            key={email.id}
-            email={email}
             onClose={goBack}
             onBack={goBack}
             onPrev={() => goToEmail("prev")}
             onNext={() => goToEmail("next")}
             hasPrev={hasPrev}
             hasNext={hasNext}
-            onForward={forward}
+            onForward={handleForward}
+            replyTriggerRef={quickReplyRef}
           />
         </div>
       </div>

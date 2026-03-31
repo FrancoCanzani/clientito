@@ -6,14 +6,60 @@ export type ContactSuggestion = {
   interactionCount: number;
 };
 
-export type AiLabel =
+export type EmailIntelligenceCategory =
   | "action_needed"
   | "important"
-  | "later"
   | "newsletter"
-  | "marketing"
   | "transactional"
   | "notification";
+
+export type EmailIntelligenceUrgency = "high" | "medium" | "low";
+
+export type EmailAction = {
+  id: string;
+  type: "reply" | "archive" | "label" | "snooze" | "forward" | "delegate";
+  label: string;
+  payload: Record<string, unknown>;
+  trustLevel: "auto" | "approve";
+  status: "pending" | "executed" | "dismissed" | "failed";
+  error: string | null;
+  executedAt: number | null;
+  updatedAt: number;
+};
+
+export type CalendarSuggestion = {
+  id: number;
+  title: string;
+  proposedDate: string;
+  startAt: number;
+  endAt: number;
+  isAllDay: boolean;
+  confidence: "high" | "low";
+  sourceText: string;
+  status: "pending" | "approved" | "dismissed";
+  location: string | null;
+  attendees: string[] | null;
+  googleEventId: string | null;
+  updatedAt: number;
+};
+
+export type EmailIntelligence = {
+  category: EmailIntelligenceCategory;
+  urgency: EmailIntelligenceUrgency;
+  briefingSentence: string | null;
+  actions: EmailAction[];
+  calendarEvents: CalendarSuggestion[];
+  autoExecute: string[];
+  requiresApproval: string[];
+};
+
+export type EmailDetailIntelligence = {
+  summary: string;
+  actions: EmailAction[];
+  calendarEvents: CalendarSuggestion[];
+  autoExecute: string[];
+  requiresApproval: string[];
+};
 
 export type EmailListItem = {
   id: string;
@@ -30,12 +76,13 @@ export type EmailListItem = {
   direction: "sent" | "received" | null;
   isRead: boolean;
   labelIds: string[];
-  aiLabel: AiLabel | null;
   hasAttachment: boolean;
   createdAt: number;
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
   snoozedUntil: number | null;
+  intelligenceStatus: "pending" | "ready" | "error" | null;
+  intelligence: EmailIntelligence | null;
 };
 
 export type EmailAttachment = {

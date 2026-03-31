@@ -1,9 +1,13 @@
 import { tool } from "ai";
-import { and, asc, desc, eq, gt, gte, isNotNull, isNull, like, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, isNull, like, lte, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
-import { emails, proposedEvents, tasks } from "../../db/schema";
+import { emailIntelligence, emails, tasks } from "../../db/schema";
 import { listEvents } from "../../lib/calendar/google";
+import {
+  getPersistedEmailIntelligence,
+} from "../../lib/email/intelligence/store";
+import { getStoredReplyDraft } from "../../lib/email/intelligence/common";
 import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
 import { getUserMailboxes } from "../../lib/email/mailbox-state";
 import { syncAllMailboxes } from "../../lib/email/sync";
@@ -224,19 +228,51 @@ export function makeReadTools(
             threadId: emails.threadId,
             mailboxId: emails.mailboxId,
             messageId: emails.messageId,
-            aiLabel: emails.aiLabel,
-            draftReply: emails.draftReply,
+            intelligenceStatus: emailIntelligence.status,
+            intelligenceCategory: emailIntelligence.category,
+            intelligenceUrgency: emailIntelligence.urgency,
+            intelligenceBriefingSentence: emailIntelligence.briefingSentence,
+            intelligenceActionsJson: emailIntelligence.actionsJson,
+            intelligenceCalendarEventsJson: emailIntelligence.calendarEventsJson,
           })
           .from(emails)
+          .leftJoin(emailIntelligence, eq(emailIntelligence.emailId, emails.id))
           .where(and(eq(emails.id, emailId), eq(emails.userId, userId)))
           .limit(1);
 
         const email = rows[0];
         if (!email) return { error: "Email not found" };
 
+        const intelligence = getPersistedEmailIntelligence(
+          email.intelligenceStatus
+            ? {
+                status: email.intelligenceStatus,
+                category: email.intelligenceCategory,
+                urgency: email.intelligenceUrgency,
+                briefingSentence: email.intelligenceBriefingSentence,
+                actionsJson: email.intelligenceActionsJson ?? [],
+                calendarEventsJson: email.intelligenceCalendarEventsJson ?? [],
+              }
+            : null,
+        );
+
         return {
-          ...email,
+          id: email.id,
+          subject: email.subject,
+          fromAddr: email.fromAddr,
+          fromName: email.fromName,
+          toAddr: email.toAddr,
+          ccAddr: email.ccAddr,
+          snippet: email.snippet,
           bodyText: (email.bodyText ?? "").replace(/\s+/g, " ").trim().slice(0, 3000),
+          date: email.date,
+          isRead: email.isRead,
+          threadId: email.threadId,
+          mailboxId: email.mailboxId,
+          messageId: email.messageId,
+          intelligenceStatus: email.intelligenceStatus ?? null,
+          intelligence,
+          draftReply: getStoredReplyDraft(intelligence),
           ...formatEmailDate(email.date),
         };
       },
@@ -255,7 +291,7 @@ export function makeReadTools(
     }),
     getAgenda: tool({
       description:
-        "Get the user's calendar events and proposed events. Defaults to today. Use when the user asks about their agenda, schedule, calendar, meetings, or what they have coming up.",
+        "Get the user's calendar events and pending email-based calendar suggestions. Defaults to today. Use when the user asks about their agenda, schedule, calendar, meetings, or what they have coming up.",
       inputSchema: z.object({
         from: z.string().optional().describe("Start date as ISO string. Defaults to start of today."),
         to: z.string().optional().describe("End date as ISO string. Defaults to end of today."),
@@ -297,31 +333,39 @@ export function makeReadTools(
         }
         calendarEvents.sort((a, b) => a.startAt - b.startAt);
 
-        const proposed = await db
+        const suggestionRows = await db
           .select({
-            id: proposedEvents.id,
-            title: proposedEvents.title,
-            description: proposedEvents.description,
-            location: proposedEvents.location,
-            startAt: proposedEvents.startAt,
-            endAt: proposedEvents.endAt,
-            status: proposedEvents.status,
+            emailId: emailIntelligence.emailId,
+            calendarEventsJson: emailIntelligence.calendarEventsJson,
           })
-          .from(proposedEvents)
-          .where(
-            and(
-              eq(proposedEvents.userId, userId),
-              eq(proposedEvents.status, "pending"),
-              gte(proposedEvents.startAt, fromMs),
-              lte(proposedEvents.startAt, toMs),
-            ),
-          );
+          .from(emailIntelligence)
+          .where(eq(emailIntelligence.userId, userId));
+
+        const proposed = suggestionRows.flatMap((row) =>
+          (row.calendarEventsJson ?? [])
+            .filter(
+              (event) =>
+                event.status === "pending" &&
+                event.startAt >= fromMs &&
+                event.startAt <= toMs,
+            )
+            .map((event) => ({
+              id: event.id,
+              emailId: row.emailId,
+              title: event.title,
+              description: event.sourceText,
+              location: event.location,
+              startAt: event.startAt,
+              endAt: event.endAt,
+              status: event.status,
+            })),
+        );
 
         return {
           from: fromIso,
           to: toIso,
           events: calendarEvents,
-          proposedEvents: proposed,
+          suggestions: proposed,
           count: calendarEvents.length + proposed.length,
         };
       },

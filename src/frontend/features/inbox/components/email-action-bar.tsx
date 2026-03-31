@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+import { Kbd } from "@/components/ui/kbd";
 import {
   Popover,
   PopoverContent,
@@ -196,23 +197,26 @@ export function EmailActionBar({
     icon: Icon;
     iconWeight?: "fill" | "regular";
     label: string;
+    shortcut?: string;
     action: () => void;
     visible?: boolean;
   };
 
   const menuItems: MenuItem[] = [
-    { icon: ArchiveIcon, label: "Archive", action: () => archiveMutation.mutate() },
-    { icon: TrashIcon, label: "Move to trash", action: () => trashMutation.mutate() },
+    { icon: ArchiveIcon, label: "Archive", shortcut: "E", action: () => archiveMutation.mutate() },
+    { icon: TrashIcon, label: "Move to trash", shortcut: "#", action: () => trashMutation.mutate() },
     { icon: WarningIcon, label: "Move to spam", action: () => spamMutation.mutate() },
     {
       icon: StarIcon,
       iconWeight: isStarred ? "fill" : "regular",
       label: isStarred ? "Unstar" : "Star",
+      shortcut: "S",
       action: () => starMutation.mutate(),
     },
     {
       icon: email.isRead ? EnvelopeSimpleIcon : EnvelopeSimpleOpenIcon,
       label: email.isRead ? "Mark as unread" : "Mark as read",
+      shortcut: "U",
       action: () => readMutation.mutate(),
     },
   ];
@@ -236,7 +240,7 @@ export function EmailActionBar({
               <ArrowBendDoubleUpLeftIcon className="size-3.5" />
             </IconButton>
           ) : null}
-          <IconButton label="Forward" onClick={handleForward}>
+          <IconButton label="Forward" shortcut="F" onClick={handleForward}>
             <ArrowBendUpRightIcon className="size-3.5" />
           </IconButton>
         </div>
@@ -271,7 +275,10 @@ export function EmailActionBar({
                       className="size-3.5 text-muted-foreground"
                       weight={item.iconWeight}
                     />
-                    {item.label}
+                    <span className="flex-1">{item.label}</span>
+                    {item.shortcut && (
+                      <Kbd className="ml-auto">{item.shortcut}</Kbd>
+                    )}
                   </button>
                 );
               })}

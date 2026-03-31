@@ -1,11 +1,13 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { z } from "zod";
-import { proposedEvents } from "../../db/schema";
 import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
 import { getUserMailboxes } from "../../lib/email/mailbox-state";
 import { createEvent } from "../../lib/calendar/google";
+import {
+  findCalendarSuggestionById,
+  updateCalendarSuggestion,
+} from "../../lib/email/intelligence/store";
 import type { AppRouteEnv } from "../types";
 
 const paramsSchema = z.object({
@@ -22,23 +24,12 @@ export function registerPostApproveProposed(api: Hono<AppRouteEnv>) {
       const env = c.env;
       const { id } = c.req.valid("param");
 
-      const rows = await db
-        .select()
-        .from(proposedEvents)
-        .where(
-          and(
-            eq(proposedEvents.id, id),
-            eq(proposedEvents.userId, user.id),
-            eq(proposedEvents.status, "pending"),
-          ),
-        )
-        .limit(1);
+      const match = await findCalendarSuggestionById(db, user.id, id);
+      if (!match || match.suggestion.status !== "pending") {
+        return c.json({ error: "Proposed event not found" }, 404);
+      }
 
-      const proposed = rows[0];
-      if (!proposed) return c.json({ error: "Proposed event not found" }, 404);
-
-      // Get a mailbox to use for Calendar API access
-      const mailboxId = proposed.mailboxId;
+      const mailboxId = match.row.mailboxId;
       let mbId: number;
 
       if (mailboxId) {
@@ -59,23 +50,26 @@ export function registerPostApproveProposed(api: Hono<AppRouteEnv>) {
         GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
       });
 
+      const start = match.suggestion.isAllDay
+        ? { date: new Date(match.suggestion.startAt).toISOString().slice(0, 10) }
+        : { dateTime: new Date(match.suggestion.startAt).toISOString() };
+      const end = match.suggestion.isAllDay
+        ? { date: new Date(match.suggestion.endAt).toISOString().slice(0, 10) }
+        : { dateTime: new Date(match.suggestion.endAt).toISOString() };
+
       const googleEvent = await createEvent(token, {
-        summary: proposed.title,
-        description: proposed.description ?? undefined,
-        location: proposed.location ?? undefined,
-        start: { dateTime: new Date(proposed.startAt).toISOString() },
-        end: { dateTime: new Date(proposed.endAt).toISOString() },
-        attendees: proposed.attendees?.map((email) => ({ email })),
+        summary: match.suggestion.title,
+        description: match.suggestion.sourceText,
+        location: match.suggestion.location ?? undefined,
+        start,
+        end,
+        attendees: match.suggestion.attendees?.map((email) => ({ email })),
       });
 
-      await db
-        .update(proposedEvents)
-        .set({
-          status: "approved",
-          googleEventId: googleEvent.id,
-          updatedAt: Date.now(),
-        })
-        .where(eq(proposedEvents.id, id));
+      await updateCalendarSuggestion(db, match, {
+        status: "approved",
+        googleEventId: googleEvent.id,
+      });
 
       return c.json(
         { data: { googleEventId: googleEvent.id, htmlLink: googleEvent.htmlLink } },

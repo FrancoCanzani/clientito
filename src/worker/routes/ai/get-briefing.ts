@@ -16,12 +16,16 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { PRIMARY_MODEL } from "../../lib/constants";
 import {
   briefingDecisions,
+  emailIntelligence,
   emails,
-  proposedEvents,
   tasks,
 } from "../../db/schema";
 import { listEvents } from "../../lib/calendar/google";
 import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
+import {
+  getPersistedEmailIntelligence,
+} from "../../lib/email/intelligence/store";
+import { getStoredReplyDraft } from "../../lib/email/intelligence/common";
 import { getUserMailboxes } from "../../lib/email/mailbox-state";
 import { STANDARD_LABELS } from "../../lib/email/types";
 import type { AppRouteEnv } from "../types";
@@ -33,16 +37,18 @@ const REPLY_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 type BriefingItem = {
   id: string;
   type:
-    | "action_needed"
-    | "important"
+    | "email_action"
+    | "briefing_email"
     | "overdue_task"
     | "due_today_task"
-    | "proposed_event"
+    | "calendar_suggestion"
     | "calendar_event";
   title: string;
   reason: string;
   href: string;
   emailId?: number;
+  actionId?: string;
+  actionType?: string;
   draftReply?: string | null;
   threadId?: string | null;
   fromAddr?: string;
@@ -76,10 +82,32 @@ function getSenderLabel(row: { fromName: string | null; fromAddr: string }) {
   return row.fromName?.trim() || row.fromAddr;
 }
 
-function buildReplyReason(row: { subject: string | null; date: number }) {
-  const age = formatDistanceToNowStrict(new Date(row.date), { addSuffix: true });
-  if (row.subject?.trim()) return `${row.subject.trim()} came in ${age}.`;
-  return `Latest inbound message was ${age}.`;
+function buildEmailReason(reason: string | null, fallback: string) {
+  return reason?.trim() || fallback;
+}
+
+function shouldSurfaceBriefingEmail(intelligence: NonNullable<ReturnType<typeof getPersistedEmailIntelligence>>) {
+  return (
+    (intelligence.category === "action_needed" ||
+      intelligence.category === "important") &&
+    intelligence.urgency !== "low" &&
+    Boolean(intelligence.briefingSentence?.trim())
+  );
+}
+
+function shouldSurfaceReplyAction(input: {
+  intelligence: NonNullable<ReturnType<typeof getPersistedEmailIntelligence>>;
+  action: NonNullable<ReturnType<typeof getPersistedEmailIntelligence>>["actions"][number];
+  draftReply: string | null;
+}) {
+  return (
+    input.action.status === "pending" &&
+    input.action.trustLevel === "approve" &&
+    input.action.type === "reply" &&
+    Boolean(input.draftReply) &&
+    (input.intelligence.category === "action_needed" ||
+      input.intelligence.category === "important")
+  );
 }
 
 function buildTaskReason(task: { dueAt: number | null }, type: "overdue_task" | "due_today_task") {
@@ -88,13 +116,6 @@ function buildTaskReason(task: { dueAt: number | null }, type: "overdue_task" | 
   }
   const age = formatDistanceToNowStrict(new Date(task.dueAt), { addSuffix: true });
   return type === "overdue_task" ? `It slipped ${age}.` : `Due ${age}.`;
-}
-
-function buildProposedEventReason(startAt: number) {
-  const d = new Date(startAt);
-  const day = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  return `Extracted from email — ${day} at ${time}`;
 }
 
 export async function buildBriefing(input: {
@@ -128,7 +149,6 @@ export async function buildBriefing(input: {
     overdueCountRows,
     dueTodayTaskRows,
     overdueTaskRows,
-    pendingProposedEvents,
     decisionRows,
   ] = await Promise.all([
     input.db
@@ -140,12 +160,15 @@ export async function buildBriefing(input: {
         fromAddr: emails.fromAddr,
         fromName: emails.fromName,
         subject: emails.subject,
-        snippet: emails.snippet,
         isRead: emails.isRead,
-        aiLabel: emails.aiLabel,
-        draftReply: emails.draftReply,
         messageId: emails.messageId,
         mailboxId: emails.mailboxId,
+        intelligenceStatus: emailIntelligence.status,
+        intelligenceCategory: emailIntelligence.category,
+        intelligenceUrgency: emailIntelligence.urgency,
+        intelligenceBriefingSentence: emailIntelligence.briefingSentence,
+        intelligenceActionsJson: emailIntelligence.actionsJson,
+        intelligenceCalendarEventsJson: emailIntelligence.calendarEventsJson,
       })
       .from(emails)
       .innerJoin(
@@ -155,6 +178,7 @@ export async function buildBriefing(input: {
           eq(emails.date, latestThreadDates.latestDate),
         ),
       )
+      .leftJoin(emailIntelligence, eq(emailIntelligence.emailId, emails.id))
       .where(eq(emails.userId, input.userId))
       .orderBy(desc(emails.date)),
     input.db
@@ -173,7 +197,7 @@ export async function buildBriefing(input: {
       .from(tasks)
       .where(and(eq(tasks.userId, input.userId), ne(tasks.status, "done"), lt(tasks.dueAt, now))),
     input.db
-      .select({ id: tasks.id, title: tasks.title, dueAt: tasks.dueAt, priority: tasks.priority })
+      .select({ id: tasks.id, title: tasks.title, dueAt: tasks.dueAt })
       .from(tasks)
       .where(
         and(
@@ -186,29 +210,10 @@ export async function buildBriefing(input: {
       .orderBy(tasks.dueAt)
       .limit(5),
     input.db
-      .select({ id: tasks.id, title: tasks.title, dueAt: tasks.dueAt, priority: tasks.priority })
+      .select({ id: tasks.id, title: tasks.title, dueAt: tasks.dueAt })
       .from(tasks)
       .where(and(eq(tasks.userId, input.userId), ne(tasks.status, "done"), lt(tasks.dueAt, now)))
       .orderBy(tasks.dueAt)
-      .limit(5),
-    input.db
-      .select({
-        id: proposedEvents.id,
-        emailId: proposedEvents.emailId,
-        title: proposedEvents.title,
-        description: proposedEvents.description,
-        location: proposedEvents.location,
-        startAt: proposedEvents.startAt,
-        endAt: proposedEvents.endAt,
-      })
-      .from(proposedEvents)
-      .where(
-        and(
-          eq(proposedEvents.userId, input.userId),
-          eq(proposedEvents.status, "pending"),
-        ),
-      )
-      .orderBy(proposedEvents.startAt)
       .limit(5),
     input.db
       .select({
@@ -220,102 +225,154 @@ export async function buildBriefing(input: {
       .where(eq(briefingDecisions.userId, input.userId)),
   ]);
 
-  // Calendar events
-  const calendarEvents: { title: string; startAt: number; endAt: number; location?: string; isAllDay: boolean; htmlLink?: string }[] = [];
+  const calendarEvents: {
+    title: string;
+    startAt: number;
+    endAt: number;
+    location?: string;
+    isAllDay: boolean;
+  }[] = [];
+
   try {
     const allMailboxes = await getUserMailboxes(input.db, input.userId);
     const dayStartIso = new Date(dayStart).toISOString();
     const dayEndIso = new Date(dayEnd).toISOString();
-    for (const mb of allMailboxes) {
-      if (!mb.historyId || mb.authState !== "ok") continue;
+    for (const mailbox of allMailboxes) {
+      if (!mailbox.historyId || mailbox.authState !== "ok") continue;
       try {
-        const token = await getGmailTokenForMailbox(input.db, mb.id, {
+        const token = await getGmailTokenForMailbox(input.db, mailbox.id, {
           GOOGLE_CLIENT_ID: input.env.GOOGLE_CLIENT_ID,
           GOOGLE_CLIENT_SECRET: input.env.GOOGLE_CLIENT_SECRET,
         });
         const events = await listEvents(token, dayStartIso, dayEndIso);
-        for (const e of events) {
-          const isAllDay = !e.start.dateTime;
+        for (const event of events) {
+          const isAllDay = !event.start.dateTime;
           calendarEvents.push({
-            title: e.summary || "(No title)",
-            startAt: isAllDay ? new Date(e.start.date!).getTime() : new Date(e.start.dateTime!).getTime(),
-            endAt: isAllDay ? new Date(e.end.date!).getTime() : new Date(e.end.dateTime!).getTime(),
-            location: e.location,
+            title: event.summary || "(No title)",
+            startAt: isAllDay
+              ? new Date(event.start.date!).getTime()
+              : new Date(event.start.dateTime!).getTime(),
+            endAt: isAllDay
+              ? new Date(event.end.date!).getTime()
+              : new Date(event.end.dateTime!).getTime(),
+            location: event.location,
             isAllDay,
-            htmlLink: e.htmlLink,
           });
         }
       } catch (error) {
-        console.error("Briefing: failed to fetch calendar events", { mailboxId: mb.id, error });
+        console.error("Briefing: failed to fetch calendar events", {
+          mailboxId: mailbox.id,
+          error,
+        });
       }
     }
-    calendarEvents.sort((a, b) => a.startAt - b.startAt);
+    calendarEvents.sort((left, right) => left.startAt - right.startAt);
   } catch (error) {
     console.error("Briefing: calendar fetch failed", { error });
   }
 
-  // Decisions map
-  const decided = new Set<string>();
+  const decidedTasks = new Set<number>();
   for (const row of decisionRows) {
-    if (row.decision !== "pending") {
-      decided.add(`${row.itemType}:${row.referenceId}`);
+    if (row.itemType === "task" && row.decision !== "pending") {
+      decidedTasks.add(row.referenceId);
     }
   }
 
-  // Deduplicate threads, keep latest per thread
-  const latestByThread = new Map<string, (typeof latestThreadRows)[0]>();
+  const emailActionItems: BriefingItem[] = [];
+  const briefingEmailItems: BriefingItem[] = [];
+  const calendarSuggestionItems: BriefingItem[] = [];
+
   for (const row of latestThreadRows) {
-    if (!row.threadId || latestByThread.has(row.threadId)) continue;
-    latestByThread.set(row.threadId, row);
+    if (row.direction !== "received") continue;
+    if (now - row.date > REPLY_WINDOW_MS) continue;
+
+    const intelligence = getPersistedEmailIntelligence({
+      status: row.intelligenceStatus ?? "pending",
+      category: row.intelligenceCategory,
+      urgency: row.intelligenceUrgency,
+      briefingSentence: row.intelligenceBriefingSentence,
+      actionsJson: row.intelligenceActionsJson ?? [],
+      calendarEventsJson: row.intelligenceCalendarEventsJson ?? [],
+    });
+
+    if (!intelligence) continue;
+
+    if (shouldSurfaceBriefingEmail(intelligence)) {
+      briefingEmailItems.push({
+        id: `briefing-email-${row.id}`,
+        type: "briefing_email",
+        title: getSenderLabel(row),
+        reason: intelligence.briefingSentence ?? "",
+        href: `/inbox/all/email/${row.id}`,
+        emailId: row.id,
+        threadId: row.threadId,
+        fromAddr: row.fromAddr,
+        subject: row.subject,
+        mailboxId: row.mailboxId,
+        messageId: row.messageId,
+      });
+    }
+
+    for (const action of intelligence.actions) {
+      const draftReply = getStoredReplyDraft({
+        ...intelligence,
+        actions: [action],
+      });
+
+      if (
+        !shouldSurfaceReplyAction({
+          intelligence,
+          action,
+          draftReply,
+        })
+      ) {
+        continue;
+      }
+
+      emailActionItems.push({
+        id: `email-action-${row.id}-${action.id}`,
+        type: "email_action",
+        title: getSenderLabel(row),
+        reason: buildEmailReason(intelligence.briefingSentence, action.label),
+        href: `/inbox/all/email/${row.id}`,
+        emailId: row.id,
+        actionId: action.id,
+        actionType: action.type,
+        draftReply,
+        threadId: row.threadId,
+        fromAddr: row.fromAddr,
+        subject: row.subject,
+        mailboxId: row.mailboxId,
+        messageId: row.messageId,
+      });
+    }
+
+    for (const suggestion of intelligence.calendarEvents) {
+      if (suggestion.status !== "pending") continue;
+      calendarSuggestionItems.push({
+        id: `calendar-suggestion-${suggestion.id}`,
+        type: "calendar_suggestion",
+        title: suggestion.title,
+        reason: buildEmailReason(intelligence.briefingSentence, suggestion.sourceText),
+        href: `/inbox/all/email/${row.id}`,
+        emailId: row.id,
+        proposedEventId: suggestion.id,
+        eventStart: suggestion.startAt,
+        eventEnd: suggestion.endAt,
+        eventLocation: suggestion.location,
+        eventDescription: suggestion.sourceText,
+      });
+    }
   }
-
-  // Trust the AI classifier labels — just filter by label + recency
-  const actionNeededThreads = [...latestByThread.values()]
-    .filter((row) => row.direction === "received")
-    .filter((row) => row.aiLabel === "action_needed")
-    .filter((row) => now - row.date <= REPLY_WINDOW_MS)
-    .filter((row) => !decided.has(`email:${row.id}`));
-
-  const importantThreads = [...latestByThread.values()]
-    .filter((row) => row.direction === "received")
-    .filter((row) => row.aiLabel === "important" || row.aiLabel === "later")
-    .filter((row) => now - row.date <= REPLY_WINDOW_MS)
-    .filter((row) => !decided.has(`email:${row.id}`))
-    .slice(0, 5);
 
   const dueTodayCount = Number(dueTodayCountRows[0]?.count ?? 0);
   const overdueCount = Number(overdueCountRows[0]?.count ?? 0);
 
   const items: BriefingItem[] = [
-    ...actionNeededThreads.map((row) => ({
-      id: `action-needed-${row.id}`,
-      type: "action_needed" as const,
-      title: getSenderLabel(row),
-      reason: buildReplyReason(row),
-      href: `/inbox/all/email/${row.id}`,
-      emailId: row.id,
-      draftReply: row.draftReply,
-      threadId: row.threadId,
-      fromAddr: row.fromAddr,
-      subject: row.subject,
-      mailboxId: row.mailboxId,
-      messageId: row.messageId,
-    })),
-    ...importantThreads.map((row) => ({
-      id: `important-${row.id}`,
-      type: "important" as const,
-      title: getSenderLabel(row),
-      reason: buildReplyReason(row),
-      href: `/inbox/all/email/${row.id}`,
-      emailId: row.id,
-      threadId: row.threadId,
-      fromAddr: row.fromAddr,
-      subject: row.subject,
-      mailboxId: row.mailboxId,
-      messageId: row.messageId,
-    })),
+    ...emailActionItems,
+    ...briefingEmailItems,
     ...overdueTaskRows
-      .filter((t) => !decided.has(`task:${t.id}`))
+      .filter((task) => !decidedTasks.has(task.id))
       .map((task) => ({
         id: `overdue-${task.id}`,
         type: "overdue_task" as const,
@@ -324,7 +381,7 @@ export async function buildBriefing(input: {
         href: "/tasks",
       })),
     ...dueTodayTaskRows
-      .filter((t) => !decided.has(`task:${t.id}`))
+      .filter((task) => !decidedTasks.has(task.id))
       .map((task) => ({
         id: `today-${task.id}`,
         type: "due_today_task" as const,
@@ -332,31 +389,18 @@ export async function buildBriefing(input: {
         reason: buildTaskReason(task, "due_today_task"),
         href: "/tasks",
       })),
-    ...pendingProposedEvents
-      .filter((pe) => !decided.has(`proposed_event:${pe.id}`))
-      .map((pe) => ({
-        id: `proposed-event-${pe.id}`,
-        type: "proposed_event" as const,
-        title: pe.title,
-        reason: buildProposedEventReason(pe.startAt),
-        href: pe.emailId ? `/inbox/all/email/${pe.emailId}` : "/calendar",
-        proposedEventId: pe.id,
-        eventStart: pe.startAt,
-        eventEnd: pe.endAt,
-        eventLocation: pe.location,
-        eventDescription: pe.description,
-      })),
-    ...calendarEvents.map((ce, i) => ({
-      id: `calendar-${i}`,
+    ...calendarSuggestionItems,
+    ...calendarEvents.map((event, index) => ({
+      id: `calendar-${index}`,
       type: "calendar_event" as const,
-      title: ce.title,
-      reason: ce.isAllDay
+      title: event.title,
+      reason: event.isAllDay
         ? "All day"
-        : `${new Date(ce.startAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – ${new Date(ce.endAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`,
+        : `${new Date(event.startAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – ${new Date(event.endAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`,
       href: "/agenda",
-      eventStart: ce.startAt,
-      eventEnd: ce.endAt,
-      eventLocation: ce.location,
+      eventStart: event.startAt,
+      eventEnd: event.endAt,
+      eventLocation: event.location,
     })),
   ];
 
@@ -364,7 +408,7 @@ export async function buildBriefing(input: {
     text: "",
     generatedAt: now,
     counts: {
-      actionNeeded: actionNeededThreads.length,
+      actionNeeded: emailActionItems.length,
       dueToday: dueTodayCount,
       overdue: overdueCount,
     },
@@ -375,30 +419,34 @@ export async function buildBriefing(input: {
 const STREAM_SYSTEM = [
   "You are a discreet, highly competent secretary writing a daily briefing as a single flowing paragraph.",
   "Weave the relevant items naturally into the text, including calendar events for today.",
-  "If an item is obviously promotional, newsletter-like, or non-actionable, leave it out.",
-  "For each item, use the EXACT link syntax [[title|href]] provided — do not change the title or href.",
-  "CRITICAL: Always keep a space before and after each [[...]] link.",
-  "Write 1-2 concise sentences. Keep it short and smooth.",
-  "Do not instruct the user or imply urgency beyond the facts.",
-  "Avoid words like should, need to, please, important, urgent.",
-  "No markdown, no bullet points. Just a natural paragraph with [[links]] inline.",
+  "For each item, use the EXACT link syntax [[title|href]] provided.",
+  "Keep it to 1-2 concise sentences.",
+  "No markdown, no bullets, no headings.",
   "If there are no items, write a short sentence saying everything looks clear.",
 ].join(" ");
 
-function buildStreamPrompt(items: BriefingItem[], counts: { actionNeeded: number; dueToday: number; overdue: number }) {
+function buildStreamPrompt(
+  items: BriefingItem[],
+  counts: { actionNeeded: number; dueToday: number; overdue: number },
+) {
   const lines = items.map((item) => {
     const label =
-      item.type === "action_needed" ? "action needed" :
-      item.type === "important" ? "important" :
-      item.type === "overdue_task" ? "overdue task" :
-      item.type === "proposed_event" ? "proposed event" :
-      item.type === "calendar_event" ? "calendar event" :
-      "due today";
+      item.type === "email_action"
+        ? "email action"
+        : item.type === "briefing_email"
+          ? "email"
+          : item.type === "overdue_task"
+            ? "overdue task"
+            : item.type === "calendar_suggestion"
+              ? "calendar suggestion"
+              : item.type === "calendar_event"
+                ? "calendar event"
+                : "due today task";
     return `- ${label}: title="${item.title}", reason="${item.reason}", link=[[${item.title}|${item.href}]]`;
   });
 
   return [
-    `Action-needed: ${counts.actionNeeded}, Overdue tasks: ${counts.overdue}, Due today: ${counts.dueToday}, Calendar events: ${items.filter((i) => i.type === "calendar_event").length}`,
+    `Action-needed: ${counts.actionNeeded}, Overdue tasks: ${counts.overdue}, Due today: ${counts.dueToday}, Calendar events: ${items.filter((item) => item.type === "calendar_event").length}`,
     "",
     "Items:",
     ...lines,
@@ -437,7 +485,10 @@ export function registerPostBriefingStream(app: Hono<AppRouteEnv>) {
     } catch (error) {
       console.error("Briefing stream failed", { userId: user.id, error });
       return new Response("Your email and tasks look under control.", {
-        headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
       });
     }
   });

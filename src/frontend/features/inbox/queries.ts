@@ -1,5 +1,6 @@
 import type {
   ContactSuggestion,
+  EmailDetailIntelligence,
   EmailDetailItem,
   EmailListItem,
   EmailListResponse,
@@ -55,6 +56,23 @@ export async function fetchEmailDetail(
       payload && typeof payload.error === "string"
         ? payload.error
         : "Failed to fetch email detail";
+    throw new Error(message);
+  }
+
+  const json = await response.json();
+  return json.data;
+}
+
+export async function fetchEmailDetailAI(
+  emailId: string,
+): Promise<EmailDetailIntelligence> {
+  const response = await fetch(`/api/inbox/emails/${emailId}/ai`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message =
+      payload && typeof payload.error === "string"
+        ? payload.error
+        : "Failed to fetch email AI detail";
     throw new Error(message);
   }
 

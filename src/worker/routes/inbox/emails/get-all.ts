@@ -1,11 +1,12 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, desc, eq, isNull, lte, or, sql, gt, like } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, like, lte, or, sql } from "drizzle-orm";
 import type { Hono } from "hono";
-import { emails } from "../../../db/schema";
+import { emailIntelligence, emails } from "../../../db/schema";
 import { syncAllMailboxes } from "../../../lib/email/sync";
 import { STANDARD_LABELS } from "../../../lib/email/types";
 import type { AppRouteEnv } from "../../types";
 import {
+  emailIntelligenceSelection,
   emailSummarySelection,
   hasEmailLabel,
   toEmailListResponse,
@@ -102,8 +103,12 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
     const whereClause = and(...conditions);
 
     const rowsWithExtra = await db
-      .select(emailSummarySelection)
+      .select({
+        ...emailSummarySelection,
+        ...emailIntelligenceSelection,
+      })
       .from(emails)
+      .leftJoin(emailIntelligence, eq(emailIntelligence.emailId, emails.id))
       .where(whereClause)
       .orderBy(desc(emails.date))
       .limit(limit + 1)

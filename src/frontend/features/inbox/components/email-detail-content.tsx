@@ -1,16 +1,19 @@
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchEmailDetail, fetchEmailThread } from "@/features/inbox/queries";
+import { patchEmail } from "@/features/inbox/mutations";
+import { fetchEmailDetailAI, fetchEmailThread } from "@/features/inbox/queries";
+import type { EmailAction } from "@/features/inbox/types";
 import {
   ArrowLeftIcon,
   CaretDownIcon,
   CaretUpIcon,
   PaperclipIcon,
 } from "@phosphor-icons/react";
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
-import type { EmailListItem } from "../types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { toast } from "sonner";
 import { formatEmailDetailDate } from "../utils/formatters";
 import { AttachmentItem } from "./attachment-item";
 import { EmailActionBar } from "./email-action-bar";
@@ -18,8 +21,32 @@ import { QuickReply, type QuickReplyHandle } from "./quick-reply";
 import { MessageBody, ThreadMessageCard } from "./thread-message-card";
 
 const ATTACHMENT_SKELETON_KEYS = ["attachment-a", "attachment-b"] as const;
+const detailRoute = getRouteApi("/_dashboard/inbox/$id/email/$emailId");
 
-function buildRecipientRows(email: EmailListItem) {
+function getSnoozeTimestamp(action: EmailAction) {
+  if (action.type !== "snooze") return null;
+  const until = action.payload.until;
+  if (typeof until !== "string" || until.trim().length === 0) return null;
+  const timestamp = new Date(until).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function isSupportedAiAction(action: EmailAction) {
+  if (action.status !== "pending") return false;
+  if (action.type === "archive") return true;
+  if (action.type === "snooze") return getSnoozeTimestamp(action) != null;
+  return false;
+}
+
+function getAiActionButtonLabel(action: EmailAction) {
+  if (action.type === "archive") return "Archive";
+  if (action.type === "snooze") return "Snooze";
+  return action.label;
+}
+
+function buildRecipientRows(
+  email: ReturnType<typeof detailRoute.useLoaderData>["email"],
+) {
   return [
     {
       label: "From",
@@ -33,7 +60,6 @@ function buildRecipientRows(email: EmailListItem) {
 }
 
 export function EmailDetailContent({
-  email,
   onClose,
   onBack,
   onPrev,
@@ -41,8 +67,8 @@ export function EmailDetailContent({
   hasPrev = false,
   hasNext = false,
   onForward,
+  replyTriggerRef,
 }: {
-  email: EmailListItem;
   onClose?: () => void;
   onBack?: () => void;
   onPrev?: () => void;
@@ -50,27 +76,15 @@ export function EmailDetailContent({
   hasPrev?: boolean;
   hasNext?: boolean;
   onForward: (initial: import("../types").ComposeInitial) => void;
+  replyTriggerRef?: RefObject<{ trigger: () => void } | null>;
 }) {
-  const forward = onForward;
+  const { email } = detailRoute.useLoaderData();
+  const queryClient = useQueryClient();
   const formattedDate = formatEmailDetailDate(email.date);
   const quickReplyRef = useRef<QuickReplyHandle>(null);
   const [threadExpansionOverrides, setThreadExpansionOverrides] = useState<
     Map<string, boolean>
   >(() => new Map());
-
-  const detailQuery = useQuery({
-    queryKey: ["email-detail", email.id],
-    queryFn: () => fetchEmailDetail(email.id),
-    staleTime: 60_000,
-  });
-
-  const liveQuery = useQuery({
-    queryKey: ["email-detail-live", email.id],
-    queryFn: () => fetchEmailDetail(email.id, { refreshLive: true }),
-    enabled: true,
-    staleTime: 60_000,
-    retry: 2,
-  });
 
   const threadQuery = useQuery({
     queryKey: ["email-thread", email.threadId],
@@ -79,7 +93,19 @@ export function EmailDetailContent({
     staleTime: 60_000,
   });
 
-  const detail = liveQuery.data ?? detailQuery.data ?? null;
+  const detailAIQuery = useQuery({
+    queryKey: ["email-ai-detail", email.id],
+    queryFn: () => fetchEmailDetailAI(email.id),
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    retry: 2,
+  });
+  const intelligence = detailAIQuery.data ?? null;
+  const intelligenceStatus = detailAIQuery.isPending ? "pending" : null;
+  const supportedAiActions = useMemo(
+    () => intelligence?.actions.filter(isSupportedAiAction) ?? [],
+    [intelligence],
+  );
   const threadMessages = useMemo(() => {
     if (!email.threadId) {
       return [email];
@@ -112,9 +138,65 @@ export function EmailDetailContent({
     email.threadId && threadMessages.length > 1,
   );
   const hasSelectedAttachments =
-    email.hasAttachment || (detail?.attachments?.length ?? 0) > 0;
+    email.hasAttachment || email.attachments.length > 0;
   const subject = email.subject ?? "(no subject)";
   const recipientRows = buildRecipientRows(email);
+
+  useEffect(() => {
+    if (replyTriggerRef) {
+      replyTriggerRef.current = {
+        trigger: () => quickReplyRef.current?.scrollIntoViewAndFocus(),
+      };
+    }
+    return () => {
+      if (replyTriggerRef) replyTriggerRef.current = null;
+    };
+  }, [replyTriggerRef]);
+
+  const aiActionMutation = useMutation({
+    mutationFn: async (action: EmailAction) => {
+      if (action.type === "archive") {
+        await patchEmail(email.id, { archived: true });
+        return action;
+      }
+
+      if (action.type === "snooze") {
+        const snoozedUntil = getSnoozeTimestamp(action);
+        if (snoozedUntil == null) {
+          throw new Error("Missing snooze time");
+        }
+        await patchEmail(email.id, { snoozedUntil });
+        return action;
+      }
+
+      throw new Error("Unsupported AI action");
+    },
+    onSuccess: async (action) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["emails"] }),
+        queryClient.invalidateQueries({ queryKey: ["email-detail", email.id] }),
+        queryClient.invalidateQueries({ queryKey: ["email-ai-detail", email.id] }),
+        email.threadId
+          ? queryClient.invalidateQueries({
+              queryKey: ["email-thread", email.threadId],
+            })
+          : Promise.resolve(),
+      ]);
+
+      if (action.type === "archive") {
+        toast.success("Archived");
+        onClose?.();
+        return;
+      }
+
+      toast.success("Snoozed");
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to apply AI action",
+      );
+    },
+  });
 
   return (
     <div className="flex w-full min-w-0 flex-col">
@@ -133,6 +215,7 @@ export function EmailDetailContent({
             </Button>
             <IconButton
               label="Previous"
+              shortcut="K"
               onClick={() => onPrev?.()}
               disabled={!hasPrev}
             >
@@ -140,6 +223,7 @@ export function EmailDetailContent({
             </IconButton>
             <IconButton
               label="Next"
+              shortcut="J"
               onClick={() => onNext?.()}
               disabled={!hasNext}
             >
@@ -147,14 +231,12 @@ export function EmailDetailContent({
             </IconButton>
           </div>
 
-          {detail ? (
-            <EmailActionBar
-              email={detail}
-              onClose={onClose}
-              onForward={forward}
-              onReply={() => quickReplyRef.current?.scrollIntoViewAndFocus()}
-            />
-          ) : null}
+          <EmailActionBar
+            email={email}
+            onClose={onClose}
+            onForward={onForward}
+            onReply={() => quickReplyRef.current?.scrollIntoViewAndFocus()}
+          />
         </div>
       </div>
 
@@ -194,104 +276,138 @@ export function EmailDetailContent({
       </div>
 
       <div className="w-full py-5">
-        {detailQuery.isPending && !showThreadTimeline ? (
-          <div className="space-y-3">
-            <Skeleton className="h-12 w-full rounded-[24px]" />
-            <Skeleton className="h-12 w-[82%] rounded-[24px]" />
-            <Skeleton className="h-72 w-full rounded-[28px]" />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {detailQuery.isError && (
-              <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                We could not fetch email detail.
-              </p>
-            )}
-
-            {threadQuery.isError && showThreadTimeline && (
-              <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                We could not load the full thread.
-              </p>
-            )}
-
-            {showThreadTimeline ? (
-              <section className="space-y-3">
-                <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  Conversation
-                </div>
-                <div className="space-y-2">
-                  {threadMessages.map((threadEmail) => {
-                    const isExpanded = isThreadMessageExpanded(threadEmail.id);
-                    const isSelectedMessage = threadEmail.id === email.id;
-
-                    return (
-                      <ThreadMessageCard
-                        key={threadEmail.id}
-                        email={threadEmail}
-                        detail={isSelectedMessage ? detail : null}
-                        active={isSelectedMessage}
-                        expanded={isExpanded}
-                        onToggle={() => toggleThreadMessage(threadEmail.id)}
-                        showAttachments={
-                          isSelectedMessage && hasSelectedAttachments
-                        }
-                        attachmentLoading={
-                          isSelectedMessage &&
-                          hasSelectedAttachments &&
-                          liveQuery.isPending
-                        }
-                        attachmentError={
-                          isSelectedMessage &&
-                          hasSelectedAttachments &&
-                          liveQuery.isError
-                        }
-                      />
-                    );
-                  })}
-                </div>
-              </section>
-            ) : (
-              <div>
-                <div className="min-w-0">
-                  <MessageBody detail={detail} />
-                </div>
-
-                {hasSelectedAttachments && (
-                  <section className="space-y-3 border-t border-border/70 pt-5 mt-5">
-                    <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                      <PaperclipIcon className="size-3" />
-                      Attachments
-                    </div>
-                    {liveQuery.isPending ? (
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {ATTACHMENT_SKELETON_KEYS.map((key) => (
-                          <Skeleton key={key} className="h-16 rounded-2xl" />
-                        ))}
-                      </div>
-                    ) : liveQuery.isError ? (
-                      <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                        We could not load live attachment data.
-                      </p>
-                    ) : detail?.attachments?.length ? (
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {detail.attachments.map((attachment) => (
-                          <AttachmentItem
-                            key={attachment.attachmentId}
-                            attachment={attachment}
-                          />
-                        ))}
-                      </div>
-                    ) : null}
-                  </section>
-                )}
+        <div className="space-y-4">
+          {intelligenceStatus === "pending" ? (
+            <section className="space-y-2 rounded-2xl border border-border/70 bg-muted/20 p-4">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-3 w-[92%]" />
+              <Skeleton className="h-3 w-[72%]" />
+            </section>
+          ) : intelligence ? (
+            <section className="space-y-3 rounded-2xl border border-border/70 bg-muted/20 p-4">
+              <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                AI overview
               </div>
-            )}
-          </div>
-        )}
+              <p className="text-sm leading-6 text-foreground/90">
+                {intelligence.summary}
+              </p>
+              {supportedAiActions.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {supportedAiActions.map((action) => (
+                    <Button
+                      key={action.id}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-full px-3 text-xs"
+                      disabled={aiActionMutation.isPending}
+                      onClick={() => aiActionMutation.mutate(action)}
+                    >
+                      {getAiActionButtonLabel(action)}
+                    </Button>
+                  ))}
+                </div>
+              )}
+              {intelligence.calendarEvents.some(
+                (event) => event.status === "pending",
+              ) && (
+                <div className="space-y-2 border-t border-border/70 pt-3">
+                  {intelligence.calendarEvents
+                    .filter((event) => event.status === "pending")
+                    .map((event) => (
+                      <div
+                        key={event.id}
+                        className="text-xs text-muted-foreground"
+                      >
+                        <span className="font-medium text-foreground">
+                          {event.title}
+                        </span>
+                        {" · "}
+                        {event.isAllDay
+                          ? new Date(event.startAt).toLocaleDateString()
+                          : new Date(event.startAt).toLocaleString()}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </section>
+          ) : null}
 
-        {detail && (
-          <QuickReply ref={quickReplyRef} email={email} detail={detail} />
-        )}
+          {detailAIQuery.isError && (
+            <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              We could not load the AI overview.
+            </p>
+          )}
+
+          {threadQuery.isError && showThreadTimeline && (
+            <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              We could not load the full thread.
+            </p>
+          )}
+
+          {showThreadTimeline ? (
+            <section className="space-y-3">
+              <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Conversation
+              </div>
+              <div className="space-y-2">
+                {threadMessages.map((threadEmail) => {
+                  const isExpanded = isThreadMessageExpanded(threadEmail.id);
+                  const isSelectedMessage = threadEmail.id === email.id;
+
+                  return (
+                    <ThreadMessageCard
+                      key={threadEmail.id}
+                      email={threadEmail}
+                      detail={isSelectedMessage ? email : null}
+                      active={isSelectedMessage}
+                      expanded={isExpanded}
+                      onToggle={() => toggleThreadMessage(threadEmail.id)}
+                      showAttachments={
+                        isSelectedMessage && hasSelectedAttachments
+                      }
+                      attachmentLoading={false}
+                      attachmentError={false}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          ) : (
+            <div>
+              <div className="min-w-0">
+                <MessageBody detail={email} />
+              </div>
+
+              {hasSelectedAttachments && (
+                <section className="mt-5 space-y-3 border-t border-border/70 pt-5">
+                  <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                    <PaperclipIcon className="size-3" />
+                    Attachments
+                  </div>
+                  {email.attachments.length > 0 ? (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {email.attachments.map((attachment) => (
+                        <AttachmentItem
+                          key={attachment.attachmentId}
+                          attachment={attachment}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {ATTACHMENT_SKELETON_KEYS.map((key) => (
+                        <Skeleton key={key} className="h-16 rounded-2xl" />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+            </div>
+          )}
+        </div>
+
+        <QuickReply ref={quickReplyRef} email={email} detail={email} />
       </div>
     </div>
   );

@@ -2,12 +2,10 @@ export type FilterActions = {
   archive?: boolean;
   markRead?: boolean;
   star?: boolean;
-  applyAiLabel?:
+  applyCategory?:
     | "action_needed"
     | "important"
-    | "later"
     | "newsletter"
-    | "marketing"
     | "transactional"
     | "notification";
   trash?: boolean;

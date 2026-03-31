@@ -1,12 +1,13 @@
 import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
-import { emails } from "../../../db/schema";
+import { emailIntelligence, emails } from "../../../db/schema";
 import { createEmailProvider } from "../../../lib/email";
 import { syncAllMailboxes } from "../../../lib/email/sync";
 import type { AppRouteEnv } from "../../types";
 import {
   buildAttachmentUrl,
+  emailIntelligenceSelection,
   emailSummarySelection,
   HAS_ATTACHMENT_LABEL,
   resolveInlineCidImages,
@@ -35,10 +36,12 @@ export function registerGetEmail(api: Hono<AppRouteEnv>) {
       const row = await db
         .select({
           ...emailSummarySelection,
+          ...emailIntelligenceSelection,
           bodyText: emails.bodyText,
           bodyHtml: emails.bodyHtml,
         })
         .from(emails)
+        .leftJoin(emailIntelligence, eq(emailIntelligence.emailId, emails.id))
         .where(and(eq(emails.userId, user.id), eq(emails.id, emailId)))
         .limit(1);
 
