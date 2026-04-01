@@ -43,6 +43,7 @@ export type HomeBriefingItem = {
   eventEnd?: number;
   eventLocation?: string | null;
   eventDescription?: string | null;
+  urgency?: "high" | "medium" | "low";
 };
 
 export type HomeBriefing = {

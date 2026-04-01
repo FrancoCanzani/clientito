@@ -27,8 +27,9 @@ function InboxContent() {
   } = useEmail();
 
   const isComposing = search.compose === true;
+  const pageContext = useMemo(() => ({ route: "inbox" }), []);
 
-  useSetPageContext(useMemo(() => ({ route: "inbox" as const }), []));
+  useSetPageContext(pageContext);
 
   useRegisterEmailCommandHandler(
     useCallback(

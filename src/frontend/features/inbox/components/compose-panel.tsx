@@ -73,7 +73,7 @@ function ComposePanelBody({
         onClick={handleClose}
       />
       <motion.div
-        className="fixed inset-x-0 bottom-0 z-50 antialiased sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[640px]"
+        className="fixed inset-x-0 bottom-0 z-50 antialiased sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-160"
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.97 }}

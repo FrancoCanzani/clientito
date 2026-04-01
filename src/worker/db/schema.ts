@@ -409,7 +409,7 @@ export const briefingDecisions = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    itemType: text("item_type").$type<"task">().notNull(),
+    itemType: text("item_type").$type<"email_action" | "task" | "calendar_suggestion">().notNull(),
     referenceId: integer("reference_id").notNull(),
     decision: text("decision")
       .$type<"pending" | "dismissed" | "replied" | "archived" | "approved">()

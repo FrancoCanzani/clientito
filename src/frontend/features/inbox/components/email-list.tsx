@@ -25,8 +25,6 @@ export function EmailList() {
     hasNextPage,
     isFetchingNextPage,
     loadMoreRef,
-    openEmail,
-    executeEmailAction,
   } = useEmail();
 
   const pageTitle = VIEW_LABELS[view];
@@ -39,7 +37,7 @@ export function EmailList() {
           actions={
             <>
               <AccountSwitcher />
-              <Button asChild>
+              <Button asChild variant={"ghost"}>
                 <Link
                   to="/inbox/$id"
                   params={{ id: mailboxId != null ? String(mailboxId) : "all" }}
@@ -62,50 +60,13 @@ export function EmailList() {
                 <div className="sticky top-12 z-10 bg-background py-2 my-2 text-xs text-muted-foreground">
                   {section.label}
                 </div>
-                <div className="space-y-1 [&:has(>[data-email-row]:hover)>[data-email-row]:not(:hover)]:opacity-85">
+                <div className="space-y-1">
                   {section.items.map((group) => {
                     const email = group.representative;
 
                     return (
-                      <EmailContextMenu
-                        key={email.id}
-                        targetEmail={email}
-                        onArchive={() =>
-                          executeEmailAction("archive", [email.id])
-                        }
-                        onTrash={() => executeEmailAction("trash", [email.id])}
-                        onSpam={() => executeEmailAction("spam", [email.id])}
-                        onSetRead={(read) =>
-                          executeEmailAction(
-                            read ? "mark-read" : "mark-unread",
-                            [email.id],
-                          )
-                        }
-                        onSetStarred={(starred) =>
-                          executeEmailAction(starred ? "star" : "unstar", [
-                            email.id,
-                          ])
-                        }
-                      >
-                        <EmailRow
-                          email={email}
-                          threadCount={group.threadCount}
-                          view={view}
-                          isOpen={false}
-                          onOpen={() => openEmail(email)}
-                          onArchive={() =>
-                            executeEmailAction("archive", [email.id])
-                          }
-                          onTrash={() =>
-                            executeEmailAction("trash", [email.id])
-                          }
-                          onToggleRead={() =>
-                            executeEmailAction(
-                              email.isRead ? "mark-unread" : "mark-read",
-                              [email.id],
-                            )
-                          }
-                        />
+                      <EmailContextMenu key={email.id} targetEmail={email}>
+                        <EmailRow group={group} isOpen={false} />
                       </EmailContextMenu>
                     );
                   })}

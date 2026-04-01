@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 
 export function PageHeader({
   title,
@@ -18,7 +18,9 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0">
-        <h1 className="truncate text-xl font-medium">{title}</h1>
+        <h1 className="truncate text-xl font-medium tracking-[-0.6px] sm:tracking-[-0.8px] md:tracking-[-1px] text-foreground">
+          {title}
+        </h1>
       </div>
       {actions ? (
         <div className="flex items-center justify-end gap-2">{actions}</div>

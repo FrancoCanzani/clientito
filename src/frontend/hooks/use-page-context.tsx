@@ -37,6 +37,16 @@ const PageContextCtx = createContext<PageContextState>({
   setContext: () => {},
 });
 
+function arePageContextsEqual(
+  left: PageContext | null,
+  right: PageContext | null,
+) {
+  if (left === right) return true;
+  if (!left || !right) return false;
+
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 export function PageContextProvider({ children }: { children: ReactNode }) {
   const [context, setContext] = useState<PageContext | null>(null);
 
@@ -52,10 +62,14 @@ export function usePageContext(): PageContext | null {
 }
 
 export function useSetPageContext(context: PageContext) {
-  const { setContext } = useContext(PageContextCtx);
+  const { context: currentContext, setContext } = useContext(PageContextCtx);
 
   useEffect(() => {
+    if (arePageContextsEqual(currentContext, context)) return;
     setContext(context);
+  }, [context, currentContext, setContext]);
+
+  useEffect(() => {
     return () => setContext(null);
-  }, [context, setContext]);
+  }, [setContext]);
 }

@@ -43,7 +43,7 @@ export const emailTriageOutputSchema = z.object({
     "transactional",
   ]),
   urgency: z.enum(["high", "medium", "low"]),
-  briefingSentence: z.string().trim().max(240).nullable(),
+  briefingSentence: z.string().trim().max(360).nullable(),
   actions: z.array(emailActionOutputSchema).max(MAX_ACTIONS),
   calendarEvents: z.array(calendarSuggestionOutputSchema),
   matchedFilterIds: z.array(z.number().int().positive()),
@@ -103,6 +103,24 @@ export type EmailDetailIntelligence = {
   requiresApproval: string[];
 };
 
+export function buildSharedActionRules() {
+  return [
+    "## Action Rules",
+    "- Only use action types: reply, archive, label, snooze.",
+    "- Every action object must include payload with keys draft, labelName, and until. Use null for unused fields.",
+    "- Do NOT suggest reply actions for automated notifications, newsletters, promos, or social network emails unless a human response is explicitly expected.",
+    "- Do NOT copy URLs, tracking links, or long CTA links into reply drafts.",
+    "- Keep reply drafts short and plain text.",
+    "- For reply actions, include payload.draft with the full reply body text.",
+    "- For snooze actions, include payload.until as an ISO date or datetime.",
+    "- For label actions, include payload.labelName.",
+    "",
+    "## Trust Levels",
+    "- Use trustLevel=approve for replies and any external commitment.",
+    "- Use trustLevel=auto only for clearly safe local actions like archive or snooze.",
+  ].join("\n");
+}
+
 export function compactText(value: string | null | undefined, maxLength: number): string {
   if (!value) return "";
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
@@ -151,7 +169,7 @@ function isDateOnly(value: string) {
 
 function normalizeBriefingSentence(value: string | null) {
   if (!value) return null;
-  const normalized = truncate(value.replace(/\s+/g, " ").trim(), 240);
+  const normalized = truncate(value.replace(/\s+/g, " ").trim(), 360);
   return normalized.length > 0 ? normalized : null;
 }
 
@@ -268,7 +286,7 @@ export function buildThreadPrompt(email: EmailContextRow, threadMessages: EmailC
   const threadBlock = threadMessages
     .map((message, index) => {
       const sender = message.fromName?.trim() || message.fromAddr;
-      const body = compactText(message.bodyText, 900) || "(empty)";
+      const body = compactText(message.bodyText, 1800) || "(empty)";
       return [
         `Message ${index + 1}`,
         `From: ${sender} <${message.fromAddr}>`,
@@ -280,6 +298,7 @@ export function buildThreadPrompt(email: EmailContextRow, threadMessages: EmailC
     .join("\n\n");
 
   return [
+    `Today: ${new Date().toISOString().slice(0, 10)}`,
     `Email ID: ${email.id}`,
     `Current message date: ${new Date(email.date).toISOString()}`,
     `From: ${email.fromName ? `${email.fromName} <${email.fromAddr}>` : email.fromAddr}`,
@@ -337,57 +356,6 @@ export async function buildSourceHash(email: EmailContextRow, threadMessages: Em
   return sha256(input);
 }
 
-export async function buildEmailIntelligenceSourceHash(
-  email: Pick<
-    EmailContextRow,
-    | "id"
-    | "threadId"
-    | "subject"
-    | "snippet"
-    | "fromAddr"
-    | "fromName"
-    | "toAddr"
-    | "ccAddr"
-    | "messageId"
-    | "date"
-  >,
-  threadMessages: Array<
-    Pick<
-      EmailContextRow,
-      "id" | "fromAddr" | "fromName" | "subject" | "bodyText" | "date"
-    >
-  >,
-) {
-  return buildSourceHash(
-    {
-      ...email,
-      userId: "",
-      mailboxId: null,
-      providerMessageId: "",
-      bodyText: null,
-      direction: "received",
-      isRead: false,
-      labelIds: null,
-      snoozedUntil: null,
-    },
-    threadMessages.map((message) => ({
-      ...message,
-      userId: "",
-      mailboxId: null,
-      providerMessageId: "",
-      threadId: email.threadId,
-      messageId: null,
-      toAddr: null,
-      ccAddr: null,
-      snippet: null,
-      direction: "received",
-      isRead: false,
-      labelIds: null,
-      snoozedUntil: null,
-    })),
-  );
-}
-
 export function deriveActionBuckets(actions: EmailAction[]) {
   const autoExecute: string[] = [];
   const requiresApproval: string[] = [];
@@ -401,26 +369,33 @@ export function deriveActionBuckets(actions: EmailAction[]) {
   return { autoExecute, requiresApproval };
 }
 
+function normalizeIntelligenceActions(
+  emailId: number,
+  actions: EmailTriageOutput["actions"],
+  calendarEventsRaw: EmailTriageOutput["calendarEvents"],
+  now: number,
+) {
+  const normalizedActions = actions
+    .slice(0, MAX_ACTIONS)
+    .map((action) => normalizeAction(emailId, action, now))
+    .filter((action): action is EmailAction => action !== null);
+  const calendarEvents = calendarEventsRaw
+    .map((event) => normalizeCalendarSuggestion(emailId, event, now))
+    .filter((event): event is CalendarSuggestion => event !== null);
+
+  return { actions: normalizedActions, calendarEvents, ...deriveActionBuckets(normalizedActions) };
+}
+
 export function normalizeEmailTriageOutput(
   emailId: number,
   output: EmailTriageOutput,
   now = Date.now(),
 ): StoredEmailTriage {
-  const actions = output.actions
-    .slice(0, MAX_ACTIONS)
-    .map((action) => normalizeAction(emailId, action, now))
-    .filter((action): action is EmailAction => action !== null);
-  const calendarEvents = output.calendarEvents
-    .map((event) => normalizeCalendarSuggestion(emailId, event, now))
-    .filter((event): event is CalendarSuggestion => event !== null);
-
   return {
     category: output.category,
     urgency: output.urgency,
     briefingSentence: normalizeBriefingSentence(output.briefingSentence),
-    actions,
-    calendarEvents,
-    ...deriveActionBuckets(actions),
+    ...normalizeIntelligenceActions(emailId, output.actions, output.calendarEvents, now),
   };
 }
 
@@ -429,19 +404,9 @@ export function normalizeEmailDetailOutput(
   output: EmailDetailOutput,
   now = Date.now(),
 ): EmailDetailIntelligence {
-  const actions = output.actions
-    .slice(0, MAX_ACTIONS)
-    .map((action) => normalizeAction(emailId, action, now))
-    .filter((action): action is EmailAction => action !== null);
-  const calendarEvents = output.calendarEvents
-    .map((event) => normalizeCalendarSuggestion(emailId, event, now))
-    .filter((event): event is CalendarSuggestion => event !== null);
-
   return {
     summary: normalizeSummary(output.summary),
-    actions,
-    calendarEvents,
-    ...deriveActionBuckets(actions),
+    ...normalizeIntelligenceActions(emailId, output.actions, output.calendarEvents, now),
   };
 }
 
@@ -483,11 +448,11 @@ export async function generateStructuredEmailObject<T extends z.ZodTypeAny>(inpu
           model: openai.responses(EMAIL_INTELLIGENCE_MODEL),
           prompt: input.prompt,
           system: input.system,
-          maxOutputTokens: 900,
+          maxOutputTokens: 1200,
           output: Output.object({ schema: input.schema }),
         }),
       {
-        maxRetries: 0,
+        maxRetries: 2,
         baseDelayMs: 1000,
         label: `email-intelligence:${EMAIL_INTELLIGENCE_MODEL}`,
       },

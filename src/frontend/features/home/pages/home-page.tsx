@@ -15,71 +15,43 @@ import { useDecisionKeyboard } from "@/features/home/hooks/use-decision-keyboard
 import { useDecisionQueue } from "@/features/home/hooks/use-decision-queue";
 import { getGreeting } from "@/features/home/utils";
 import { useAuth } from "@/hooks/use-auth";
-import { getRouteApi, useRouter } from "@tanstack/react-router";
+import { getRouteApi } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback } from "react";
 
 const homeRoute = getRouteApi("/_dashboard/home");
 
 export default function HomePage() {
   const briefing = homeRoute.useLoaderData();
   const { user } = useAuth();
-  const router = useRouter();
   const greeting = getGreeting(user?.name);
   const hasItems = briefing.items.length > 0;
   const stream = useBriefingStream(hasItems && !briefing.text);
   const briefingText = briefing.text || stream.text;
 
-  const shouldShowBriefingSkeleton = hasItems && !briefingText && !stream.error;
-  const isAnimating = stream.isStreaming;
-
   const queue = useDecisionQueue(briefing.items);
-  const isHomeRoute = router.state.location.pathname === "/home";
-
-  const sendActiveReply = useCallback(() => {
-    if (!queue.activeItem) return;
-    if (queue.activeItem.type === "calendar_suggestion") {
-      queue.approveEvent(queue.activeItem.id);
-    } else {
-      queue.sendReply(queue.activeItem.id);
-    }
-  }, [queue]);
-
-  const skipActive = useCallback(() => {
-    if (!queue.activeItem) return;
-    if (queue.activeItem.type === "calendar_suggestion") {
-      queue.dismissEvent(queue.activeItem.id);
-    } else {
-      queue.dismiss(queue.activeItem.id);
-    }
-  }, [queue]);
-
-  const archiveActive = useCallback(() => {
-    if (queue.activeItem) queue.archiveItem(queue.activeItem.id);
-  }, [queue]);
 
   useDecisionKeyboard({
     navigateUp: queue.navigateUp,
     navigateDown: queue.navigateDown,
     toggleEditing: queue.toggleEditing,
     cancelEditing: queue.cancelEditing,
-    sendActiveReply,
-    skipActive,
-    archiveActive,
-    enabled: isHomeRoute,
+    sendActiveReply: queue.confirmActive,
+    skipActive: queue.skipActive,
+    archiveActive: queue.archiveActive,
+    enabled: true,
   });
 
-  const showCards =
-    queue.visibleItems.length > 0 && !isAnimating && briefingText;
-  const showCaughtUpState = briefing.items.length === 0 && !isAnimating;
+  const isAnimating = stream.isStreaming;
+  const showCards = queue.visibleItems.length > 0 && !isAnimating && briefingText;
+  const showCaughtUp = !hasItems && !isAnimating;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col space-y-6">
-      {!showCaughtUpState && <PageHeader title={greeting} />}
+      <PageHeader title={greeting} />
 
-      {!showCaughtUpState && (
+      {!showCaughtUp && (
         <AnimatePresence mode="wait">
-          {shouldShowBriefingSkeleton ? (
+          {hasItems && !briefingText && !stream.error ? (
             <motion.div
               key="skeleton"
               initial={{ opacity: 0 }}
@@ -103,31 +75,35 @@ export default function HomePage() {
               <BriefingText text={briefingText} animate={isAnimating} />
             </motion.div>
           ) : stream.error ? (
-            <motion.p
+            <motion.div
               key="error"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-sm text-muted-foreground"
+              className="flex items-center gap-2 text-sm text-muted-foreground"
             >
-              Today&apos;s briefing couldn&apos;t load right now.
-            </motion.p>
+              <span>Today&apos;s briefing couldn&apos;t load right now.</span>
+              <button
+                type="button"
+                onClick={stream.retry}
+                className="text-xs underline underline-offset-2 hover:text-foreground"
+              >
+                Retry
+              </button>
+            </motion.div>
           ) : null}
         </AnimatePresence>
       )}
 
-      {showCaughtUpState && (
-        <>
-          <PageHeader title={greeting} />
-          <Empty className="min-h-[50vh] flex-1 border-0">
-            <EmptyHeader>
-              <EmptyTitle>You're all caught up</EmptyTitle>
-              <EmptyDescription>
-                Nothing needs your attention right now. Items will show up here
-                when they need action.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        </>
+      {showCaughtUp && (
+        <Empty className="min-h-[50vh] flex-1 border-0">
+          <EmptyHeader>
+            <EmptyTitle>You're all caught up</EmptyTitle>
+            <EmptyDescription>
+              Nothing needs your attention right now. Items will show up here
+              when they need action.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       )}
 
       <AgendaPanel days={1} showEmptyState={false} hideProposed showHeader />

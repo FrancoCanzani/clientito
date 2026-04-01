@@ -7,6 +7,7 @@ import { createEmailProvider } from "../index";
 import { getUserFilters } from "../user-filters";
 import {
   buildFilterPrompt,
+  buildSharedActionRules,
   buildSourceHash,
   buildThreadPrompt,
   EMAIL_INTELLIGENCE_SCHEMA_VERSION,
@@ -26,27 +27,30 @@ import {
 } from "./store";
 
 const TRIAGE_SYSTEM = [
-  "You are an email triage assistant.",
+  "## Role",
+  "You are an email triage assistant. Classify the email for inbox surfacing and home briefing, not deep detail view.",
   "Return one JSON object matching the requested schema.",
-  "Classify the email for inbox surfacing and home briefing, not deep detail view.",
-  "briefingSentence must be a short sentence for the home digest, or null if the email is routine.",
-  "actions should contain only lightweight home-worthy next steps, with at most 4 items.",
-  "Every action object must include payload with keys draft, labelName, and until.",
-  "For unused payload fields, return null.",
-  "Only use action types reply, archive, label, or snooze.",
-  "Do not suggest reply actions for automated notifications, newsletters, promos, or social network recommendation emails unless a human response is explicitly expected.",
-  "Do not copy URLs, tracking links, or long CTA links into reply drafts.",
-  "Keep reply drafts short and plain text.",
-  "Use trustLevel=approve for replies and any external commitment.",
-  "Use trustLevel=auto only for clearly safe local actions like archive or snooze.",
-  "For reply actions, include payload.draft with the full reply body text.",
-  "For snooze actions, include payload.until as an ISO date or datetime.",
-  "For label actions, include payload.labelName.",
-  "calendarEvents should only include high-signal date or meeting suggestions that can appear on the home screen.",
-  "Use category=action_needed only when a human likely expects a reply or concrete next step.",
-  "matchedFilterIds must include only the provided filter IDs that clearly match this email.",
-  "If no provided filters clearly match, return an empty matchedFilterIds array.",
-].join(" ");
+  "",
+  "## Classification",
+  "- category:",
+  "  - action_needed: the user must do something — pay, reply, sign, approve, renew, or meet a deadline. Government, tax, legal, and financial deadlines are always action_needed.",
+  "  - important: high-value updates the user should know about but that don't require a response (e.g. shipping confirmations, account security alerts, personal messages that are FYI).",
+  "  - notification: automated alerts, status updates, policy changes, product announcements. Most bulk emails from companies (GitHub, services, platforms) are notifications, NOT important.",
+  "  - newsletter: recurring content digests, blog roundups, marketing.",
+  "  - transactional: receipts, order confirmations, password resets.",
+  "- urgency: high for items with a deadline within 7 days or needing attention today, medium for items needing attention this week, low for informational.",
+  "- briefingSentence: 1-2 sentences summarizing what the sender wants and why it matters, or null if the email is routine. Be specific — include names, dates, and amounts when relevant.",
+  "- Be consistent: if you see the same sender and same type of email, classify it the same way every time.",
+  "",
+  buildSharedActionRules(),
+  "",
+  "## Calendar Events",
+  "- calendarEvents: only include high-signal date or meeting suggestions with enough detail to present to the user.",
+  "",
+  "## Filter Matching",
+  "- matchedFilterIds: include only the provided filter IDs that clearly match this email.",
+  "- If no provided filters clearly match, return an empty array.",
+].join("\n");
 
 async function generateEmailTriage(
   env: Env,
@@ -213,7 +217,7 @@ export async function enqueueEmailIntelligence(
     .from(emails)
     .where(inArray(emails.id, emailIds));
 
-  const threadIds = [...new Set(rows.map((row) => row.threadId).filter(Boolean))] as string[];
+  const threadIds = [...new Set(rows.map((row) => row.threadId).filter((id): id is string => Boolean(id)))];
   const latestThreadRows = threadIds.length
     ? await db
         .select({

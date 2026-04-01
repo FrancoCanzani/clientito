@@ -4,9 +4,15 @@ import {
   type HomeBriefingItem,
 } from "@/features/home/queries";
 import { patchEmail, sendEmail } from "@/features/inbox/mutations";
+import { updateTask } from "@/features/tasks/mutations";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+
+function parseTaskId(itemId: string) {
+  const match = itemId.match(/^(?:overdue|today)-(\d+)$/);
+  return match ? Number(match[1]) : null;
+}
 
 export function useDecisionQueue(items: HomeBriefingItem[]) {
   const queryClient = useQueryClient();
@@ -25,15 +31,17 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
   const visibleItems = useMemo(
     () =>
       items.filter(
-        (item) =>
-          item.type !== "calendar_event" &&
-          item.type !== "briefing_email" &&
-          !dismissed.has(item.id),
+        (item) => item.type !== "calendar_event" && !dismissed.has(item.id),
       ),
     [items, dismissed],
   );
 
   const activeItem = visibleItems[activeIndex] ?? null;
+
+  const findItem = useCallback(
+    (id: string) => items.find((i) => i.id === id),
+    [items],
+  );
 
   useEffect(() => {
     setDrafts((current) => {
@@ -48,18 +56,26 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
   }, [items]);
 
   const markDone = useCallback(
-    (item: HomeBriefingItem, decision: "dismissed" | "replied" | "archived" | "approved") => {
+    (
+      item: HomeBriefingItem,
+      decision: "dismissed" | "replied" | "archived" | "approved",
+    ) => {
       setDismissed((prev) => new Set(prev).add(item.id));
       setEditingId(null);
+
       let ref:
         | {
             itemType: "email_action" | "task" | "calendar_suggestion";
             referenceId: number;
             actionId?: string;
           }
-        | null = null;
+        | undefined;
+
       if (item.proposedEventId) {
-        ref = { itemType: "calendar_suggestion", referenceId: item.proposedEventId };
+        ref = {
+          itemType: "calendar_suggestion",
+          referenceId: item.proposedEventId,
+        };
       } else if (item.emailId && item.actionId) {
         ref = {
           itemType: "email_action",
@@ -67,9 +83,10 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
           actionId: item.actionId,
         };
       } else {
-        const match = item.id.match(/^(?:overdue|today)-(\d+)$/);
-        if (match) ref = { itemType: "task", referenceId: Number(match[1]) };
+        const taskId = parseTaskId(item.id);
+        if (taskId) ref = { itemType: "task", referenceId: taskId };
       }
+
       if (ref) postBriefingDecision({ ...ref, decision }).catch(() => {});
     },
     [],
@@ -77,11 +94,10 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
 
   const dismiss = useCallback(
     (id: string) => {
-      const item = items.find((i) => i.id === id);
-      if (!item) return;
-      markDone(item, "dismissed");
+      const item = findItem(id);
+      if (item) markDone(item, "dismissed");
     },
-    [items, markDone],
+    [findItem, markDone],
   );
 
   const navigateUp = useCallback(() => {
@@ -117,7 +133,7 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
 
   const archiveItem = useCallback(
     async (id: string) => {
-      const item = items.find((i) => i.id === id);
+      const item = findItem(id);
       if (!item?.emailId) return;
       try {
         await patchEmail(String(item.emailId), {
@@ -131,12 +147,12 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
         toast.error("Failed to archive");
       }
     },
-    [items, queryClient, markDone],
+    [findItem, queryClient, markDone],
   );
 
   const approveEvent = useCallback(
     async (id: string) => {
-      const item = items.find((i) => i.id === id);
+      const item = findItem(id);
       if (!item?.proposedEventId) return;
       try {
         await approveProposedEvent(item.proposedEventId);
@@ -147,26 +163,22 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
         toast.error("Failed to add event");
       }
     },
-    [items, queryClient, markDone],
+    [findItem, queryClient, markDone],
   );
 
   const dismissEvent = useCallback(
     async (id: string) => {
-      const item = items.find((i) => i.id === id);
+      const item = findItem(id);
       if (!item?.proposedEventId) return;
-      try {
-        markDone(item, "dismissed");
-        queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
-      } catch {
-        toast.error("Failed to dismiss event");
-      }
+      markDone(item, "dismissed");
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
     },
-    [items, queryClient, markDone],
+    [findItem, queryClient, markDone],
   );
 
   const sendReply = useCallback(
     async (id: string) => {
-      const item = items.find((i) => i.id === id);
+      const item = findItem(id);
       const draft = drafts[id] ?? item?.draftReply ?? "";
       if (!item?.fromAddr || !draft) return;
 
@@ -195,15 +207,59 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
         setSendingId(null);
       }
     },
-    [items, drafts, queryClient, markDone],
+    [findItem, drafts, queryClient, markDone],
   );
+
+  const completeTask = useCallback(
+    async (id: string) => {
+      const item = findItem(id);
+      if (!item) return;
+      const taskId = parseTaskId(item.id);
+      if (!taskId) return;
+      try {
+        await updateTask(taskId, { status: "done" });
+        queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        markDone(item, "dismissed");
+        toast.success("Task completed");
+      } catch {
+        toast.error("Failed to complete task");
+      }
+    },
+    [findItem, queryClient, markDone],
+  );
+
+  const confirmActive = useCallback(() => {
+    if (!activeItem) return;
+    if (activeItem.type === "calendar_suggestion") {
+      approveEvent(activeItem.id);
+    } else if (
+      activeItem.type === "overdue_task" ||
+      activeItem.type === "due_today_task"
+    ) {
+      completeTask(activeItem.id);
+    } else {
+      sendReply(activeItem.id);
+    }
+  }, [activeItem, approveEvent, completeTask, sendReply]);
+
+  const skipActive = useCallback(() => {
+    if (!activeItem) return;
+    if (activeItem.type === "calendar_suggestion") {
+      dismissEvent(activeItem.id);
+    } else {
+      dismiss(activeItem.id);
+    }
+  }, [activeItem, dismissEvent, dismiss]);
+
+  const archiveActive = useCallback(() => {
+    if (activeItem) archiveItem(activeItem.id);
+  }, [activeItem, archiveItem]);
 
   return {
     visibleItems,
     activeIndex,
     activeItem,
     drafts,
-    isLoadingDrafts: false,
     editingId,
     sendingId,
     setActiveIndex,
@@ -217,5 +273,9 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
     sendReply,
     approveEvent,
     dismissEvent,
+    completeTask,
+    confirmActive,
+    skipActive,
+    archiveActive,
   };
 }

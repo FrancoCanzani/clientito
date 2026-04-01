@@ -58,7 +58,6 @@ export function getStoredEmailTriage(row: StoredTriageRow) {
   return serializeStoredEmailTriage(row);
 }
 
-export const getPersistedEmailIntelligence = getStoredEmailTriage;
 
 export function isEmailEligibleForIntelligence(
   email: Pick<
@@ -155,7 +154,12 @@ export async function findCalendarSuggestionById(
   const rows = await db
     .select()
     .from(emailIntelligence)
-    .where(eq(emailIntelligence.userId, userId));
+    .where(
+      and(
+        eq(emailIntelligence.userId, userId),
+        eq(emailIntelligence.status, "ready"),
+      ),
+    );
 
   for (const row of rows) {
     const suggestion = (row.calendarEventsJson ?? []).find(

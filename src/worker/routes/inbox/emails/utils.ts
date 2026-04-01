@@ -3,7 +3,7 @@ import { emailIntelligence, emails } from "../../../db/schema";
 import type { AttachmentMeta } from "../../../lib/email";
 import {
   getIntelligenceStatus,
-  getPersistedEmailIntelligence,
+  getStoredEmailTriage,
 } from "../../../lib/email/intelligence/store";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
@@ -96,7 +96,7 @@ export function toEmailListResponse(row: {
     intelligenceStatus: getIntelligenceStatus(
       row.intelligenceStatus ? { status: row.intelligenceStatus } : null,
     ),
-    intelligence: getPersistedEmailIntelligence(
+    intelligence: getStoredEmailTriage(
       row.intelligenceStatus
         ? {
             status: row.intelligenceStatus,

@@ -1,5 +1,7 @@
 import { useCompletion } from "@ai-sdk/react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+
+let cachedStreamText = "";
 
 export function useBriefingStream(enabled = false) {
   const hasTriggered = useRef(false);
@@ -8,17 +10,29 @@ export function useBriefingStream(enabled = false) {
     api: "/api/ai/briefing/stream",
     credentials: "same-origin",
     streamProtocol: "text",
+    onFinish: (_prompt, text) => {
+      cachedStreamText = text;
+    },
   });
 
   useEffect(() => {
-    if (!enabled || hasTriggered.current) return;
+    if (!enabled || hasTriggered.current || cachedStreamText) return;
     hasTriggered.current = true;
     complete("");
   }, [enabled, complete]);
 
+  const retry = useCallback(() => {
+    cachedStreamText = "";
+    complete("");
+  }, [complete]);
+
+  const text = completion || cachedStreamText;
+
   return {
-    text: completion,
+    text,
     isStreaming: isLoading,
     error,
+    retry,
   };
 }
+

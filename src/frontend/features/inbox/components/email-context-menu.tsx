@@ -13,59 +13,67 @@ import {
   WarningIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
+import { useEmail } from "../context/email-context";
 import type { EmailListItem } from "../types";
 
 type EmailContextMenuProps = {
   children: ReactNode;
   targetEmail: EmailListItem;
-  onArchive: () => void;
-  onTrash: () => void;
-  onSpam: () => void;
-  onSetRead: (isRead: boolean) => void;
-  onSetStarred: (starred: boolean) => void;
 };
 
 export function EmailContextMenu({
   children,
   targetEmail,
-  onArchive,
-  onTrash,
-  onSpam,
-  onSetRead,
-  onSetStarred,
 }: EmailContextMenuProps) {
+  const { executeEmailAction } = useEmail();
   const isRead = targetEmail.isRead;
   const isStarred = targetEmail.labelIds.includes("STARRED");
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger className="block w-full">
-        {children}
+      <ContextMenuTrigger asChild>
+        <div className="block w-full">{children}</div>
       </ContextMenuTrigger>
-      <ContextMenuContent className="min-w-44 rounded-md">
-        <ContextMenuItem onSelect={onArchive}>
-          <ArchiveIcon className="size-4 text-muted-foreground" />
+      <ContextMenuContent>
+        <ContextMenuItem
+          onSelect={() => executeEmailAction("archive", [targetEmail.id])}
+        >
+          <ArchiveIcon className="size-3.5 text-muted-foreground" />
           Archive
         </ContextMenuItem>
-        <ContextMenuItem onSelect={onTrash}>
-          <TrashIcon className="size-4 text-muted-foreground" />
+        <ContextMenuItem
+          onSelect={() => executeEmailAction("trash", [targetEmail.id])}
+        >
+          <TrashIcon className="size-3.5 text-muted-foreground" />
           Move to trash
         </ContextMenuItem>
-        <ContextMenuItem onSelect={onSpam}>
-          <WarningIcon className="size-4 text-muted-foreground" />
+        <ContextMenuItem
+          onSelect={() => executeEmailAction("spam", [targetEmail.id])}
+        >
+          <WarningIcon className="size-3.5 text-muted-foreground" />
           Move to spam
         </ContextMenuItem>
-        <ContextMenuItem onSelect={() => onSetRead(!isRead)}>
+        <ContextMenuItem
+          onSelect={() =>
+            executeEmailAction(isRead ? "mark-unread" : "mark-read", [
+              targetEmail.id,
+            ])
+          }
+        >
           {isRead ? (
-            <EnvelopeSimpleIcon className="size-4 text-muted-foreground" />
+            <EnvelopeSimpleIcon className="size-3.5 text-muted-foreground" />
           ) : (
-            <EnvelopeSimpleOpenIcon className="size-4 text-muted-foreground" />
+            <EnvelopeSimpleOpenIcon className="size-3.5 text-muted-foreground" />
           )}
           {isRead ? "Mark as unread" : "Mark as read"}
         </ContextMenuItem>
-        <ContextMenuItem onSelect={() => onSetStarred(!isStarred)}>
+        <ContextMenuItem
+          onSelect={() =>
+            executeEmailAction(isStarred ? "unstar" : "star", [targetEmail.id])
+          }
+        >
           <StarIcon
-            className="size-4 text-muted-foreground"
+            className="size-3.5 text-muted-foreground"
             weight={isStarred ? "fill" : "regular"}
           />
           {isStarred ? "Unstar" : "Star"}

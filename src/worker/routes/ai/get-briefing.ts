@@ -23,7 +23,7 @@ import {
 import { listEvents } from "../../lib/calendar/google";
 import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
 import {
-  getPersistedEmailIntelligence,
+  getStoredEmailTriage,
 } from "../../lib/email/intelligence/store";
 import { getStoredReplyDraft } from "../../lib/email/intelligence/common";
 import { getUserMailboxes } from "../../lib/email/mailbox-state";
@@ -60,6 +60,7 @@ type BriefingItem = {
   eventEnd?: number;
   eventLocation?: string | null;
   eventDescription?: string | null;
+  urgency?: "high" | "medium" | "low";
 };
 
 type BriefingData = {
@@ -86,7 +87,7 @@ function buildEmailReason(reason: string | null, fallback: string) {
   return reason?.trim() || fallback;
 }
 
-function shouldSurfaceBriefingEmail(intelligence: NonNullable<ReturnType<typeof getPersistedEmailIntelligence>>) {
+function shouldSurfaceBriefingEmail(intelligence: NonNullable<ReturnType<typeof getStoredEmailTriage>>) {
   return (
     (intelligence.category === "action_needed" ||
       intelligence.category === "important") &&
@@ -96,8 +97,8 @@ function shouldSurfaceBriefingEmail(intelligence: NonNullable<ReturnType<typeof 
 }
 
 function shouldSurfaceReplyAction(input: {
-  intelligence: NonNullable<ReturnType<typeof getPersistedEmailIntelligence>>;
-  action: NonNullable<ReturnType<typeof getPersistedEmailIntelligence>>["actions"][number];
+  intelligence: NonNullable<ReturnType<typeof getStoredEmailTriage>>;
+  action: NonNullable<ReturnType<typeof getStoredEmailTriage>>["actions"][number];
   draftReply: string | null;
 }) {
   return (
@@ -281,12 +282,13 @@ export async function buildBriefing(input: {
   const emailActionItems: BriefingItem[] = [];
   const briefingEmailItems: BriefingItem[] = [];
   const calendarSuggestionItems: BriefingItem[] = [];
+  const emailIdsWithActions = new Set<number>();
 
   for (const row of latestThreadRows) {
     if (row.direction !== "received") continue;
     if (now - row.date > REPLY_WINDOW_MS) continue;
 
-    const intelligence = getPersistedEmailIntelligence({
+    const intelligence = getStoredEmailTriage({
       status: row.intelligenceStatus ?? "pending",
       category: row.intelligenceCategory,
       urgency: row.intelligenceUrgency,
@@ -296,22 +298,6 @@ export async function buildBriefing(input: {
     });
 
     if (!intelligence) continue;
-
-    if (shouldSurfaceBriefingEmail(intelligence)) {
-      briefingEmailItems.push({
-        id: `briefing-email-${row.id}`,
-        type: "briefing_email",
-        title: getSenderLabel(row),
-        reason: intelligence.briefingSentence ?? "",
-        href: `/inbox/all/email/${row.id}`,
-        emailId: row.id,
-        threadId: row.threadId,
-        fromAddr: row.fromAddr,
-        subject: row.subject,
-        mailboxId: row.mailboxId,
-        messageId: row.messageId,
-      });
-    }
 
     for (const action of intelligence.actions) {
       const draftReply = getStoredReplyDraft({
@@ -344,6 +330,25 @@ export async function buildBriefing(input: {
         subject: row.subject,
         mailboxId: row.mailboxId,
         messageId: row.messageId,
+        urgency: intelligence.urgency,
+      });
+      emailIdsWithActions.add(row.id);
+    }
+
+    if (!emailIdsWithActions.has(row.id) && shouldSurfaceBriefingEmail(intelligence)) {
+      briefingEmailItems.push({
+        id: `briefing-email-${row.id}`,
+        type: "briefing_email",
+        title: getSenderLabel(row),
+        reason: intelligence.briefingSentence ?? "",
+        href: `/inbox/all/email/${row.id}`,
+        emailId: row.id,
+        threadId: row.threadId,
+        fromAddr: row.fromAddr,
+        subject: row.subject,
+        mailboxId: row.mailboxId,
+        messageId: row.messageId,
+        urgency: intelligence.urgency,
       });
     }
 
@@ -417,10 +422,11 @@ export async function buildBriefing(input: {
 }
 
 const STREAM_SYSTEM = [
-  "You are a discreet, highly competent secretary writing a daily briefing as a single flowing paragraph.",
+  "You are a discreet, highly competent secretary writing a daily briefing.",
+  "Write a concise summary in 2-4 sentences as a single flowing paragraph.",
   "Weave the relevant items naturally into the text, including calendar events for today.",
+  "Prioritize items by urgency — mention time-sensitive items first.",
   "For each item, use the EXACT link syntax [[title|href]] provided.",
-  "Keep it to 1-2 concise sentences.",
   "No markdown, no bullets, no headings.",
   "If there are no items, write a short sentence saying everything looks clear.",
 ].join(" ");
@@ -476,7 +482,7 @@ export function registerPostBriefingStream(app: Hono<AppRouteEnv>) {
         model: workersAI(PRIMARY_MODEL),
         system: STREAM_SYSTEM,
         prompt: buildStreamPrompt(briefing.items, briefing.counts),
-        maxOutputTokens: 250,
+        maxOutputTokens: 400,
       });
 
       return result.toTextStreamResponse({

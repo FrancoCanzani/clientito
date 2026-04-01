@@ -12,7 +12,14 @@ import {
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { toast } from "sonner";
 import { formatEmailDetailDate } from "../utils/formatters";
 import { AttachmentItem } from "./attachment-item";
@@ -35,12 +42,19 @@ function isSupportedAiAction(action: EmailAction) {
   if (action.status !== "pending") return false;
   if (action.type === "archive") return true;
   if (action.type === "snooze") return getSnoozeTimestamp(action) != null;
+  if (
+    action.type === "reply" &&
+    typeof action.payload.draft === "string" &&
+    action.payload.draft.trim()
+  )
+    return true;
   return false;
 }
 
 function getAiActionButtonLabel(action: EmailAction) {
   if (action.type === "archive") return "Archive";
   if (action.type === "snooze") return "Snooze";
+  if (action.type === "reply") return "Use suggested reply";
   return action.label;
 }
 
@@ -153,6 +167,17 @@ export function EmailDetailContent({
     };
   }, [replyTriggerRef]);
 
+  const handleAiAction = useCallback(
+    (action: EmailAction) => {
+      if (action.type === "reply") {
+        quickReplyRef.current?.scrollIntoViewAndFocus();
+        return;
+      }
+      aiActionMutation.mutate(action);
+    },
+    [quickReplyRef],
+  );
+
   const aiActionMutation = useMutation({
     mutationFn: async (action: EmailAction) => {
       if (action.type === "archive") {
@@ -175,7 +200,9 @@ export function EmailDetailContent({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["emails"] }),
         queryClient.invalidateQueries({ queryKey: ["email-detail", email.id] }),
-        queryClient.invalidateQueries({ queryKey: ["email-ai-detail", email.id] }),
+        queryClient.invalidateQueries({
+          queryKey: ["email-ai-detail", email.id],
+        }),
         email.threadId
           ? queryClient.invalidateQueries({
               queryKey: ["email-thread", email.threadId],
@@ -278,17 +305,17 @@ export function EmailDetailContent({
       <div className="w-full py-5">
         <div className="space-y-4">
           {intelligenceStatus === "pending" ? (
-            <section className="space-y-2 rounded-2xl border border-border/70 bg-muted/20 p-4">
+            <section className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-4">
               <Skeleton className="h-3 w-16" />
               <Skeleton className="h-3 w-[92%]" />
               <Skeleton className="h-3 w-[72%]" />
             </section>
           ) : intelligence ? (
-            <section className="space-y-3 rounded-2xl border border-border/70 bg-muted/20 p-4">
-              <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                AI overview
+            <section className="space-y-4 rounded-md border border-border/50 p-2">
+              <div className="tracking-[-0.6px] text-sm text-foreground font-medium">
+                Overview
               </div>
-              <p className="text-sm leading-6 text-foreground/90">
+              <p className="text-xs tracking-[-0.2px]">
                 {intelligence.summary}
               </p>
               {supportedAiActions.length > 0 && (
@@ -299,14 +326,23 @@ export function EmailDetailContent({
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-8 rounded-full px-3 text-xs"
                       disabled={aiActionMutation.isPending}
-                      onClick={() => aiActionMutation.mutate(action)}
+                      onClick={() => handleAiAction(action)}
                     >
                       {getAiActionButtonLabel(action)}
                     </Button>
                   ))}
                 </div>
+              )}
+              {supportedAiActions.some(
+                (a) => a.type === "reply" && a.payload.draft,
+              ) && (
+                <p className="line-clamp-3 text-xs leading-5 text-muted-foreground">
+                  {String(
+                    supportedAiActions.find((a) => a.type === "reply")?.payload
+                      .draft ?? "",
+                  )}
+                </p>
               )}
               {intelligence.calendarEvents.some(
                 (event) => event.status === "pending",

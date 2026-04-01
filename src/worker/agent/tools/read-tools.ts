@@ -5,7 +5,7 @@ import type { Database } from "../../db/client";
 import { emailIntelligence, emails, tasks } from "../../db/schema";
 import { listEvents } from "../../lib/calendar/google";
 import {
-  getPersistedEmailIntelligence,
+  getStoredEmailTriage,
 } from "../../lib/email/intelligence/store";
 import { getStoredReplyDraft } from "../../lib/email/intelligence/common";
 import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
@@ -243,7 +243,7 @@ export function makeReadTools(
         const email = rows[0];
         if (!email) return { error: "Email not found" };
 
-        const intelligence = getPersistedEmailIntelligence(
+        const intelligence = getStoredEmailTriage(
           email.intelligenceStatus
             ? {
                 status: email.intelligenceStatus,

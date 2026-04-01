@@ -12,7 +12,7 @@ function AppShortcutBindings() {
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <PageContextProvider>
-      <TooltipProvider delayDuration={300} skipDelayDuration={0}>
+      <TooltipProvider skipDelayDuration={0}>
         <EmailCommandProvider>
           <AppShortcutBindings />
           {children}
