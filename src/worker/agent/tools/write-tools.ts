@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
-import { emails, notes, tasks } from "../../db/schema";
+import { emails, tasks } from "../../db/schema";
 import { createEvent } from "../../lib/calendar/google";
 import { createEmailProvider } from "../../lib/email";
 import {
@@ -417,23 +417,6 @@ export function makeWriteTools(
       },
     }),
 
-    createNote: tool({
-      description: "Create a new note.",
-      inputSchema: z.object({
-        title: z.string().describe("Note title."),
-        content: z.string().describe("Note body content."),
-      }),
-      needsApproval: true,
-      execute: async ({ title, content }) => {
-        const now = Date.now();
-        const result = await db
-          .insert(notes)
-          .values({ userId, title, content, createdAt: now, updatedAt: now })
-          .returning({ id: notes.id });
-        return { created: true, noteId: result[0].id, title };
-      },
-    }),
-
     archiveEmail: tool({
       description: "Archive an email (remove from inbox).",
       inputSchema: z.object({
@@ -680,48 +663,6 @@ export function makeWriteTools(
           subject: resolvedSubject,
           body: resolvedBody,
         };
-      },
-    }),
-
-    updateNote: tool({
-      description: "Update an existing note's title or content.",
-      inputSchema: z.object({
-        noteId: z.number().int().positive().describe("Note ID to update."),
-        title: z.string().optional().describe("New note title."),
-        content: z.string().optional().describe("New note content."),
-      }),
-      needsApproval: true,
-      execute: async ({ noteId, title, content }) => {
-        const existing = await db
-          .select({ id: notes.id })
-          .from(notes)
-          .where(and(eq(notes.id, noteId), eq(notes.userId, userId)))
-          .limit(1);
-        if (!existing[0]) return { error: "Note not found" };
-
-        const updates: Record<string, unknown> = { updatedAt: Date.now() };
-        if (title !== undefined) updates.title = title;
-        if (content !== undefined) updates.content = content;
-
-        await db
-          .update(notes)
-          .set(updates)
-          .where(and(eq(notes.id, noteId), eq(notes.userId, userId)));
-        return { updated: true, noteId };
-      },
-    }),
-
-    deleteNote: tool({
-      description: "Delete a note permanently.",
-      inputSchema: z.object({
-        noteId: z.number().int().positive().describe("Note ID to delete."),
-      }),
-      needsApproval: true,
-      execute: async ({ noteId }) => {
-        await db
-          .delete(notes)
-          .where(and(eq(notes.id, noteId), eq(notes.userId, userId)));
-        return { deleted: true, noteId };
       },
     }),
 

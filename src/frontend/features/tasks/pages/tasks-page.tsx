@@ -160,7 +160,7 @@ export default function TasksPage() {
 
   return (
     <TaskActionsProvider value={taskActions}>
-      <div className="mx-auto w-full max-w-3xl space-y-5">
+      <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-5">
         <PageHeader
           title={VIEW_LABELS[view]}
           actions={
@@ -244,7 +244,7 @@ export default function TasksPage() {
           )}
         </div>
 
-        {!isMobile && editor?.mode === "create" ? (
+        {!isMobile && editor?.mode === "create" && (
           <TaskEditor
             key={`create-${editor.dueAt ?? "none"}`}
             defaultDueAt={editor.dueAt}
@@ -259,7 +259,7 @@ export default function TasksPage() {
               })
             }
           />
-        ) : null}
+        )}
 
         {layout === "board" ? (
           <TaskBoard
@@ -305,23 +305,25 @@ export default function TasksPage() {
                   })
                 }
               />
-            ) : editingTask ? (
-              <TaskEditor
-                key={editingTask.id}
-                task={editingTask}
-                submitLabel="Save changes"
-                variant="sheet"
-                isSubmitting={updateTaskMutation.isPending}
-                onCancel={closeEditor}
-                onDelete={() => deleteTaskMutation.mutate(editingTask.id)}
-                onSubmit={(value) =>
-                  updateTaskMutation.mutate({
-                    taskId: editingTask.id,
-                    input: value,
-                  })
-                }
-              />
-            ) : null}
+            ) : (
+              editingTask && (
+                <TaskEditor
+                  key={editingTask.id}
+                  task={editingTask}
+                  submitLabel="Save changes"
+                  variant="sheet"
+                  isSubmitting={updateTaskMutation.isPending}
+                  onCancel={closeEditor}
+                  onDelete={() => deleteTaskMutation.mutate(editingTask.id)}
+                  onSubmit={(value) =>
+                    updateTaskMutation.mutate({
+                      taskId: editingTask.id,
+                      input: value,
+                    })
+                  }
+                />
+              )
+            )}
           </SheetContent>
         </Sheet>
 

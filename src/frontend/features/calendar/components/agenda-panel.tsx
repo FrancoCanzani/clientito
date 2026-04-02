@@ -124,7 +124,7 @@ export function AgendaPanel({
     }
 
     return (
-      <Empty className="min-h-32 border-0 p-0">
+      <Empty className="min-h-0 flex-1 border-0 p-0">
         <EmptyHeader>
           <EmptyTitle>No upcoming events</EmptyTitle>
           <EmptyDescription>

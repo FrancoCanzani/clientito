@@ -12,7 +12,7 @@ import { ComposeEmailFields } from "./compose-email-fields";
 import { useComposeEmail } from "./compose-email-state";
 
 export type QuickReplyHandle = {
-  scrollIntoViewAndFocus: () => void;
+  scrollIntoViewAndFocus: (draft?: string) => void;
 };
 
 function buildReplyInitial(
@@ -57,7 +57,10 @@ export const QuickReply = forwardRef<
   });
 
   useImperativeHandle(ref, () => ({
-    scrollIntoViewAndFocus: () => {
+    scrollIntoViewAndFocus: (draft?: string) => {
+      if (draft) {
+        compose.setBody(draft);
+      }
       setOpen(true);
       requestAnimationFrame(() => {
         containerRef.current?.scrollIntoView({

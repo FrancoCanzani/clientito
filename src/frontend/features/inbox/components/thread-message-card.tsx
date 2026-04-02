@@ -144,16 +144,18 @@ export function ThreadMessageCard({
                     <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                       We could not load attachments for this message.
                     </p>
-                  ) : attachments.length > 0 ? (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {attachments.map((attachment) => (
-                        <AttachmentItem
-                          key={attachment.attachmentId}
-                          attachment={attachment}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
+                  ) : (
+                    attachments.length > 0 && (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {attachments.map((attachment) => (
+                          <AttachmentItem
+                            key={attachment.attachmentId}
+                            attachment={attachment}
+                          />
+                        ))}
+                      </div>
+                    )
+                  )}
                 </section>
               )}
             </div>

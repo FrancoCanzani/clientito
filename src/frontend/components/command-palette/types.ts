@@ -9,7 +9,7 @@ export interface PaletteCommand {
   to?: string;
 }
 
-export type PaletteMode = "commands" | "agent" | "new-task" | "search";
+export type PaletteMode = "commands" | "agent" | "new-task";
 
 export const commandGroupHeadingClassName =
   "**:[[cmdk-group-heading]]:px-3 **:[[cmdk-group-heading]]:py-1 **:[[cmdk-group-heading]]:text-[10px] **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wider **:[[cmdk-group-heading]]:text-muted-foreground";

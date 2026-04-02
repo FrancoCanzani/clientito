@@ -19,9 +19,6 @@ import remarkGfm from "remark-gfm";
 
 const toolLabels: Record<string, string> = {
   createTask: "Create task",
-  createNote: "Create note",
-  updateNote: "Update note",
-  deleteNote: "Delete note",
   archiveEmail: "Archive email",
   batchArchive: "Archive emails",
   trashEmail: "Trash email",
@@ -196,28 +193,28 @@ function EmailActionArgs({ args }: { args: Record<string, unknown> }) {
 
   return (
     <div className="space-y-3">
-      {isPresent(args.to) ? (
+      {isPresent(args.to) && (
         <ToolField
           label="To"
           value={<p className="break-all">{String(args.to)}</p>}
         />
-      ) : null}
-      {isPresent(args.cc) ? (
+      )}
+      {isPresent(args.cc) && (
         <ToolField
           label="CC"
           value={<p className="break-all">{String(args.cc)}</p>}
         />
-      ) : null}
-      {resolvedSubject ? (
+      )}
+      {resolvedSubject && (
         <ToolField
           label="Subject"
           value={<p className="text-balance">{resolvedSubject}</p>}
         />
-      ) : null}
-      {resolvedBody ? <ToolBodyPreview text={resolvedBody} /> : null}
-      {forwardEmailId && forwardEmailQuery.isPending ? (
+      )}
+      {resolvedBody && <ToolBodyPreview text={resolvedBody} />}
+      {forwardEmailId && forwardEmailQuery.isPending && (
         <ToolField label="Forward" value="Loading forwarded email preview..." />
-      ) : null}
+      )}
     </div>
   );
 }
@@ -236,40 +233,40 @@ function ToolArgs({
     case "createTask": {
       return (
         <div className="space-y-3">
-          {isPresent(args.title) ? (
+          {isPresent(args.title) && (
             <ToolField
               label="Title"
               value={<p className="text-balance">{String(args.title)}</p>}
             />
-          ) : null}
-          {isPresent(args.dueAt) ? (
+          )}
+          {isPresent(args.dueAt) && (
             <ToolField
               label="Due"
               value={formatDueAt(args.dueAt) ?? String(args.dueAt)}
             />
-          ) : null}
+          )}
         </div>
       );
     }
     case "updateTask": {
       return (
         <div className="space-y-3">
-          {isPresent(args.taskId) ? (
+          {isPresent(args.taskId) && (
             <ToolField label="Task ID" value={String(args.taskId)} />
-          ) : null}
-          {isPresent(args.title) ? (
+          )}
+          {isPresent(args.title) && (
             <ToolField
               label="Title"
               value={<p className="text-balance">{String(args.title)}</p>}
             />
-          ) : null}
-          {isPresent(args.status) ? (
+          )}
+          {isPresent(args.status) && (
             <ToolField label="Status" value={String(args.status)} />
-          ) : null}
-          {isPresent(args.priority) ? (
+          )}
+          {isPresent(args.priority) && (
             <ToolField label="Priority" value={String(args.priority)} />
-          ) : null}
-          {args.dueAt !== undefined ? (
+          )}
+          {args.dueAt !== undefined && (
             <ToolField
               label="Due"
               value={
@@ -278,12 +275,11 @@ function ToolArgs({
                   : (formatDueAt(args.dueAt) ?? String(args.dueAt))
               }
             />
-          ) : null}
+          )}
         </div>
       );
     }
     case "deleteTask":
-    case "deleteNote":
     case "archiveEmail":
     case "trashEmail":
     case "snoozeEmail":
@@ -296,19 +292,17 @@ function ToolArgs({
     case "dismissProposedEvent": {
       const fieldLabel = toolName.includes("Task")
         ? "Task ID"
-        : toolName.includes("Note")
-          ? "Note ID"
-          : toolName.includes("Proposed") || toolName.includes("Event")
-            ? "Event ID"
-            : "Email ID";
+        : toolName.includes("Proposed") || toolName.includes("Event")
+          ? "Event ID"
+          : "Email ID";
       const idValue =
-        args.taskId ?? args.emailId ?? args.noteId ?? args.proposedId;
+        args.taskId ?? args.emailId ?? args.proposedId;
 
       return (
         <div className="space-y-3">
-          {isPresent(idValue) ? (
+          {isPresent(idValue) && (
             <ToolField label={fieldLabel} value={String(idValue)} />
-          ) : null}
+          )}
         </div>
       );
     }
@@ -321,53 +315,6 @@ function ToolArgs({
             label="Emails"
             value={`${ids.length} email${ids.length === 1 ? "" : "s"}`}
           />
-        </div>
-      );
-    }
-    case "updateNote": {
-      return (
-        <div className="space-y-3">
-          {isPresent(args.noteId) ? (
-            <ToolField label="Note ID" value={String(args.noteId)} />
-          ) : null}
-          {isPresent(args.title) ? (
-            <ToolField
-              label="Title"
-              value={<p className="text-balance">{String(args.title)}</p>}
-            />
-          ) : null}
-          {typeof args.content === "string" &&
-          args.content.trim().length > 0 ? (
-            <ToolField
-              label="Content"
-              multiline
-              value={<ToolBodyPreview text={args.content.trim()} />}
-            />
-          ) : null}
-        </div>
-      );
-    }
-    case "createNote": {
-      const content =
-        typeof args.content === "string" && args.content.trim().length > 0
-          ? args.content.trim()
-          : null;
-
-      return (
-        <div className="space-y-3">
-          {isPresent(args.title) ? (
-            <ToolField
-              label="Title"
-              value={<p className="text-balance">{String(args.title)}</p>}
-            />
-          ) : null}
-          {content ? (
-            <ToolField
-              label="Content"
-              multiline
-              value={<ToolBodyPreview text={content} />}
-            />
-          ) : null}
         </div>
       );
     }

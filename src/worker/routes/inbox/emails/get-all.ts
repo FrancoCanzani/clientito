@@ -98,6 +98,11 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
       case "starred":
         conditions.push(hasEmailLabel(STANDARD_LABELS.STARRED));
         break;
+      case "important":
+        conditions.push(
+          sql<boolean>`${emailIntelligence.category} in ('important', 'action_needed')`,
+        );
+        break;
     }
 
     const whereClause = and(...conditions);

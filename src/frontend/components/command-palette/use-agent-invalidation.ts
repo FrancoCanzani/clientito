@@ -16,7 +16,6 @@ export function useAgentInvalidation(
     ) {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["emails"] });
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
     }
   }, [status, queryClient]);
 }

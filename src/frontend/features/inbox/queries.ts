@@ -1,19 +1,41 @@
+import {
+  infiniteQueryOptions,
+  queryOptions,
+} from "@tanstack/react-query";
 import type {
   ContactSuggestion,
   EmailDetailIntelligence,
   EmailDetailItem,
   EmailListItem,
   EmailListResponse,
+  InboxSearchScope,
+  InboxSearchSuggestionsResponse,
 } from "./types";
 
 type FetchEmailsParams = {
   search?: string;
   isRead?: "true" | "false";
-  view?: "inbox" | "sent" | "spam" | "trash" | "snoozed" | "archived" | "starred";
+  view?: "inbox" | "sent" | "spam" | "trash" | "snoozed" | "archived" | "starred" | "important";
   limit?: number;
   offset?: number;
   mailboxId?: number;
 };
+
+function appendEmailListParams(
+  query: URLSearchParams,
+  params?: FetchEmailsParams | InboxSearchScope,
+) {
+  if (!params) return;
+  if (params.mailboxId) query.set("mailboxId", String(params.mailboxId));
+  if (params.view) query.set("view", params.view);
+  if ("includeJunk" in params && params.includeJunk) {
+    query.set("includeJunk", "true");
+  }
+}
+
+function normalizeSearchQuery(query: string) {
+  return query.trim().replace(/\s+/g, " ");
+}
 
 export async function fetchEmails(
   params?: FetchEmailsParams,
@@ -33,6 +55,29 @@ export async function fetchEmails(
       payload && typeof payload.error === "string"
         ? payload.error
         : "Failed to fetch emails";
+    throw new Error(message);
+  }
+
+  return response.json() as Promise<EmailListResponse>;
+}
+
+export async function fetchSearchEmails(
+  params: InboxSearchScope & { limit?: number; offset?: number },
+): Promise<EmailListResponse> {
+  const query = new URLSearchParams();
+  const normalizedQuery = normalizeSearchQuery(params.q);
+  query.set("q", normalizedQuery);
+  if (params.limit) query.set("limit", String(params.limit));
+  if (params.offset) query.set("offset", String(params.offset));
+  appendEmailListParams(query, params);
+
+  const response = await fetch(`/api/inbox/search/emails?${query}`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message =
+      payload && typeof payload.error === "string"
+        ? payload.error
+        : "Failed to search emails";
     throw new Error(message);
   }
 
@@ -80,6 +125,15 @@ export async function fetchEmailDetailAI(
   return json.data;
 }
 
+export async function fetchEmailSummary(
+  emailId: string,
+): Promise<string | null> {
+  const response = await fetch(`/api/inbox/emails/${emailId}/ai/summary`);
+  if (!response.ok) return null;
+  const json = await response.json();
+  return json.data?.summary ?? null;
+}
+
 export async function fetchEmailThread(
   threadId: string,
 ): Promise<EmailListItem[]> {
@@ -113,4 +167,75 @@ export async function fetchContactSuggestions(
   }
 
   return response.json() as Promise<{ data: ContactSuggestion[] }>;
+}
+
+export async function fetchSearchSuggestions(
+  params: InboxSearchScope,
+): Promise<InboxSearchSuggestionsResponse> {
+  const query = new URLSearchParams();
+  const normalizedQuery = normalizeSearchQuery(params.q);
+  if (normalizedQuery) query.set("q", normalizedQuery);
+  appendEmailListParams(query, params);
+
+  const response = await fetch(`/api/inbox/search/suggestions?${query}`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message =
+      payload && typeof payload.error === "string"
+        ? payload.error
+        : "Failed to fetch search suggestions";
+    throw new Error(message);
+  }
+
+  const json = (await response.json()) as { data: InboxSearchSuggestionsResponse };
+  return json.data;
+}
+
+export const INBOX_SEARCH_PAGE_SIZE = 30;
+
+export function inboxSearchResultsInfiniteQueryOptions(params: InboxSearchScope) {
+  return infiniteQueryOptions({
+    queryKey: [
+      "emails",
+      "search",
+      normalizeSearchQuery(params.q),
+      params.mailboxId ?? "all",
+      params.view ?? "all",
+      params.includeJunk ?? false,
+    ] as const,
+    initialPageParam: 0,
+    enabled: normalizeSearchQuery(params.q).length >= 2,
+    queryFn: ({ pageParam }) =>
+      fetchSearchEmails({
+        ...params,
+        q: normalizeSearchQuery(params.q),
+        limit: INBOX_SEARCH_PAGE_SIZE,
+        offset: pageParam,
+      }),
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.hasMore
+        ? lastPage.pagination.offset + lastPage.pagination.limit
+        : undefined,
+    staleTime: 30_000,
+  });
+}
+
+export function inboxSearchSuggestionsQueryOptions(params: InboxSearchScope) {
+  return queryOptions({
+    queryKey: [
+      "emails",
+      "search",
+      "suggestions",
+      normalizeSearchQuery(params.q),
+      params.mailboxId ?? "all",
+      params.view ?? "all",
+      params.includeJunk ?? false,
+    ] as const,
+    queryFn: () =>
+      fetchSearchSuggestions({
+        ...params,
+        q: normalizeSearchQuery(params.q),
+      }),
+    staleTime: 30_000,
+  });
 }

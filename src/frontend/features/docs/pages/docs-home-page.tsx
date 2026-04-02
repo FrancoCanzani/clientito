@@ -37,11 +37,11 @@ export default function DocsHomePage() {
                 {doc.title}
               </Link>
             </h2>
-            {doc.description ? (
+            {doc.description && (
               <p className="mt-2 leading-[1.7] text-[#5d554c]">
                 {doc.description}
               </p>
-            ) : null}
+            )}
           </article>
         ))}
       </section>

@@ -22,7 +22,8 @@ export type EmailActionType =
   | "label"
   | "snooze"
   | "forward"
-  | "delegate";
+  | "delegate"
+  | "create_task";
 
 export type EmailActionTrustLevel = "auto" | "approve";
 

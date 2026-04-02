@@ -67,7 +67,7 @@ export function ComposeEditor({
       }}
     >
       <ComposeBubbleMenu editor={editor} />
-      {hasForwardedContent ? (
+      {hasForwardedContent && (
         <button
           type="button"
           className="mb-2 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
@@ -79,7 +79,7 @@ export function ComposeEditor({
             ? "Hide original message"
             : "Show original message"}
         </button>
-      ) : null}
+      )}
       <div
         className={cn(
           hasForwardedContent &&

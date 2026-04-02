@@ -21,7 +21,6 @@ import inboxRoutes from "./routes/inbox/router";
 import searchRoutes from "./routes/inbox/search/router";
 import subscriptionsRoutes from "./routes/inbox/subscriptions/router";
 import syncRoutes from "./routes/inbox/sync/router";
-import notesRoutes from "./routes/notes/router";
 import settingsRoutes from "./routes/settings/router";
 import tasksRoutes from "./routes/tasks/router";
 import type { AppRouteEnv } from "./routes/types";
@@ -77,7 +76,6 @@ app.route("/api/ai", aiRoutes);
 
 app.route("/api/tasks", tasksRoutes);
 app.route("/api/calendar", calendarRoutes);
-app.route("/api/notes", notesRoutes);
 app.route("/api/settings", settingsRoutes);
 app.route("/api/search", searchRoutes);
 app.route("/api/subscriptions", subscriptionsRoutes);

@@ -64,11 +64,11 @@ function LoginRoute() {
             : "Continue with Google"}
         </Button>
 
-        {signInMutation.error ? (
+        {signInMutation.error && (
           <p className="mt-4 text-center text-xs text-destructive">
             {signInMutation.error.message}
           </p>
-        ) : null}
+        )}
 
         <div className="gap-3 flex justify-center">
           {POLICY_LINKS.map((label) => (

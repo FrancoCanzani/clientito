@@ -19,9 +19,9 @@ export default function SubscriptionsPage() {
 
   if (items.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-3xl space-y-4 py-4">
+      <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-4 py-4">
         <PageHeader title="Subscriptions" />
-        <Empty className="min-h-56 border-0 p-0">
+        <Empty className="min-h-0 flex-1 border-0 p-0">
           <EmptyHeader>
             <EmptyTitle>No subscriptions found</EmptyTitle>
             <EmptyDescription>
@@ -34,7 +34,7 @@ export default function SubscriptionsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4 py-4">
+    <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-4 py-4">
       <PageHeader title="Subscriptions" />
 
       <div className="space-y-1">

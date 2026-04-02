@@ -1,4 +1,5 @@
 import { useAppAgent } from "@/hooks/use-agent";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useHotkey } from "@tanstack/react-hotkeys";
 import { isToolUIPart } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -10,6 +11,7 @@ function focusDelayed(ref: React.RefObject<HTMLElement | null>) {
 }
 
 export function useCommandPaletteState() {
+  const isMobile = useIsMobile();
   const inputRef = useRef<HTMLInputElement>(null);
   const agentInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -21,8 +23,6 @@ export function useCommandPaletteState() {
   const [agentHasSubmitted, setAgentHasSubmitted] = useState(false);
   const [taskInput, setTaskInput] = useState("");
   const [agentInput, setAgentInput] = useState("");
-  const [searchInput, setSearchInput] = useState("");
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const {
     messages,
@@ -58,7 +58,6 @@ export function useCommandPaletteState() {
     setQuery("");
     setMode("commands");
     setTaskInput("");
-    setSearchInput("");
     setAgentHasSubmitted(false);
   }, []);
 
@@ -96,14 +95,6 @@ export function useCommandPaletteState() {
     [clearHistory, submitAgentMessage],
   );
 
-  const enterSearchMode = useCallback(() => {
-    setMode("search");
-    setOpen(true);
-    setQuery("");
-    setSearchInput("");
-    focusDelayed(searchInputRef);
-  }, []);
-
   const startFreshChat = useCallback(() => {
     setAgentHasSubmitted(false);
     clearHistory();
@@ -125,9 +116,8 @@ export function useCommandPaletteState() {
   useHotkey(
     "Escape",
     () => {
-      if (mode === "agent" || mode === "search") {
+      if (mode === "agent") {
         setMode("commands");
-        setSearchInput("");
         focusDelayed(inputRef);
         return;
       }
@@ -167,6 +157,7 @@ export function useCommandPaletteState() {
     agentInputRef,
     containerRef,
     messagesViewportRef,
+    isMobile,
     // State
     open,
     setOpen,
@@ -185,11 +176,6 @@ export function useCommandPaletteState() {
     isConnected,
     hasPendingApprovals,
     addToolApprovalResponse,
-    // Search
-    searchInput,
-    setSearchInput,
-    searchInputRef,
-    enterSearchMode,
     // Callbacks
     close,
     submitAgentMessage,

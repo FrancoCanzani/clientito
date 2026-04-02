@@ -1,8 +1,8 @@
 import {
+  VIEW_VALUES,
   VIEW_LABELS,
   type EmailView,
 } from "@/features/inbox/utils/inbox-filters";
-import { createNote } from "@/features/notes/mutations";
 import { createTask } from "@/features/tasks/mutations";
 import { parseTaskInput } from "@/features/tasks/utils";
 import { useLogout } from "@/hooks/use-auth";
@@ -12,6 +12,7 @@ import {
   ArchiveIcon,
   CheckSquareIcon,
   EnvelopeSimpleIcon,
+  FlagIcon,
   FunnelIcon,
   GearIcon,
   HouseSimpleIcon,
@@ -19,7 +20,6 @@ import {
   MoonIcon,
   NewspaperIcon,
   CalendarDotsIcon,
-  NoteBlankIcon,
   PaperPlaneTiltIcon,
   SignOutIcon,
   StarIcon,
@@ -46,17 +46,17 @@ const VIEW_ICONS: Record<string, React.ComponentType<{ className?: string }>> =
     trash: TrashIcon,
     archived: ArchiveIcon,
     starred: StarIcon,
+    important: FlagIcon,
   };
 
 function buildNavigationCommands(
-  runNavigation: (to: "/home" | "/notes" | "/tasks" | "/docs" | "/settings" | "/agenda") => void,
+  runNavigation: (to: "/home" | "/tasks" | "/docs" | "/settings" | "/agenda") => void,
   navigateToInbox: () => void,
 ): PaletteCommand[] {
   return [
     { id: "home", label: "Home", section: "navigation", to: "/home", icon: paletteIcon(HouseSimpleIcon), onSelect: () => runNavigation("/home") },
     { id: "inbox", label: "Inbox", section: "navigation", to: "/inbox/$id", icon: paletteIcon(TrayIcon), onSelect: navigateToInbox },
     { id: "tasks", label: "Tasks", section: "navigation", to: "/tasks", icon: paletteIcon(CheckSquareIcon), onSelect: () => runNavigation("/tasks") },
-    { id: "notes", label: "Notes", section: "navigation", to: "/notes", icon: paletteIcon(NoteBlankIcon), onSelect: () => runNavigation("/notes") },
     { id: "agenda", label: "Agenda", section: "navigation", to: "/agenda", icon: paletteIcon(CalendarDotsIcon), onSelect: () => runNavigation("/agenda") },
     { id: "settings", label: "Settings", section: "navigation", to: "/settings", icon: paletteIcon(GearIcon), onSelect: () => runNavigation("/settings") },
   ];
@@ -65,13 +65,13 @@ function buildNavigationCommands(
 function buildMailboxCommands(
   isEmailsRoute: boolean,
   activeInboxId: string,
+  activeView: EmailView | undefined,
   navigate: ReturnType<typeof useNavigate>,
   close: () => void,
-  setMode: (mode: PaletteMode) => void,
 ): PaletteCommand[] {
   if (!isEmailsRoute) return [];
 
-  const emailViews: EmailView[] = ["inbox", "sent", "archived", "starred", "spam", "trash"];
+  const emailViews: EmailView[] = ["inbox", "important", "sent", "archived", "starred", "spam", "trash"];
   const viewCommands: PaletteCommand[] = emailViews.map((view) => ({
     id: `email-view-${view}`,
     label: VIEW_LABELS[view],
@@ -98,7 +98,16 @@ function buildMailboxCommands(
       label: "Search",
       section: "email-navigation",
       icon: paletteIcon(MagnifyingGlassIcon),
-      onSelect: () => setMode("search"),
+      onSelect: () => {
+        navigate({
+          to: "/inbox/search",
+          search: {
+            mailboxId: activeInboxId === "all" ? undefined : Number(activeInboxId),
+            view: activeView === "inbox" ? undefined : activeView,
+          },
+        });
+        close();
+      },
     },
     {
       id: "subscriptions",
@@ -154,12 +163,11 @@ function buildActionCommands(opts: {
   navigate: ReturnType<typeof useNavigate>;
   close: () => void;
   setMode: (mode: PaletteMode) => void;
-  createNoteMutation: { mutate: () => void };
   resolvedTheme: string | undefined;
   toggleTheme: () => void;
   logout: { mutate: () => void };
 }): PaletteCommand[] {
-  const { activeInboxId, navigate, close, setMode, createNoteMutation, resolvedTheme, toggleTheme, logout } = opts;
+  const { activeInboxId, navigate, close, setMode, resolvedTheme, toggleTheme, logout } = opts;
 
   return [
     {
@@ -178,13 +186,6 @@ function buildActionCommands(opts: {
       section: "actions",
       icon: paletteIcon(CheckSquareIcon),
       onSelect: () => setMode("new-task"),
-    },
-    {
-      id: "new-note",
-      label: "New Note",
-      section: "actions",
-      icon: paletteIcon(NoteBlankIcon),
-      onSelect: () => createNoteMutation.mutate(),
     },
     {
       id: "toggle-theme",
@@ -218,7 +219,11 @@ export function usePaletteCommands({
 
   const pathname = router.state.location.pathname;
   const activeInboxId = getActiveInboxId(pathname);
-  const isEmailsRoute = pathname.startsWith("/inbox/");
+  const routeSearch = router.state.location.search as { view?: unknown };
+  const activeView = VIEW_VALUES.includes(routeSearch.view as EmailView)
+    ? (routeSearch.view as EmailView)
+    : undefined;
+  const isEmailsRoute = pathname === "/inbox/search" || pathname.startsWith("/inbox/");
   const isTasksRoute = pathname === "/tasks";
 
   const navigateToInbox = useCallback(() => {
@@ -227,7 +232,7 @@ export function usePaletteCommands({
   }, [close, navigate, activeInboxId]);
 
   const runNavigation = useCallback(
-    (to: "/home" | "/notes" | "/tasks" | "/docs" | "/settings" | "/agenda") => {
+    (to: "/home" | "/tasks" | "/docs" | "/settings" | "/agenda") => {
       navigate({ to });
       close();
     },
@@ -246,16 +251,6 @@ export function usePaletteCommands({
     onError: () => toast.error("Failed to create task"),
   });
 
-  const createNoteMutation = useMutation({
-    mutationFn: async () =>
-      createNote({ title: "Untitled note", content: "" }),
-    onSuccess: (created) => {
-      navigate({ to: "/notes/$noteId", params: { noteId: created.id } });
-      close();
-    },
-    onError: () => toast.error("Failed to create note"),
-  });
-
   const navigationCommands = useMemo(
     () => {
       const all = buildNavigationCommands(runNavigation, navigateToInbox);
@@ -269,8 +264,8 @@ export function usePaletteCommands({
   );
 
   const mailboxCommands = useMemo(
-    () => buildMailboxCommands(isEmailsRoute, activeInboxId, navigate, close, setMode),
-    [isEmailsRoute, activeInboxId, navigate, close, setMode],
+    () => buildMailboxCommands(isEmailsRoute, activeInboxId, activeView, navigate, close),
+    [isEmailsRoute, activeInboxId, activeView, navigate, close],
   );
 
   const taskViewCommands = useMemo(
@@ -281,9 +276,9 @@ export function usePaletteCommands({
   const actionCommands = useMemo(
     () => buildActionCommands({
       activeInboxId, navigate, close, setMode,
-      createNoteMutation, resolvedTheme, toggleTheme, logout,
+      resolvedTheme, toggleTheme, logout,
     }),
-    [activeInboxId, navigate, close, setMode, createNoteMutation, resolvedTheme, toggleTheme, logout],
+    [activeInboxId, navigate, close, setMode, resolvedTheme, toggleTheme, logout],
   );
 
   const agentSuggestions = useMemo(() => {
@@ -292,13 +287,6 @@ export function usePaletteCommands({
         "Summarize what I'm looking at",
         "Draft a reply for the current email",
         "What should I follow up on here?",
-      ];
-    }
-    if (pathname === "/notes" || pathname.startsWith("/notes/")) {
-      return [
-        "Summarize this note",
-        "Turn this note into tasks",
-        "What is missing here?",
       ];
     }
     if (pathname === "/tasks") {

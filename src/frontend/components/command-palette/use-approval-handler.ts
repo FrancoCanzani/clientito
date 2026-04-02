@@ -22,7 +22,6 @@ function shouldIgnoreApprovalHotkeyTarget(target: EventTarget | null) {
 function invalidateAll(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: ["tasks"] });
   queryClient.invalidateQueries({ queryKey: ["emails"] });
-  queryClient.invalidateQueries({ queryKey: ["notes"] });
 }
 
 export function useApprovalHandler({

@@ -235,11 +235,11 @@ export function EmailActionBar({
             <ArrowBendUpLeftIcon className="size-3.5" />
             Reply
           </Button>
-          {showReplyAll ? (
+          {showReplyAll && (
             <IconButton label="Reply all" onClick={handleReplyAll}>
               <ArrowBendDoubleUpLeftIcon className="size-3.5" />
             </IconButton>
-          ) : null}
+          )}
           <IconButton label="Forward" shortcut="F" onClick={handleForward}>
             <ArrowBendUpRightIcon className="size-3.5" />
           </IconButton>

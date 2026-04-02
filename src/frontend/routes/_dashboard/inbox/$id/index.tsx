@@ -21,7 +21,7 @@ const emailsSearchSchema = z.object({
   threadId: z.string().trim().optional(),
   compose: z.coerce.boolean().optional(),
   view: z
-    .enum(["inbox", "sent", "spam", "trash", "snoozed", "archived", "starred"])
+    .enum(["inbox", "sent", "spam", "trash", "snoozed", "archived", "starred", "important"])
     .optional(),
 });
 

@@ -5,7 +5,7 @@ export const listEmailsQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional(),
   search: z.string().trim().max(500).optional(),
   isRead: z.enum(["true", "false"]).optional(),
-  view: z.enum(["inbox", "sent", "spam", "trash", "snoozed", "archived", "starred"]).optional(),
+  view: z.enum(["inbox", "sent", "spam", "trash", "snoozed", "archived", "starred", "important"]).optional(),
   mailboxId: z.coerce.number().int().positive().optional(),
 });
 

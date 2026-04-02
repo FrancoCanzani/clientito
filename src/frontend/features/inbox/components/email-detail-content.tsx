@@ -2,7 +2,12 @@ import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { patchEmail } from "@/features/inbox/mutations";
-import { fetchEmailDetailAI, fetchEmailThread } from "@/features/inbox/queries";
+import {
+  fetchEmailDetailAI,
+  fetchEmailSummary,
+  fetchEmailThread,
+} from "@/features/inbox/queries";
+import { createTask } from "@/features/tasks/mutations";
 import type { EmailAction } from "@/features/inbox/types";
 import {
   ArrowLeftIcon,
@@ -48,6 +53,12 @@ function isSupportedAiAction(action: EmailAction) {
     action.payload.draft.trim()
   )
     return true;
+  if (
+    action.type === "create_task" &&
+    typeof action.payload.taskTitle === "string" &&
+    action.payload.taskTitle.trim()
+  )
+    return true;
   return false;
 }
 
@@ -55,6 +66,7 @@ function getAiActionButtonLabel(action: EmailAction) {
   if (action.type === "archive") return "Archive";
   if (action.type === "snooze") return "Snooze";
   if (action.type === "reply") return "Use suggested reply";
+  if (action.type === "create_task") return "Create task";
   return action.label;
 }
 
@@ -115,11 +127,19 @@ export function EmailDetailContent({
     retry: 2,
   });
   const intelligence = detailAIQuery.data ?? null;
-  const intelligenceStatus = detailAIQuery.isPending ? "pending" : null;
   const supportedAiActions = useMemo(
     () => intelligence?.actions.filter(isSupportedAiAction) ?? [],
     [intelligence],
   );
+
+  const summaryQuery = useQuery({
+    queryKey: ["email-ai-summary", email.id],
+    queryFn: () => fetchEmailSummary(email.id),
+    enabled: intelligence != null && !intelligence.summary,
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+  });
+  const summary = intelligence?.summary || summaryQuery.data || null;
   const threadMessages = useMemo(() => {
     if (!email.threadId) {
       return [email];
@@ -170,7 +190,10 @@ export function EmailDetailContent({
   const handleAiAction = useCallback(
     (action: EmailAction) => {
       if (action.type === "reply") {
-        quickReplyRef.current?.scrollIntoViewAndFocus();
+        const draft = typeof action.payload.draft === "string"
+          ? action.payload.draft
+          : undefined;
+        quickReplyRef.current?.scrollIntoViewAndFocus(draft);
         return;
       }
       aiActionMutation.mutate(action);
@@ -194,6 +217,15 @@ export function EmailDetailContent({
         return action;
       }
 
+      if (action.type === "create_task") {
+        const title = typeof action.payload.taskTitle === "string"
+          ? action.payload.taskTitle.trim()
+          : "";
+        if (!title) throw new Error("Missing task title");
+        await createTask({ title });
+        return action;
+      }
+
       throw new Error("Unsupported AI action");
     },
     onSuccess: async (action) => {
@@ -213,6 +245,12 @@ export function EmailDetailContent({
       if (action.type === "archive") {
         toast.success("Archived");
         onClose?.();
+        return;
+      }
+
+      if (action.type === "create_task") {
+        queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        toast.success("Task created");
         return;
       }
 
@@ -304,20 +342,21 @@ export function EmailDetailContent({
 
       <div className="w-full py-5">
         <div className="space-y-4">
-          {intelligenceStatus === "pending" ? (
-            <section className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-4">
-              <Skeleton className="h-3 w-16" />
-              <Skeleton className="h-3 w-[92%]" />
-              <Skeleton className="h-3 w-[72%]" />
-            </section>
-          ) : intelligence ? (
+          {intelligence && (
             <section className="space-y-4 rounded-md border border-border/50 p-2">
               <div className="tracking-[-0.6px] text-sm text-foreground font-medium">
                 Overview
               </div>
-              <p className="text-xs tracking-[-0.2px]">
-                {intelligence.summary}
-              </p>
+              {summary && (
+                <p className="text-xs tracking-[-0.2px]">
+                  {summary}
+                </p>
+              )}
+              {!summary && summaryQuery.isFetching && (
+                <p className="text-xs tracking-[-0.2px] animate-pulse text-muted-foreground">
+                  Summarizing...
+                </p>
+              )}
               {supportedAiActions.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {supportedAiActions.map((action) => (
@@ -367,7 +406,7 @@ export function EmailDetailContent({
                 </div>
               )}
             </section>
-          ) : null}
+          )}
 
           {detailAIQuery.isError && (
             <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">

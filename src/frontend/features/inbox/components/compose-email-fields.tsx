@@ -208,9 +208,9 @@ export function ComposeEmailFields({
           className={bodyClassName ?? "min-h-32 text-sm leading-relaxed"}
           autoFocus={editorAutoFocus}
         />
-        {forwardedContent ? (
+        {forwardedContent && (
           <ForwardedMessagePreview html={forwardedContent} />
-        ) : null}
+        )}
       </div>
 
       <div className="mt-auto px-3 py-2">

@@ -22,9 +22,11 @@ export function PageHeader({
           {title}
         </h1>
       </div>
-      {actions ? (
-        <div className="flex items-center justify-end gap-2">{actions}</div>
-      ) : null}
+      {actions && (
+        <div className="flex flex-1 items-center justify-end gap-2">
+          {actions}
+        </div>
+      )}
     </header>
   );
 }

@@ -6,6 +6,45 @@ export type ContactSuggestion = {
   interactionCount: number;
 };
 
+export type InboxSearchScope = {
+  q: string;
+  mailboxId?: number;
+  view?: "inbox" | "sent" | "spam" | "trash" | "snoozed" | "archived" | "starred" | "important";
+  includeJunk?: boolean;
+};
+
+export type InboxSearchFilterSuggestion = {
+  kind: "filter";
+  id: string;
+  label: string;
+  query: string;
+  description: string | null;
+};
+
+export type InboxSearchContactSuggestion = ContactSuggestion & {
+  kind: "contact";
+  id: string;
+  label: string;
+  query: string;
+  description: string | null;
+};
+
+export type InboxSearchSubjectSuggestion = {
+  kind: "subject";
+  id: string;
+  label: string;
+  query: string;
+  subject: string;
+  description: string | null;
+  lastUsedAt: number | null;
+};
+
+export type InboxSearchSuggestionsResponse = {
+  filters: InboxSearchFilterSuggestion[];
+  contacts: InboxSearchContactSuggestion[];
+  subjects: InboxSearchSubjectSuggestion[];
+};
+
 export type EmailIntelligenceCategory =
   | "action_needed"
   | "important"
@@ -17,7 +56,7 @@ export type EmailIntelligenceUrgency = "high" | "medium" | "low";
 
 export type EmailAction = {
   id: string;
-  type: "reply" | "archive" | "label" | "snooze" | "forward" | "delegate";
+  type: "reply" | "archive" | "label" | "snooze" | "forward" | "delegate" | "create_task";
   label: string;
   payload: Record<string, unknown>;
   trustLevel: "auto" | "approve";
@@ -54,7 +93,7 @@ export type EmailIntelligence = {
 };
 
 export type EmailDetailIntelligence = {
-  summary: string;
+  summary: string | null;
   actions: EmailAction[];
   calendarEvents: CalendarSuggestion[];
   autoExecute: string[];
@@ -111,6 +150,9 @@ export type EmailListResponse = {
     limit: number;
     offset: number;
     hasMore: boolean;
+  };
+  searchMeta?: {
+    hiddenJunkCount: number;
   };
 };
 

@@ -4,13 +4,9 @@ import {
   EmailProvider,
   useEmail,
 } from "@/features/inbox/context/email-context";
-import {
-  useRegisterEmailCommandHandler,
-  type EmailCommand,
-} from "@/features/inbox/hooks/use-email-command-state";
 import { useSetPageContext } from "@/hooks/use-page-context";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 
 const emailsRoute = getRouteApi("/_dashboard/inbox/$id/");
 
@@ -18,34 +14,11 @@ function InboxContent() {
   const navigate = emailsRoute.useNavigate();
   const search = emailsRoute.useSearch();
 
-  const {
-    mailboxId,
-    executeEmailAction,
-    forwardOpen,
-    composeInitial,
-    closeForward,
-  } = useEmail();
+  const { mailboxId, forwardOpen, composeInitial, closeForward } = useEmail();
 
   const isComposing = search.compose === true;
-  const pageContext = useMemo(() => ({ route: "inbox" }), []);
 
-  useSetPageContext(pageContext);
-
-  useRegisterEmailCommandHandler(
-    useCallback(
-      (command: EmailCommand) => {
-        switch (command.type) {
-          case "archive":
-            executeEmailAction("archive");
-            break;
-          case "trash":
-            executeEmailAction("trash");
-            break;
-        }
-      },
-      [executeEmailAction],
-    ),
-  );
+  useSetPageContext(useMemo(() => ({ route: "inbox" }), []));
 
   return (
     <>

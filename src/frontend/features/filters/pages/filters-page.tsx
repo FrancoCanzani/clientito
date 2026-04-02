@@ -192,7 +192,7 @@ export default function FiltersPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-8 py-2">
+    <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-8 py-2">
       <PageHeader title="Filters" />
 
       <form onSubmit={handlePromptSubmit} className="relative">
@@ -272,7 +272,7 @@ export default function FiltersPage() {
           ))}
         </div>
       ) : filters.length === 0 && !editing ? (
-        <Empty className="min-h-56 border-0 p-0">
+        <Empty className="min-h-0 flex-1 border-0 p-0">
           <EmptyHeader>
             <EmptyTitle>No filters yet</EmptyTitle>
             <EmptyDescription>

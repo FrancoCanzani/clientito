@@ -20,8 +20,7 @@ import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/setti
 import { Route as DashboardHomeRouteImport } from './routes/_dashboard/home'
 import { Route as DashboardGetStartedRouteImport } from './routes/_dashboard/get-started'
 import { Route as DashboardAgendaRouteImport } from './routes/_dashboard/agenda'
-import { Route as DashboardNotesIndexRouteImport } from './routes/_dashboard/notes/index'
-import { Route as DashboardNotesNoteIdRouteImport } from './routes/_dashboard/notes/$noteId'
+import { Route as DashboardInboxSearchRouteImport } from './routes/_dashboard/inbox/search'
 import { Route as DashboardInboxIdIndexRouteImport } from './routes/_dashboard/inbox/$id/index'
 import { Route as DashboardInboxIdSubscriptionsRouteImport } from './routes/_dashboard/inbox/$id/subscriptions'
 import { Route as DashboardInboxIdFiltersRouteImport } from './routes/_dashboard/inbox/$id/filters'
@@ -81,14 +80,9 @@ const DashboardAgendaRoute = DashboardAgendaRouteImport.update({
   path: '/agenda',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
-const DashboardNotesIndexRoute = DashboardNotesIndexRouteImport.update({
-  id: '/notes/',
-  path: '/notes/',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardNotesNoteIdRoute = DashboardNotesNoteIdRouteImport.update({
-  id: '/notes/$noteId',
-  path: '/notes/$noteId',
+const DashboardInboxSearchRoute = DashboardInboxSearchRouteImport.update({
+  id: '/inbox/search',
+  path: '/inbox/search',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardInboxIdIndexRoute = DashboardInboxIdIndexRouteImport.update({
@@ -125,8 +119,7 @@ export interface FileRoutesByFullPath {
   '/tasks': typeof DashboardTasksRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
-  '/notes/$noteId': typeof DashboardNotesNoteIdRoute
-  '/notes/': typeof DashboardNotesIndexRoute
+  '/inbox/search': typeof DashboardInboxSearchRoute
   '/inbox/$id/filters': typeof DashboardInboxIdFiltersRoute
   '/inbox/$id/subscriptions': typeof DashboardInboxIdSubscriptionsRoute
   '/inbox/$id/': typeof DashboardInboxIdIndexRoute
@@ -142,8 +135,7 @@ export interface FileRoutesByTo {
   '/tasks': typeof DashboardTasksRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs': typeof DocsIndexRoute
-  '/notes/$noteId': typeof DashboardNotesNoteIdRoute
-  '/notes': typeof DashboardNotesIndexRoute
+  '/inbox/search': typeof DashboardInboxSearchRoute
   '/inbox/$id/filters': typeof DashboardInboxIdFiltersRoute
   '/inbox/$id/subscriptions': typeof DashboardInboxIdSubscriptionsRoute
   '/inbox/$id': typeof DashboardInboxIdIndexRoute
@@ -162,8 +154,7 @@ export interface FileRoutesById {
   '/_dashboard/tasks': typeof DashboardTasksRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
-  '/_dashboard/notes/$noteId': typeof DashboardNotesNoteIdRoute
-  '/_dashboard/notes/': typeof DashboardNotesIndexRoute
+  '/_dashboard/inbox/search': typeof DashboardInboxSearchRoute
   '/_dashboard/inbox/$id/filters': typeof DashboardInboxIdFiltersRoute
   '/_dashboard/inbox/$id/subscriptions': typeof DashboardInboxIdSubscriptionsRoute
   '/_dashboard/inbox/$id/': typeof DashboardInboxIdIndexRoute
@@ -182,8 +173,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/docs/$slug'
     | '/docs/'
-    | '/notes/$noteId'
-    | '/notes/'
+    | '/inbox/search'
     | '/inbox/$id/filters'
     | '/inbox/$id/subscriptions'
     | '/inbox/$id/'
@@ -199,8 +189,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/docs/$slug'
     | '/docs'
-    | '/notes/$noteId'
-    | '/notes'
+    | '/inbox/search'
     | '/inbox/$id/filters'
     | '/inbox/$id/subscriptions'
     | '/inbox/$id'
@@ -218,8 +207,7 @@ export interface FileRouteTypes {
     | '/_dashboard/tasks'
     | '/docs/$slug'
     | '/docs/'
-    | '/_dashboard/notes/$noteId'
-    | '/_dashboard/notes/'
+    | '/_dashboard/inbox/search'
     | '/_dashboard/inbox/$id/filters'
     | '/_dashboard/inbox/$id/subscriptions'
     | '/_dashboard/inbox/$id/'
@@ -312,18 +300,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAgendaRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
-    '/_dashboard/notes/': {
-      id: '/_dashboard/notes/'
-      path: '/notes'
-      fullPath: '/notes/'
-      preLoaderRoute: typeof DashboardNotesIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/notes/$noteId': {
-      id: '/_dashboard/notes/$noteId'
-      path: '/notes/$noteId'
-      fullPath: '/notes/$noteId'
-      preLoaderRoute: typeof DashboardNotesNoteIdRouteImport
+    '/_dashboard/inbox/search': {
+      id: '/_dashboard/inbox/search'
+      path: '/inbox/search'
+      fullPath: '/inbox/search'
+      preLoaderRoute: typeof DashboardInboxSearchRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/inbox/$id/': {
@@ -363,8 +344,7 @@ interface DashboardRouteRouteChildren {
   DashboardHomeRoute: typeof DashboardHomeRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardTasksRoute: typeof DashboardTasksRoute
-  DashboardNotesNoteIdRoute: typeof DashboardNotesNoteIdRoute
-  DashboardNotesIndexRoute: typeof DashboardNotesIndexRoute
+  DashboardInboxSearchRoute: typeof DashboardInboxSearchRoute
   DashboardInboxIdFiltersRoute: typeof DashboardInboxIdFiltersRoute
   DashboardInboxIdSubscriptionsRoute: typeof DashboardInboxIdSubscriptionsRoute
   DashboardInboxIdIndexRoute: typeof DashboardInboxIdIndexRoute
@@ -377,8 +357,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardHomeRoute: DashboardHomeRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardTasksRoute: DashboardTasksRoute,
-  DashboardNotesNoteIdRoute: DashboardNotesNoteIdRoute,
-  DashboardNotesIndexRoute: DashboardNotesIndexRoute,
+  DashboardInboxSearchRoute: DashboardInboxSearchRoute,
   DashboardInboxIdFiltersRoute: DashboardInboxIdFiltersRoute,
   DashboardInboxIdSubscriptionsRoute: DashboardInboxIdSubscriptionsRoute,
   DashboardInboxIdIndexRoute: DashboardInboxIdIndexRoute,

@@ -40,7 +40,7 @@ function DashboardLayout() {
   return (
     <AppProviders>
       <div className="flex min-h-dvh flex-col antialiased">
-        <main className="flex min-h-dvh w-full flex-1 flex-col px-4 py-4 pb-24">
+        <main className="flex min-h-dvh w-full flex-1 flex-col px-4 py-4 pb-24 md:pb-4">
           <div className="flex min-h-0 flex-1 flex-col">
             <Outlet />
           </div>

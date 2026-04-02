@@ -46,12 +46,12 @@ export default function HomePage() {
   const showCaughtUp = !hasItems && !isAnimating;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col space-y-6">
+    <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-6">
       <PageHeader title={greeting} />
 
       {!showCaughtUp && (
         <AnimatePresence mode="wait">
-          {hasItems && !briefingText && !stream.error ? (
+          {hasItems && !briefingText && !stream.error && (
             <motion.div
               key="skeleton"
               initial={{ opacity: 0 }}
@@ -65,16 +65,18 @@ export default function HomePage() {
               <Skeleton className="h-4 w-[76%]" />
               <Skeleton className="h-4 w-[50%]" />
             </motion.div>
-          ) : briefingText ? (
+          )}
+          {briefingText && (
             <motion.div
               key="briefing"
-              initial={{ opacity: 0 }}
+              initial={isAnimating ? { opacity: 0 } : false}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4 }}
             >
               <BriefingText text={briefingText} animate={isAnimating} />
             </motion.div>
-          ) : stream.error ? (
+          )}
+          {!briefingText && stream.error && (
             <motion.div
               key="error"
               initial={{ opacity: 0 }}
@@ -90,7 +92,7 @@ export default function HomePage() {
                 Retry
               </button>
             </motion.div>
-          ) : null}
+          )}
         </AnimatePresence>
       )}
 

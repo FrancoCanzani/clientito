@@ -12,11 +12,11 @@ export function parseMailboxId(id: string): number | undefined {
 }
 
 export function getActiveInboxId(pathname: string): string {
-  const match = pathname.match(/^\/inbox\/([^/]+)/);
+  const match = pathname.match(/^\/inbox\/(?!search(?:\/|$))([^/]+)/);
   return match?.[1] ?? "all";
 }
 
 export function getSearchMailboxId(pathname: string): number | undefined {
-  const match = pathname.match(/^\/inbox\/([^/]+)/);
+  const match = pathname.match(/^\/inbox\/(?!search(?:\/|$))([^/]+)/);
   return match ? parseMailboxId(match[1]) : undefined;
 }

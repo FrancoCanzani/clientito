@@ -5,23 +5,13 @@ import {
   EnvelopeSimpleIcon,
   EnvelopeSimpleOpenIcon,
   PaperclipIcon,
+  StarIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
 import { useEmail } from "../context/email-context";
 import type { EmailListItem } from "../types";
 import { formatInboxRowDate } from "../utils/formatters";
 import type { ThreadGroup } from "../utils/group-emails-by-thread";
-
-function getBadgeLabel(email: EmailListItem) {
-  const category = email.intelligence?.category;
-  const urgency = email.intelligence?.urgency;
-
-  if (category === "action_needed") return "Action needed";
-  if (category === "important")
-    return urgency === "high" ? "Urgent" : "Important";
-  if (urgency === "high") return "Urgent";
-  return null;
-}
 
 type EmailRowProps = {
   group: ThreadGroup;
@@ -31,6 +21,7 @@ type EmailRowProps = {
 export function EmailRow({ group, isOpen }: EmailRowProps) {
   const { openEmail, executeEmailAction, view } = useEmail();
   const email: EmailListItem = group.representative;
+  const isStarred = email.labelIds.includes("STARRED");
   const threadCount = group.threadCount;
   const participantLabel =
     view === "sent"
@@ -38,7 +29,6 @@ export function EmailRow({ group, isOpen }: EmailRowProps) {
         ? `To: ${email.toAddr}`
         : "To: (unknown recipient)"
       : email.fromName || email.fromAddr;
-  const visibleBadge = getBadgeLabel(email);
 
   return (
     <div
@@ -64,11 +54,11 @@ export function EmailRow({ group, isOpen }: EmailRowProps) {
         aria-hidden
       />
 
-      <div className="min-w-0 flex-1 items-center gap-2 overflow-hidden text-xs flex">
+      <div className="min-w-0 flex-1 items-center gap-2 overflow-hidden flex">
         <span className="text-sm shrink-0 truncate tracking-[-0.6px] text-foreground font-medium">
           {participantLabel}
         </span>
-        <span className="text-foreground/50 truncate tracking-[-0.2px]">
+        <span className="text-foreground/50 text-sm truncate tracking-[-0.2px]">
           {email.subject ?? "(no subject)"}
         </span>
       </div>
@@ -76,7 +66,9 @@ export function EmailRow({ group, isOpen }: EmailRowProps) {
       <div className="shrink-0">
         <div className="relative flex min-w-20 justify-end text-xs text-muted-foreground">
           <div className="flex items-center gap-2 group-hover:invisible">
-            {visibleBadge && <span className="italic">{visibleBadge}</span>}
+            {isStarred && (
+              <StarIcon className="size-3 text-yellow-500" weight="fill" aria-hidden />
+            )}
             {email.hasAttachment && (
               <PaperclipIcon className="size-3" aria-hidden />
             )}
@@ -114,6 +106,20 @@ export function EmailRow({ group, isOpen }: EmailRowProps) {
               ) : (
                 <EnvelopeSimpleOpenIcon className="size-3.5" />
               )}
+            </IconButton>
+            <IconButton
+              label={isStarred ? "Unstar" : "Star"}
+              variant="ghost"
+              size="icon-sm"
+              onClick={(event) => {
+                event.stopPropagation();
+                executeEmailAction(isStarred ? "unstar" : "star", [email.id]);
+              }}
+            >
+              <StarIcon
+                className={cn("size-3.5", isStarred && "text-yellow-500")}
+                weight={isStarred ? "fill" : "regular"}
+              />
             </IconButton>
             <IconButton
               label="Delete"

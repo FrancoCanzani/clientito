@@ -42,8 +42,8 @@ export function TaskListView({
 }: TaskListViewProps) {
   if (sections.length === 0) {
     return (
-      <div className="space-y-5">
-        <Empty className="min-h-[60vh] border-0 p-0">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <Empty className="min-h-0 flex-1 border-0 p-0">
           <EmptyHeader>
             <EmptyTitle>
               {totalTasks > 0 && !showCompleted

@@ -65,11 +65,11 @@ export default function DocPage() {
           <h1 className="mt-2 text-[clamp(1.95rem,4.8vw,2.9rem)] leading-[1.04] tracking-[-0.025em] text-[#171411]">
             {doc.title}
           </h1>
-          {doc.description ? (
+          {doc.description && (
             <p className="mt-4 max-w-[40rem] text-[1rem] leading-[1.65] text-[#5d554c]">
               {doc.description}
             </p>
-          ) : null}
+          )}
         </header>
 
         <div
@@ -109,7 +109,7 @@ export default function DocPage() {
           aria-label="Document pagination"
         >
           <div>
-            {neighbors.previous ? (
+            {neighbors.previous && (
               <Link
                 to="/docs/$slug"
                 params={{ slug: neighbors.previous.slug }}
@@ -117,10 +117,10 @@ export default function DocPage() {
               >
                 Previous: {neighbors.previous.title}
               </Link>
-            ) : null}
+            )}
           </div>
           <div>
-            {neighbors.next ? (
+            {neighbors.next && (
               <Link
                 to="/docs/$slug"
                 params={{ slug: neighbors.next.slug }}
@@ -128,12 +128,12 @@ export default function DocPage() {
               >
                 Next: {neighbors.next.title}
               </Link>
-            ) : null}
+            )}
           </div>
         </nav>
       </article>
 
-      {doc.headings.length > 0 ? (
+      {doc.headings.length > 0 && (
         <aside
           className="mt-7 border-t border-[rgba(41,33,24,0.16)] pt-4 xl:sticky xl:top-6 xl:mt-0 xl:max-h-[calc(100vh-3rem)] xl:overflow-auto xl:border-t-0 xl:pt-1"
           aria-label="Table of contents"
@@ -161,7 +161,7 @@ export default function DocPage() {
             ))}
           </ul>
         </aside>
-      ) : null}
+      )}
     </div>
   );
 }

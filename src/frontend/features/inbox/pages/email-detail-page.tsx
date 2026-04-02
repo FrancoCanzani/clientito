@@ -111,7 +111,7 @@ export default function EmailDetailPage() {
   };
 
   const goBack = () => {
-    navigate({ to: "/inbox/$id", params: { id: params.id } });
+    router.history.back();
   };
 
   const quickReplyRef = useRef<{ trigger: () => void } | null>(null);

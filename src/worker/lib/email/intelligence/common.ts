@@ -17,12 +17,13 @@ export const MAX_RETRY_ATTEMPTS = 3;
 export const ELIGIBILITY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const emailActionOutputSchema = z.object({
-  type: z.enum(["reply", "archive", "label", "snooze"]),
+  type: z.enum(["reply", "archive", "label", "snooze", "create_task"]),
   label: z.string().trim().min(1).max(120),
   payload: z.object({
     draft: z.string().trim().max(2000).nullable(),
     labelName: z.string().trim().max(120).nullable(),
     until: z.string().trim().max(100).nullable(),
+    taskTitle: z.string().trim().max(200).nullable(),
   }),
   trustLevel: z.enum(["auto", "approve"]),
 });
@@ -106,7 +107,7 @@ export type EmailDetailIntelligence = {
 export function buildSharedActionRules() {
   return [
     "## Action Rules",
-    "- Only use action types: reply, archive, label, snooze.",
+    "- Only use action types: reply, archive, label, snooze, create_task.",
     "- Every action object must include payload with keys draft, labelName, and until. Use null for unused fields.",
     "- Do NOT suggest reply actions for automated notifications, newsletters, promos, or social network emails unless a human response is explicitly expected.",
     "- Do NOT copy URLs, tracking links, or long CTA links into reply drafts.",
@@ -114,10 +115,11 @@ export function buildSharedActionRules() {
     "- For reply actions, include payload.draft with the full reply body text.",
     "- For snooze actions, include payload.until as an ISO date or datetime.",
     "- For label actions, include payload.labelName.",
+    "- For create_task actions, include payload.taskTitle with a concise task title derived from the email. Suggest create_task for emails that require follow-up, action items, or commitments.",
     "",
     "## Trust Levels",
     "- Use trustLevel=approve for replies and any external commitment.",
-    "- Use trustLevel=auto only for clearly safe local actions like archive or snooze.",
+    "- Use trustLevel=auto only for clearly safe local actions like archive, snooze, or create_task.",
   ].join("\n");
 }
 
@@ -215,6 +217,13 @@ function normalizeAction(
       typeof payload.labelName === "string" ? payload.labelName.trim() : "";
     if (!labelName) return null;
     payload.labelName = truncate(labelName, 120);
+  }
+
+  if (action.type === "create_task") {
+    const taskTitle =
+      typeof payload.taskTitle === "string" ? payload.taskTitle.trim() : "";
+    if (!taskTitle) return null;
+    payload.taskTitle = truncate(taskTitle, 200);
   }
 
   return {

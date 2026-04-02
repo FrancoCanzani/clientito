@@ -327,7 +327,7 @@ export default function SettingsPage() {
                       {statusCopy.badge}
                     </div>
                   </div>
-                  {accounts.length > 1 ? (
+                  {accounts.length > 1 && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -340,7 +340,7 @@ export default function SettingsPage() {
                     >
                       <TrashIcon className="size-3.5 text-muted-foreground" />
                     </Button>
-                  ) : null}
+                  )}
                 </div>
 
                 <div className="border-t border-border/60">

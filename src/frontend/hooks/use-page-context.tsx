@@ -18,7 +18,6 @@ type PageEntity =
         bodyPreview?: string | null;
       }
   | { type: "person"; id: string; name: string | null; email: string | null }
-  | { type: "note"; id: string; title: string | null }
   | { type: "task"; id: string; title: string };
 
 export type PageContext = {

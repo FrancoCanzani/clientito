@@ -3,9 +3,11 @@ import { AgendaPanel } from "@/features/calendar/components/agenda-panel";
 
 export default function AgendaPage() {
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-6">
       <PageHeader title="Agenda" />
-      <AgendaPanel days={14} />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <AgendaPanel days={14} />
+      </div>
     </div>
   );
 }

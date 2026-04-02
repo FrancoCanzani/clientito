@@ -61,6 +61,8 @@ const REMOVES_FROM_LIST: Set<EmailInboxAction> = new Set([
 const IMMEDIATE_ACTIONS: Set<EmailInboxAction> = new Set([
   "mark-read",
   "mark-unread",
+  "star",
+  "unstar",
 ]);
 
 type PendingAction = {
