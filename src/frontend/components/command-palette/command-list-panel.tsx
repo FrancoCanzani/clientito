@@ -1,3 +1,4 @@
+import { Kbd } from "@/components/ui/kbd";
 import { KeyReturnIcon } from "@phosphor-icons/react";
 import { Command } from "cmdk";
 import type { PaletteCommand } from "./types";
@@ -24,7 +25,8 @@ function CommandGroup({
           className={commandItemClassName}
         >
           <span className="text-muted-foreground">{command.icon}</span>
-          {command.label}
+          <span>{command.label}</span>
+          {command.shortcut && <Kbd className="ml-auto">{command.shortcut}</Kbd>}
         </Command.Item>
       ))}
     </Command.Group>

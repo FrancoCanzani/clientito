@@ -3,12 +3,6 @@ import { TriageCard } from "@/features/home/components/triage-card";
 import type { useDecisionQueue } from "@/features/home/hooks/use-decision-queue";
 import { AnimatePresence, motion } from "motion/react";
 
-function getUrgencyBorder(urgency?: "high" | "medium" | "low") {
-  if (urgency === "high") return "border-l-2 border-l-red-500/60";
-  if (urgency === "medium") return "border-l-2 border-l-amber-500/40";
-  return "";
-}
-
 const SECTION_LABELS: Partial<Record<string, string>> = {
   email_action: "Needs reply",
   briefing_email: "Emails",
@@ -56,10 +50,10 @@ export function CardStack({ queue }: { queue: DecisionQueue }) {
                 </p>
               )}
               <div
-                className={`group rounded-lg border bg-card p-3 ${getUrgencyBorder(item.urgency)} ${
+                className={`group rounded-[24px] transition-shadow duration-150 ease-out ${
                   isActive
-                    ? "border-primary/40 ring-1 ring-primary/20"
-                    : "border-border"
+                    ? "shadow-[0_10px_30px_rgba(15,23,42,0.08)]"
+                    : "shadow-none"
                 }`}
               >
                 <TriageCard item={item} queue={queue} isActive={isActive} />

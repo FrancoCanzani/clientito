@@ -175,6 +175,7 @@ function buildActionCommands(opts: {
       label: "New Email",
       section: "actions",
       icon: paletteIcon(EnvelopeSimpleIcon),
+      shortcut: "C",
       onSelect: () => {
         navigate({ to: "/inbox/$id", params: { id: activeInboxId }, search: { compose: true } });
         close();

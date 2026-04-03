@@ -5,6 +5,7 @@ export interface PaletteCommand {
   label: string;
   section: string;
   icon: ReactNode;
+  shortcut?: string;
   onSelect: () => void;
   to?: string;
 }

@@ -3,6 +3,7 @@ import type { Task, TaskPriority, TaskStatus } from "./types";
 export async function createTask(input: {
   title: string;
   description?: string | null;
+  sourceEmailId?: number;
   dueAt?: number;
   priority?: TaskPriority;
   status?: TaskStatus;

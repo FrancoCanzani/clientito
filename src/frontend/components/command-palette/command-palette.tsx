@@ -1,3 +1,4 @@
+import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 import {
   CaretDownIcon,
@@ -27,9 +28,15 @@ function CommandPaletteSurface({
   handleDiscard,
 }: {
   state: ReturnType<typeof useCommandPaletteState>;
-  visibleNavigationCommands: ReturnType<typeof usePaletteCommands>["visibleNavigationCommands"];
-  emailNavigationCommands: ReturnType<typeof usePaletteCommands>["emailNavigationCommands"];
-  taskNavigationCommands: ReturnType<typeof usePaletteCommands>["taskNavigationCommands"];
+  visibleNavigationCommands: ReturnType<
+    typeof usePaletteCommands
+  >["visibleNavigationCommands"];
+  emailNavigationCommands: ReturnType<
+    typeof usePaletteCommands
+  >["emailNavigationCommands"];
+  taskNavigationCommands: ReturnType<
+    typeof usePaletteCommands
+  >["taskNavigationCommands"];
   actionCommands: ReturnType<typeof usePaletteCommands>["actionCommands"];
   agentSuggestions: ReturnType<typeof usePaletteCommands>["agentSuggestions"];
   submitTask: ReturnType<typeof usePaletteCommands>["submitTask"];
@@ -90,11 +97,7 @@ function CommandPaletteSurface({
         </AnimatePresence>
       </LazyMotion>
 
-      <div
-        className={cn(
-          "flex items-center gap-2 px-3 py-2",
-        )}
-      >
+      <div className={cn("flex items-center gap-2 px-3 py-2")}>
         {state.mode === "agent" ? (
           <>
             <input
@@ -155,6 +158,9 @@ function CommandPaletteSurface({
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
         )}
+        {!state.open && state.mode !== "agent" && (
+          <Kbd className="ml-auto shrink-0">⌘K</Kbd>
+        )}
         {state.mode !== "agent" && normalizedQuery && (
           <button
             type="button"
@@ -168,9 +174,9 @@ function CommandPaletteSurface({
         )}
         {state.open ? (
           <CaretDownIcon className="size-4 shrink-0 text-muted-foreground" />
-        ) : (
+        ) : state.mode === "agent" ? (
           <CaretRightIcon className="size-4 shrink-0 text-muted-foreground" />
-        )}
+        ) : null}
       </div>
     </Command>
   );
@@ -214,23 +220,15 @@ export function CommandPalette() {
     />
   );
 
-  const isDesktopHidden = !state.isMobile && !state.open;
-
   return (
-    <m.div
+    <div
       ref={state.containerRef}
-      initial={false}
-      animate={isDesktopHidden ? { opacity: 0, y: 32 } : { opacity: 1, y: 0 }}
-      transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
-      aria-hidden={isDesktopHidden}
-      style={{ visibility: isDesktopHidden ? "hidden" : "visible" }}
       className={cn(
-        "fixed bottom-6 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-2",
-        !state.isMobile && "md:bottom-4",
-        isDesktopHidden && "pointer-events-none",
+        "fixed bottom-6 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-2 transition-opacity duration-200",
+        !state.open && !state.isMobile && "opacity-80 hover:opacity-100",
       )}
     >
       {surface}
-    </m.div>
+    </div>
   );
 }

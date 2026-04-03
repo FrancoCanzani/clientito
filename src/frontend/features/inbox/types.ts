@@ -56,7 +56,7 @@ export type EmailIntelligenceUrgency = "high" | "medium" | "low";
 
 export type EmailAction = {
   id: string;
-  type: "reply" | "archive" | "label" | "snooze" | "forward" | "delegate" | "create_task";
+  type: "reply" | "archive" | "label" | "snooze" | "create_task";
   label: string;
   payload: Record<string, unknown>;
   trustLevel: "auto" | "approve";

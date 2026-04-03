@@ -4,6 +4,7 @@ export const TASK_COLUMNS = {
   id: tasks.id,
   title: tasks.title,
   description: tasks.description,
+  sourceEmailId: tasks.sourceEmailId,
   dueAt: tasks.dueAt,
   priority: tasks.priority,
   status: tasks.status,

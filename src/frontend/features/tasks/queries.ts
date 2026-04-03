@@ -6,6 +6,7 @@ export async function fetchTasks(params?: {
   dueToday?: boolean;
   dueAfter?: number;
   dueBefore?: number;
+  sourceEmailId?: number;
   limit?: number;
   offset?: number;
 }): Promise<TaskListResponse> {
@@ -20,6 +21,8 @@ export async function fetchTasks(params?: {
     query.set("dueAfter", String(params.dueAfter));
   if (params?.dueBefore !== undefined)
     query.set("dueBefore", String(params.dueBefore));
+  if (params?.sourceEmailId !== undefined)
+    query.set("sourceEmailId", String(params.sourceEmailId));
   if (params?.limit !== undefined)
     query.set("limit", String(params.limit));
   if (params?.offset !== undefined)

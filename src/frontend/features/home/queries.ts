@@ -35,6 +35,7 @@ export type HomeBriefingItem = {
   draftReply?: string | null;
   threadId?: string | null;
   fromAddr?: string;
+  fromName?: string | null;
   subject?: string | null;
   mailboxId?: number | null;
   messageId?: string | null;

@@ -6,7 +6,6 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Kbd } from "@/components/ui/kbd";
-import { Skeleton } from "@/components/ui/skeleton";
 import { AgendaPanel } from "@/features/calendar/components/agenda-panel";
 import { BriefingText } from "@/features/home/components/briefing-text";
 import { CardStack } from "@/features/home/components/card-stack";
@@ -51,21 +50,6 @@ export default function HomePage() {
 
       {!showCaughtUp && (
         <AnimatePresence mode="wait">
-          {hasItems && !briefingText && !stream.error && (
-            <motion.div
-              key="skeleton"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="space-y-2 pt-1"
-            >
-              <Skeleton className="h-4 w-[88%]" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-[76%]" />
-              <Skeleton className="h-4 w-[50%]" />
-            </motion.div>
-          )}
           {briefingText && (
             <motion.div
               key="briefing"
@@ -110,10 +94,8 @@ export default function HomePage() {
 
       <AgendaPanel days={1} showEmptyState={false} hideProposed showHeader />
 
-      {showCards && <CardStack queue={queue} />}
-
       {showCards && (
-        <div className="mt-auto flex items-center justify-between pt-4 text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
           <span>{queue.visibleItems.length} items remaining</span>
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
@@ -140,6 +122,8 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {showCards && <CardStack queue={queue} />}
     </div>
   );
 }

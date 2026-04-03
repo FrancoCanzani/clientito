@@ -24,6 +24,9 @@ export const emailActionOutputSchema = z.object({
     labelName: z.string().trim().max(120).nullable(),
     until: z.string().trim().max(100).nullable(),
     taskTitle: z.string().trim().max(200).nullable(),
+    taskDueAt: z.string().trim().max(100).nullable(),
+    taskPriority: z.enum(["urgent", "high", "medium", "low"]).nullable(),
+    taskStatus: z.enum(["backlog", "todo", "in_progress", "done"]).nullable(),
   }),
   trustLevel: z.enum(["auto", "approve"]),
 });
@@ -108,7 +111,7 @@ export function buildSharedActionRules() {
   return [
     "## Action Rules",
     "- Only use action types: reply, archive, label, snooze, create_task.",
-    "- Every action object must include payload with keys draft, labelName, and until. Use null for unused fields.",
+    "- Every action object must include payload with all keys (draft, labelName, until, taskTitle, taskDueAt, taskPriority, taskStatus). Use null for unused fields.",
     "- Do NOT suggest reply actions for automated notifications, newsletters, promos, or social network emails unless a human response is explicitly expected.",
     "- Do NOT copy URLs, tracking links, or long CTA links into reply drafts.",
     "- Keep reply drafts short and plain text.",
@@ -116,10 +119,11 @@ export function buildSharedActionRules() {
     "- For snooze actions, include payload.until as an ISO date or datetime.",
     "- For label actions, include payload.labelName.",
     "- For create_task actions, include payload.taskTitle with a concise task title derived from the email. Suggest create_task for emails that require follow-up, action items, or commitments.",
+    "- For create_task actions, also include payload.taskDueAt as an ISO date if a deadline is mentioned or can be inferred, payload.taskPriority (urgent/high/medium/low) based on urgency, and payload.taskStatus (default to 'todo'). Use null for any field that cannot be determined.",
     "",
     "## Trust Levels",
     "- Use trustLevel=approve for replies and any external commitment.",
-    "- Use trustLevel=auto only for clearly safe local actions like archive, snooze, or create_task.",
+    "- Use trustLevel=auto only for clearly safe local actions like archive or snooze. Always use trustLevel=approve for create_task.",
   ].join("\n");
 }
 
@@ -224,6 +228,25 @@ function normalizeAction(
       typeof payload.taskTitle === "string" ? payload.taskTitle.trim() : "";
     if (!taskTitle) return null;
     payload.taskTitle = truncate(taskTitle, 200);
+
+    const taskDueAt =
+      typeof payload.taskDueAt === "string" ? payload.taskDueAt.trim() : "";
+    if (taskDueAt) {
+      const parsed = new Date(taskDueAt).getTime();
+      payload.taskDueAt = Number.isFinite(parsed) ? parsed : null;
+    } else {
+      payload.taskDueAt = null;
+    }
+
+    const validPriorities = ["urgent", "high", "medium", "low"];
+    payload.taskPriority = validPriorities.includes(String(payload.taskPriority))
+      ? payload.taskPriority
+      : null;
+
+    const validStatuses = ["backlog", "todo", "in_progress", "done"];
+    payload.taskStatus = validStatuses.includes(String(payload.taskStatus))
+      ? payload.taskStatus
+      : "todo";
   }
 
   return {
@@ -231,7 +254,7 @@ function normalizeAction(
     type: action.type,
     label,
     payload,
-    trustLevel: action.trustLevel,
+    trustLevel: action.type === "create_task" ? "approve" : action.trustLevel,
     status: "pending",
     error: null,
     executedAt: null,

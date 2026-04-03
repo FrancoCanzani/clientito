@@ -21,8 +21,6 @@ export type EmailActionType =
   | "archive"
   | "label"
   | "snooze"
-  | "forward"
-  | "delegate"
   | "create_task";
 
 export type EmailActionTrustLevel = "auto" | "approve";
@@ -239,6 +237,9 @@ export const tasks = sqliteTable(
       .references(() => user.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     description: text("description"),
+    sourceEmailId: integer("source_email_id").references(() => emails.id, {
+      onDelete: "set null",
+    }),
     dueAt: integer("due_at"),
     priority: text("priority")
       .$type<"urgent" | "high" | "medium" | "low">()
@@ -255,6 +256,7 @@ export const tasks = sqliteTable(
   (table) => [
     index("tasks_user_status_idx").on(table.userId, table.status),
     index("tasks_user_due_idx").on(table.userId, table.dueAt),
+    index("tasks_user_source_email_idx").on(table.userId, table.sourceEmailId),
   ],
 );
 

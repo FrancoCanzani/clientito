@@ -52,6 +52,7 @@ type BriefingItem = {
   draftReply?: string | null;
   threadId?: string | null;
   fromAddr?: string;
+  fromName?: string | null;
   subject?: string | null;
   mailboxId?: number | null;
   messageId?: string | null;
@@ -327,6 +328,7 @@ export async function buildBriefing(input: {
         draftReply,
         threadId: row.threadId,
         fromAddr: row.fromAddr,
+        fromName: row.fromName,
         subject: row.subject,
         mailboxId: row.mailboxId,
         messageId: row.messageId,
@@ -345,6 +347,7 @@ export async function buildBriefing(input: {
         emailId: row.id,
         threadId: row.threadId,
         fromAddr: row.fromAddr,
+        fromName: row.fromName,
         subject: row.subject,
         mailboxId: row.mailboxId,
         messageId: row.messageId,
@@ -361,6 +364,7 @@ export async function buildBriefing(input: {
         reason: buildEmailReason(intelligence.briefingSentence, suggestion.sourceText),
         href: `/inbox/all/email/${row.id}`,
         emailId: row.id,
+        fromName: row.fromName,
         proposedEventId: suggestion.id,
         eventStart: suggestion.startAt,
         eventEnd: suggestion.endAt,

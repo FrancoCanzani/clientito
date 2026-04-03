@@ -4,14 +4,13 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
 import { AgendaDayGroup } from "@/features/calendar/components/agenda-day-group";
 import {
   approveProposedEvent,
   dismissProposedEvent,
   editProposedEvent,
 } from "@/features/calendar/mutations";
-import { fetchAgendaEvents } from "@/features/calendar/queries";
+import { agendaEventsQueryOptions } from "@/features/calendar/queries";
 import type { AgendaEvent } from "@/features/calendar/types";
 import { ArrowRightIcon } from "@phosphor-icons/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -62,9 +61,7 @@ export function AgendaPanel({
   }, [days]);
 
   const eventsQuery = useQuery({
-    queryKey: ["calendar-events", from, to],
-    queryFn: () => fetchAgendaEvents(from, to),
-    staleTime: 60_000,
+    ...agendaEventsQueryOptions({ from, to }),
   });
 
   const approveMutation = useMutation({
@@ -102,17 +99,6 @@ export function AgendaPanel({
     }
     return groupByDay(events);
   }, [eventsQuery.data, hideProposed]);
-
-  if (eventsQuery.isLoading) {
-    return (
-      <div className="space-y-3">
-        <Skeleton className="h-4 w-20" />
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-8 w-[80%]" />
-      </div>
-    );
-  }
 
   if (eventsQuery.isError) {
     return null;

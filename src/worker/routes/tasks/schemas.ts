@@ -11,6 +11,7 @@ export const getTasksQuerySchema = z.object({
   dueToday: z.coerce.boolean().optional(),
   dueAfter: z.coerce.number().int().optional(),
   dueBefore: z.coerce.number().int().optional(),
+  sourceEmailId: z.coerce.number().int().positive().optional(),
   status: taskStatusSchema.optional(),
   view: z.enum(["today", "upcoming"]).optional(),
   limit: z.coerce.number().int().min(1).optional(),
@@ -20,6 +21,7 @@ export const getTasksQuerySchema = z.object({
 export const postTaskBodySchema = z.object({
   title: z.string().trim().min(1),
   description: z.string().trim().max(4000).nullable().optional(),
+  sourceEmailId: z.number().int().positive().optional(),
   dueAt: z.number().int().optional(),
   priority: taskPrioritySchema.optional(),
   status: taskStatusSchema.optional(),

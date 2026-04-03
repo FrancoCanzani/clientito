@@ -1,6 +1,5 @@
 import { useAppAgent } from "@/hooks/use-agent";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useHotkey } from "@tanstack/react-hotkeys";
 import { isToolUIPart } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { discardPendingApprovalParts } from "./agent-approval-utils";
@@ -108,28 +107,35 @@ export function useCommandPaletteState() {
     setAgentInput("");
   }, [agentInput, submitAgentMessage]);
 
-  useHotkey("Mod+K", () => {
-    setOpen(true);
-    focusDelayed(inputRef);
-  });
-
-  useHotkey(
-    "Escape",
-    () => {
-      if (mode === "agent") {
-        setMode("commands");
+  // Cmd+K to open and focus, Escape to close / exit agent mode
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "k" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setOpen(true);
         focusDelayed(inputRef);
         return;
       }
-      close();
-    },
-    {
-      enabled: open || mode === "agent",
-      preventDefault: false,
-      stopPropagation: false,
-    },
-  );
 
+      if (event.key === "Escape") {
+        setMode((currentMode) => {
+          if (currentMode === "agent") {
+            focusDelayed(inputRef);
+            return "commands";
+          }
+          setOpen(false);
+          setQuery("");
+          setTaskInput("");
+          setAgentHasSubmitted(false);
+          return "commands";
+        });
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // Outside click to close
   useEffect(() => {
     if (!open) return;
     function onClick(event: MouseEvent) {
@@ -144,6 +150,7 @@ export function useCommandPaletteState() {
     return () => document.removeEventListener("mousedown", onClick);
   }, [close, open]);
 
+  // Auto-scroll agent messages
   useEffect(() => {
     if (mode !== "agent") return;
     const viewport = messagesViewportRef.current;

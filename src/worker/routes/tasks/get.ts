@@ -16,6 +16,7 @@ export function registerGetTasks(api: Hono<AppRouteEnv>) {
       dueToday,
       dueAfter,
       dueBefore,
+      sourceEmailId,
       status,
       view,
       limit,
@@ -45,6 +46,10 @@ export function registerGetTasks(api: Hono<AppRouteEnv>) {
 
     if (dueBefore !== undefined) {
       conditions.push(lte(tasks.dueAt, dueBefore));
+    }
+
+    if (sourceEmailId !== undefined) {
+      conditions.push(eq(tasks.sourceEmailId, sourceEmailId));
     }
 
     const whereClause = and(...conditions);

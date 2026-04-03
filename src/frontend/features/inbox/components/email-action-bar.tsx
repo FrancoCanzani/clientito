@@ -234,6 +234,7 @@ export function EmailActionBar({
           >
             <ArrowBendUpLeftIcon className="size-3.5" />
             Reply
+            <Kbd className="ml-1">R</Kbd>
           </Button>
           {showReplyAll && (
             <IconButton label="Reply all" onClick={handleReplyAll}>

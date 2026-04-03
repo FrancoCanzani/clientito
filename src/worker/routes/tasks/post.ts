@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
-import { tasks } from "../../db/schema";
+import { emails, tasks } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 import { postTaskBodySchema } from "./schemas";
 import { TASK_COLUMNS } from "./utils";
@@ -11,8 +11,20 @@ export function registerPostTasks(api: Hono<AppRouteEnv>) {
     const db = c.get("db");
     const user = c.get("user")!;
 
-    const { title, description, dueAt, priority, status } =
+    const { title, description, sourceEmailId, dueAt, priority, status } =
       c.req.valid("json");
+
+    if (sourceEmailId !== undefined) {
+      const sourceEmail = await db
+        .select({ id: emails.id })
+        .from(emails)
+        .where(and(eq(emails.id, sourceEmailId), eq(emails.userId, user.id)))
+        .limit(1);
+
+      if (!sourceEmail[0]) {
+        return c.json({ error: "Source email not found" }, 400);
+      }
+    }
 
     const inserted = await db
       .insert(tasks)
@@ -20,6 +32,7 @@ export function registerPostTasks(api: Hono<AppRouteEnv>) {
         userId: user.id,
         title,
         description: description ?? null,
+        sourceEmailId: sourceEmailId ?? null,
         dueAt: dueAt ?? null,
         priority: priority ?? "low",
         status: status ?? "todo",

@@ -1,4 +1,3 @@
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
   CaretDownIcon,
@@ -10,8 +9,6 @@ import { formatEmailThreadDate } from "../utils/formatters";
 import { prepareEmailHtml } from "../utils/prepare-email-html";
 import { AttachmentItem } from "./attachment-item";
 import { EmailHtmlRenderer } from "./email-html-renderer";
-
-const ATTACHMENT_SKELETON_KEYS = ["attachment-a", "attachment-b"] as const;
 
 function buildPreview(email: EmailListItem, detail?: EmailDetailItem | null) {
   const rawText =
@@ -54,8 +51,6 @@ type ThreadMessageCardProps = {
   expanded: boolean;
   onToggle: () => void;
   showAttachments: boolean;
-  attachmentLoading: boolean;
-  attachmentError: boolean;
 };
 
 export function ThreadMessageCard({
@@ -65,8 +60,6 @@ export function ThreadMessageCard({
   expanded,
   onToggle,
   showAttachments,
-  attachmentLoading,
-  attachmentError,
 }: ThreadMessageCardProps) {
   const formattedDate = formatEmailThreadDate(email.date);
   const attachments = detail?.attachments ?? [];
@@ -134,27 +127,15 @@ export function ThreadMessageCard({
                     <PaperclipIcon className="size-3" />
                     Attachments
                   </div>
-                  {attachmentLoading ? (
+                  {attachments.length > 0 && (
                     <div className="grid gap-2 sm:grid-cols-2">
-                      {ATTACHMENT_SKELETON_KEYS.map((key) => (
-                        <Skeleton key={key} className="h-16 rounded-2xl" />
+                      {attachments.map((attachment) => (
+                        <AttachmentItem
+                          key={attachment.attachmentId}
+                          attachment={attachment}
+                        />
                       ))}
                     </div>
-                  ) : attachmentError ? (
-                    <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                      We could not load attachments for this message.
-                    </p>
-                  ) : (
-                    attachments.length > 0 && (
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {attachments.map((attachment) => (
-                          <AttachmentItem
-                            key={attachment.attachmentId}
-                            attachment={attachment}
-                          />
-                        ))}
-                      </div>
-                    )
                   )}
                 </section>
               )}
