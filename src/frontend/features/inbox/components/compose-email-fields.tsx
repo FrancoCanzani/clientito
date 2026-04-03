@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -8,12 +7,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getMailboxDisplayEmail } from "@/hooks/use-mailboxes";
-import { ClockIcon } from "@phosphor-icons/react";
+import { cn } from "@/lib/utils";
+import {
+  CheckIcon,
+  ClockIcon,
+  PaperclipIcon,
+  SpinnerGapIcon,
+} from "@phosphor-icons/react";
 import DOMPurify from "dompurify";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useGrammarCheck } from "../hooks/use-grammar-check";
 import { AttachmentBar } from "./attachment-bar";
 import { ComposeEditor } from "./compose-editor";
 import { useComposeEmail } from "./compose-email-state";
+import { GrammarDiffView } from "./grammar-diff-view";
 import { RecipientInput } from "./recipient-input";
 import { ScheduleSendPicker } from "./schedule-send-picker";
 
@@ -59,6 +67,19 @@ function ForwardedMessagePreview({ html }: { html: string }) {
   );
 }
 
+function htmlToPlainText(html: string): string {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent ?? "";
+}
+
+function plainTextToHtml(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => `<p>${line || "<br>"}</p>`)
+    .join("");
+}
+
 export function ComposeEmailFields({
   compose,
   bodyClassName,
@@ -90,6 +111,27 @@ export function ComposeEmailFields({
 
   const [showCc, setShowCc] = useState(cc.length > 0);
   const [showBcc, setShowBcc] = useState(bcc.length > 0);
+  const grammar = useGrammarCheck();
+  const isReviewing = grammar.state.status === "reviewing";
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const hasBody =
+    body.trim().length > 0 && body !== "<p></p>" && body !== "<p><br></p>";
+
+  const handleGrammarCheck = async () => {
+    const plainText = htmlToPlainText(body);
+    if (!plainText.trim()) return;
+    const result = await grammar.check(plainText);
+    if (result === "no_changes") {
+      toast.info("No grammar issues found");
+    }
+  };
+
+  const handleAccept = () => {
+    const corrected = grammar.accept();
+    if (corrected) {
+      setBody(plainTextToHtml(corrected));
+    }
+  };
 
   return (
     <div
@@ -99,7 +141,11 @@ export function ComposeEmailFields({
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.preventDefault();
-          onEscape?.();
+          if (isReviewing) {
+            grammar.discard();
+          } else {
+            onEscape?.();
+          }
         }
       }}
     >
@@ -199,41 +245,93 @@ export function ComposeEmailFields({
       <div className="mx-2 border-t border-border/30" />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-1">
-        <ComposeEditor
-          initialContent={body}
-          onChange={setBody}
-          onSend={() => {
-            if (canSend) send();
-          }}
-          className={bodyClassName ?? "min-h-32 text-sm leading-relaxed"}
-          autoFocus={editorAutoFocus}
-        />
-        {forwardedContent && (
-          <ForwardedMessagePreview html={forwardedContent} />
+        {grammar.state.status === "reviewing" ? (
+          <GrammarDiffView
+            original={grammar.state.original}
+            corrected={grammar.state.corrected}
+            onAccept={handleAccept}
+            onDiscard={grammar.discard}
+            className={bodyClassName ?? "min-h-32 text-sm leading-relaxed"}
+          />
+        ) : (
+          <>
+            <ComposeEditor
+              initialContent={body}
+              onChange={setBody}
+              onSend={() => {
+                if (canSend) send();
+              }}
+              className={bodyClassName ?? "min-h-32 text-sm leading-relaxed"}
+              autoFocus={editorAutoFocus}
+            />
+            {forwardedContent && (
+              <ForwardedMessagePreview html={forwardedContent} />
+            )}
+          </>
         )}
       </div>
 
-      <div className="mt-auto px-3 py-2">
-        <div className="flex items-center justify-between gap-3">
+      {!isReviewing && (
+        <div className="mt-auto px-3 py-2">
           <AttachmentBar
             files={attachments.files}
             uploading={attachments.uploading}
             onAddFiles={(files) => attachments.addFiles(files)}
             onRemoveFile={attachments.removeFile}
           />
-          <div className="flex items-center gap-1">
-            <ScheduleSendPicker
-              onSchedule={(timestamp) => { scheduleSend(timestamp); }}
-            >
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) {
+                attachments.addFiles(e.target.files);
+                e.target.value = "";
+              }
+            }}
+          />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
                 className="size-8"
-                disabled={!canSend}
+                disabled={attachments.uploading}
+                onClick={() => fileInputRef.current?.click()}
+                title="Attach files"
               >
-                <ClockIcon className="size-4" />
+                <PaperclipIcon className="size-4" />
               </Button>
-            </ScheduleSendPicker>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                disabled={grammar.state.status === "loading" || !hasBody}
+                onClick={handleGrammarCheck}
+                title="Grammar check"
+              >
+                {grammar.state.status === "loading" ? (
+                  <SpinnerGapIcon className="size-4 animate-spin" />
+                ) : (
+                  <CheckIcon className="size-4" />
+                )}
+              </Button>
+              <ScheduleSendPicker
+                onSchedule={(timestamp) => {
+                  scheduleSend(timestamp);
+                }}
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  disabled={!canSend}
+                >
+                  <ClockIcon className="size-4" />
+                </Button>
+              </ScheduleSendPicker>
+            </div>
             <Button
               variant="secondary"
               onClick={() => send()}
@@ -243,7 +341,7 @@ export function ComposeEmailFields({
             </Button>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -18,7 +18,7 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0">
-        <h1 className="truncate text-xl font-medium tracking-[-0.6px] sm:tracking-[-0.8px] md:tracking-[-1px] text-foreground">
+        <h1 className="truncate text-xl font-medium tracking-[-0.6px] sm:tracking-[-0.8px] font-serif md:tracking-[-1px] text-foreground">
           {title}
         </h1>
       </div>

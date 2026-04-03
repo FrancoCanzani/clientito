@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
-const STORAGE_PREFIX = "compose-draft:";
-const EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+const SAVE_DELAY_MS = 2000;
 
 type DraftState = {
   mailboxId: number | null;
@@ -13,42 +13,12 @@ type DraftState = {
   forwardedContent?: string;
 };
 
-type StoredDraft = DraftState & { savedAt: number };
-
-function getStorageKey(composeKey: string): string {
-  return STORAGE_PREFIX + (composeKey || "new");
-}
-
-function load(key: string): DraftState | null {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed: StoredDraft = JSON.parse(raw);
-    if (Date.now() - (parsed.savedAt ?? 0) > EXPIRY_MS) {
-      localStorage.removeItem(key);
-      return null;
-    }
-    const { savedAt: _, ...draft } = parsed;
-    return draft;
-  } catch {
-    return null;
-  }
-}
-
-function save(key: string, draft: DraftState): void {
-  try {
-    localStorage.setItem(
-      key,
-      JSON.stringify({ ...draft, savedAt: Date.now() }),
-    );
-  } catch {}
-}
-
-function clear(key: string): void {
-  try {
-    localStorage.removeItem(key);
-  } catch {}
-}
+type ServerDraft = DraftState & {
+  id: number;
+  composeKey: string;
+  updatedAt: number;
+  createdAt: number;
+};
 
 function isDraftEmpty(d: DraftState): boolean {
   return (
@@ -61,8 +31,35 @@ function isDraftEmpty(d: DraftState): boolean {
   );
 }
 
+async function saveDraft(
+  composeKey: string,
+  draft: DraftState,
+): Promise<void> {
+  await fetch("/api/inbox/drafts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      composeKey,
+      mailboxId: draft.mailboxId,
+      to: draft.to,
+      cc: draft.cc,
+      bcc: draft.bcc,
+      subject: draft.subject,
+      body: draft.body,
+      forwardedContent: draft.forwardedContent ?? "",
+    }),
+  });
+}
+
+async function deleteDraftByKey(composeKey: string): Promise<void> {
+  await fetch(
+    `/api/inbox/drafts/by-key?composeKey=${encodeURIComponent(composeKey)}`,
+    { method: "DELETE" },
+  );
+}
+
 export function useLocalDraft(composeKey: string, draft: DraftState) {
-  const storageKey = getStorageKey(composeKey);
+  const queryClient = useQueryClient();
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
@@ -70,19 +67,43 @@ export function useLocalDraft(composeKey: string, draft: DraftState) {
     const timer = setTimeout(() => {
       const d = draftRef.current;
       if (isDraftEmpty(d)) {
-        clear(storageKey);
+        deleteDraftByKey(composeKey);
       } else {
-        save(storageKey, d);
+        saveDraft(composeKey, d);
       }
-    }, 1000);
+    }, SAVE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [draft, storageKey]);
+  }, [draft, composeKey]);
 
   return {
-    clearDraft: () => clear(storageKey),
+    clearDraft: () => {
+      deleteDraftByKey(composeKey);
+      queryClient.invalidateQueries({ queryKey: ["drafts"] });
+    },
   };
 }
 
-useLocalDraft.load = function loadDraft(composeKey: string): DraftState | null {
-  return load(getStorageKey(composeKey));
+useLocalDraft.load = async function loadDraft(
+  composeKey: string,
+): Promise<DraftState | null> {
+  try {
+    const response = await fetch(
+      `/api/inbox/drafts/by-key?composeKey=${encodeURIComponent(composeKey)}`,
+    );
+    if (!response.ok) return null;
+    const json = (await response.json()) as { data: ServerDraft | null };
+    if (!json.data) return null;
+    const d = json.data;
+    return {
+      mailboxId: d.mailboxId ?? null,
+      to: d.to,
+      cc: d.cc,
+      bcc: d.bcc,
+      subject: d.subject,
+      body: d.body,
+      forwardedContent: d.forwardedContent ?? "",
+    };
+  } catch {
+    return null;
+  }
 };

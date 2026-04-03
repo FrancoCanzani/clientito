@@ -7,13 +7,13 @@ import {
   fetchEmailSummary,
   fetchEmailThread,
 } from "@/features/inbox/queries";
-import { createTask } from "@/features/tasks/mutations";
-import { fetchTasks } from "@/features/tasks/queries";
 import type {
   EmailAction,
   EmailDetailIntelligence,
   EmailDetailItem,
 } from "@/features/inbox/types";
+import { createTask } from "@/features/tasks/mutations";
+import { fetchTasks } from "@/features/tasks/queries";
 import type { Task, TaskPriority, TaskStatus } from "@/features/tasks/types";
 import {
   ArchiveIcon,
@@ -23,6 +23,7 @@ import {
   CheckCircleIcon,
   ClockIcon,
   PaperclipIcon,
+  WarningIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
@@ -163,9 +164,10 @@ function useEmailAiActions({
       }
 
       if (action.type === "create_task") {
-        const title = typeof action.payload.taskTitle === "string"
-          ? action.payload.taskTitle.trim()
-          : "";
+        const title =
+          typeof action.payload.taskTitle === "string"
+            ? action.payload.taskTitle.trim()
+            : "";
         if (!title) throw new Error("Missing task title");
 
         await createTask({
@@ -230,9 +232,10 @@ function useEmailAiActions({
   const handleAiAction = useCallback(
     (action: EmailAction) => {
       if (action.type === "reply") {
-        const draft = typeof action.payload.draft === "string"
-          ? action.payload.draft
-          : undefined;
+        const draft =
+          typeof action.payload.draft === "string"
+            ? action.payload.draft
+            : undefined;
         onReplyRequested(draft);
         return;
       }
@@ -256,6 +259,8 @@ function EmailOverviewPanel({
   onAiAction,
   aiActionPending,
   linkedTasks,
+  onMarkSpam,
+  spamPending,
 }: {
   intelligence: EmailDetailIntelligence;
   summary: string | null;
@@ -263,10 +268,14 @@ function EmailOverviewPanel({
   onAiAction: (action: EmailAction) => void;
   aiActionPending: boolean;
   linkedTasks: Task[];
+  onMarkSpam: () => void;
+  spamPending: boolean;
 }) {
   const pendingActions = intelligence.actions
     .filter(isSupportedAiAction)
-    .filter((action) => action.type !== "create_task" || linkedTasks.length === 0);
+    .filter(
+      (action) => action.type !== "create_task" || linkedTasks.length === 0,
+    );
   const replyDraft = pendingActions.find(
     (action) =>
       action.type === "reply" &&
@@ -313,6 +322,40 @@ function EmailOverviewPanel({
 
   return (
     <section className="space-y-4 rounded-2xl border border-border/60 bg-card/70 p-3">
+      {intelligence.suspicious.isSuspicious && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 gap-2.5">
+              <WarningIcon className="mt-0.5 size-4 shrink-0 text-amber-700" />
+              <div className="min-w-0 space-y-1">
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-amber-800">
+                  Suspicious email
+                </p>
+                <p className="text-sm text-foreground">
+                  {intelligence.suspicious.reason ??
+                    "This message shows signs of phishing or impersonation."}
+                </p>
+                {intelligence.suspicious.confidence && (
+                  <p className="text-xs text-amber-900/80">
+                    Confidence: {intelligence.suspicious.confidence}
+                  </p>
+                )}
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="border-amber-500/30 bg-background/80"
+              disabled={spamPending}
+              onClick={onMarkSpam}
+            >
+              {spamPending ? "Marking..." : "Mark as spam"}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-1">
         <div className="text-sm font-medium tracking-[-0.6px] text-foreground">
           Overview
@@ -379,7 +422,9 @@ function EmailOverviewPanel({
         </div>
       )}
 
-      {intelligence.calendarEvents.some((event) => event.status === "pending") && (
+      {intelligence.calendarEvents.some(
+        (event) => event.status === "pending",
+      ) && (
         <div className="space-y-2 border-t border-border/70 pt-3">
           {intelligence.calendarEvents
             .filter((event) => event.status === "pending")
@@ -463,6 +508,32 @@ export function EmailDetailContent({
     gcTime: 10 * 60_000,
   });
   const summary = intelligence?.summary || summaryQuery.data || null;
+  const markSpamMutation = useMutation({
+    mutationFn: async () => {
+      await patchEmail(email.id, { spam: true });
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["emails"] }),
+        queryClient.invalidateQueries({ queryKey: ["email-detail", email.id] }),
+        queryClient.invalidateQueries({
+          queryKey: ["email-ai-detail", email.id],
+        }),
+        email.threadId
+          ? queryClient.invalidateQueries({
+              queryKey: ["email-thread", email.threadId],
+            })
+          : Promise.resolve(),
+      ]);
+      toast.success("Moved to spam");
+      onClose?.();
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to move email to spam",
+      );
+    },
+  });
   const threadMessages = useMemo(() => {
     if (!email.threadId) {
       return [email];
@@ -581,7 +652,7 @@ export function EmailDetailContent({
             </div>
           </div>
 
-          <span className="shrink-0 text-xs font-mono tracking-tight font-medium text-muted-foreground">
+          <span className="shrink-0 text-xs tracking-tight font-medium text-muted-foreground">
             {formattedDate}
           </span>
         </div>
@@ -597,6 +668,8 @@ export function EmailDetailContent({
               onAiAction={handleAiAction}
               aiActionPending={aiActionMutation.isPending}
               linkedTasks={linkedTasks}
+              onMarkSpam={() => markSpamMutation.mutate()}
+              spamPending={markSpamMutation.isPending}
             />
           )}
 

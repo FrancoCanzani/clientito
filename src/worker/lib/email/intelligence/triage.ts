@@ -371,6 +371,7 @@ export async function processEmailIntelligence(
         urgency: output.urgency,
         summary: null,
         briefingSentence: normalized.briefingSentence,
+        suspiciousJson: normalized.suspicious,
         actionsJson: actions,
         calendarEventsJson: normalized.calendarEvents,
         status: "ready",

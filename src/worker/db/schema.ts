@@ -35,6 +35,14 @@ export type CalendarSuggestionConfidence = "high" | "low";
 
 export type CalendarSuggestionStatus = "pending" | "approved" | "dismissed";
 
+export type EmailSuspiciousKind =
+  | "phishing"
+  | "impersonation"
+  | "credential_harvest"
+  | "payment_fraud";
+
+export type EmailSuspiciousConfidence = "low" | "medium" | "high";
+
 export type EmailAction = {
   id: string;
   type: EmailActionType;
@@ -63,6 +71,13 @@ export type CalendarSuggestion = {
   updatedAt: number;
 };
 
+export type EmailSuspiciousFlag = {
+  isSuspicious: boolean;
+  kind: EmailSuspiciousKind | null;
+  reason: string | null;
+  confidence: EmailSuspiciousConfidence | null;
+};
+
 export type EmailIntelligenceStatus = "pending" | "ready" | "error";
 
 export type PersistedEmailIntelligence = {
@@ -70,6 +85,7 @@ export type PersistedEmailIntelligence = {
   urgency: EmailIntelligenceUrgency;
   summary: string;
   briefingSentence: string | null;
+  suspicious: EmailSuspiciousFlag;
   actions: EmailAction[];
   calendarEvents: CalendarSuggestion[];
   autoExecute: string[];
@@ -197,6 +213,15 @@ export const emailIntelligence = sqliteTable(
     urgency: text("urgency").$type<EmailIntelligenceUrgency>(),
     summary: text("summary"),
     briefingSentence: text("briefing_sentence"),
+    suspiciousJson: text("suspicious_json", { mode: "json" })
+      .$type<EmailSuspiciousFlag>()
+      .notNull()
+      .default({
+        isSuspicious: false,
+        kind: null,
+        reason: null,
+        confidence: null,
+      }),
     actionsJson: text("actions_json", { mode: "json" })
       .$type<EmailAction[]>()
       .notNull()
@@ -402,6 +427,34 @@ export const scheduledEmails = sqliteTable(
   (table) => [
     index("scheduled_emails_pending_idx").on(table.status, table.scheduledFor),
     index("scheduled_emails_user_idx").on(table.userId, table.status),
+  ],
+);
+
+export const drafts = sqliteTable(
+  "drafts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    composeKey: text("compose_key").notNull(),
+    mailboxId: integer("mailbox_id"),
+    toAddr: text("to_addr").notNull().default(""),
+    ccAddr: text("cc_addr").notNull().default(""),
+    bccAddr: text("bcc_addr").notNull().default(""),
+    subject: text("subject").notNull().default(""),
+    body: text("body").notNull().default(""),
+    forwardedContent: text("forwarded_content").notNull().default(""),
+    threadId: text("thread_id"),
+    attachmentKeys: text("attachment_keys", { mode: "json" }).$type<
+      Array<{ key: string; filename: string; mimeType: string }>
+    >(),
+    updatedAt: integer("updated_at").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("drafts_user_compose_key_idx").on(table.userId, table.composeKey),
+    index("drafts_user_updated_idx").on(table.userId, table.updatedAt),
   ],
 );
 

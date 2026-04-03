@@ -22,6 +22,7 @@ import searchRoutes from "./routes/inbox/search/router";
 import subscriptionsRoutes from "./routes/inbox/subscriptions/router";
 import syncRoutes from "./routes/inbox/sync/router";
 import settingsRoutes from "./routes/settings/router";
+import draftsRoutes from "./routes/inbox/drafts/router";
 import tasksRoutes from "./routes/tasks/router";
 import type { AppRouteEnv } from "./routes/types";
 import { handleScheduled } from "./scheduled";
@@ -74,6 +75,7 @@ app.route("/api/sync", syncRoutes);
 app.route("/api/emails", emailsRoutes);
 app.route("/api/ai", aiRoutes);
 
+app.route("/api/inbox/drafts", draftsRoutes);
 app.route("/api/tasks", tasksRoutes);
 app.route("/api/calendar", calendarRoutes);
 app.route("/api/settings", settingsRoutes);

@@ -34,6 +34,7 @@ export const emailIntelligenceSelection = {
   intelligenceCategory: emailIntelligence.category,
   intelligenceUrgency: emailIntelligence.urgency,
   intelligenceBriefingSentence: emailIntelligence.briefingSentence,
+  intelligenceSuspiciousJson: emailIntelligence.suspiciousJson,
   intelligenceActionsJson: emailIntelligence.actionsJson,
   intelligenceCalendarEventsJson: emailIntelligence.calendarEventsJson,
 } as const;
@@ -69,6 +70,7 @@ export function toEmailListResponse(row: {
   intelligenceCategory: import("../../../db/schema").EmailIntelligenceCategory | null;
   intelligenceUrgency: import("../../../db/schema").EmailIntelligenceUrgency | null;
   intelligenceBriefingSentence: string | null;
+  intelligenceSuspiciousJson: import("../../../db/schema").EmailSuspiciousFlag | null;
   intelligenceActionsJson: import("../../../db/schema").EmailAction[] | null;
   intelligenceCalendarEventsJson: import("../../../db/schema").CalendarSuggestion[] | null;
 }) {
@@ -103,6 +105,7 @@ export function toEmailListResponse(row: {
             category: row.intelligenceCategory,
             urgency: row.intelligenceUrgency,
             briefingSentence: row.intelligenceBriefingSentence,
+            suspiciousJson: row.intelligenceSuspiciousJson,
             actionsJson: row.intelligenceActionsJson ?? [],
             calendarEventsJson: row.intelligenceCalendarEventsJson ?? [],
           }
@@ -136,6 +139,7 @@ export function toEmailDetailResponse(row: {
   intelligenceCategory: import("../../../db/schema").EmailIntelligenceCategory | null;
   intelligenceUrgency: import("../../../db/schema").EmailIntelligenceUrgency | null;
   intelligenceBriefingSentence: string | null;
+  intelligenceSuspiciousJson: import("../../../db/schema").EmailSuspiciousFlag | null;
   intelligenceActionsJson: import("../../../db/schema").EmailAction[] | null;
   intelligenceCalendarEventsJson: import("../../../db/schema").CalendarSuggestion[] | null;
 }) {

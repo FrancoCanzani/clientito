@@ -12,6 +12,7 @@ import {
   ArchiveIcon,
   CheckSquareIcon,
   EnvelopeSimpleIcon,
+  FileIcon,
   FlagIcon,
   FunnelIcon,
   GearIcon,
@@ -71,8 +72,9 @@ function buildMailboxCommands(
 ): PaletteCommand[] {
   if (!isEmailsRoute) return [];
 
-  const emailViews: EmailView[] = ["inbox", "important", "sent", "archived", "starred", "spam", "trash"];
-  const viewCommands: PaletteCommand[] = emailViews.map((view) => ({
+  const emailViews: EmailView[] = ["inbox", "important", "sent", "archived", "starred"];
+  const junkViews: EmailView[] = ["spam", "trash"];
+  const makeViewCommand = (view: EmailView): PaletteCommand => ({
     id: `email-view-${view}`,
     label: VIEW_LABELS[view],
     section: "email-navigation",
@@ -89,10 +91,21 @@ function buildMailboxCommands(
       });
       close();
     },
-  }));
+  });
 
   return [
-    ...viewCommands,
+    ...emailViews.map(makeViewCommand),
+    {
+      id: "drafts",
+      label: "Drafts",
+      section: "email-navigation",
+      icon: paletteIcon(FileIcon),
+      onSelect: () => {
+        navigate({ to: "/drafts" });
+        close();
+      },
+    },
+    ...junkViews.map(makeViewCommand),
     {
       id: "search-emails",
       label: "Search",

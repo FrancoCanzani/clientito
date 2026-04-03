@@ -82,10 +82,18 @@ export type CalendarSuggestion = {
   updatedAt: number;
 };
 
+export type EmailSuspiciousFlag = {
+  isSuspicious: boolean;
+  kind: "phishing" | "impersonation" | "credential_harvest" | "payment_fraud" | null;
+  reason: string | null;
+  confidence: "low" | "medium" | "high" | null;
+};
+
 export type EmailIntelligence = {
   category: EmailIntelligenceCategory;
   urgency: EmailIntelligenceUrgency;
   briefingSentence: string | null;
+  suspicious: EmailSuspiciousFlag;
   actions: EmailAction[];
   calendarEvents: CalendarSuggestion[];
   autoExecute: string[];
@@ -94,6 +102,7 @@ export type EmailIntelligence = {
 
 export type EmailDetailIntelligence = {
   summary: string | null;
+  suspicious: EmailSuspiciousFlag;
   actions: EmailAction[];
   calendarEvents: CalendarSuggestion[];
   autoExecute: string[];
@@ -165,4 +174,5 @@ export type ComposeInitial = {
   body?: string;
   bodyHtml?: string;
   threadId?: string;
+  composeKey?: string;
 };

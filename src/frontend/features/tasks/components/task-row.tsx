@@ -62,17 +62,19 @@ export function TaskRow({
         </button>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          {task.dueAt && (() => {
-            const d = new Date(task.dueAt);
-            const h = d.getHours();
-            const m = d.getMinutes();
-            if (h === 12 && m === 0) return null;
-            return (
-              <span className="font-mono text-xs text-muted-foreground">
-                {h.toString().padStart(2, "0")}:{m.toString().padStart(2, "0")}
-              </span>
-            );
-          })()}
+          {task.dueAt &&
+            (() => {
+              const d = new Date(task.dueAt);
+              const h = d.getHours();
+              const m = d.getMinutes();
+              if (h === 12 && m === 0) return null;
+              return (
+                <span className="text-xs text-muted-foreground">
+                  {h.toString().padStart(2, "0")}:
+                  {m.toString().padStart(2, "0")}
+                </span>
+              );
+            })()}
         </div>
       </div>
 

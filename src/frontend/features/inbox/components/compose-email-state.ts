@@ -112,6 +112,10 @@ function createComposeDraft(initial?: ComposeInitial) {
 }
 
 export function getComposeInitialKey(initial?: ComposeInitial) {
+  if (initial?.composeKey) {
+    return initial.composeKey;
+  }
+
   return [
     initial?.mailboxId ?? "",
     initial?.to ?? "",
@@ -130,36 +134,44 @@ export function useComposeEmail(
   const queryClient = useQueryClient();
   const mailboxesQuery = useMailboxes();
   const composeKey = getComposeInitialKey(initial);
-  const [draft, setDraft] = useState(() => {
-    const saved = useLocalDraft.load(composeKey);
-    if (!saved) {
-      return createComposeDraft(initial);
-    }
+  const [draft, setDraft] = useState(() => createComposeDraft(initial));
+  const [loadingDraft, setLoadingDraft] = useState(true);
 
-    const normalizedSaved = saved as Partial<ComposeDraft>;
-    if (typeof normalizedSaved.forwardedContent === "string") {
-      return {
-        mailboxId: normalizedSaved.mailboxId ?? null,
-        to: normalizedSaved.to ?? "",
-        cc: normalizedSaved.cc ?? "",
-        bcc: normalizedSaved.bcc ?? "",
-        subject: normalizedSaved.subject ?? "",
-        body: normalizedSaved.body ?? "",
-        forwardedContent: normalizedSaved.forwardedContent,
-      } satisfies ComposeDraft;
-    }
+  // Load saved draft from server on mount
+  useEffect(() => {
+    let cancelled = false;
+    useLocalDraft.load(composeKey).then((saved) => {
+      if (cancelled) return;
+      if (saved) {
+        const normalizedSaved = saved as Partial<ComposeDraft>;
+        if (typeof normalizedSaved.forwardedContent === "string") {
+          setDraft({
+            mailboxId: normalizedSaved.mailboxId ?? null,
+            to: normalizedSaved.to ?? "",
+            cc: normalizedSaved.cc ?? "",
+            bcc: normalizedSaved.bcc ?? "",
+            subject: normalizedSaved.subject ?? "",
+            body: normalizedSaved.body ?? "",
+            forwardedContent: normalizedSaved.forwardedContent,
+          });
+        } else {
+          const split = splitForwardedContent(normalizedSaved.body ?? "");
+          setDraft({
+            mailboxId: normalizedSaved.mailboxId ?? null,
+            to: normalizedSaved.to ?? "",
+            cc: normalizedSaved.cc ?? "",
+            bcc: normalizedSaved.bcc ?? "",
+            subject: normalizedSaved.subject ?? "",
+            body: split.body,
+            forwardedContent: split.forwardedContent,
+          });
+        }
+      }
+      setLoadingDraft(false);
+    });
+    return () => { cancelled = true; };
+  }, [composeKey]);
 
-    const split = splitForwardedContent(normalizedSaved.body ?? "");
-    return {
-      mailboxId: normalizedSaved.mailboxId ?? null,
-      to: normalizedSaved.to ?? "",
-      cc: normalizedSaved.cc ?? "",
-      bcc: normalizedSaved.bcc ?? "",
-      subject: normalizedSaved.subject ?? "",
-      body: split.body,
-      forwardedContent: split.forwardedContent,
-    } satisfies ComposeDraft;
-  });
   const { clearDraft } = useLocalDraft(composeKey, draft);
   const attachments = useAttachmentUpload();
   const bodyRef = useRef(draft.body);
@@ -240,6 +252,7 @@ export function useComposeEmail(
       setDraft(createComposeDraft());
       attachments.clear();
       queryClient.invalidateQueries({ queryKey: ["emails"] });
+      queryClient.invalidateQueries({ queryKey: ["drafts"] });
       if (threadId) {
         queryClient.invalidateQueries({ queryKey: ["email-thread", threadId] });
       }
@@ -292,6 +305,7 @@ export function useComposeEmail(
         setDraft(createComposeDraft());
         attachments.clear();
         queryClient.invalidateQueries({ queryKey: ["scheduled-emails"] });
+        queryClient.invalidateQueries({ queryKey: ["drafts"] });
         options?.onSent?.();
       } catch (error) {
         setSendPending(false);
@@ -331,5 +345,6 @@ export function useComposeEmail(
     isPending: sendPending,
     attachments,
     clearDraft,
+    loadingDraft,
   };
 }

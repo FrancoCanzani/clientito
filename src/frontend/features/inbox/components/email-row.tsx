@@ -64,18 +64,22 @@ export function EmailRow({ group, isOpen }: EmailRowProps) {
       </div>
 
       <div className="shrink-0">
-        <div className="relative flex min-w-20 justify-end text-xs text-muted-foreground">
+        <div className="relative flex min-w-24 justify-end text-xs text-muted-foreground">
           <div className="flex items-center gap-2 group-hover:invisible">
             {isStarred && (
-              <StarIcon className="size-3 text-yellow-500" weight="fill" aria-hidden />
+              <StarIcon
+                className="size-3 text-yellow-500"
+                weight="fill"
+                aria-hidden
+              />
             )}
             {email.hasAttachment && (
               <PaperclipIcon className="size-3" aria-hidden />
             )}
             {threadCount > 1 && (
-              <span className="font-mono tabular-nums">[{threadCount}]</span>
+              <span className="tabular-nums">[{threadCount}]</span>
             )}
-            <span className="font-mono">{formatInboxRowDate(email.date)}</span>
+            <span>{formatInboxRowDate(email.date)}</span>
           </div>
 
           <div className="absolute inset-y-0 right-0 hidden items-center justify-end group-hover:flex">

@@ -69,7 +69,7 @@ export function ThreadMessageCard({
     <div
       className={cn(
         "border-b border-border/70 transition-colors duration-150 ease-out last:border-b-0",
-        active && "bg-muted/[0.12]",
+        active && "bg-muted/12",
       )}
     >
       <div className="relative">
@@ -96,9 +96,7 @@ export function ThreadMessageCard({
                 </p>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-mono tracking-tight">
-                  {formattedDate}
-                </span>
+                <span className="tracking-tight">{formattedDate}</span>
                 {expanded ? (
                   <CaretDownIcon className="size-4 shrink-0" />
                 ) : (

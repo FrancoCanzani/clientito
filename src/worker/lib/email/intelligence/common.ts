@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   type CalendarSuggestion,
   type EmailAction,
+  type EmailSuspiciousFlag,
   type FilterActions,
 } from "../../../db/schema";
 import { truncate, withRetry } from "../../utils";
@@ -38,6 +39,18 @@ export const calendarSuggestionOutputSchema = z.object({
   sourceText: z.string().trim().min(1).max(500),
 });
 
+export const suspiciousFlagOutputSchema = z.object({
+  isSuspicious: z.boolean(),
+  kind: z.enum([
+    "phishing",
+    "impersonation",
+    "credential_harvest",
+    "payment_fraud",
+  ]).nullable(),
+  reason: z.string().trim().max(280).nullable(),
+  confidence: z.enum(["low", "medium", "high"]).nullable(),
+});
+
 export const emailTriageOutputSchema = z.object({
   category: z.enum([
     "important",
@@ -48,6 +61,7 @@ export const emailTriageOutputSchema = z.object({
   ]),
   urgency: z.enum(["high", "medium", "low"]),
   briefingSentence: z.string().trim().max(360).nullable(),
+  suspicious: suspiciousFlagOutputSchema,
   actions: z.array(emailActionOutputSchema).max(MAX_ACTIONS),
   calendarEvents: z.array(calendarSuggestionOutputSchema),
   matchedFilterIds: z.array(z.number().int().positive()),
@@ -55,6 +69,7 @@ export const emailTriageOutputSchema = z.object({
 
 export const emailDetailOutputSchema = z.object({
   summary: z.string().trim().min(1).max(500),
+  suspicious: suspiciousFlagOutputSchema,
   actions: z.array(emailActionOutputSchema).max(MAX_ACTIONS),
   calendarEvents: z.array(calendarSuggestionOutputSchema),
 });
@@ -93,6 +108,7 @@ export type StoredEmailTriage = {
   category: "important" | "action_needed" | "newsletter" | "notification" | "transactional";
   urgency: "high" | "medium" | "low";
   briefingSentence: string | null;
+  suspicious: EmailSuspiciousFlag;
   actions: EmailAction[];
   calendarEvents: CalendarSuggestion[];
   autoExecute: string[];
@@ -101,6 +117,7 @@ export type StoredEmailTriage = {
 
 export type EmailDetailIntelligence = {
   summary: string;
+  suspicious: EmailSuspiciousFlag;
   actions: EmailAction[];
   calendarEvents: CalendarSuggestion[];
   autoExecute: string[];
@@ -109,6 +126,12 @@ export type EmailDetailIntelligence = {
 
 export function buildSharedActionRules() {
   return [
+    "## Safety",
+    "- Set suspicious.isSuspicious=true only when there are concrete scam or impersonation signals, not just generic urgency or marketing language.",
+    "- Use suspicious.kind for phishing, impersonation, credential_harvest, or payment_fraud when applicable.",
+    "- Use suspicious.reason to explain the strongest signal in one short sentence.",
+    "- If the email appears normal or you are unsure, set isSuspicious=false and other suspicious fields to null.",
+    "",
     "## Action Rules",
     "- Only use action types: reply, archive, label, snooze, create_task.",
     "- Every action object must include payload with all keys (draft, labelName, until, taskTitle, taskDueAt, taskPriority, taskStatus). Use null for unused fields.",
@@ -181,6 +204,30 @@ function normalizeBriefingSentence(value: string | null) {
 
 function normalizeSummary(value: string) {
   return truncate(value.replace(/\s+/g, " ").trim(), 500);
+}
+
+function normalizeSuspiciousFlag(
+  suspicious: EmailTriageOutput["suspicious"] | EmailDetailOutput["suspicious"],
+): EmailSuspiciousFlag {
+  if (!suspicious?.isSuspicious) {
+    return {
+      isSuspicious: false,
+      kind: null,
+      reason: null,
+      confidence: null,
+    };
+  }
+
+  const reason = typeof suspicious.reason === "string"
+    ? truncate(suspicious.reason.replace(/\s+/g, " ").trim(), 280)
+    : "";
+
+  return {
+    isSuspicious: true,
+    kind: suspicious.kind ?? null,
+    reason: reason || null,
+    confidence: suspicious.confidence ?? null,
+  };
 }
 
 function normalizeReplyDraft(payload: Record<string, unknown>) {
@@ -427,6 +474,7 @@ export function normalizeEmailTriageOutput(
     category: output.category,
     urgency: output.urgency,
     briefingSentence: normalizeBriefingSentence(output.briefingSentence),
+    suspicious: normalizeSuspiciousFlag(output.suspicious),
     ...normalizeIntelligenceActions(emailId, output.actions, output.calendarEvents, now),
   };
 }
@@ -438,6 +486,7 @@ export function normalizeEmailDetailOutput(
 ): EmailDetailIntelligence {
   return {
     summary: normalizeSummary(output.summary),
+    suspicious: normalizeSuspiciousFlag(output.suspicious),
     ...normalizeIntelligenceActions(emailId, output.actions, output.calendarEvents, now),
   };
 }

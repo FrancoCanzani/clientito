@@ -36,6 +36,12 @@ export function registerGetEmailAIDetail(api: Hono<AppRouteEnv>) {
       return c.json({
         data: cached ?? {
           summary: null,
+          suspicious: {
+            isSuspicious: false,
+            kind: null,
+            reason: null,
+            confidence: null,
+          },
           actions: [],
           calendarEvents: [],
           autoExecute: [],

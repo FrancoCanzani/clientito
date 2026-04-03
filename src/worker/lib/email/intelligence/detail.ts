@@ -54,6 +54,12 @@ export async function getEmailDetailCached(
   const actions = existing.actionsJson ?? [];
   return {
     summary: existing.summary,
+    suspicious: existing.suspiciousJson ?? {
+      isSuspicious: false,
+      kind: null,
+      reason: null,
+      confidence: null,
+    },
     actions,
     calendarEvents: existing.calendarEventsJson ?? [],
     ...deriveActionBuckets(actions),
@@ -132,6 +138,12 @@ export async function generateEmailDetailIntelligence(
 
   return {
     summary: resolvedSummary ?? null,
+    suspicious: cached?.suspicious ?? {
+      isSuspicious: false,
+      kind: null,
+      reason: null,
+      confidence: null,
+    },
     actions: cached?.actions ?? [],
     calendarEvents: cached?.calendarEvents ?? [],
     autoExecute: cached?.autoExecute ?? [],

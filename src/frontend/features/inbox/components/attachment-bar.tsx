@@ -1,6 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { PaperclipIcon, XIcon } from "@phosphor-icons/react";
-import { useRef } from "react";
+import { cn } from "@/lib/utils";
+import { XIcon } from "@phosphor-icons/react";
 import type { AttachmentFile } from "../hooks/use-attachment-upload";
 
 function formatSize(bytes: number): string {
@@ -19,35 +18,12 @@ type AttachmentBarProps = {
 export function AttachmentBar({
   files,
   uploading,
-  onAddFiles,
   onRemoveFile,
 }: AttachmentBarProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  if (files.length === 0 && !uploading) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={() => fileInputRef.current?.click()}
-        disabled={uploading}
-      >
-        <PaperclipIcon className="size-3" />
-        {uploading ? "Uploading..." : "Attach"}
-      </Button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          if (e.target.files && e.target.files.length > 0) {
-            onAddFiles(e.target.files);
-            e.target.value = "";
-          }
-        }}
-      />
+    <div className={cn("mb-2 flex flex-wrap items-center gap-2", uploading && "animate-pulse")}>
       {files.map((file) => (
         <span
           key={file.key}

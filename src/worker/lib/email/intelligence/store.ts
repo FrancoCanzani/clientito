@@ -7,6 +7,7 @@ import {
   ELIGIBILITY_WINDOW_MS,
   MAX_THREAD_MESSAGES,
   type EmailContextRow,
+  type EmailSuspiciousFlag,
   type StoredEmailTriage,
 } from "./common";
 
@@ -17,6 +18,7 @@ type StoredTriageRow =
       | "category"
       | "urgency"
       | "briefingSentence"
+      | "suspiciousJson"
       | "actionsJson"
       | "calendarEventsJson"
     >
@@ -37,10 +39,18 @@ function serializeStoredEmailTriage(row: StoredTriageRow): StoredEmailTriage | n
   const calendarEvents = row.calendarEventsJson ?? [];
   const buckets = deriveActionBuckets(actions);
 
+  const suspicious = row.suspiciousJson ?? {
+    isSuspicious: false,
+    kind: null,
+    reason: null,
+    confidence: null,
+  } satisfies EmailSuspiciousFlag;
+
   return {
     category: row.category,
     urgency: row.urgency,
     briefingSentence: row.briefingSentence ?? null,
+    suspicious,
     actions,
     calendarEvents,
     autoExecute: buckets.autoExecute,

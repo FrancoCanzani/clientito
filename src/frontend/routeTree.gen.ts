@@ -19,6 +19,7 @@ import { Route as DashboardTasksRouteImport } from './routes/_dashboard/tasks'
 import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
 import { Route as DashboardHomeRouteImport } from './routes/_dashboard/home'
 import { Route as DashboardGetStartedRouteImport } from './routes/_dashboard/get-started'
+import { Route as DashboardDraftsRouteImport } from './routes/_dashboard/drafts'
 import { Route as DashboardAgendaRouteImport } from './routes/_dashboard/agenda'
 import { Route as DashboardInboxSearchRouteImport } from './routes/_dashboard/inbox/search'
 import { Route as DashboardInboxIdIndexRouteImport } from './routes/_dashboard/inbox/$id/index'
@@ -75,6 +76,11 @@ const DashboardGetStartedRoute = DashboardGetStartedRouteImport.update({
   path: '/get-started',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardDraftsRoute = DashboardDraftsRouteImport.update({
+  id: '/drafts',
+  path: '/drafts',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const DashboardAgendaRoute = DashboardAgendaRouteImport.update({
   id: '/agenda',
   path: '/agenda',
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/docs': typeof DocsRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/agenda': typeof DashboardAgendaRoute
+  '/drafts': typeof DashboardDraftsRoute
   '/get-started': typeof DashboardGetStartedRoute
   '/home': typeof DashboardHomeRoute
   '/settings': typeof DashboardSettingsRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/agenda': typeof DashboardAgendaRoute
+  '/drafts': typeof DashboardDraftsRoute
   '/get-started': typeof DashboardGetStartedRoute
   '/home': typeof DashboardHomeRoute
   '/settings': typeof DashboardSettingsRoute
@@ -148,6 +156,7 @@ export interface FileRoutesById {
   '/docs': typeof DocsRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/_dashboard/agenda': typeof DashboardAgendaRoute
+  '/_dashboard/drafts': typeof DashboardDraftsRoute
   '/_dashboard/get-started': typeof DashboardGetStartedRoute
   '/_dashboard/home': typeof DashboardHomeRoute
   '/_dashboard/settings': typeof DashboardSettingsRoute
@@ -167,6 +176,7 @@ export interface FileRouteTypes {
     | '/docs'
     | '/login'
     | '/agenda'
+    | '/drafts'
     | '/get-started'
     | '/home'
     | '/settings'
@@ -183,6 +193,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/agenda'
+    | '/drafts'
     | '/get-started'
     | '/home'
     | '/settings'
@@ -201,6 +212,7 @@ export interface FileRouteTypes {
     | '/docs'
     | '/login'
     | '/_dashboard/agenda'
+    | '/_dashboard/drafts'
     | '/_dashboard/get-started'
     | '/_dashboard/home'
     | '/_dashboard/settings'
@@ -293,6 +305,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardGetStartedRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/drafts': {
+      id: '/_dashboard/drafts'
+      path: '/drafts'
+      fullPath: '/drafts'
+      preLoaderRoute: typeof DashboardDraftsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/agenda': {
       id: '/_dashboard/agenda'
       path: '/agenda'
@@ -340,6 +359,7 @@ declare module '@tanstack/react-router' {
 
 interface DashboardRouteRouteChildren {
   DashboardAgendaRoute: typeof DashboardAgendaRoute
+  DashboardDraftsRoute: typeof DashboardDraftsRoute
   DashboardGetStartedRoute: typeof DashboardGetStartedRoute
   DashboardHomeRoute: typeof DashboardHomeRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
@@ -353,6 +373,7 @@ interface DashboardRouteRouteChildren {
 
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAgendaRoute: DashboardAgendaRoute,
+  DashboardDraftsRoute: DashboardDraftsRoute,
   DashboardGetStartedRoute: DashboardGetStartedRoute,
   DashboardHomeRoute: DashboardHomeRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,

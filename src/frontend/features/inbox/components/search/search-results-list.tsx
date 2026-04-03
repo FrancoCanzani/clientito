@@ -74,7 +74,7 @@ function SearchResultRow({
             {email.hasAttachment && (
               <PaperclipIcon className="size-3" aria-hidden />
             )}
-            <span className="font-mono">{formatSearchDate(email.date)}</span>
+            <span>{formatSearchDate(email.date)}</span>
           </div>
         </div>
       </div>

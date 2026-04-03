@@ -5,6 +5,7 @@ import { registerGetBriefing, registerPostBriefingStream } from "./get-briefing"
 import { registerPostBriefingDecision } from "./post-briefing-decision";
 import { registerPostDraftReply } from "./post-draft-reply";
 import { registerPostDraftReplies } from "./post-draft-replies";
+import { registerPostGrammarCheck } from "./post-grammar-check";
 import { registerPostSummarizeEmail } from "./post-summarize-email";
 
 const aiRoutes = new Hono<AppRouteEnv>();
@@ -15,6 +16,7 @@ registerPostBriefingStream(aiRoutes);
 registerPostBriefingDecision(aiRoutes);
 registerPostDraftReply(aiRoutes);
 registerPostDraftReplies(aiRoutes);
+registerPostGrammarCheck(aiRoutes);
 registerPostSummarizeEmail(aiRoutes);
 
 export default aiRoutes;

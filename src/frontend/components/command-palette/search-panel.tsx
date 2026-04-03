@@ -52,7 +52,7 @@ function SearchResultRow({
           </p>
         )}
       </div>
-      <span className="shrink-0 font-mono text-xs text-muted-foreground">
+      <span className="shrink-0 text-xs text-muted-foreground">
         {formatSearchDate(email.date)}
       </span>
     </button>
@@ -86,7 +86,12 @@ export function SearchPanel({
   } = useInfiniteQuery({
     queryKey: ["emails", "search", debouncedSearch, mailboxId ?? "all"],
     queryFn: ({ pageParam }) =>
-      fetchEmails({ search: debouncedSearch, limit: PAGE_SIZE, offset: pageParam, mailboxId }),
+      fetchEmails({
+        search: debouncedSearch,
+        limit: PAGE_SIZE,
+        offset: pageParam,
+        mailboxId,
+      }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) =>
       lastPage?.pagination?.hasMore
