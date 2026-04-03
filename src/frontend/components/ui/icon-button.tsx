@@ -1,4 +1,3 @@
-import * as React from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import {
@@ -7,6 +6,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { VariantProps } from "class-variance-authority";
+import * as React from "react";
 
 type IconButtonProps = React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
@@ -21,23 +21,21 @@ function IconButton({
   shortcut,
   tooltipSide = "top",
   variant = "ghost",
-  size = "icon-lg",
+  size,
   children,
   ...props
 }: IconButtonProps) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button
-          variant={variant}
-          size={size}
-          aria-label={label}
-          {...props}
-        >
+        <Button variant={variant} size={size} aria-label={label} {...props}>
           {children}
         </Button>
       </TooltipTrigger>
-      <TooltipContent side={tooltipSide} className="flex items-center gap-2 text-xs">
+      <TooltipContent
+        side={tooltipSide}
+        className="flex items-center gap-2 text-xs"
+      >
         {label}
         {shortcut && <Kbd>{shortcut}</Kbd>}
       </TooltipContent>

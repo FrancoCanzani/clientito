@@ -11,8 +11,8 @@ export function BriefingText({
 }) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
-  const segments = parseBriefingSegments(text);
   const shouldAnimate = animate && !reduceMotion;
+  const segments = parseBriefingSegments(text);
 
   const tokens: { key: number; node: React.ReactNode }[] = [];
   let tokenIndex = 0;
@@ -26,7 +26,7 @@ export function BriefingText({
           <button
             type="button"
             onClick={() => router.navigate({ to: href })}
-            className="inline cursor-pointer bg-transparent p-0 text-foreground underline decoration-foreground/30 underline-offset-2 transition-colors hover:decoration-foreground/60"
+            className="underline decoration-dashed decoration-1 underline-offset-3 decoration-muted-foreground hover:bg-yellow-100 text-primary"
           >
             {segment.title}
           </button>
@@ -49,7 +49,9 @@ export function BriefingText({
               key={key}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.18, delay: key * 0.02, ease: [0.23, 1, 0.32, 1] }}
+              transition={{
+                duration: 0.18,
+              }}
             >
               {node}
             </m.span>

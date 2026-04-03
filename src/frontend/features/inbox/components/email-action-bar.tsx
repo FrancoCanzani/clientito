@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/popover";
 import { useAuth } from "@/hooks/use-auth";
 import { useMailboxes } from "@/hooks/use-mailboxes";
+import type { Icon } from "@phosphor-icons/react";
 import {
   ArchiveIcon,
   ArrowBendDoubleUpLeftIcon,
@@ -22,7 +23,6 @@ import {
   TrashIcon,
   WarningIcon,
 } from "@phosphor-icons/react";
-import type { Icon } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -88,15 +88,27 @@ export function EmailActionBar({
 
   const archiveMutation = useEmailPatch(
     { archived: true },
-    { successMessage: "Archived", errorMessage: "Failed to archive", closeAfter: true },
+    {
+      successMessage: "Archived",
+      errorMessage: "Failed to archive",
+      closeAfter: true,
+    },
   );
   const trashMutation = useEmailPatch(
     { trashed: true },
-    { successMessage: "Moved to trash", errorMessage: "Failed to delete", closeAfter: true },
+    {
+      successMessage: "Moved to trash",
+      errorMessage: "Failed to delete",
+      closeAfter: true,
+    },
   );
   const spamMutation = useEmailPatch(
     { spam: true },
-    { successMessage: "Moved to spam", errorMessage: "Failed to move to spam", closeAfter: true },
+    {
+      successMessage: "Moved to spam",
+      errorMessage: "Failed to move to spam",
+      closeAfter: true,
+    },
   );
   const starMutation = useEmailPatch(
     { starred: !isStarred },
@@ -203,9 +215,23 @@ export function EmailActionBar({
   };
 
   const menuItems: MenuItem[] = [
-    { icon: ArchiveIcon, label: "Archive", shortcut: "E", action: () => archiveMutation.mutate() },
-    { icon: TrashIcon, label: "Move to trash", shortcut: "#", action: () => trashMutation.mutate() },
-    { icon: WarningIcon, label: "Move to spam", action: () => spamMutation.mutate() },
+    {
+      icon: ArchiveIcon,
+      label: "Archive",
+      shortcut: "E",
+      action: () => archiveMutation.mutate(),
+    },
+    {
+      icon: TrashIcon,
+      label: "Move to trash",
+      shortcut: "#",
+      action: () => trashMutation.mutate(),
+    },
+    {
+      icon: WarningIcon,
+      label: "Move to spam",
+      action: () => spamMutation.mutate(),
+    },
     {
       icon: StarIcon,
       iconWeight: isStarred ? "fill" : "regular",
@@ -225,13 +251,7 @@ export function EmailActionBar({
     <div className="space-y-3">
       <div className="flex gap-2 items-center justify-end">
         <div className="flex flex-wrap items-center gap-0.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 px-2 text-muted-foreground"
-            onClick={() => onReply?.()}
-          >
+          <Button type="button" variant="ghost" onClick={() => onReply?.()}>
             <ArrowBendUpLeftIcon className="size-3.5" />
             Reply
             <Kbd className="ml-1">R</Kbd>
@@ -273,7 +293,7 @@ export function EmailActionBar({
                     onClick={() => handleMenuAction(item.action)}
                   >
                     <IconComponent
-                      className="size-3.5 text-muted-foreground"
+                      className="size-3.5"
                       weight={item.iconWeight}
                     />
                     <span className="flex-1">{item.label}</span>
@@ -293,10 +313,7 @@ export function EmailActionBar({
                     handleMenuAction(() => snoozeMutation.mutate(null))
                   }
                 >
-                  <ClockIcon
-                    className="size-3.5 text-muted-foreground"
-                    weight="fill"
-                  />
+                  <ClockIcon className="size-3.5" weight="fill" />
                   Unsnooze
                 </button>
               ) : (
@@ -311,7 +328,7 @@ export function EmailActionBar({
                     className={menuItemClassName}
                     disabled={actionsPending}
                   >
-                    <ClockIcon className="size-3.5 text-muted-foreground" />
+                    <ClockIcon className="size-3.5" />
                     Snooze
                   </button>
                 </SnoozePicker>
@@ -325,7 +342,7 @@ export function EmailActionBar({
                     handleMenuAction(() => unsubscribeMutation.mutate())
                   }
                 >
-                  <BellSlashIcon className="size-3.5 text-muted-foreground" />
+                  <BellSlashIcon className="size-3.5" />
                   Unsubscribe
                 </button>
               )}

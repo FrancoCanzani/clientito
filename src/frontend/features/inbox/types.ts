@@ -133,6 +133,13 @@ export type EmailListItem = {
   intelligence: EmailIntelligence | null;
 };
 
+export type EmailBodySource = {
+  bodyText: string | null;
+  bodyHtml: string | null;
+  resolvedBodyText?: string | null;
+  resolvedBodyHtml?: string | null;
+};
+
 export type EmailAttachment = {
   attachmentId: string;
   filename: string | null;
@@ -152,6 +159,8 @@ export type EmailDetailItem = EmailListItem & {
   resolvedBodyHtml: string | null;
   attachments: EmailAttachment[];
 };
+
+export type EmailThreadItem = EmailListItem & EmailBodySource;
 
 export type EmailListResponse = {
   data: EmailListItem[];

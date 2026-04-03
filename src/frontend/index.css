@@ -85,7 +85,7 @@
 }
 
 @theme inline {
-  --font-sans: "Inter", sans-serif;
+  --font-sans: "Colfax", "Inter", sans-serif;
   --font-serif: "Gelasio", serif;
   --font-pixel: "Geist Pixel", monospace;
   --color-sidebar-ring: var(--sidebar-ring);

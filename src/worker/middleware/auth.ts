@@ -9,6 +9,14 @@ import type { AppRouteEnv } from "../routes/types";
 export const authMiddleware = createMiddleware<AppRouteEnv>(async (c, next) => {
   c.set("db", createDb(c.env.DB));
 
+  const pathname = new URL(c.req.raw.url).pathname;
+  if (pathname.startsWith("/api/auth/")) {
+    c.set("user", null);
+    c.set("session", null);
+    await next();
+    return;
+  }
+
   const authInstance = auth(c.env);
   const session = await authInstance.api.getSession({
     headers: c.req.raw.headers,

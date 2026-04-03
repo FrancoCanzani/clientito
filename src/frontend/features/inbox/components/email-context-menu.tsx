@@ -16,15 +16,13 @@ import type { ReactNode } from "react";
 import { useEmail } from "../context/email-context";
 import type { EmailListItem } from "../types";
 
-type EmailContextMenuProps = {
-  children: ReactNode;
-  targetEmail: EmailListItem;
-};
-
 export function EmailContextMenu({
   children,
   targetEmail,
-}: EmailContextMenuProps) {
+}: {
+  children: ReactNode;
+  targetEmail: EmailListItem;
+}) {
   const { executeEmailAction } = useEmail();
   const isRead = targetEmail.isRead;
   const isStarred = targetEmail.labelIds.includes("STARRED");
@@ -38,19 +36,14 @@ export function EmailContextMenu({
         <ContextMenuItem
           onSelect={() => executeEmailAction("archive", [targetEmail.id])}
         >
-          <ArchiveIcon className="size-3.5 text-muted-foreground" />
+          <ArchiveIcon className="size-3.5" />
           Archive
         </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => executeEmailAction("trash", [targetEmail.id])}
-        >
-          <TrashIcon className="size-3.5 text-muted-foreground" />
-          Move to trash
-        </ContextMenuItem>
+
         <ContextMenuItem
           onSelect={() => executeEmailAction("spam", [targetEmail.id])}
         >
-          <WarningIcon className="size-3.5 text-muted-foreground" />
+          <WarningIcon className="size-3.5" />
           Move to spam
         </ContextMenuItem>
         <ContextMenuItem
@@ -61,9 +54,9 @@ export function EmailContextMenu({
           }
         >
           {isRead ? (
-            <EnvelopeSimpleIcon className="size-3.5 text-muted-foreground" />
+            <EnvelopeSimpleIcon className="size-3.5" />
           ) : (
-            <EnvelopeSimpleOpenIcon className="size-3.5 text-muted-foreground" />
+            <EnvelopeSimpleOpenIcon className="size-3.5" />
           )}
           {isRead ? "Mark as unread" : "Mark as read"}
         </ContextMenuItem>
@@ -73,10 +66,17 @@ export function EmailContextMenu({
           }
         >
           <StarIcon
-            className="size-3.5 text-muted-foreground"
+            className="size-3.5"
             weight={isStarred ? "fill" : "regular"}
           />
           {isStarred ? "Unstar" : "Star"}
+        </ContextMenuItem>
+        <ContextMenuItem
+          variant="destructive"
+          onSelect={() => executeEmailAction("trash", [targetEmail.id])}
+        >
+          <TrashIcon className="size-3.5" />
+          Move to trash
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

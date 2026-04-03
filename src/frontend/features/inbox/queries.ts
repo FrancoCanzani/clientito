@@ -4,6 +4,7 @@ import {
 } from "@tanstack/react-query";
 import type {
   ContactSuggestion,
+  EmailThreadItem,
   EmailDetailIntelligence,
   EmailDetailItem,
   EmailListItem,
@@ -136,7 +137,7 @@ export async function fetchEmailSummary(
 
 export async function fetchEmailThread(
   threadId: string,
-): Promise<EmailListItem[]> {
+): Promise<EmailThreadItem[]> {
   const response = await fetch(`/api/inbox/emails/thread/${threadId}`);
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
@@ -147,7 +148,7 @@ export async function fetchEmailThread(
     throw new Error(message);
   }
 
-  const json = (await response.json()) as { data: EmailListItem[] };
+  const json = (await response.json()) as { data: EmailThreadItem[] };
   return json.data;
 }
 

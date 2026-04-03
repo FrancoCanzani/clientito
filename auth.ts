@@ -38,7 +38,7 @@ export function auth(env: Env) {
     },
     session: {
       cookieCache: {
-        enabled: true,
+        enabled: false,
         maxAge: 5 * 60,
       },
     },

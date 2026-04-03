@@ -41,7 +41,8 @@ export default function HomePage() {
   });
 
   const isAnimating = stream.isStreaming;
-  const showCards = queue.visibleItems.length > 0 && !isAnimating && briefingText;
+  const showCards =
+    queue.visibleItems.length > 0 && !isAnimating && briefingText;
   const showCaughtUp = !hasItems && !isAnimating;
 
   return (
@@ -55,7 +56,7 @@ export default function HomePage() {
               key="briefing"
               initial={isAnimating ? { opacity: 0 } : false}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.4 }}
+              transition={{ duration: 0.1 }}
             >
               <BriefingText text={briefingText} animate={isAnimating} />
             </motion.div>
@@ -95,7 +96,7 @@ export default function HomePage() {
       <AgendaPanel days={1} showEmptyState={false} hideProposed showHeader />
 
       {showCards && (
-        <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground">
           <span>{queue.visibleItems.length} items remaining</span>
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">

@@ -1,24 +1,9 @@
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import type { DecisionQueue } from "@/features/home/components/card-stack";
 import type { HomeBriefingItem } from "@/features/home/queries";
-import {
-  ArchiveIcon,
-  CalendarPlusIcon,
-  CheckCircleIcon,
-  EnvelopeSimpleIcon,
-  PaperPlaneRightIcon,
-  PencilSimpleIcon,
-} from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
-
-function Pill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center rounded-full border border-border/70 bg-background px-2.5 py-1 text-[11px] font-medium tracking-[-0.01em] text-foreground/80">
-      {children}
-    </span>
-  );
-}
 
 function truncateCopy(value: string, maxLength: number) {
   const normalized = value.replace(/\s+/g, " ").trim();
@@ -26,44 +11,11 @@ function truncateCopy(value: string, maxLength: number) {
   return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
 }
 
-function toTitleCase(value: string) {
-  return value
-    .split(/[\s-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function getDomainLabel(domain: string) {
-  const parts = domain
-    .split(".")
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (parts.length >= 2) {
-    return toTitleCase(parts[parts.length - 2] ?? parts[0] ?? domain);
-  }
-
-  return toTitleCase(parts[0] ?? domain);
-}
-
 function getSenderPresentation(item: HomeBriefingItem) {
   const fromName = item.fromName?.trim();
-  const domain = item.fromAddr?.split("@")[1]?.trim() ?? null;
-
-  if (fromName) {
-    const match = fromName.match(/^(.*?)\s+from\s+(.+)$/i);
-    if (match) {
-      return {
-        senderName: match[1]!.trim(),
-        sourceLabel: match[2]!.trim(),
-      };
-    }
-  }
 
   return {
-    senderName: fromName || item.title,
-    sourceLabel: domain ? getDomainLabel(domain) : null,
+    senderName: fromName || item.fromAddr || item.title,
   };
 }
 
@@ -86,6 +38,36 @@ function getSummaryText(item: HomeBriefingItem) {
   return item.reason || item.title;
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getInlineSummaryText(
+  item: HomeBriefingItem,
+  summaryText: string,
+  senderName: string,
+) {
+  const normalized = summaryText.trim();
+  if (
+    item.type !== "email_action" &&
+    item.type !== "briefing_email" &&
+    item.type !== "calendar_suggestion"
+  ) {
+    return normalized;
+  }
+
+  const candidates = [senderName].filter(Boolean) as string[];
+
+  for (const candidate of candidates) {
+    const pattern = new RegExp(`^${escapeRegExp(candidate)}\\s+`, "i");
+    if (pattern.test(normalized)) {
+      return normalized.replace(pattern, "");
+    }
+  }
+
+  return normalized;
+}
+
 function getPrimaryAction({
   item,
   draft,
@@ -101,19 +83,17 @@ function getPrimaryAction({
 }) {
   if (item.type === "calendar_suggestion") {
     return {
-      icon: <CalendarPlusIcon className="size-4" />,
-      label: "Accept",
+      label: "Calendar",
       detail: formatEventRange(item),
       dismissLabel: "Decline",
       onDismiss: () => queue.dismissEvent(item.id),
-      primaryLabel: "Accept",
+      primaryLabel: "Schedule",
       onPrimary: () => queue.approveEvent(item.id),
     };
   }
 
   if (item.type === "overdue_task" || item.type === "due_today_task") {
     return {
-      icon: <CheckCircleIcon className="size-4" />,
       label: item.type === "overdue_task" ? "Overdue" : "Due today",
       detail: item.title,
       dismissLabel: "Skip",
@@ -125,7 +105,6 @@ function getPrimaryAction({
 
   if (item.type === "briefing_email") {
     return {
-      icon: <EnvelopeSimpleIcon className="size-4" />,
       label: "Email",
       detail: item.subject || "Open this message",
       dismissLabel: "Skip",
@@ -137,7 +116,6 @@ function getPrimaryAction({
 
   if (item.actionType === "archive") {
     return {
-      icon: <ArchiveIcon className="size-4" />,
       label: "Archive",
       detail: "Move this thread out of the inbox",
       dismissLabel: "Dismiss",
@@ -149,7 +127,6 @@ function getPrimaryAction({
 
   if (item.actionType === "reply") {
     return {
-      icon: <PencilSimpleIcon className="size-4" />,
       label: "Draft",
       detail: truncateCopy(draft || item.reason || item.title, 96),
       dismissLabel: "Dismiss",
@@ -160,7 +137,6 @@ function getPrimaryAction({
   }
 
   return {
-    icon: <PaperPlaneRightIcon className="size-4" />,
     label: "Email action",
     detail: item.subject || "Open this message",
     dismissLabel: "Dismiss",
@@ -183,8 +159,9 @@ export function TriageCard({
   const draft = queue.drafts[item.id] ?? item.draftReply ?? "";
   const isEditing = queue.editingId === item.id;
   const isSending = queue.sendingId === item.id;
-  const { senderName, sourceLabel } = getSenderPresentation(item);
+  const { senderName } = getSenderPresentation(item);
   const summaryText = getSummaryText(item);
+  const inlineSummaryText = getInlineSummaryText(item, summaryText, senderName);
   const action = getPrimaryAction({
     item,
     draft,
@@ -204,57 +181,58 @@ export function TriageCard({
   }, [isEditing]);
 
   return (
-    <div className="overflow-hidden rounded-[22px] border border-border/70 bg-card shadow-[0_1px_0_rgba(15,23,42,0.03)]">
+    <div className="overflow-hidden rounded-md border border-border/40">
       <button
         type="button"
-        className="block w-full bg-background px-4 py-4 text-left transition-colors duration-150 ease-out hover:bg-muted/[0.16]"
+        className="block w-full text-start text-pretty"
         onClick={() => navigate({ to: item.href })}
       >
-        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-          {(item.type === "email_action" || item.type === "briefing_email") && (
+        <p className="text-sm px-4 py-3 rounded-b-md shadow-xs">
+          {(item.type === "email_action" ||
+            item.type === "briefing_email" ||
+            item.type === "calendar_suggestion") && (
             <>
-              <Pill>{senderName}</Pill>
-              {sourceLabel && <Pill>{sourceLabel}</Pill>}
+              <span className="font-medium">{senderName}</span>
+              <span className="ml-1">{inlineSummaryText}</span>
             </>
           )}
-          {item.type === "calendar_suggestion" && <Pill>Suggested event</Pill>}
           {(item.type === "overdue_task" || item.type === "due_today_task") && (
-            <Pill>{item.type === "overdue_task" ? "Overdue task" : "Today"}</Pill>
+            <>
+              <span>{item.type === "overdue_task" ? "Overdue" : "Today"}</span>
+              <span className="ml-1">{inlineSummaryText}</span>
+            </>
           )}
-        </div>
-
-        <p className="mt-3 text-[15px] leading-6 tracking-[-0.02em] text-foreground">
-          {summaryText}
+          {item.type !== "email_action" &&
+            item.type !== "briefing_email" &&
+            item.type !== "calendar_suggestion" &&
+            item.type !== "overdue_task" &&
+            item.type !== "due_today_task" &&
+            inlineSummaryText}
         </p>
       </button>
 
-      <div className="flex flex-col gap-3 border-t border-border/70 bg-muted/[0.42] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-background text-foreground/80">
-            {action.icon}
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between bg-muted">
+        <div className="flex min-w-0 items-center gap-2.5 text-muted-foreground text-xs">
+          <div className="min-w-0 truncate">
+            <span className="mr-1 font-medium text-primary">
               {action.label}
-            </p>
-            <p className="truncate text-sm text-foreground/85">
-              {action.detail}
-            </p>
+            </span>
+            <span className="truncate">{action.detail}</span>
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-2">
-          <button
+          <Button
             type="button"
-            className="text-sm text-muted-foreground transition-colors duration-150 ease-out hover:text-foreground"
+            variant={"destructive"}
             onClick={action.onDismiss}
           >
             {action.dismissLabel}
-          </button>
+          </Button>
           <Button
             type="button"
-            size="sm"
-            className="min-w-[7.5rem] active:scale-[0.98]"
+            variant={"outline"}
+            className="bg-background"
             disabled={isSending}
             onClick={action.onPrimary}
           >
@@ -264,27 +242,26 @@ export function TriageCard({
       </div>
 
       {item.actionType === "reply" && draft && isEditing && (
-        <div className="border-t border-border/70 bg-background px-4 py-4">
+        <div className="px-4 py-3">
           <div className="space-y-3">
-            <textarea
+            <Textarea
               ref={textareaRef}
-              className="min-h-28 w-full resize-none rounded-2xl border border-border/80 bg-muted/25 px-3 py-3 text-[13px] leading-6 text-foreground outline-none transition-shadow focus:ring-2 focus:ring-primary/15"
+              className="min-h-32 w-full text-xs resize-none rounded-md"
               rows={5}
               value={draft}
-              onChange={(event) => queue.updateDraft(item.id, event.target.value)}
+              onChange={(event) =>
+                queue.updateDraft(item.id, event.target.value)
+              }
             />
             <div className="flex items-center justify-end gap-2">
               <Button
-                variant="ghost"
-                size="sm"
-                className="active:scale-[0.98]"
+                variant="destructive"
                 onClick={() => queue.toggleEditing(item.id)}
               >
                 Cancel
               </Button>
               <Button
-                size="sm"
-                className="min-w-[6rem] active:scale-[0.98]"
+                variant={"outline"}
                 disabled={isSending}
                 onClick={() => queue.sendReply(item.id)}
               >

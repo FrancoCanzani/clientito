@@ -13,12 +13,13 @@ import type { EmailListItem } from "../types";
 import { formatInboxRowDate } from "../utils/formatters";
 import type { ThreadGroup } from "../utils/group-emails-by-thread";
 
-type EmailRowProps = {
+export function EmailRow({
+  group,
+  isOpen,
+}: {
   group: ThreadGroup;
   isOpen: boolean;
-};
-
-export function EmailRow({ group, isOpen }: EmailRowProps) {
+}) {
   const { openEmail, executeEmailAction, view } = useEmail();
   const email: EmailListItem = group.representative;
   const isStarred = email.labelIds.includes("STARRED");
@@ -68,18 +69,20 @@ export function EmailRow({ group, isOpen }: EmailRowProps) {
           <div className="flex items-center gap-2 group-hover:invisible">
             {isStarred && (
               <StarIcon
-                className="size-3 text-yellow-500"
+                className="size-3.5 text-yellow-400"
                 weight="fill"
                 aria-hidden
               />
             )}
             {email.hasAttachment && (
-              <PaperclipIcon className="size-3" aria-hidden />
+              <PaperclipIcon className="size-3.5" aria-hidden />
             )}
             {threadCount > 1 && (
               <span className="tabular-nums">[{threadCount}]</span>
             )}
-            <span>{formatInboxRowDate(email.date)}</span>
+            <span className="tabular-nums">
+              {formatInboxRowDate(email.date)}
+            </span>
           </div>
 
           <div className="absolute inset-y-0 right-0 hidden items-center justify-end group-hover:flex">
@@ -121,7 +124,7 @@ export function EmailRow({ group, isOpen }: EmailRowProps) {
               }}
             >
               <StarIcon
-                className={cn("size-3.5", isStarred && "text-yellow-500")}
+                className={cn("size-3.5", isStarred && "text-yellow-400")}
                 weight={isStarred ? "fill" : "regular"}
               />
             </IconButton>
@@ -134,7 +137,7 @@ export function EmailRow({ group, isOpen }: EmailRowProps) {
                 executeEmailAction("trash", [email.id]);
               }}
             >
-              <TrashIcon className="size-3.5" />
+              <TrashIcon className="size-3.5" fill="red" />
             </IconButton>
           </div>
         </div>

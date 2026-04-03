@@ -7,7 +7,7 @@ import type { AppRouteEnv } from "../../types";
 import {
   emailIntelligenceSelection,
   emailSummarySelection,
-  toEmailListResponse,
+  toEmailDetailResponse,
 } from "./utils";
 import { emailThreadParamsSchema } from "./schemas";
 
@@ -25,6 +25,8 @@ export function registerGetEmailThread(api: Hono<AppRouteEnv>) {
       const rows = await db
         .select({
           ...emailSummarySelection,
+          bodyText: emails.bodyText,
+          bodyHtml: emails.bodyHtml,
           ...emailIntelligenceSelection,
         })
         .from(emails)
@@ -32,7 +34,7 @@ export function registerGetEmailThread(api: Hono<AppRouteEnv>) {
         .where(and(eq(emails.threadId, threadId), eq(emails.userId, user.id)))
         .orderBy(asc(emails.date));
 
-      return c.json({ data: rows.map(toEmailListResponse) }, 200);
+      return c.json({ data: rows.map(toEmailDetailResponse) }, 200);
     },
   );
 }

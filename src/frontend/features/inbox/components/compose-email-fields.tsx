@@ -31,6 +31,7 @@ type ComposeEmailFieldsProps = {
   onEscape?: () => void;
   recipientAutoFocus?: boolean;
   editorAutoFocus?: boolean;
+  showAccountSwitcher?: boolean;
 };
 
 function ForwardedMessagePreview({ html }: { html: string }) {
@@ -86,6 +87,7 @@ export function ComposeEmailFields({
   onEscape,
   recipientAutoFocus = false,
   editorAutoFocus = false,
+  showAccountSwitcher = true,
 }: ComposeEmailFieldsProps) {
   const {
     to,
@@ -149,14 +151,14 @@ export function ComposeEmailFields({
         }
       }}
     >
-      <div className="space-y-2 p-1">
-        {availableMailboxes.length > 1 && (
+      <div className="space-y-2 px-1 py-2 border-b border-border/40">
+        {showAccountSwitcher && availableMailboxes.length > 1 && (
           <Select
             value={mailboxId != null ? String(mailboxId) : undefined}
             onValueChange={(value) => setMailboxId(Number(value))}
           >
             <SelectTrigger
-              className="h-auto w-full border-0 px-2 text-left text-sm text-muted-foreground shadow-none focus-visible:ring-0"
+              className="h-auto w-full border-0 px-3 text-left text-xs text-muted-foreground shadow-none focus-visible:ring-0"
               size="default"
             >
               <SelectValue placeholder="Select sender" />
@@ -174,13 +176,13 @@ export function ComposeEmailFields({
           </Select>
         )}
 
-        <div className="flex items-center px-2 py-1 gap-2">
+        <div className="flex items-start gap-2 p-1">
           <RecipientInput
             value={to}
             onChange={setTo}
             autoFocus={recipientAutoFocus}
           />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pt-1">
             {!showCc && (
               <button
                 type="button"
@@ -203,11 +205,11 @@ export function ComposeEmailFields({
         </div>
 
         {showCc && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2 px-2 py-1">
             <RecipientInput value={cc} onChange={setCc} placeholder="Cc" />
             <button
               type="button"
-              className="shrink-0 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
+              className="shrink-0 pt-1 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
               onClick={() => {
                 setCc("");
                 setShowCc(false);
@@ -219,11 +221,11 @@ export function ComposeEmailFields({
         )}
 
         {showBcc && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2 px-2 py-1">
             <RecipientInput value={bcc} onChange={setBcc} placeholder="Bcc" />
             <button
               type="button"
-              className="shrink-0 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
+              className="shrink-0 pt-1 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
               onClick={() => {
                 setBcc("");
                 setShowBcc(false);
@@ -241,8 +243,6 @@ export function ComposeEmailFields({
           className="w-full bg-transparent py-1 px-2 text-xs outline-none placeholder:text-muted-foreground/50"
         />
       </div>
-
-      <div className="mx-2 border-t border-border/30" />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-1">
         {grammar.state.status === "reviewing" ? (
@@ -296,25 +296,23 @@ export function ComposeEmailFields({
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8"
                 disabled={attachments.uploading}
                 onClick={() => fileInputRef.current?.click()}
                 title="Attach files"
               >
-                <PaperclipIcon className="size-4" />
+                <PaperclipIcon className="size-3.5" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8"
                 disabled={grammar.state.status === "loading" || !hasBody}
                 onClick={handleGrammarCheck}
                 title="Grammar check"
               >
                 {grammar.state.status === "loading" ? (
-                  <SpinnerGapIcon className="size-4 animate-spin" />
+                  <SpinnerGapIcon className="size-3.5 animate-spin" />
                 ) : (
-                  <CheckIcon className="size-4" />
+                  <CheckIcon className="size-3.5" />
                 )}
               </Button>
               <ScheduleSendPicker
@@ -322,13 +320,8 @@ export function ComposeEmailFields({
                   scheduleSend(timestamp);
                 }}
               >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  disabled={!canSend}
-                >
-                  <ClockIcon className="size-4" />
+                <Button variant="ghost" size="icon" disabled={!canSend}>
+                  <ClockIcon className="size-3.5" />
                 </Button>
               </ScheduleSendPicker>
             </div>

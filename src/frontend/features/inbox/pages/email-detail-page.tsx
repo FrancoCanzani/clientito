@@ -1,16 +1,16 @@
 import { ComposePanel } from "@/features/inbox/components/compose-panel";
 import { EmailDetailContent } from "@/features/inbox/components/email-detail-content";
+import { useRegisterEmailCommandHandler } from "@/features/inbox/hooks/use-email-command-state";
+import { patchEmail } from "@/features/inbox/mutations";
 import type {
   ComposeInitial,
   EmailListItem,
   EmailListResponse,
 } from "@/features/inbox/types";
+import { buildForwardedEmailHtml } from "@/features/inbox/utils/build-forwarded-html";
 import { openEmail as openInboxEmail } from "@/features/inbox/utils/open-email";
-import { useRegisterEmailCommandHandler } from "@/features/inbox/hooks/use-email-command-state";
 import { useSetPageContext } from "@/hooks/use-page-context";
 import { parseMailboxId } from "@/lib/utils";
-import { patchEmail } from "@/features/inbox/mutations";
-import { buildForwardedEmailHtml } from "@/features/inbox/utils/build-forwarded-html";
 import {
   useMutation,
   useQueryClient,
@@ -41,11 +41,7 @@ export default function EmailDetailPage() {
 
   useSetPageContext(
     useMemo(() => {
-      const bodyPreview = (
-        email.resolvedBodyText ??
-        email.bodyText ??
-        ""
-      )
+      const bodyPreview = (email.resolvedBodyText ?? email.bodyText ?? "")
         .replace(/\s+/g, " ")
         .trim()
         .slice(0, 1500);
@@ -118,24 +114,33 @@ export default function EmailDetailPage() {
 
   const invalidateEmail = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["emails"] });
-    queryClient.invalidateQueries({ queryKey: ["email-detail", params.emailId] });
-    queryClient.invalidateQueries({ queryKey: ["email-ai-detail", params.emailId] });
+    queryClient.invalidateQueries({
+      queryKey: ["email-detail", params.emailId],
+    });
+    queryClient.invalidateQueries({
+      queryKey: ["email-ai-detail", params.emailId],
+    });
     void router.invalidate();
   }, [queryClient, params.emailId, router]);
 
   const archiveMutation = useMutation({
     mutationFn: () => patchEmail(params.emailId, { archived: true }),
-    onSuccess: () => { invalidateEmail(); goBack(); },
+    onSuccess: () => {
+      invalidateEmail();
+      goBack();
+    },
   });
 
   const trashMutation = useMutation({
     mutationFn: () => patchEmail(params.emailId, { trashed: true }),
-    onSuccess: () => { invalidateEmail(); goBack(); },
+    onSuccess: () => {
+      invalidateEmail();
+      goBack();
+    },
   });
 
   const toggleReadMutation = useMutation({
-    mutationFn: () =>
-      patchEmail(params.emailId, { isRead: !email.isRead }),
+    mutationFn: () => patchEmail(params.emailId, { isRead: !email.isRead }),
     onSuccess: invalidateEmail,
   });
 
@@ -200,7 +205,13 @@ export default function EmailDetailPage() {
             break;
         }
       },
-      [archiveMutation, trashMutation, toggleReadMutation, toggleStarMutation, handleForward],
+      [
+        archiveMutation,
+        trashMutation,
+        toggleReadMutation,
+        toggleStarMutation,
+        handleForward,
+      ],
     ),
   );
 

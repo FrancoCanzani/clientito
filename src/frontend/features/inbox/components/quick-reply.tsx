@@ -77,7 +77,7 @@ export const QuickReply = forwardRef<
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex w-full items-center gap-2 rounded-md border border-border/50 p-4 justify-center text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+          className="flex w-full items-center gap-2 rounded-md border border-border/40 p-3 justify-center text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground"
         >
           Click here to reply
         </button>
@@ -103,9 +103,9 @@ export const QuickReply = forwardRef<
         <div className="min-h-0 flex-1 overflow-y-auto">
           <ComposeEmailFields
             compose={compose}
-            bodyClassName="min-h-32 text-sm leading-relaxed"
             onEscape={() => setOpen(false)}
             editorAutoFocus
+            showAccountSwitcher={false}
           />
         </div>
       </div>

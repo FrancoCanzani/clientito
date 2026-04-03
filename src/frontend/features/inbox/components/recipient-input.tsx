@@ -157,7 +157,10 @@ export function RecipientInput({
 
   return (
     <div ref={containerRef} className="relative w-full">
-      <label className="flex max-h-24 flex-wrap items-center gap-1 overflow-y-auto">
+      <div
+        className="flex max-h-24 flex-wrap items-center gap-1 overflow-y-auto"
+        onClick={() => inputRef.current?.focus()}
+      >
         {chips.map((email, i) => {
           const displayName = nameMap.get(email);
           return (
@@ -194,7 +197,7 @@ export function RecipientInput({
           autoFocus={autoFocus}
           className={`min-w-20 flex-1 bg-transparent py-1 text-xs outline-none placeholder:text-muted-foreground/50 ${inputClassName ?? ""}`}
         />
-      </label>
+      </div>
 
       {showDropdown && (
         <div className="absolute top-full left-0 z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-lg">

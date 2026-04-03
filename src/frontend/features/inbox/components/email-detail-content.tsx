@@ -321,7 +321,7 @@ function EmailOverviewPanel({
   });
 
   return (
-    <section className="space-y-4 rounded-2xl border border-border/60 bg-card/70 p-3">
+    <section className="space-y-4 rounded-md border border-border/40 p-3">
       {intelligence.suspicious.isSuspicious && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-3">
           <div className="flex items-start justify-between gap-3">
@@ -356,10 +356,10 @@ function EmailOverviewPanel({
         </div>
       )}
 
-      <div className="space-y-1">
-        <div className="text-sm font-medium tracking-[-0.6px] text-foreground">
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium tracking-[-0.6px] text-foreground">
           Overview
-        </div>
+        </h3>
         {summary ? (
           <p className="text-xs tracking-[-0.2px] text-foreground/90">
             {summary}
@@ -371,14 +371,24 @@ function EmailOverviewPanel({
         ) : null}
       </div>
 
+      {replyDraft && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium tracking-[-0.6px] text-foreground">
+            Draft reply
+          </h3>
+          <p className="text-xs tracking-[-0.2px] text-foreground/90">
+            {String(replyDraft.payload.draft ?? "")}
+          </p>
+        </div>
+      )}
+
       {pendingActions.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {pendingActions.map((action) => (
             <Button
               key={action.id}
               type="button"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               disabled={aiActionPending}
               onClick={() => onAiAction(action)}
             >
@@ -386,12 +396,6 @@ function EmailOverviewPanel({
             </Button>
           ))}
         </div>
-      )}
-
-      {replyDraft && (
-        <p className="line-clamp-3 rounded-xl bg-muted/45 px-3 py-2 text-xs leading-5 text-muted-foreground">
-          {String(replyDraft.payload.draft ?? "")}
-        </p>
       )}
 
       {linkedTasks.length > 0 && (
@@ -465,6 +469,7 @@ export function EmailDetailContent({
   replyTriggerRef?: RefObject<{ trigger: () => void } | null>;
 }) {
   const { email } = detailRoute.useLoaderData();
+  const queryClient = useQueryClient();
   const formattedDate = formatEmailDetailDate(email.date);
   const quickReplyRef = useRef<QuickReplyHandle>(null);
   const [threadExpansionOverrides, setThreadExpansionOverrides] = useState<
@@ -542,10 +547,14 @@ export function EmailDetailContent({
     return threadQuery.data?.length ? threadQuery.data : [email];
   }, [email, threadQuery.data]);
   const defaultExpandedThreadIds = useMemo(() => {
-    const next = new Set<string>([email.id]);
-    const mostRecentThreadMessage = threadMessages[threadMessages.length - 1];
-    if (mostRecentThreadMessage) {
-      next.add(mostRecentThreadMessage.id);
+    const next = new Set<string>();
+    const selectedThreadMessage = threadMessages.find(
+      (threadMessage) => threadMessage.id === email.id,
+    );
+    if (selectedThreadMessage) {
+      next.add(selectedThreadMessage.id);
+    } else {
+      next.add(email.id);
     }
     return next;
   }, [email.id, threadMessages]);
@@ -565,8 +574,7 @@ export function EmailDetailContent({
   const showThreadTimeline = Boolean(
     email.threadId && threadMessages.length > 1,
   );
-  const hasSelectedAttachments =
-    email.hasAttachment || email.attachments.length > 0;
+  const hasSelectedAttachments = email.attachments.length > 0;
   const subject = email.subject ?? "(no subject)";
   const recipientRows = buildRecipientRows(email);
 
@@ -582,17 +590,11 @@ export function EmailDetailContent({
   }, [replyTriggerRef]);
 
   return (
-    <div className="flex w-full min-w-0 flex-col">
-      <div className="sticky top-0 z-10 w-full bg-background pb-3 pt-5">
+    <div className="flex w-full min-w-0 flex-col space-y-8">
+      <div className="sticky top-0 z-10 w-full bg-background pt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-0.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 px-2 text-muted-foreground"
-              onClick={() => onBack?.()}
-            >
+            <Button type="button" variant="ghost" onClick={() => onBack?.()}>
               <ArrowLeftIcon className="size-3.5" />
               Back
             </Button>
@@ -623,22 +625,12 @@ export function EmailDetailContent({
         </div>
       </div>
 
-      <div className="mb-5">
-        <h1 className="min-w-0 text-lg font-medium text-foreground sm:text-xl">
-          {subject}
-        </h1>
+      <div className="space-y-2">
+        <h1 className="min-w-0 font-medium text-foreground">{subject}</h1>
 
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="min-w-0 space-y-1">
-              <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
-                <p className="truncate text-sm font-medium text-foreground">
-                  {email.fromName || email.fromAddr}
-                </p>
-                <span className="truncate text-sm text-muted-foreground">
-                  {email.fromAddr}
-                </span>
-              </div>
               <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                 {recipientRows.map((row) => (
                   <p key={row.label} className="min-w-0">
@@ -652,14 +644,14 @@ export function EmailDetailContent({
             </div>
           </div>
 
-          <span className="shrink-0 text-xs tracking-tight font-medium text-muted-foreground">
+          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
             {formattedDate}
           </span>
         </div>
       </div>
 
-      <div className="w-full py-5">
-        <div className="space-y-4">
+      <div className="w-full">
+        <div className="space-y-8">
           {intelligence && (
             <EmailOverviewPanel
               intelligence={intelligence}
@@ -687,9 +679,6 @@ export function EmailDetailContent({
 
           {showThreadTimeline ? (
             <section className="space-y-3">
-              <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                Conversation
-              </div>
               <div className="space-y-2">
                 {threadMessages.map((threadEmail) => {
                   const isExpanded = isThreadMessageExpanded(threadEmail.id);
@@ -699,13 +688,10 @@ export function EmailDetailContent({
                     <ThreadMessageCard
                       key={threadEmail.id}
                       email={threadEmail}
-                      detail={isSelectedMessage ? email : null}
-                      active={isSelectedMessage}
+                      body={isSelectedMessage ? email : threadEmail}
                       expanded={isExpanded}
                       onToggle={() => toggleThreadMessage(threadEmail.id)}
-                      showAttachments={
-                        isSelectedMessage && hasSelectedAttachments
-                      }
+                      attachments={isSelectedMessage ? email.attachments : []}
                     />
                   );
                 })}

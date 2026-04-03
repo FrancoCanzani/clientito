@@ -39,12 +39,14 @@ const ipKey = (c: any): string => {
   return "unknown";
 };
 
+const isSafeAuthRead = (c: any): boolean => c.req.method === "GET";
+
 /** Auth routes: brute force protection */
 export const authLimiter = rateLimiter<AppRouteEnv>({
   windowMs: 15 * 60 * 1000,
   limit: 20,
   keyGenerator: ipKey,
-  skip: isLocalRequest,
+  skip: (c) => isLocalRequest(c) || isSafeAuthRead(c),
 });
 
 export const strictLimiter = rateLimiter<AppRouteEnv>({

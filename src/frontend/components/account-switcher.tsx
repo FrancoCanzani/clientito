@@ -34,12 +34,12 @@ export function AccountSwitcher() {
   const label =
     activeId === "all"
       ? "All accounts"
-      : (activeAccount ? getMailboxDisplayEmail(activeAccount) : null) ??
-        "Account";
+      : ((activeAccount ? getMailboxDisplayEmail(activeAccount) : null) ??
+        "Account");
 
   return (
     <Link
-      className="text-muted-foreground hover:text-primary flex items-center gap-1.5 text-sm"
+      className="text-muted-foreground hover:text-primary flex items-center gap-1.5 text-xs"
       to="/inbox/$id"
       params={{ id: nextOption.id }}
       search={{
@@ -50,7 +50,7 @@ export function AccountSwitcher() {
         threadId: undefined,
       }}
     >
-      {label}
+      <span className="whitespace-nowrap">{label}</span>
     </Link>
   );
 }
