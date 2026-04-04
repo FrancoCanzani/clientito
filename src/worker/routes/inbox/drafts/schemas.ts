@@ -29,3 +29,7 @@ export const upsertDraftBodySchema = z.object({
 export const deleteDraftByKeyQuerySchema = z.object({
   composeKey: z.string().min(1),
 });
+
+export const getDraftsQuerySchema = z.object({
+  mailboxId: z.coerce.number().int().positive().optional(),
+});

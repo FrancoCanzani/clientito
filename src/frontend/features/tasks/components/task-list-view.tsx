@@ -13,6 +13,7 @@ import {
   type TaskSection,
 } from "@/features/tasks/utils";
 import { PlusIcon } from "@phosphor-icons/react";
+import type { ComponentProps } from "react";
 
 type EditorState =
   | { mode: "create"; dueAt: number | null }
@@ -28,6 +29,7 @@ type TaskListViewProps = {
   view: TaskView;
   onSetEditor: (editor: EditorState) => void;
   onCreateFromEmpty: () => void;
+  taskRowActions: ComponentProps<typeof TaskRow>["actions"];
 };
 
 export function TaskListView({
@@ -39,6 +41,7 @@ export function TaskListView({
   view,
   onSetEditor,
   onCreateFromEmpty,
+  taskRowActions,
 }: TaskListViewProps) {
   if (sections.length === 0) {
     return (
@@ -103,6 +106,7 @@ export function TaskListView({
                   editor?.mode === "edit" &&
                   editor.taskId === task.id
                 }
+                actions={taskRowActions}
               />
             ))}
           </div>

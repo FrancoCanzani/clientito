@@ -2,6 +2,7 @@ import {
   infiniteQueryOptions,
   queryOptions,
 } from "@tanstack/react-query";
+import type { EmailView } from "./utils/inbox-filters";
 import type {
   ContactSuggestion,
   EmailThreadItem,
@@ -15,7 +16,7 @@ import type {
 type FetchEmailsParams = {
   search?: string;
   isRead?: "true" | "false";
-  view?: "inbox" | "sent" | "spam" | "trash" | "snoozed" | "archived" | "starred" | "important";
+  view?: EmailView;
   limit?: number;
   offset?: number;
   mailboxId?: number;
@@ -191,7 +192,41 @@ export async function fetchSearchSuggestions(
   return json.data;
 }
 
+export const EMAIL_LIST_PAGE_SIZE = 60;
 export const INBOX_SEARCH_PAGE_SIZE = 30;
+
+export function getEmailListQueryKey(
+  view: EmailView,
+  mailboxId: number | null,
+) {
+  return ["emails", view, mailboxId ?? "all"] as const;
+}
+
+export function emailListInfiniteQueryOptions({
+  view,
+  mailboxId,
+}: {
+  view: EmailView;
+  mailboxId: number | null;
+}) {
+  return infiniteQueryOptions({
+    queryKey: getEmailListQueryKey(view, mailboxId),
+    queryFn: ({ pageParam }) =>
+      fetchEmails({
+        view,
+        limit: EMAIL_LIST_PAGE_SIZE,
+        offset: pageParam,
+        mailboxId: mailboxId ?? undefined,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) =>
+      lastPage?.pagination?.hasMore
+        ? lastPage.pagination.offset + lastPage.pagination.limit
+        : undefined,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+  });
+}
 
 export function inboxSearchResultsInfiniteQueryOptions(params: InboxSearchScope) {
   return infiniteQueryOptions({

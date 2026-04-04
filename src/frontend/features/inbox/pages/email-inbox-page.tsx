@@ -4,17 +4,18 @@ import {
   EmailProvider,
   useEmail,
 } from "@/features/inbox/context/email-context";
-import { useHotkeyScope } from "@/lib/hotkeys/use-scope";
+import type { EmailView } from "@/features/inbox/utils/inbox-filters";
 import { useSetPageContext } from "@/hooks/use-page-context";
+import { useHotkeyScope } from "@/lib/hotkeys/use-scope";
 import { getRouteApi } from "@tanstack/react-router";
 import { useMemo } from "react";
 
-const emailsRoute = getRouteApi("/_dashboard/inbox/$id/");
+const mailboxRoute = getRouteApi("/_dashboard/inbox/$id");
 
 function InboxContent() {
   useHotkeyScope("inbox");
-  const navigate = emailsRoute.useNavigate();
-  const search = emailsRoute.useSearch();
+  const navigate = mailboxRoute.useNavigate();
+  const search = mailboxRoute.useSearch();
 
   const { mailboxId, forwardOpen, composeInitial, closeForward } = useEmail();
 
@@ -50,9 +51,15 @@ function InboxContent() {
   );
 }
 
-export default function EmailInboxPage() {
+export default function EmailInboxPage({
+  view,
+  mailboxId,
+}: {
+  view: EmailView;
+  mailboxId: number | null;
+}) {
   return (
-    <EmailProvider>
+    <EmailProvider view={view} mailboxId={mailboxId}>
       <InboxContent />
     </EmailProvider>
   );

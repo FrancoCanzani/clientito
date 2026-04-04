@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useEmailAiActions } from "@/features/inbox/hooks/use-email-ai-actions";
 import { patchEmail } from "@/features/inbox/mutations";
 import {
@@ -195,6 +196,7 @@ export function EmailDetailContent({
       <div className="sticky top-0 z-10 w-full bg-background pt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-0.5">
+            <SidebarTrigger className="h-10 w-10 md:hidden [&_svg]:size-5" />
             <Button type="button" variant="ghost" onClick={() => onBack?.()}>
               <ArrowLeftIcon className="size-3.5" />
               Back

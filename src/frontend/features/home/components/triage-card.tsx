@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { DecisionQueue } from "@/features/home/components/card-stack";
+import type { DecisionQueue } from "@/features/home/hooks/use-decision-queue";
 import type { HomeBriefingItem } from "@/features/home/queries";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
@@ -112,6 +112,24 @@ function getPrimaryAction({
       onDismiss: () => queue.dismiss(item.id),
       primaryLabel: "Open",
       onPrimary: () => navigate({ to: item.href }),
+    };
+  }
+
+  if (item.actionType === "create_task") {
+    const dueLabel = item.taskDueAt
+      ? new Intl.DateTimeFormat(undefined, {
+          month: "short",
+          day: "numeric",
+        }).format(item.taskDueAt)
+      : null;
+
+    return {
+      label: "Task",
+      detail: [item.taskTitle, dueLabel].filter(Boolean).join(" · "),
+      dismissLabel: "Dismiss",
+      onDismiss: () => queue.dismiss(item.id),
+      primaryLabel: "Add Task",
+      onPrimary: () => queue.approveTask(item.id),
     };
   }
 
@@ -233,7 +251,7 @@ export function TriageCard({
           <Button
             type="button"
             variant={"outline"}
-            className="bg-background"
+            className="bg-background border-dashed"
             disabled={isSending}
             onClick={action.onPrimary}
           >

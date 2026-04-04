@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/page-header";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Empty,
   EmptyDescription,
@@ -17,10 +18,17 @@ export default function SubscriptionsPage() {
   const { subscriptions } = route.useLoaderData();
   const [items, setItems] = useState(subscriptions);
 
-  if (items.length === 0) {
-    return (
-      <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-4 py-4">
-        <PageHeader title="Subscriptions" />
+  return (
+    <div className="flex min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col gap-4 py-4">
+      <PageHeader
+        title={
+          <div className="flex items-center gap-2">
+            <SidebarTrigger className="h-10 w-10 md:hidden [&>svg]:size-5" />
+            <span>Subscriptions</span>
+          </div>
+        }
+      />
+      {items.length === 0 ? (
         <Empty className="min-h-0 flex-1 border-0 p-0">
           <EmptyHeader>
             <EmptyTitle>No subscriptions found</EmptyTitle>
@@ -29,25 +37,21 @@ export default function SubscriptionsPage() {
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-4 py-4">
-      <PageHeader title="Subscriptions" />
-
-      <div className="space-y-1">
-        {items.map((sub) => (
-          <SubscriptionRow
-            key={sub.fromAddr}
-            subscription={sub}
-            onRemove={(fromAddr) =>
-              setItems((current) => current.filter((item) => item.fromAddr !== fromAddr))
-            }
-          />
-        ))}
-      </div>
+      ) : (
+        <div className="space-y-1">
+          {items.map((sub) => (
+            <SubscriptionRow
+              key={sub.fromAddr}
+              subscription={sub}
+              onRemove={(fromAddr) =>
+                setItems((current) =>
+                  current.filter((item) => item.fromAddr !== fromAddr),
+                )
+              }
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

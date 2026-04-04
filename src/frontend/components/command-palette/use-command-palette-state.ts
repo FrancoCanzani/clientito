@@ -20,7 +20,6 @@ export function useCommandPaletteState() {
   const [mode, setMode] = useState<PaletteMode>("commands");
   const [query, setQuery] = useState("");
   const [agentHasSubmitted, setAgentHasSubmitted] = useState(false);
-  const [taskInput, setTaskInput] = useState("");
   const [agentInput, setAgentInput] = useState("");
 
   const {
@@ -56,7 +55,6 @@ export function useCommandPaletteState() {
     setOpen(false);
     setQuery("");
     setMode("commands");
-    setTaskInput("");
     setAgentHasSubmitted(false);
   }, []);
 
@@ -125,7 +123,6 @@ export function useCommandPaletteState() {
           }
           setOpen(false);
           setQuery("");
-          setTaskInput("");
           setAgentHasSubmitted(false);
           return "commands";
         });
@@ -173,8 +170,6 @@ export function useCommandPaletteState() {
     query,
     setQuery,
     agentHasSubmitted,
-    taskInput,
-    setTaskInput,
     agentInput,
     setAgentInput,
     // Agent

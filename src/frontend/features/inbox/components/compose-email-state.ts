@@ -3,9 +3,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAttachmentUpload } from "../hooks/use-attachment-upload";
-import { useDraft } from "../hooks/use-draft";
+import { loadDraft, useDraft } from "../hooks/use-draft";
 import { useUndoSend } from "../hooks/use-undo-send";
 import { sendEmail } from "../mutations";
+import { getDraftsQueryKey } from "../queries/drafts";
 import type { ComposeInitial } from "../types";
 import { buildPlainForwardedHtml } from "../utils/build-forwarded-html";
 
@@ -137,7 +138,7 @@ export function useComposeEmail(
   useEffect(() => {
     let cancelled = false;
 
-    useDraft.load(composeKey).then((savedDraft) => {
+    loadDraft(composeKey).then((savedDraft) => {
       if (cancelled) return;
 
       if (savedDraft) {
@@ -245,7 +246,9 @@ export function useComposeEmail(
       clearDraft();
       toast.success("Email sent");
       queryClient.invalidateQueries({ queryKey: ["emails"] });
-      queryClient.invalidateQueries({ queryKey: ["drafts"] });
+      queryClient.invalidateQueries({
+        queryKey: getDraftsQueryKey(draftSnapshotRef.current.mailboxId),
+      });
       if (threadId) {
         queryClient.invalidateQueries({ queryKey: ["email-thread", threadId] });
       }
@@ -298,7 +301,9 @@ export function useComposeEmail(
         setDraft(createComposeDraft());
         attachments.clear();
         queryClient.invalidateQueries({ queryKey: ["scheduled-emails"] });
-        queryClient.invalidateQueries({ queryKey: ["drafts"] });
+        queryClient.invalidateQueries({
+          queryKey: getDraftsQueryKey(draft.mailboxId),
+        });
         options?.onSent?.();
       } catch (error) {
         setSendPending(false);

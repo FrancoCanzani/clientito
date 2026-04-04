@@ -25,6 +25,7 @@ const detailRoute = getRouteApi("/_dashboard/inbox/$id/email/$emailId");
 export default function EmailDetailPage() {
   useHotkeyScope("inbox");
   const params = detailRoute.useParams();
+  const search = detailRoute.useSearch();
   const { email } = detailRoute.useLoaderData();
   const navigate = useNavigate();
   const router = useRouter();
@@ -66,12 +67,12 @@ export default function EmailDetailPage() {
   const orderedEmails = useMemo(() => {
     const cached = queryClient.getQueryData<InfiniteData<EmailListResponse>>([
       "emails",
-      "inbox",
+      search.context ?? "inbox",
       mailboxId ?? "all",
     ]);
     if (!cached) return [] as EmailListItem[];
     return cached.pages.flatMap((page) => page.data);
-  }, [queryClient, mailboxId]);
+  }, [queryClient, mailboxId, search.context]);
 
   const orderedIds = useMemo(
     () => orderedEmails.map((email) => email.id),
@@ -96,6 +97,7 @@ export default function EmailDetailPage() {
     const nextEmail = orderedEmailById.get(nextId);
     if (nextEmail) {
       openInboxEmail(queryClient, navigate, params.id, nextEmail, {
+        context: search.context ?? "inbox",
         replace: true,
       });
       return;
@@ -104,6 +106,12 @@ export default function EmailDetailPage() {
     navigate({
       to: "/inbox/$id/email/$emailId",
       params: { id: params.id, emailId: nextId },
+      search: {
+        context:
+          search.context && search.context !== "inbox"
+            ? search.context
+            : undefined,
+      },
       replace: true,
     });
   };
@@ -219,7 +227,7 @@ export default function EmailDetailPage() {
 
   return (
     <>
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="w-full max-w-3xl">
         <div className="min-w-0">
           <EmailDetailContent
             onClose={goBack}

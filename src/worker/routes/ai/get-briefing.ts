@@ -33,6 +33,8 @@ import { hasEmailLabel } from "../inbox/emails/utils";
 import { getDayBoundsUtc } from "../../lib/utils";
 
 const REPLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const FALLBACK_WINDOW_MS = 48 * 60 * 60 * 1000;
+const MAX_FALLBACK_ITEMS = 3;
 
 type BriefingItem = {
   id: string;
@@ -62,6 +64,9 @@ type BriefingItem = {
   eventLocation?: string | null;
   eventDescription?: string | null;
   urgency?: "high" | "medium" | "low";
+  taskTitle?: string | null;
+  taskDueAt?: number | null;
+  taskPriority?: "urgent" | "high" | "medium" | "low" | null;
 };
 
 type BriefingData = {
@@ -110,6 +115,16 @@ function shouldSurfaceReplyAction(input: {
     Boolean(input.draftReply) &&
     (input.intelligence.category === "action_needed" ||
       input.intelligence.category === "important")
+  );
+}
+
+function shouldSurfaceCreateTaskAction(
+  action: NonNullable<ReturnType<typeof getStoredEmailTriage>>["actions"][number],
+) {
+  return (
+    action.status === "pending" &&
+    action.type === "create_task" &&
+    Boolean(action.payload?.taskTitle?.trim())
   );
 }
 
@@ -286,6 +301,7 @@ export async function buildBriefing(input: {
   const briefingEmailItems: BriefingItem[] = [];
   const calendarSuggestionItems: BriefingItem[] = [];
   const emailIdsWithActions = new Set<number>();
+  let fallbackCount = 0;
 
   for (const row of latestThreadRows) {
     if (row.direction !== "received") continue;
@@ -306,9 +322,59 @@ export async function buildBriefing(input: {
       calendarEventsJson: row.intelligenceCalendarEventsJson ?? [],
     });
 
-    if (!intelligence) continue;
+    if (!intelligence) {
+      // Surface recent unread emails that haven't been analyzed yet as fallbacks,
+      // so nothing silently disappears from the briefing while triage is pending or failed.
+      if (
+        !row.isRead &&
+        now - row.date < FALLBACK_WINDOW_MS &&
+        fallbackCount < MAX_FALLBACK_ITEMS
+      ) {
+        briefingEmailItems.push({
+          id: `briefing-email-${row.id}`,
+          type: "briefing_email",
+          title: getSenderLabel(row),
+          reason: row.subject?.trim() || "New message",
+          href: `/inbox/all/email/${row.id}`,
+          emailId: row.id,
+          threadId: row.threadId,
+          fromAddr: row.fromAddr,
+          fromName: row.fromName,
+          subject: row.subject,
+          mailboxId: row.mailboxId,
+          messageId: row.messageId,
+        });
+        fallbackCount++;
+      }
+      continue;
+    }
 
     for (const action of intelligence.actions) {
+      if (shouldSurfaceCreateTaskAction(action)) {
+        emailActionItems.push({
+          id: `email-action-${row.id}-${action.id}`,
+          type: "email_action",
+          title: getSenderLabel(row),
+          reason: buildEmailReason(intelligence.briefingSentence, action.label),
+          href: `/inbox/all/email/${row.id}`,
+          emailId: row.id,
+          actionId: action.id,
+          actionType: "create_task",
+          threadId: row.threadId,
+          fromAddr: row.fromAddr,
+          fromName: row.fromName,
+          subject: row.subject,
+          mailboxId: row.mailboxId,
+          messageId: row.messageId,
+          urgency: intelligence.urgency,
+          taskTitle: action.payload?.taskTitle ?? null,
+          taskDueAt: (action.payload?.taskDueAt as number | null) ?? null,
+          taskPriority: action.payload?.taskPriority ?? null,
+        });
+        emailIdsWithActions.add(row.id);
+        continue;
+      }
+
       const draftReply = getStoredReplyDraft({
         ...intelligence,
         actions: [action],

@@ -45,6 +45,9 @@ export type HomeBriefingItem = {
   eventLocation?: string | null;
   eventDescription?: string | null;
   urgency?: "high" | "medium" | "low";
+  taskTitle?: string | null;
+  taskDueAt?: number | null;
+  taskPriority?: "urgent" | "high" | "medium" | "low" | null;
 };
 
 export type HomeBriefing = {

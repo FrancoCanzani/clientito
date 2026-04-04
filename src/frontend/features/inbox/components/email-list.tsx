@@ -1,6 +1,6 @@
-import { AccountSwitcher } from "@/components/account-switcher";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Empty,
   EmptyDescription,
@@ -9,14 +9,11 @@ import {
 } from "@/components/ui/empty";
 import { useEmail } from "@/features/inbox/context/email-context";
 import { VIEW_LABELS } from "@/features/inbox/utils/inbox-filters";
-import { Link, getRouteApi } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { EmailContextMenu } from "./email-context-menu";
 import { EmailRow } from "./email-row";
 
-const emailsRoute = getRouteApi("/_dashboard/inbox/$id/");
-
 export function EmailList() {
-  const search = emailsRoute.useSearch();
   const {
     view,
     mailboxId,
@@ -30,21 +27,22 @@ export function EmailList() {
   const pageTitle = VIEW_LABELS[view];
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col">
+    <div className="flex min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-6">
         <PageHeader
-          title={pageTitle}
+          title={
+            <div className="flex items-center gap-2">
+              <SidebarTrigger className="h-10 w-10 md:hidden [&>svg]:size-5" />
+              <span>{pageTitle}</span>
+            </div>
+          }
           actions={
             <>
-              <AccountSwitcher />
               <Button asChild variant={"ghost"}>
                 <Link
                   to="/inbox/$id"
                   params={{ id: mailboxId != null ? String(mailboxId) : "all" }}
-                  search={{
-                    view: search.view,
-                    compose: true,
-                  }}
+                  search={{ compose: true }}
                 >
                   New Email
                 </Link>

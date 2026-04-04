@@ -1,16 +1,43 @@
 import { PrioritySelect } from "@/features/tasks/components/priority-select";
 import { StatusSelect } from "@/features/tasks/components/status-select";
 import { TaskEditor } from "@/features/tasks/components/task-editor";
-import { useTaskActions } from "@/features/tasks/hooks/use-task-actions";
-import type { Task } from "@/features/tasks/types";
+import type { TaskEditorSubmitValue } from "@/features/tasks/components/task-editor";
+import type { Task, TaskPriority, TaskStatus } from "@/features/tasks/types";
 import { isOverdue } from "@/features/tasks/utils";
 import { cn } from "@/lib/utils";
+
+type TaskRowActions = {
+  isUpdateSubmitting: boolean;
+  onStatusChange: (taskId: number, status: TaskStatus) => void;
+  onPriorityChange: (taskId: number, priority: TaskPriority) => void;
+  onToggleEdit: (taskId: number) => void;
+  onCancelEdit: () => void;
+  onDelete: (taskId: number) => void;
+  onSubmitEdit: (taskId: number, value: TaskEditorSubmitValue) => void;
+};
+
+function formatDueTime(dueAt: number) {
+  const date = new Date(dueAt);
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+
+  if (hours === 12 && minutes === 0) {
+    return null;
+  }
+
+  return `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")}`;
+}
+
 export function TaskRow({
   task,
   isEditing,
+  actions,
 }: {
   task: Task;
   isEditing: boolean;
+  actions: TaskRowActions;
 }) {
   const {
     isUpdateSubmitting,
@@ -20,9 +47,10 @@ export function TaskRow({
     onCancelEdit,
     onDelete,
     onSubmitEdit,
-  } = useTaskActions();
+  } = actions;
 
   const overdue = isOverdue(task);
+  const dueTime = task.dueAt ? formatDueTime(task.dueAt) : null;
 
   return (
     <div>
@@ -62,19 +90,9 @@ export function TaskRow({
         </button>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          {task.dueAt &&
-            (() => {
-              const d = new Date(task.dueAt);
-              const h = d.getHours();
-              const m = d.getMinutes();
-              if (h === 12 && m === 0) return null;
-              return (
-                <span className="text-xs text-muted-foreground">
-                  {h.toString().padStart(2, "0")}:
-                  {m.toString().padStart(2, "0")}
-                </span>
-              );
-            })()}
+          {dueTime && (
+            <span className="text-xs text-muted-foreground">{dueTime}</span>
+          )}
         </div>
       </div>
 

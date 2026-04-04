@@ -13,7 +13,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
-const emailsRoute = getRouteApi("/_dashboard/inbox/$id/");
+const mailboxRoute = getRouteApi("/_dashboard/inbox/$id");
 
 export type EmailInboxAction =
   | "archive"
@@ -78,8 +78,8 @@ export function useEmailInboxActions({
   view: EmailView;
   mailboxId: number | null | undefined;
 }) {
-  const navigate = emailsRoute.useNavigate();
-  const params = emailsRoute.useParams();
+  const navigate = mailboxRoute.useNavigate();
+  const params = mailboxRoute.useParams();
   const queryClient = useQueryClient();
   const pendingRef = useRef<PendingAction | null>(null);
 
@@ -97,9 +97,11 @@ export function useEmailInboxActions({
 
   const openEmail = useCallback(
     (email: EmailListItem) => {
-      openInboxEmail(queryClient, navigate, params.id, email);
+      openInboxEmail(queryClient, navigate, params.id, email, {
+        context: view,
+      });
     },
-    [navigate, params.id, queryClient],
+    [navigate, params.id, queryClient, view],
   );
 
   const inflightRef = useRef(0);

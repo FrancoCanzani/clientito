@@ -39,12 +39,20 @@ type EmailContextValue = {
 
 const EmailContext = createContext<EmailContextValue | null>(null);
 
-export function EmailProvider({ children }: { children: ReactNode }) {
-  const emailData = useEmailData();
+export function EmailProvider({
+  children,
+  view,
+  mailboxId,
+}: {
+  children: ReactNode;
+  view: EmailView;
+  mailboxId: number | null;
+}) {
+  const emailData = useEmailData({ view, mailboxId });
 
   const { openEmail, closeEmail, executeEmailAction } = useEmailInboxActions({
-    view: emailData.view,
-    mailboxId: emailData.mailboxId,
+    view,
+    mailboxId,
   });
 
   const [composeInitial, setComposeInitial] = useState<

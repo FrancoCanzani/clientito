@@ -110,7 +110,7 @@ export const QuickReply = forwardRef<
             compose={compose}
             onEscape={handleClose}
             editorAutoFocus
-            showAccountSwitcher={false}
+            showMailboxSelector={false}
           />
         </div>
       </div>

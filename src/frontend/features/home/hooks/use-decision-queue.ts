@@ -4,7 +4,7 @@ import {
   type HomeBriefingItem,
 } from "@/features/home/queries";
 import { patchEmail, sendEmail } from "@/features/inbox/mutations";
-import { updateTask } from "@/features/tasks/mutations";
+import { createTask, updateTask } from "@/features/tasks/mutations";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -228,6 +228,28 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
     [findItem, queryClient, markDone],
   );
 
+  const approveTask = useCallback(
+    async (id: string) => {
+      const item = findItem(id);
+      if (!item?.taskTitle) return;
+      try {
+        await createTask({
+          title: item.taskTitle,
+          dueAt: item.taskDueAt ?? undefined,
+          priority: item.taskPriority ?? "medium",
+          sourceEmailId: item.emailId,
+          status: "todo",
+        });
+        queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        markDone(item, "approved");
+        toast.success("Task created");
+      } catch {
+        toast.error("Failed to create task");
+      }
+    },
+    [findItem, queryClient, markDone],
+  );
+
   const confirmActive = useCallback(() => {
     if (!activeItem) return;
     if (activeItem.type === "calendar_suggestion") {
@@ -237,10 +259,12 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
       activeItem.type === "due_today_task"
     ) {
       completeTask(activeItem.id);
+    } else if (activeItem.actionType === "create_task") {
+      approveTask(activeItem.id);
     } else {
       sendReply(activeItem.id);
     }
-  }, [activeItem, approveEvent, completeTask, sendReply]);
+  }, [activeItem, approveEvent, completeTask, approveTask, sendReply]);
 
   const skipActive = useCallback(() => {
     if (!activeItem) return;
@@ -274,8 +298,11 @@ export function useDecisionQueue(items: HomeBriefingItem[]) {
     approveEvent,
     dismissEvent,
     completeTask,
+    approveTask,
     confirmActive,
     skipActive,
     archiveActive,
   };
 }
+
+export type DecisionQueue = ReturnType<typeof useDecisionQueue>;

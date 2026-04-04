@@ -5,6 +5,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ComposePanel } from "../components/compose-panel";
@@ -12,6 +13,7 @@ import type { ComposeInitial } from "../types";
 import {
   deleteDraft,
   draftsQueryOptions,
+  getDraftsQueryKey,
   type DraftItem,
 } from "../queries/drafts";
 import { formatDistanceToNow } from "date-fns";
@@ -42,20 +44,31 @@ function draftToComposeInitial(draft: DraftItem): ComposeInitial {
   };
 }
 
-export default function DraftsPage() {
-  const { data: drafts = [], isLoading } = useQuery(draftsQueryOptions);
+export default function DraftsPage({
+  mailboxId,
+}: {
+  mailboxId: number | null;
+}) {
+  const { data: drafts = [], isLoading } = useQuery(draftsQueryOptions(mailboxId));
   const queryClient = useQueryClient();
   const [editingDraft, setEditingDraft] = useState<ComposeInitial | null>(null);
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     await deleteDraft(id);
-    queryClient.invalidateQueries({ queryKey: ["drafts"] });
+    queryClient.invalidateQueries({ queryKey: getDraftsQueryKey(mailboxId) });
   };
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col">
-      <PageHeader title="Drafts" />
+    <div className="flex min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col">
+      <PageHeader
+        title={
+          <div className="flex items-center gap-2">
+            <SidebarTrigger className="h-10 w-10 md:hidden [&>svg]:size-5" />
+            <span>Drafts</span>
+          </div>
+        }
+      />
 
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center">
@@ -117,7 +130,7 @@ export default function DraftsPage() {
         onOpenChange={(open) => {
           if (!open) {
             setEditingDraft(null);
-            queryClient.invalidateQueries({ queryKey: ["drafts"] });
+            queryClient.invalidateQueries({ queryKey: getDraftsQueryKey(mailboxId) });
           }
         }}
       />

@@ -31,7 +31,7 @@ type ComposeEmailFieldsProps = {
   onEscape?: () => void;
   recipientAutoFocus?: boolean;
   editorAutoFocus?: boolean;
-  showAccountSwitcher?: boolean;
+  showMailboxSelector?: boolean;
 };
 
 function ForwardedMessagePreview({ html }: { html: string }) {
@@ -87,7 +87,7 @@ export function ComposeEmailFields({
   onEscape,
   recipientAutoFocus = false,
   editorAutoFocus = false,
-  showAccountSwitcher = true,
+  showMailboxSelector = true,
 }: ComposeEmailFieldsProps) {
   const {
     to,
@@ -152,7 +152,7 @@ export function ComposeEmailFields({
       }}
     >
       <div className="space-y-2 px-1 py-2 border-b border-border/40">
-        {showAccountSwitcher && availableMailboxes.length > 1 && (
+        {showMailboxSelector && availableMailboxes.length > 1 && (
           <Select
             value={mailboxId != null ? String(mailboxId) : undefined}
             onValueChange={(value) => setMailboxId(Number(value))}

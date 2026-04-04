@@ -1,8 +1,6 @@
 import { TriageCard } from "@/features/home/components/triage-card";
-import type { useDecisionQueue } from "@/features/home/hooks/use-decision-queue";
+import type { DecisionQueue } from "@/features/home/hooks/use-decision-queue";
 import { useEffect, useRef } from "react";
-
-export type DecisionQueue = ReturnType<typeof useDecisionQueue>;
 
 export function CardStack({ queue }: { queue: DecisionQueue }) {
   const activeRef = useRef<HTMLDivElement>(null);

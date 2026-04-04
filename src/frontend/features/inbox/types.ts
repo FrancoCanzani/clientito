@@ -1,3 +1,5 @@
+import type { EmailView } from "./utils/inbox-filters";
+
 export type ContactSuggestion = {
   email: string;
   name: string | null;
@@ -9,7 +11,7 @@ export type ContactSuggestion = {
 export type InboxSearchScope = {
   q: string;
   mailboxId?: number;
-  view?: "inbox" | "sent" | "spam" | "trash" | "snoozed" | "archived" | "starred" | "important";
+  view?: EmailView;
   includeJunk?: boolean;
 };
 

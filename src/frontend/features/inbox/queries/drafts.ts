@@ -16,8 +16,16 @@ export type DraftItem = {
   createdAt: number;
 };
 
-export async function fetchDrafts(): Promise<DraftItem[]> {
-  const response = await fetch("/api/inbox/drafts");
+export function getDraftsQueryKey(mailboxId: number | null) {
+  return ["drafts", mailboxId ?? "all"] as const;
+}
+
+export async function fetchDrafts(mailboxId: number | null): Promise<DraftItem[]> {
+  const search =
+    mailboxId == null
+      ? ""
+      : `?mailboxId=${encodeURIComponent(String(mailboxId))}`;
+  const response = await fetch(`/api/inbox/drafts${search}`);
   if (!response.ok) throw new Error("Failed to fetch drafts");
   const json = (await response.json()) as { data: DraftItem[] };
   return json.data;
@@ -30,7 +38,9 @@ export async function deleteDraft(id: number): Promise<void> {
   if (!response.ok) throw new Error("Failed to delete draft");
 }
 
-export const draftsQueryOptions = queryOptions({
-  queryKey: ["drafts"],
-  queryFn: fetchDrafts,
-});
+export function draftsQueryOptions(mailboxId: number | null) {
+  return queryOptions({
+    queryKey: getDraftsQueryKey(mailboxId),
+    queryFn: () => fetchDrafts(mailboxId),
+  });
+}

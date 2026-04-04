@@ -1,16 +1,15 @@
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { PageHeader } from "@/components/page-header";
 import { TaskBoard } from "@/features/tasks/components/task-board";
 import {
   TaskEditor,
   type TaskEditorSubmitValue,
 } from "@/features/tasks/components/task-editor";
 import { TaskListView } from "@/features/tasks/components/task-list-view";
-import { TaskActionsProvider } from "@/features/tasks/hooks/use-task-actions";
 import { useTaskMutations } from "@/features/tasks/hooks/use-task-mutations";
 import type {
   TaskLayout,
@@ -50,21 +49,25 @@ export default function TasksPage() {
   const layout: TaskLayout = isMobile ? "list" : layoutPref;
 
   const setLayout = useCallback(
-    (l: TaskLayout) =>
+    (nextLayout: TaskLayout) =>
       navigate({
-        search: (prev) => ({ ...prev, layout: l === "list" ? undefined : l }),
+        search: (prev) => ({
+          ...prev,
+          layout: nextLayout === "list" ? undefined : nextLayout,
+        }),
       }),
     [navigate],
   );
 
   const setShowCompleted = useCallback(
-    (v: boolean) =>
-      navigate({ search: (prev) => ({ ...prev, completed: v || undefined }) }),
+    (nextValue: boolean) =>
+      navigate({
+        search: (prev) => ({ ...prev, completed: nextValue || undefined }),
+      }),
     [navigate],
   );
 
   const tasks = taskResponse.data;
-
   const visibleTasks = useMemo(
     () =>
       tasks.filter((task) => (showCompleted ? true : task.status !== "done")),
@@ -90,11 +93,11 @@ export default function TasksPage() {
   } = useTaskMutations({ closeEditor });
 
   const setView = useCallback(
-    (v: TaskView) => {
+    (nextView: TaskView) => {
       navigate({
         search: (prev) => ({
           ...prev,
-          view: v === "all" ? undefined : v,
+          view: nextView === "all" ? undefined : nextView,
         }),
       });
     },
@@ -137,7 +140,7 @@ export default function TasksPage() {
     [updateTaskMutation],
   );
 
-  const taskActions = useMemo(
+  const taskRowActions = useMemo(
     () => ({
       isUpdateSubmitting: updateTaskMutation.isPending,
       onStatusChange: handleStatusChange,
@@ -159,175 +162,171 @@ export default function TasksPage() {
   );
 
   return (
-    <TaskActionsProvider value={taskActions}>
-      <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-5">
-        <PageHeader
-          title={VIEW_LABELS[view]}
-          actions={
-            <>
+    <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-5">
+      <PageHeader
+        title={VIEW_LABELS[view]}
+        actions={
+          <Button
+            size="sm"
+            onClick={() =>
+              setEditor({
+                mode: "create",
+                dueAt: view === "today" ? getDefaultCreateDueAt() : null,
+              })
+            }
+          >
+            Add task
+          </Button>
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <ButtonGroup>
+          {(["all", "today", "upcoming"] as TaskView[]).map((taskView) => (
+            <Button
+              key={taskView}
+              variant={view === taskView ? "default" : "outline"}
+              onClick={() => setView(taskView)}
+            >
+              {VIEW_LABELS[taskView]}
+            </Button>
+          ))}
+        </ButtonGroup>
+
+        {!isMobile && (
+          <ButtonGroup>
+            <Button
+              variant={layout === "list" ? "default" : "outline"}
+              onClick={() => setLayout("list")}
+            >
+              <ListIcon />
+            </Button>
+            <Button
+              variant={layout === "board" ? "default" : "outline"}
+              onClick={() => setLayout("board")}
+            >
+              <KanbanIcon />
+            </Button>
+          </ButtonGroup>
+        )}
+
+        {layout === "list" && (
+          <>
+            <ButtonGroup>
               <Button
-                size="sm"
+                variant={sortMode === "date" ? "default" : "outline"}
                 onClick={() =>
-                  setEditor({
-                    mode: "create",
-                    dueAt: view === "today" ? getDefaultCreateDueAt() : null,
+                  navigate({ search: (prev) => ({ ...prev, sort: "date" }) })
+                }
+              >
+                Date
+              </Button>
+              <Button
+                variant={sortMode === "priority" ? "default" : "outline"}
+                onClick={() =>
+                  navigate({
+                    search: (prev) => ({ ...prev, sort: "priority" }),
                   })
                 }
               >
-                Add task
-              </Button>
-            </>
-          }
-        />
-
-        <div className="flex flex-wrap items-center gap-2">
-          <ButtonGroup>
-            {(["all", "today", "upcoming"] as TaskView[]).map((v) => (
-              <Button
-                key={v}
-                variant={view === v ? "default" : "outline"}
-                onClick={() => setView(v)}
-              >
-                {VIEW_LABELS[v]}
-              </Button>
-            ))}
-          </ButtonGroup>
-
-          {!isMobile && (
-            <ButtonGroup>
-              <Button
-                variant={layout === "list" ? "default" : "outline"}
-                onClick={() => setLayout("list")}
-              >
-                <ListIcon />
-              </Button>
-              <Button
-                variant={layout === "board" ? "default" : "outline"}
-                onClick={() => setLayout("board")}
-              >
-                <KanbanIcon />
+                Priority
               </Button>
             </ButtonGroup>
-          )}
 
-          {layout === "list" && (
-            <>
-              <ButtonGroup>
-                <Button
-                  variant={sortMode === "date" ? "default" : "outline"}
-                  onClick={() =>
-                    navigate({ search: (prev) => ({ ...prev, sort: "date" }) })
-                  }
-                >
-                  Date
-                </Button>
-                <Button
-                  variant={sortMode === "priority" ? "default" : "outline"}
-                  onClick={() =>
-                    navigate({
-                      search: (prev) => ({ ...prev, sort: "priority" }),
-                    })
-                  }
-                >
-                  Priority
-                </Button>
-              </ButtonGroup>
-
-              <div className="flex items-center justify-center gap-2">
-                <Checkbox
-                  checked={showCompleted}
-                  onCheckedChange={(v) => setShowCompleted(v === true)}
-                />
-                <Label className="text-primary">Show completed</Label>
-              </div>
-            </>
-          )}
-        </div>
-
-        {!isMobile && editor?.mode === "create" && (
-          <TaskEditor
-            key={`create-${editor.dueAt ?? "none"}`}
-            defaultDueAt={editor.dueAt}
-            submitLabel="Create task"
-            autoFocus
-            isSubmitting={createTaskMutation.isPending}
-            onCancel={closeEditor}
-            onSubmit={(value) =>
-              createTaskMutation.mutate({
-                ...value,
-                dueAt: value.dueAt ?? undefined,
-              })
-            }
-          />
+            <div className="flex items-center justify-center gap-2">
+              <Checkbox
+                checked={showCompleted}
+                onCheckedChange={(value) => setShowCompleted(value === true)}
+              />
+              <Label className="text-primary">Show completed</Label>
+            </div>
+          </>
         )}
+      </div>
 
-        {layout === "board" ? (
-          <TaskBoard
-            tasks={tasks}
-            onEdit={(taskId) => setEditor({ mode: "edit", taskId })}
-          />
-        ) : (
-          <TaskListView
-            sections={sections}
-            totalTasks={tasks.length}
-            editor={editor}
-            isMobile={isMobile}
-            showCompleted={showCompleted}
-            view={view}
-            onSetEditor={setEditor}
-            onCreateFromEmpty={() =>
-              setEditor({
-                mode: "create",
-                dueAt: getDefaultCreateDueAt(),
-              })
-            }
-          />
-        )}
+      {!isMobile && editor?.mode === "create" && (
+        <TaskEditor
+          key={`create-${editor.dueAt ?? "none"}`}
+          defaultDueAt={editor.dueAt}
+          submitLabel="Create task"
+          autoFocus
+          isSubmitting={createTaskMutation.isPending}
+          onCancel={closeEditor}
+          onSubmit={(value) =>
+            createTaskMutation.mutate({
+              ...value,
+              dueAt: value.dueAt ?? undefined,
+            })
+          }
+        />
+      )}
 
-        <Sheet
-          open={(isMobile || layout === "board") && editor !== null}
-          onOpenChange={closeEditor}
-        >
-          <SheetContent showCloseButton={false} side="bottom" className="pb-4">
-            {editor?.mode === "create" ? (
+      {layout === "board" ? (
+        <TaskBoard
+          tasks={tasks}
+          onEdit={(taskId) => setEditor({ mode: "edit", taskId })}
+        />
+      ) : (
+        <TaskListView
+          sections={sections}
+          totalTasks={tasks.length}
+          editor={editor}
+          isMobile={isMobile}
+          showCompleted={showCompleted}
+          view={view}
+          onSetEditor={setEditor}
+          onCreateFromEmpty={() =>
+            setEditor({
+              mode: "create",
+              dueAt: getDefaultCreateDueAt(),
+            })
+          }
+          taskRowActions={taskRowActions}
+        />
+      )}
+
+      <Sheet
+        open={(isMobile || layout === "board") && editor !== null}
+        onOpenChange={closeEditor}
+      >
+        <SheetContent showCloseButton={false} side="bottom" className="pb-4">
+          {editor?.mode === "create" ? (
+            <TaskEditor
+              key={`mobile-create-${editor.dueAt ?? "none"}`}
+              defaultDueAt={editor.dueAt}
+              submitLabel="Create task"
+              variant="sheet"
+              autoFocus
+              isSubmitting={createTaskMutation.isPending}
+              onCancel={closeEditor}
+              onSubmit={(value) =>
+                createTaskMutation.mutate({
+                  ...value,
+                  dueAt: value.dueAt ?? undefined,
+                })
+              }
+            />
+          ) : (
+            editingTask && (
               <TaskEditor
-                key={`mobile-create-${editor.dueAt ?? "none"}`}
-                defaultDueAt={editor.dueAt}
-                submitLabel="Create task"
+                key={editingTask.id}
+                task={editingTask}
+                submitLabel="Save changes"
                 variant="sheet"
-                autoFocus
-                isSubmitting={createTaskMutation.isPending}
+                isSubmitting={updateTaskMutation.isPending}
                 onCancel={closeEditor}
+                onDelete={() => deleteTaskMutation.mutate(editingTask.id)}
                 onSubmit={(value) =>
-                  createTaskMutation.mutate({
-                    ...value,
-                    dueAt: value.dueAt ?? undefined,
+                  updateTaskMutation.mutate({
+                    taskId: editingTask.id,
+                    input: value,
                   })
                 }
               />
-            ) : (
-              editingTask && (
-                <TaskEditor
-                  key={editingTask.id}
-                  task={editingTask}
-                  submitLabel="Save changes"
-                  variant="sheet"
-                  isSubmitting={updateTaskMutation.isPending}
-                  onCancel={closeEditor}
-                  onDelete={() => deleteTaskMutation.mutate(editingTask.id)}
-                  onSubmit={(value) =>
-                    updateTaskMutation.mutate({
-                      taskId: editingTask.id,
-                      input: value,
-                    })
-                  }
-                />
-              )
-            )}
-          </SheetContent>
-        </Sheet>
-
-      </div>
-    </TaskActionsProvider>
+            )
+          )}
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }

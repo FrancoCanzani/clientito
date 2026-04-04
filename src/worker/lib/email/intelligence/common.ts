@@ -141,8 +141,9 @@ export function buildSharedActionRules() {
     "- For reply actions, include payload.draft with the full reply body text.",
     "- For snooze actions, include payload.until as an ISO date or datetime.",
     "- For label actions, include payload.labelName.",
-    "- For create_task actions, include payload.taskTitle with a concise task title derived from the email. Suggest create_task for emails that require follow-up, action items, or commitments.",
+    "- For create_task actions, include payload.taskTitle as a clear imperative (e.g. 'Pay invoice of €149.23 to AEAT', 'Sign DocuSign document'). ALWAYS suggest create_task for emails that contain payments, deadlines, verifications, signatures, renewals, or any user commitment.",
     "- For create_task actions, also include payload.taskDueAt as an ISO date if a deadline is mentioned or can be inferred, payload.taskPriority (urgent/high/medium/low) based on urgency, and payload.taskStatus (default to 'todo'). Use null for any field that cannot be determined.",
+    "- Prefer suggesting create_task over just classifying as action_needed with no action. Every action_needed email should have at least one create_task action.",
     "",
     "## Trust Levels",
     "- Use trustLevel=approve for replies and any external commitment.",
@@ -477,6 +478,44 @@ export function normalizeEmailTriageOutput(
     suspicious: normalizeSuspiciousFlag(output.suspicious),
     ...normalizeIntelligenceActions(emailId, output.actions, output.calendarEvents, now),
   };
+}
+
+export function ensureCreateTaskAction(
+  emailId: number,
+  normalized: StoredEmailTriage,
+  now: number,
+): StoredEmailTriage {
+  if (normalized.category !== "action_needed") return normalized;
+  if (normalized.actions.some((a) => a.type === "create_task")) return normalized;
+
+  const taskTitle = normalized.briefingSentence?.slice(0, 200) ?? null;
+  if (!taskTitle) return normalized;
+
+  const priority = normalized.urgency === "high" ? "urgent" : normalized.urgency;
+
+  const action = normalizeAction(
+    emailId,
+    {
+      type: "create_task",
+      label: "Create task for this action item",
+      payload: {
+        draft: null,
+        labelName: null,
+        until: null,
+        taskTitle,
+        taskDueAt: null,
+        taskPriority: priority,
+        taskStatus: "todo",
+      },
+      trustLevel: "approve",
+    },
+    now,
+  );
+
+  if (!action) return normalized;
+
+  const actions = [...normalized.actions, action];
+  return { ...normalized, actions, ...deriveActionBuckets(actions) };
 }
 
 export function normalizeEmailDetailOutput(

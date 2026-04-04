@@ -6,7 +6,17 @@ import {
 import { Button } from "@/components/ui/button";
 import type { UIMessage } from "ai";
 import { getToolName, isToolUIPart } from "ai";
-import { getAgentStatusLabel } from "./types";
+
+function getAgentStatusLabel(
+  status: "ready" | "streaming" | "submitted" | "error",
+  isConnected: boolean,
+) {
+  if (!isConnected) return "Connecting";
+  if (status === "submitted") return "Sending request";
+  if (status === "streaming") return "Working";
+  if (status === "error") return null;
+  return null;
+}
 
 export function AgentPanel({
   messages,

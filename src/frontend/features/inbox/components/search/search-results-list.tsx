@@ -47,10 +47,10 @@ function SearchResultRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-          <span className="shrink-0 truncate text-sm font-medium tracking-[-0.6px] text-foreground">
+          <span className="min-w-0 max-w-[15rem] shrink truncate text-sm font-medium tracking-[-0.6px] text-foreground">
             {participantLabel}
           </span>
-          <span className="truncate text-sm tracking-[-0.2px] text-foreground/50">
+          <span className="min-w-0 flex-1 truncate text-sm tracking-[-0.2px] text-foreground/50">
             {email.subject ?? "(no subject)"}
           </span>
         </div>
@@ -101,7 +101,7 @@ export function SearchResultsList({
 }) {
   if (query.length < 2) {
     return (
-      <Empty className="min-h-0 flex-1 justify-center border-0 p-0">
+      <Empty className="h-full min-h-full flex-1 justify-center border-0 p-0">
         <EmptyHeader>
           <EmptyTitle>Search your inbox</EmptyTitle>
           <EmptyDescription>
@@ -114,7 +114,7 @@ export function SearchResultsList({
 
   if (isPending) {
     return (
-      <Empty className="min-h-0 flex-1 justify-center border-0 p-0">
+      <Empty className="h-full min-h-full flex-1 justify-center border-0 p-0">
         <EmptyHeader>
           <EmptyTitle>Searching</EmptyTitle>
           <EmptyDescription>
@@ -127,7 +127,7 @@ export function SearchResultsList({
 
   if (results.length === 0) {
     return (
-      <Empty className="min-h-0 flex-1 justify-center border-0 p-0">
+      <Empty className="h-full min-h-full flex-1 justify-center border-0 p-0">
         <EmptyHeader>
           <EmptyTitle>No results</EmptyTitle>
           <EmptyDescription>

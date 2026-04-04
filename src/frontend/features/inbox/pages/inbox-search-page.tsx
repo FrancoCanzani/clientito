@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { SearchResultsList } from "@/features/inbox/components/search/search-results-list";
 import { SearchSuggestionsList } from "@/features/inbox/components/search/search-suggestions-list";
 import {
@@ -20,11 +21,19 @@ import { getRouteApi } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
 
-const searchRoute = getRouteApi("/_dashboard/inbox/search");
+const searchRoute = getRouteApi("/_dashboard/inbox/$id/search");
 
-export default function InboxSearchPage() {
+export default function InboxSearchPage({
+  mailboxId,
+  search,
+}: {
+  mailboxId: number | null;
+  search: {
+    q: string;
+    includeJunk?: boolean;
+  };
+}) {
   const navigate = searchRoute.useNavigate();
-  const search = searchRoute.useSearch();
   const queryClient = useQueryClient();
   const routeQuery = search.q ?? "";
 
@@ -42,11 +51,10 @@ export default function InboxSearchPage() {
   const scope = useMemo(
     () => ({
       q: routeQuery,
-      mailboxId: search.mailboxId,
+      mailboxId: mailboxId ?? undefined,
       includeJunk: search.includeJunk,
-      view: search.view,
     }),
-    [routeQuery, search.includeJunk, search.mailboxId, search.view],
+    [routeQuery, search.includeJunk, mailboxId],
   );
 
   useSetPageContext(useMemo(() => ({ route: "inbox-search" }), []));
@@ -106,19 +114,22 @@ export default function InboxSearchPage() {
   const hiddenJunkCount =
     resultsQuery.data?.pages[0]?.searchMeta?.hiddenJunkCount ?? 0;
   const canToggleJunk =
-    search.view !== "spam" &&
-    search.view !== "trash" &&
-    (hiddenJunkCount > 0 || search.includeJunk === true);
+    hiddenJunkCount > 0 || search.includeJunk === true;
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col">
+    <div className="flex min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-5">
         <PageHeader
-          title="Search"
+          title={
+            <div className="flex items-center gap-2">
+              <SidebarTrigger className="h-10 w-10 md:hidden [&>svg]:size-5" />
+              <span>Search</span>
+            </div>
+          }
           actions={
             <div className="w-full max-w-72">
               <Input
-                className="text-xs h-7"
+                className="h-7 text-xs"
                 value={query}
                 onChange={(event) => handleQueryChange(event.target.value)}
                 onKeyDown={(event) => {

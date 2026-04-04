@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/page-header";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
 import {
   FilterEditor,
@@ -30,7 +31,7 @@ import {
   TrashIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const NOISE_FILTER_TEMPLATES = [
@@ -91,6 +92,12 @@ export default function FiltersPage() {
     queryKey: ["filters"],
     queryFn: fetchFilters,
   });
+  const availableTemplates = useMemo(() => {
+    const existingNames = new Set(filters.map((filter) => filter.name));
+    return NOISE_FILTER_TEMPLATES.filter(
+      (template) => !existingNames.has(template.name),
+    );
+  }, [filters]);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["filters"] });
@@ -192,8 +199,15 @@ export default function FiltersPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-8 py-2">
-      <PageHeader title="Filters" />
+    <div className="flex min-h-0 w-full max-w-2xl min-w-0 flex-1 flex-col gap-8 py-2">
+      <PageHeader
+        title={
+          <div className="flex items-center gap-2">
+            <SidebarTrigger className="md:hidden" />
+            <span>Filters</span>
+          </div>
+        }
+      />
 
       <form onSubmit={handlePromptSubmit} className="relative">
         <SparkleIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -222,35 +236,28 @@ export default function FiltersPage() {
         </Button>
       </form>
 
-      {(() => {
-        const existingNames = new Set(filters.map((f) => f.name));
-        const available = NOISE_FILTER_TEMPLATES.filter(
-          (t) => !existingNames.has(t.name),
-        );
-        if (available.length === 0 || isPending) return null;
-        return (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">
-              Suggested
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {available.map((template) => (
-                <Button
-                  key={template.name}
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  disabled={createMutation.isPending}
-                  onClick={() => createMutation.mutate(template)}
-                >
-                  <PlusIcon className="mr-1 size-3" />
-                  {template.name}
-                </Button>
-              ))}
-            </div>
+      {!isPending && availableTemplates.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            Suggested
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {availableTemplates.map((template) => (
+              <Button
+                key={template.name}
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                disabled={createMutation.isPending}
+                onClick={() => createMutation.mutate(template)}
+              >
+                <PlusIcon className="mr-1 size-3" />
+                {template.name}
+              </Button>
+            ))}
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {editing && (
         <FilterEditor

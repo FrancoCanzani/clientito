@@ -12,6 +12,7 @@ import {
   buildThreadPrompt,
   EMAIL_INTELLIGENCE_SCHEMA_VERSION,
   emailTriageOutputSchema,
+  ensureCreateTaskAction,
   generateStructuredEmailObject,
   INLINE_PROCESS_LIMIT,
   MAX_RETRY_ATTEMPTS,
@@ -43,6 +44,19 @@ const TRIAGE_SYSTEM = [
   "- Be consistent: if you see the same sender and same type of email, classify it the same way every time.",
   "",
   buildSharedActionRules(),
+  "",
+  "## Commitment & Deadline Extraction",
+  "- ALWAYS suggest a create_task action when the email contains any of these signals:",
+  "  - A payment is due or overdue (bills, invoices, debts, subscriptions).",
+  "  - A document needs to be signed, submitted, or uploaded.",
+  "  - A verification or identity check is required.",
+  "  - An account action is required before a deadline (e.g. review, renew, cancel).",
+  "  - An event needs to be confirmed or attended.",
+  "  - A reply or response is explicitly expected by a date.",
+  "  - An item expires, locks, or gets deleted by a date.",
+  "- Extract the deadline as taskDueAt whenever a date is mentioned or implied (e.g. 'within 7 days', 'before April 10').",
+  "- Set taskPriority to 'urgent' if the deadline is within 3 days or the email indicates immediate action.",
+  "- The taskTitle should be a clear, actionable imperative (e.g. 'Pay Aquaservice balance of 34.58€', 'Sign DocuSign addendum for mandate n°43615', 'Verify identity on Revolut').",
   "",
   "## Calendar Events",
   "- calendarEvents: only include high-signal date or meeting suggestions with enough detail to present to the user.",
@@ -336,14 +350,15 @@ export async function processEmailIntelligence(
       prompt,
       activeFilters,
     );
-    const normalized = normalizeEmailTriageOutput(emailId, output, now);
+    const triage = normalizeEmailTriageOutput(emailId, output, now);
     const { email: nextEmail, categoryOverride } = await applyFilterActions(
       db,
       env,
       email,
       activeFilters.filter((filter) => matchedFilterIds.includes(filter.id)),
     );
-    const category = categoryOverride ?? normalized.category;
+    if (categoryOverride) triage.category = categoryOverride;
+    const normalized = ensureCreateTaskAction(emailId, triage, now);
 
     const actions: EmailAction[] = [];
     for (const action of normalized.actions) {
