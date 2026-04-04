@@ -1,4 +1,8 @@
-import { emailListInfiniteQueryOptions } from "@/features/inbox/queries";
+import {
+  EMAIL_LIST_PAGE_SIZE,
+  fetchEmails,
+} from "@/features/inbox/queries";
+import type { EmailListResponse } from "@/features/inbox/types";
 import { buildThreadSections } from "@/features/inbox/utils/build-thread-sections";
 import { groupEmailsByThread } from "@/features/inbox/utils/group-emails-by-thread";
 import type { EmailView } from "@/features/inbox/utils/inbox-filters";
@@ -9,13 +13,33 @@ import { useMemo } from "react";
 export function useEmailData({
   view,
   mailboxId,
+  initialPage,
 }: {
   view: EmailView;
-  mailboxId: number | null;
+  mailboxId: number;
+  initialPage: EmailListResponse;
 }) {
-  const emailsQuery = useInfiniteQuery(
-    emailListInfiniteQueryOptions({ view, mailboxId }),
-  );
+  const emailsQuery = useInfiniteQuery({
+    queryKey: ["emails", view, mailboxId],
+    queryFn: ({ pageParam }) =>
+      fetchEmails({
+        view,
+        mailboxId,
+        limit: EMAIL_LIST_PAGE_SIZE,
+        offset: pageParam,
+      }),
+    initialPageParam: 0,
+    initialData: {
+      pages: [initialPage],
+      pageParams: [0],
+    },
+    getNextPageParam: (lastPage) =>
+      lastPage?.pagination?.hasMore
+        ? lastPage.pagination.offset + lastPage.pagination.limit
+        : undefined,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+  });
 
   const displayEmails = useMemo(
     () => emailsQuery.data?.pages.flatMap((page) => page.data) ?? [],

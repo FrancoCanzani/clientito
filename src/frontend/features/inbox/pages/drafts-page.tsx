@@ -5,27 +5,21 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { TrashIcon } from "@phosphor-icons/react";
+import { formatDistanceToNow } from "date-fns";
+import { getRouteApi, useRouter } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { ComposePanel } from "../components/compose-panel";
 import type { ComposeInitial } from "../types";
+import { htmlToPlainText } from "../utils/html-to-plain-text";
 import {
   deleteDraft,
-  draftsQueryOptions,
-  getDraftsQueryKey,
   type DraftItem,
 } from "../queries/drafts";
-import { formatDistanceToNow } from "date-fns";
-import { TrashIcon } from "@phosphor-icons/react";
-import { Button } from "@/components/ui/button";
 
-function htmlToPlainText(html: string): string {
-  if (typeof document === "undefined") return html;
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return div.textContent ?? "";
-}
+const draftsRoute = getRouteApi("/_dashboard/$mailboxId/inbox/drafts");
 
 function draftToComposeInitial(draft: DraftItem): ComposeInitial {
   const body = draft.forwardedContent
@@ -44,19 +38,21 @@ function draftToComposeInitial(draft: DraftItem): ComposeInitial {
   };
 }
 
-export default function DraftsPage({
-  mailboxId,
-}: {
-  mailboxId: number | null;
-}) {
-  const { data: drafts = [], isLoading } = useQuery(draftsQueryOptions(mailboxId));
-  const queryClient = useQueryClient();
+export default function DraftsPage() {
+  const loadedDrafts = draftsRoute.useLoaderData();
+  const router = useRouter();
+  const [drafts, setDrafts] = useState(loadedDrafts);
   const [editingDraft, setEditingDraft] = useState<ComposeInitial | null>(null);
+
+  useEffect(() => {
+    setDrafts(loadedDrafts);
+  }, [loadedDrafts]);
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     await deleteDraft(id);
-    queryClient.invalidateQueries({ queryKey: getDraftsQueryKey(mailboxId) });
+    setDrafts((current) => current.filter((draft) => draft.id !== id));
+    void router.invalidate();
   };
 
   return (
@@ -70,11 +66,7 @@ export default function DraftsPage({
         }
       />
 
-      {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <span className="text-sm text-muted-foreground">Loading...</span>
-        </div>
-      ) : drafts.length === 0 ? (
+      {drafts.length === 0 ? (
         <Empty>
           <EmptyHeader>
             <EmptyTitle>No drafts</EmptyTitle>
@@ -130,7 +122,7 @@ export default function DraftsPage({
         onOpenChange={(open) => {
           if (!open) {
             setEditingDraft(null);
-            queryClient.invalidateQueries({ queryKey: getDraftsQueryKey(mailboxId) });
+            void router.invalidate();
           }
         }}
       />

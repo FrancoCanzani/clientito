@@ -6,8 +6,7 @@ import {
 } from "@/features/inbox/components/compose-bridge";
 import { fetchEmailDetail } from "@/features/inbox/queries";
 import type { EmailDetailItem } from "@/features/inbox/types";
-import { normalizeAgentText } from "@/lib/normalize-agent-text";
-import { cn } from "@/lib/utils";
+import { cn, normalizeAgentText } from "@/lib/utils";
 import { CheckIcon, PencilSimpleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { isReasoningUIPart, isToolUIPart, type UIMessage } from "ai";

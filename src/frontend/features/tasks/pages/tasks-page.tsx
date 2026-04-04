@@ -28,7 +28,7 @@ import { KanbanIcon, ListIcon } from "@phosphor-icons/react";
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 
-const tasksRouteApi = getRouteApi("/_dashboard/tasks");
+const tasksRouteApi = getRouteApi("/_dashboard/$mailboxId/tasks");
 
 type EditorState =
   | { mode: "create"; dueAt: number | null }

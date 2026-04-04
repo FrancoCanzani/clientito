@@ -1,18 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import type { DraftState } from "../types";
 import { getDraftsQueryKey } from "../queries/drafts";
 
 const SAVE_DELAY_MS = 2000;
-
-type DraftState = {
-  mailboxId: number | null;
-  to: string;
-  cc: string;
-  bcc: string;
-  subject: string;
-  body: string;
-  forwardedContent?: string;
-};
 
 type ServerDraft = DraftState & {
   id: number;

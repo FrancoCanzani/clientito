@@ -169,5 +169,5 @@ export const shortcuts: Shortcut[] = [
 ];
 
 export function getShortcutsByScope(scope: ShortcutScope): Shortcut[] {
-  return shortcuts.filter((s) => s.scope === scope);
+  return shortcuts.filter((shortcut) => shortcut.scope === scope);
 }

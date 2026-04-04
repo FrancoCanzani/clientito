@@ -61,8 +61,9 @@ export type HomeBriefing = {
   items: HomeBriefingItem[];
 };
 
-export async function fetchBriefing(): Promise<HomeBriefing> {
-  const response = await fetch("/api/ai/briefing");
+export async function fetchBriefing(mailboxId: number): Promise<HomeBriefing> {
+  const params = new URLSearchParams({ mailboxId: String(mailboxId) });
+  const response = await fetch(`/api/ai/briefing?${params}`);
   if (!response.ok) throw { status: response.status };
   const json = await response.json();
   return json.data;

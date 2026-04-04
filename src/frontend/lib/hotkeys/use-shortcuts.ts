@@ -1,6 +1,6 @@
-import type { Shortcut } from "@/config/shortcuts";
-import { useHotkeys, type HotkeyCallback } from "react-hotkeys-hook";
+import type { Shortcut } from "@/lib/hotkeys/shortcuts";
 import { useCallback, useMemo } from "react";
+import { useHotkeys, type HotkeyCallback } from "react-hotkeys-hook";
 
 type HotkeysEvent = Parameters<HotkeyCallback>[1];
 
@@ -59,7 +59,7 @@ export function useShortcuts(
   const hotkeyString = useMemo(
     () =>
       Object.values(shortcutMap)
-        .map((s) => formatKeys(s.keys))
+        .map((shortcut) => formatKeys(shortcut.keys))
         .join(","),
     [shortcutMap],
   );
@@ -70,7 +70,7 @@ export function useShortcuts(
 
       const pressed = buildPressedKey(hotkeysEvent);
       const match = Object.entries(shortcutMap).find(
-        ([, s]) => formatKeys(s.keys) === pressed,
+        ([, shortcut]) => formatKeys(shortcut.keys) === pressed,
       );
 
       if (match) {

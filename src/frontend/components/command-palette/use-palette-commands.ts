@@ -2,14 +2,14 @@ import { VIEW_VALUES, type EmailView } from "@/features/inbox/utils/inbox-filter
 import { useLogout } from "@/hooks/use-auth";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import { useTheme } from "@/hooks/use-theme";
-import { getActiveInboxId } from "@/lib/utils";
+import { getPreferredMailboxId } from "@/features/inbox/utils/mailbox";
 import {
+  AtIcon,
+  CalendarDotsIcon,
   CheckSquareIcon,
   GearIcon,
   HouseSimpleIcon,
-  AtIcon,
   MoonIcon,
-  CalendarDotsIcon,
   SignOutIcon,
   SunIcon,
   TrayIcon,
@@ -23,45 +23,73 @@ function paletteIcon(Icon: React.ComponentType<{ className?: string }>) {
 }
 
 function buildNavigationCommands(
-  runNavigation: (to: "/home" | "/tasks" | "/docs" | "/settings" | "/agenda") => void,
+  runNavigation: (target: "home" | "tasks" | "docs" | "settings" | "agenda") => void,
   navigateToInbox: () => void,
 ): PaletteCommand[] {
   return [
-    { id: "home", label: "Home", icon: paletteIcon(HouseSimpleIcon), onSelect: () => runNavigation("/home") },
-    { id: "inbox", label: "Inbox", icon: paletteIcon(TrayIcon), onSelect: navigateToInbox },
-    { id: "tasks", label: "Tasks", icon: paletteIcon(CheckSquareIcon), onSelect: () => runNavigation("/tasks") },
-    { id: "agenda", label: "Agenda", icon: paletteIcon(CalendarDotsIcon), onSelect: () => runNavigation("/agenda") },
-    { id: "settings", label: "Settings", icon: paletteIcon(GearIcon), onSelect: () => runNavigation("/settings") },
+    {
+      id: "home",
+      label: "Home",
+      icon: paletteIcon(HouseSimpleIcon),
+      onSelect: () => runNavigation("home"),
+    },
+    {
+      id: "inbox",
+      label: "Inbox",
+      icon: paletteIcon(TrayIcon),
+      onSelect: navigateToInbox,
+    },
+    {
+      id: "tasks",
+      label: "Tasks",
+      icon: paletteIcon(CheckSquareIcon),
+      onSelect: () => runNavigation("tasks"),
+    },
+    {
+      id: "agenda",
+      label: "Agenda",
+      icon: paletteIcon(CalendarDotsIcon),
+      onSelect: () => runNavigation("agenda"),
+    },
+    {
+      id: "settings",
+      label: "Settings",
+      icon: paletteIcon(GearIcon),
+      onSelect: () => runNavigation("settings"),
+    },
   ];
 }
 
 function buildAccountCommands(
-  isEmailsRoute: boolean,
-  activeInboxId: string,
+  activeMailboxId: number,
   currentMailboxView: EmailView | undefined,
-  pathname: string,
+  currentRouteId: string | undefined,
   routeSearch: {
     q?: unknown;
     includeJunk?: unknown;
     context?: unknown;
   },
-  accounts: Array<{ mailboxId: number | null; email: string | null; gmailEmail?: string | null }>,
+  accounts: Array<{
+    mailboxId: number | null;
+    email: string | null;
+    gmailEmail?: string | null;
+  }>,
   navigate: ReturnType<typeof useNavigate>,
   close: () => void,
 ): PaletteCommand[] {
-  if (!isEmailsRoute) return [];
-
   return accounts
-    .filter((account) => account.mailboxId != null)
+    .filter(
+      (account): account is typeof account & { mailboxId: number } =>
+        account.mailboxId != null,
+    )
+    .filter((account) => account.mailboxId !== activeMailboxId)
     .map((account) => {
-      const mailboxId = String(account.mailboxId);
+      const mailboxId = account.mailboxId;
       const label = getMailboxDisplayEmail(account) ?? "Account";
+
       return {
         id: `switch-mailbox-${mailboxId}`,
-        label:
-          mailboxId === activeInboxId
-            ? `${label} (Current)`
-            : `Switch to ${label}`,
+        label: `Switch to ${label}`,
         icon: paletteIcon(AtIcon),
         onSelect: () => {
           const currentContext =
@@ -69,15 +97,30 @@ function buildAccountCommands(
               ? (routeSearch.context as EmailView)
               : currentMailboxView;
 
-          if (pathname.endsWith("/drafts")) {
+          if (currentRouteId === "/_dashboard/$mailboxId/home") {
             navigate({
-              to: "/inbox/$id/drafts",
-              params: { id: mailboxId },
+              to: "/$mailboxId/home",
+              params: { mailboxId },
             });
-          } else if (pathname.endsWith("/search")) {
+          } else if (currentRouteId === "/_dashboard/$mailboxId/agenda") {
             navigate({
-              to: "/inbox/$id/search",
-              params: { id: mailboxId },
+              to: "/$mailboxId/agenda",
+              params: { mailboxId },
+            });
+          } else if (currentRouteId === "/_dashboard/$mailboxId/tasks") {
+            navigate({
+              to: "/$mailboxId/tasks",
+              params: { mailboxId },
+            });
+          } else if (currentRouteId === "/_dashboard/$mailboxId/inbox/drafts") {
+            navigate({
+              to: "/$mailboxId/inbox/drafts",
+              params: { mailboxId },
+            });
+          } else if (currentRouteId === "/_dashboard/$mailboxId/inbox/search") {
+            navigate({
+              to: "/$mailboxId/inbox/search",
+              params: { mailboxId },
               search: {
                 q:
                   typeof routeSearch.q === "string" && routeSearch.q.trim()
@@ -89,60 +132,87 @@ function buildAccountCommands(
                     : undefined,
               },
             });
-          } else if (pathname.endsWith("/starred")) {
+          } else if (currentRouteId === "/_dashboard/$mailboxId/inbox/starred") {
             navigate({
-              to: "/inbox/$id/starred",
-              params: { id: mailboxId },
+              to: "/$mailboxId/inbox/starred",
+              params: { mailboxId },
             });
-          } else if (pathname.endsWith("/sent")) {
+          } else if (currentRouteId === "/_dashboard/$mailboxId/inbox/sent") {
             navigate({
-              to: "/inbox/$id/sent",
-              params: { id: mailboxId },
+              to: "/$mailboxId/inbox/sent",
+              params: { mailboxId },
             });
-          } else if (pathname.endsWith("/archived")) {
+          } else if (currentRouteId === "/_dashboard/$mailboxId/inbox/archived") {
             navigate({
-              to: "/inbox/$id/archived",
-              params: { id: mailboxId },
+              to: "/$mailboxId/inbox/archived",
+              params: { mailboxId },
             });
-          } else if (pathname.endsWith("/spam")) {
+          } else if (currentRouteId === "/_dashboard/$mailboxId/inbox/spam") {
             navigate({
-              to: "/inbox/$id/spam",
-              params: { id: mailboxId },
+              to: "/$mailboxId/inbox/spam",
+              params: { mailboxId },
             });
-          } else if (pathname.endsWith("/trash")) {
+          } else if (currentRouteId === "/_dashboard/$mailboxId/inbox/trash") {
             navigate({
-              to: "/inbox/$id/trash",
-              params: { id: mailboxId },
+              to: "/$mailboxId/inbox/trash",
+              params: { mailboxId },
             });
-          } else if (pathname.includes("/email/") && currentContext === "sent") {
+          } else if (
+            currentRouteId === "/_dashboard/$mailboxId/inbox/subscriptions"
+          ) {
             navigate({
-              to: "/inbox/$id/sent",
-              params: { id: mailboxId },
+              to: "/$mailboxId/inbox/subscriptions",
+              params: { mailboxId },
             });
-          } else if (pathname.includes("/email/") && currentContext === "starred") {
+          } else if (currentRouteId === "/_dashboard/$mailboxId/inbox/filters") {
             navigate({
-              to: "/inbox/$id/starred",
-              params: { id: mailboxId },
+              to: "/$mailboxId/inbox/filters",
+              params: { mailboxId },
             });
-          } else if (pathname.includes("/email/") && currentContext === "archived") {
+          } else if (
+            currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
+            currentContext === "sent"
+          ) {
             navigate({
-              to: "/inbox/$id/archived",
-              params: { id: mailboxId },
+              to: "/$mailboxId/inbox/sent",
+              params: { mailboxId },
             });
-          } else if (pathname.includes("/email/") && currentContext === "spam") {
+          } else if (
+            currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
+            currentContext === "starred"
+          ) {
             navigate({
-              to: "/inbox/$id/spam",
-              params: { id: mailboxId },
+              to: "/$mailboxId/inbox/starred",
+              params: { mailboxId },
             });
-          } else if (pathname.includes("/email/") && currentContext === "trash") {
+          } else if (
+            currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
+            currentContext === "archived"
+          ) {
             navigate({
-              to: "/inbox/$id/trash",
-              params: { id: mailboxId },
+              to: "/$mailboxId/inbox/archived",
+              params: { mailboxId },
+            });
+          } else if (
+            currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
+            currentContext === "spam"
+          ) {
+            navigate({
+              to: "/$mailboxId/inbox/spam",
+              params: { mailboxId },
+            });
+          } else if (
+            currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
+            currentContext === "trash"
+          ) {
+            navigate({
+              to: "/$mailboxId/inbox/trash",
+              params: { mailboxId },
             });
           } else {
             navigate({
-              to: "/inbox/$id",
-              params: { id: mailboxId },
+              to: "/$mailboxId/inbox",
+              params: { mailboxId },
               search: {
                 view:
                   currentContext === "important"
@@ -152,19 +222,20 @@ function buildAccountCommands(
               },
             });
           }
+
           close();
         },
       } satisfies PaletteCommand;
-    })
-    .filter((command) => !command.label.endsWith("(Current)"));
+    });
 }
 
 function buildTaskViewCommands(
   isTasksRoute: boolean,
+  mailboxId: number | null,
   navigate: ReturnType<typeof useNavigate>,
   close: () => void,
 ): PaletteCommand[] {
-  if (!isTasksRoute) return [];
+  if (!isTasksRoute || mailboxId == null) return [];
 
   return ([
     { view: "all", label: "All Tasks" },
@@ -176,7 +247,8 @@ function buildTaskViewCommands(
     icon: paletteIcon(CheckSquareIcon),
     onSelect: () => {
       navigate({
-        to: "/tasks",
+        to: "/$mailboxId/tasks",
+        params: { mailboxId },
         search: (prev) => ({ ...prev, view: view === "all" ? undefined : view }),
       });
       close();
@@ -195,15 +267,24 @@ function buildActionCommands(opts: {
   return [
     {
       id: "toggle-theme",
-      label: resolvedTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode",
+      label:
+        resolvedTheme === "dark"
+          ? "Switch to Light Mode"
+          : "Switch to Dark Mode",
       icon: paletteIcon(resolvedTheme === "dark" ? SunIcon : MoonIcon),
-      onSelect: () => { toggleTheme(); close(); },
+      onSelect: () => {
+        toggleTheme();
+        close();
+      },
     },
     {
       id: "sign-out",
       label: "Sign out",
       icon: paletteIcon(SignOutIcon),
-      onSelect: () => { logout.mutate(); close(); },
+      onSelect: () => {
+        logout.mutate();
+        close();
+      },
     },
   ];
 }
@@ -219,18 +300,19 @@ export function usePaletteCommands({
   const accounts = useMailboxes().data?.accounts ?? [];
   const { resolved: resolvedTheme, toggle: toggleTheme } = useTheme();
 
-  const pathname = router.state.location.pathname;
-  const activeInboxIdFromPath = getActiveInboxId(pathname);
-  const firstMailboxId =
-    accounts.find((account) => account.mailboxId != null)?.mailboxId ?? null;
-  const defaultInboxId =
-    activeInboxIdFromPath !== "all"
-      ? activeInboxIdFromPath
-      : firstMailboxId != null
-        ? String(firstMailboxId)
-        : "all";
-  const isEmailsRoute = pathname === "/inbox/search" || pathname.startsWith("/inbox/");
-  const isTasksRoute = pathname === "/tasks";
+  const matches = router.state.matches;
+  const currentRouteId = matches[matches.length - 1]?.routeId;
+  const activeMailboxParam = matches.find(
+    (match) => match.routeId === "/_dashboard/$mailboxId",
+  )?.params.mailboxId;
+  const activeMailboxId = activeMailboxParam != null ? Number(activeMailboxParam) : null;
+  const defaultMailboxId = activeMailboxId ?? getPreferredMailboxId(accounts);
+  const isMailboxRoute = activeMailboxId != null;
+  const isEmailsRoute = matches.some((match) =>
+    match.routeId.startsWith("/_dashboard/$mailboxId/inbox"),
+  );
+  const isTasksRoute = currentRouteId === "/_dashboard/$mailboxId/tasks";
+  const isHomeRoute = currentRouteId === "/_dashboard/$mailboxId/home";
   const routeSearch = router.state.location.search as {
     view?: unknown;
     q?: unknown;
@@ -245,80 +327,109 @@ export function usePaletteCommands({
     currentMailboxView === "important" ? "important" : undefined;
 
   const navigateToInbox = useCallback(() => {
+    if (defaultMailboxId == null) {
+      navigate({ to: "/get-started" });
+      close();
+      return;
+    }
+
     navigate({
-      to: "/inbox/$id",
-      params: { id: defaultInboxId },
+      to: "/$mailboxId/inbox",
+      params: { mailboxId: defaultMailboxId },
       search: { view: currentInboxView },
     });
     close();
-  }, [close, navigate, defaultInboxId, currentInboxView]);
+  }, [close, currentInboxView, defaultMailboxId, navigate]);
 
   const runNavigation = useCallback(
-    (to: "/home" | "/tasks" | "/docs" | "/settings" | "/agenda") => {
-      navigate({ to });
+    (target: "home" | "tasks" | "docs" | "settings" | "agenda") => {
+      if (target === "tasks") {
+        if (defaultMailboxId != null) {
+          navigate({
+            to: "/$mailboxId/tasks",
+            params: { mailboxId: defaultMailboxId },
+          });
+        } else {
+          navigate({ to: "/get-started" });
+        }
+      } else if (target === "docs") {
+        navigate({ to: "/docs" });
+      } else if (target === "settings") {
+        navigate({ to: "/settings" });
+      } else if (defaultMailboxId != null) {
+        navigate({
+          to: target === "home" ? "/$mailboxId/home" : "/$mailboxId/agenda",
+          params: { mailboxId: defaultMailboxId },
+        });
+      } else {
+        navigate({ to: "/get-started" });
+      }
+
       close();
     },
-    [close, navigate],
+    [close, defaultMailboxId, navigate],
   );
 
-  const navigationCommands = useMemo(
-    () => {
-      const all = buildNavigationCommands(runNavigation, navigateToInbox);
-      return all.filter((cmd) => {
-        if (isEmailsRoute && cmd.id === "inbox") return false;
-        if (isTasksRoute && cmd.id === "tasks") return false;
-        return true;
-      });
-    },
-    [runNavigation, navigateToInbox, isEmailsRoute, isTasksRoute],
-  );
+  const navigationCommands = useMemo(() => {
+    const all = buildNavigationCommands(runNavigation, navigateToInbox);
+    return all.filter((cmd) => {
+      if (isEmailsRoute && cmd.id === "inbox") return false;
+      if (isTasksRoute && cmd.id === "tasks") return false;
+      if (isHomeRoute && cmd.id === "home") return false;
+      return true;
+    });
+  }, [runNavigation, navigateToInbox, isEmailsRoute, isTasksRoute, isHomeRoute]);
 
   const accountCommands = useMemo(
     () =>
-      buildAccountCommands(
-        isEmailsRoute,
-        defaultInboxId,
-        currentMailboxView,
-        pathname,
-        routeSearch,
-        accounts,
-        navigate,
-        close,
-      ),
+      isMailboxRoute && activeMailboxId != null
+        ? buildAccountCommands(
+            activeMailboxId,
+            currentMailboxView,
+            currentRouteId,
+            routeSearch,
+            accounts,
+            navigate,
+            close,
+          )
+        : [],
     [
-      isEmailsRoute,
-      defaultInboxId,
+      activeMailboxId,
+      close,
       currentMailboxView,
-      pathname,
+      currentRouteId,
+      isMailboxRoute,
+      navigate,
       routeSearch,
       accounts,
-      navigate,
-      close,
     ],
   );
 
   const taskViewCommands = useMemo(
-    () => buildTaskViewCommands(isTasksRoute, navigate, close),
-    [isTasksRoute, navigate, close],
+    () => buildTaskViewCommands(isTasksRoute, defaultMailboxId, navigate, close),
+    [isTasksRoute, defaultMailboxId, navigate, close],
   );
 
   const actionCommands = useMemo(
-    () => buildActionCommands({
-      close,
-      resolvedTheme, toggleTheme, logout,
-    }),
+    () =>
+      buildActionCommands({
+        close,
+        resolvedTheme,
+        toggleTheme,
+        logout,
+      }),
     [close, resolvedTheme, toggleTheme, logout],
   );
 
   const agentSuggestions = useMemo(() => {
-    if (pathname.startsWith("/inbox/")) {
+    if (isEmailsRoute) {
       return [
         "Summarize what I'm looking at",
         "Draft a reply for the current email",
         "What should I follow up on here?",
       ];
     }
-    if (pathname === "/tasks") {
+    if (isTasksRoute) {
       return [
         "What should I prioritize today?",
         "Show overdue tasks",
@@ -330,7 +441,7 @@ export function usePaletteCommands({
       "Find emails I should reply to",
       "Create a task from my current context",
     ];
-  }, [pathname]);
+  }, [isEmailsRoute, isTasksRoute]);
 
   return {
     visibleNavigationCommands: navigationCommands,

@@ -1,32 +1,31 @@
-import { getShortcutsByScope } from "@/config/shortcuts";
-import { useEmailCommandActions } from "@/features/inbox/hooks/use-email-command-state";
-import { useShortcuts } from "@/lib/hotkeys";
+import { issueEmailCommand } from "@/features/inbox/hooks/use-email-command-state";
+import { getShortcutsByScope } from "@/lib/hotkeys/shortcuts";
+import { useShortcuts } from "@/lib/hotkeys/use-shortcuts";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useMemo } from "react";
 
-function getActiveInboxId(pathname: string): string {
-  const match = pathname.match(/^\/inbox\/([^/]+)/);
-  return match?.[1] ?? "all";
-}
-
 const inboxShortcuts = getShortcutsByScope("inbox");
 
-export function InboxHotkeys() {
+export function useInboxHotkeys() {
   const navigate = useNavigate();
   const router = useRouter();
-  const issueEmailCommand = useEmailCommandActions();
-  const activeInboxId = getActiveInboxId(
-    router.state.location.pathname,
-  );
+  const activeMailboxParam = router.state.matches.find(
+    (match) => match.routeId === "/_dashboard/$mailboxId",
+  )?.params.mailboxId;
+  const activeMailboxId = activeMailboxParam != null
+    ? Number(activeMailboxParam)
+    : null;
 
   const handlers = useMemo(
     () => ({
       compose: () =>
-        navigate({
-          to: "/inbox/$id",
-          params: { id: activeInboxId },
-          search: { compose: true },
-        }),
+        activeMailboxId
+          ? navigate({
+              to: "/$mailboxId/inbox",
+              params: { mailboxId: activeMailboxId },
+              search: { compose: true },
+            })
+          : undefined,
       archive: () => issueEmailCommand({ type: "archive" }),
       trash: () => issueEmailCommand({ type: "trash" }),
       navigateNext: () => issueEmailCommand({ type: "navigate-next" }),
@@ -38,10 +37,8 @@ export function InboxHotkeys() {
       toggleRead: () => issueEmailCommand({ type: "toggle-read" }),
       toggleStar: () => issueEmailCommand({ type: "toggle-star" }),
     }),
-    [navigate, activeInboxId, issueEmailCommand],
+    [navigate, activeMailboxId],
   );
 
   useShortcuts(inboxShortcuts, handlers, { scope: "inbox" });
-
-  return null;
 }

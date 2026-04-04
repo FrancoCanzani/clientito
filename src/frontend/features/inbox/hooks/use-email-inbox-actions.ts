@@ -13,7 +13,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
-const mailboxRoute = getRouteApi("/_dashboard/inbox/$id");
+const mailboxRoute = getRouteApi("/_dashboard/$mailboxId/inbox");
 
 export type EmailInboxAction =
   | "archive"
@@ -76,32 +76,32 @@ export function useEmailInboxActions({
   mailboxId,
 }: {
   view: EmailView;
-  mailboxId: number | null | undefined;
+  mailboxId: number;
 }) {
   const navigate = mailboxRoute.useNavigate();
-  const params = mailboxRoute.useParams();
   const queryClient = useQueryClient();
   const pendingRef = useRef<PendingAction | null>(null);
 
   const emailsQueryKey = useMemo(
-    () => ["emails", view, mailboxId ?? "all"],
+    () => ["emails", view, mailboxId],
     [mailboxId, view],
   );
 
   const closeEmail = useCallback(() => {
     navigate({
-      to: "/inbox/$id",
-      params: { id: params.id },
+      to: "/$mailboxId/inbox",
+      params: { mailboxId },
     });
-  }, [navigate, params.id]);
+  }, [navigate, mailboxId]);
 
   const openEmail = useCallback(
     (email: EmailListItem) => {
-      openInboxEmail(queryClient, navigate, params.id, email, {
+      const routeMailboxId = email.mailboxId ?? mailboxId;
+      openInboxEmail(queryClient, navigate, routeMailboxId, email, {
         context: view,
       });
     },
-    [navigate, params.id, queryClient, view],
+    [mailboxId, navigate, queryClient, view],
   );
 
   const inflightRef = useRef(0);

@@ -1,5 +1,15 @@
 import type { EmailView } from "./utils/inbox-filters";
 
+export type DraftState = {
+  mailboxId: number | null;
+  to: string;
+  cc: string;
+  bcc: string;
+  subject: string;
+  body: string;
+  forwardedContent: string;
+};
+
 export type ContactSuggestion = {
   email: string;
   name: string | null;

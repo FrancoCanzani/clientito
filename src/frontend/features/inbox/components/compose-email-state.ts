@@ -7,7 +7,7 @@ import { loadDraft, useDraft } from "../hooks/use-draft";
 import { useUndoSend } from "../hooks/use-undo-send";
 import { sendEmail } from "../mutations";
 import { getDraftsQueryKey } from "../queries/drafts";
-import type { ComposeInitial } from "../types";
+import type { ComposeInitial, DraftState } from "../types";
 import { buildPlainForwardedHtml } from "../utils/build-forwarded-html";
 
 type UseComposeEmailOptions = {
@@ -69,6 +69,28 @@ function splitForwardedContent(content: string) {
   return {
     body,
     forwardedContent,
+  };
+}
+
+type AttachmentKey = { key: string; filename: string; mimeType: string };
+
+function buildEmailPayload(
+  snap: DraftState,
+  bodyOverride: string,
+  threadId: string | undefined,
+  attachmentKeys?: AttachmentKey[],
+  scheduledFor?: number,
+) {
+  return {
+    mailboxId: snap.mailboxId ?? undefined,
+    to: snap.to,
+    cc: snap.cc.trim().length > 0 ? snap.cc.trim() : undefined,
+    bcc: snap.bcc.trim().length > 0 ? snap.bcc.trim() : undefined,
+    subject: snap.subject,
+    body: combineComposeBody(bodyOverride, snap.forwardedContent),
+    threadId,
+    attachments: attachmentKeys,
+    ...(scheduledFor != null && { scheduledFor }),
   };
 }
 
@@ -229,18 +251,14 @@ export function useComposeEmail(
 
   const undoSend = useUndoSend({
     onSend: () => {
-      const snap = draftSnapshotRef.current;
-      const attSnap = attachmentSnapshotRef.current;
-      return sendEmail({
-        mailboxId: snap.mailboxId ?? undefined,
-        to: snap.to,
-        cc: snap.cc.trim().length > 0 ? snap.cc.trim() : undefined,
-        bcc: snap.bcc.trim().length > 0 ? snap.bcc.trim() : undefined,
-        subject: snap.subject,
-        body: combineComposeBody(bodyRef.current, snap.forwardedContent),
-        threadId: threadId ?? undefined,
-        attachments: attSnap,
-      });
+      return sendEmail(
+        buildEmailPayload(
+          draftSnapshotRef.current,
+          bodyRef.current,
+          threadId ?? undefined,
+          attachmentSnapshotRef.current,
+        ),
+      );
     },
     onSuccess: () => {
       clearDraft();
@@ -276,34 +294,26 @@ export function useComposeEmail(
     async (scheduledFor: number) => {
       try {
         setSendPending(true);
-        await sendEmail({
-          mailboxId: draft.mailboxId ?? undefined,
-          to: draft.to,
-          cc: draft.cc.trim().length > 0 ? draft.cc.trim() : undefined,
-          bcc: draft.bcc.trim().length > 0 ? draft.bcc.trim() : undefined,
-          subject: draft.subject,
-          body: combineComposeBody(bodyRef.current, draft.forwardedContent),
-          threadId: threadId ?? undefined,
-          attachments:
-            attachments.files.length > 0
-              ? attachments.getAttachmentKeys()
-              : undefined,
-          scheduledFor,
-        });
-        clearDraft();
+        await sendEmail(
+          buildEmailPayload(
+            draft,
+            bodyRef.current,
+            threadId ?? undefined,
+            attachments.files.length > 0 ? attachments.getAttachmentKeys() : undefined,
+            scheduledFor,
+          ),
+        );
         const timeStr = new Intl.DateTimeFormat(undefined, {
           weekday: "short",
           hour: "numeric",
           minute: "2-digit",
         }).format(new Date(scheduledFor));
-        toast.success(`Email scheduled for ${timeStr}`);
-        setSendPending(false);
-        setDraft(createComposeDraft());
-        attachments.clear();
+        clearDraft();
         queryClient.invalidateQueries({ queryKey: ["scheduled-emails"] });
         queryClient.invalidateQueries({
           queryKey: getDraftsQueryKey(draft.mailboxId),
         });
+        toast.success(`Email scheduled for ${timeStr}`);
         options?.onSent?.();
       } catch (error) {
         setSendPending(false);

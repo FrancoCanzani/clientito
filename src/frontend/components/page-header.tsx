@@ -13,7 +13,7 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "sticky top-0 z-20 flex items-center justify-between gap-3 bg-background pb-2 pt-5",
+        "sticky top-0 z-20 flex items-center justify-between gap-3 bg-background pt-6 pb-2",
         className,
       )}
     >

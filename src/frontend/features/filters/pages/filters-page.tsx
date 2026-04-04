@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +9,6 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
-import { PageHeader } from "@/components/page-header";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -18,7 +18,6 @@ import {
 import {
   createFilter,
   deleteFilter,
-  fetchFilters,
   generateFilter,
   updateFilter,
 } from "@/features/filters/queries";
@@ -30,9 +29,12 @@ import {
   SparkleIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { getRouteApi, useRouter } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+
+const filtersRoute = getRouteApi("/_dashboard/$mailboxId/inbox/filters");
 
 const NOISE_FILTER_TEMPLATES = [
   {
@@ -84,23 +86,22 @@ function formatActions(actions: Record<string, unknown>) {
 }
 
 export default function FiltersPage() {
-  const queryClient = useQueryClient();
+  const { filters: loadedFilters } = filtersRoute.useLoaderData();
+  const router = useRouter();
   const [editing, setEditing] = useState<EditingFilter | null>(null);
   const [prompt, setPrompt] = useState("");
+  const [filters, setFilters] = useState(loadedFilters);
 
-  const { data: filters = [], isPending } = useQuery({
-    queryKey: ["filters"],
-    queryFn: fetchFilters,
-  });
+  useEffect(() => {
+    setFilters(loadedFilters);
+  }, [loadedFilters]);
+
   const availableTemplates = useMemo(() => {
     const existingNames = new Set(filters.map((filter) => filter.name));
     return NOISE_FILTER_TEMPLATES.filter(
       (template) => !existingNames.has(template.name),
     );
   }, [filters]);
-
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["filters"] });
 
   const generateMutation = useMutation({
     mutationFn: generateFilter,
@@ -119,10 +120,11 @@ export default function FiltersPage() {
 
   const createMutation = useMutation({
     mutationFn: createFilter,
-    onSuccess: () => {
-      invalidate();
+    onSuccess: (nextFilter) => {
+      setFilters((current) => [nextFilter, ...current]);
       setEditing(null);
       toast.success("Filter created");
+      void router.invalidate();
     },
     onError: () => toast.error("Failed to create filter"),
   });
@@ -133,19 +135,25 @@ export default function FiltersPage() {
       ...rest
     }: { id: number } & Parameters<typeof updateFilter>[1]) =>
       updateFilter(id, rest),
-    onSuccess: () => {
-      invalidate();
+    onSuccess: (nextFilter) => {
+      setFilters((current) =>
+        current.map((filter) =>
+          filter.id === nextFilter.id ? nextFilter : filter,
+        ),
+      );
       setEditing(null);
       toast.success("Filter updated");
+      void router.invalidate();
     },
     onError: () => toast.error("Failed to update filter"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteFilter,
-    onSuccess: () => {
-      invalidate();
+    onSuccess: (_, id) => {
+      setFilters((current) => current.filter((filter) => filter.id !== id));
       toast.success("Filter deleted");
+      void router.invalidate();
     },
     onError: () => toast.error("Failed to delete filter"),
   });
@@ -153,7 +161,14 @@ export default function FiltersPage() {
   const toggleMutation = useMutation({
     mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
       updateFilter(id, { enabled }),
-    onSuccess: invalidate,
+    onSuccess: (nextFilter) => {
+      setFilters((current) =>
+        current.map((filter) =>
+          filter.id === nextFilter.id ? nextFilter : filter,
+        ),
+      );
+      void router.invalidate();
+    },
   });
 
   const startEdit = useCallback((filter: EmailFilter) => {
@@ -199,7 +214,7 @@ export default function FiltersPage() {
   };
 
   return (
-    <div className="flex min-h-0 w-full max-w-2xl min-w-0 flex-1 flex-col gap-8 py-2">
+    <div className="flex min-h-0 w-full max-w-2xl min-w-0 flex-1 flex-col gap-8">
       <PageHeader
         title={
           <div className="flex items-center gap-2">
@@ -236,11 +251,9 @@ export default function FiltersPage() {
         </Button>
       </form>
 
-      {!isPending && availableTemplates.length > 0 && (
+      {availableTemplates.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">
-            Suggested
-          </p>
+          <p className="text-xs font-medium text-muted-foreground">Suggested</p>
           <div className="flex flex-wrap gap-2">
             {availableTemplates.map((template) => (
               <Button
@@ -269,7 +282,7 @@ export default function FiltersPage() {
         />
       )}
 
-      {isPending ? (
+      {generateMutation.isPending && filters.length === 0 ? (
         <div className="space-y-3">
           {FILTER_SKELETON_KEYS.map((key) => (
             <div

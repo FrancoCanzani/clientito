@@ -4,8 +4,8 @@ import type { EmailListItem, EmailListResponse } from "@/features/inbox/types";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 
 type NavigateToEmail = (options: {
-  to: "/inbox/$id/email/$emailId";
-  params: { id: string; emailId: string };
+  to: "/$mailboxId/inbox/email/$emailId";
+  params: { mailboxId: number; emailId: string };
   search?: { context?: EmailView };
   replace?: boolean;
 }) => void;
@@ -13,13 +13,13 @@ type NavigateToEmail = (options: {
 export function openEmail(
   queryClient: QueryClient,
   navigate: NavigateToEmail,
-  routeMailboxId: string,
+  routeMailboxId: number,
   email: Pick<EmailListItem, "id" | "isRead">,
   options?: { replace?: boolean; context?: EmailView },
 ) {
   navigate({
-    to: "/inbox/$id/email/$emailId",
-    params: { id: routeMailboxId, emailId: email.id },
+    to: "/$mailboxId/inbox/email/$emailId",
+    params: { mailboxId: routeMailboxId, emailId: email.id },
     search: {
       context:
         options?.context && options.context !== "inbox"

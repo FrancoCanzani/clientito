@@ -8,7 +8,8 @@ import {
   StarIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import { useEmail } from "../context/email-context";
+import type { EmailInboxAction } from "@/features/inbox/hooks/use-email-inbox-actions";
+import type { EmailView } from "@/features/inbox/utils/inbox-filters";
 import type { EmailListItem } from "../types";
 import { formatInboxRowDate } from "../utils/formatters";
 import type { ThreadGroup } from "../utils/group-emails-by-thread";
@@ -16,11 +17,16 @@ import type { ThreadGroup } from "../utils/group-emails-by-thread";
 export function EmailRow({
   group,
   isOpen,
+  view,
+  onOpen,
+  onAction,
 }: {
   group: ThreadGroup;
   isOpen: boolean;
+  view: EmailView;
+  onOpen: (email: EmailListItem) => void;
+  onAction: (action: EmailInboxAction, ids?: string[]) => void;
 }) {
-  const { openEmail, executeEmailAction, view } = useEmail();
   const email: EmailListItem = group.representative;
   const isStarred = email.labelIds.includes("STARRED");
   const threadCount = group.threadCount;
@@ -39,11 +45,11 @@ export function EmailRow({
         "flex w-full group items-center gap-2 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40 cursor-default",
         isOpen && "bg-muted/50",
       )}
-      onClick={() => openEmail(email)}
+      onClick={() => onOpen(email)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          openEmail(email);
+          onOpen(email);
         }
       }}
     >
@@ -92,7 +98,7 @@ export function EmailRow({
               size="icon-sm"
               onClick={(event) => {
                 event.stopPropagation();
-                executeEmailAction("archive", [email.id]);
+                onAction("archive", [email.id]);
               }}
             >
               <ArchiveIcon className="size-3.5" />
@@ -103,9 +109,7 @@ export function EmailRow({
               size="icon-sm"
               onClick={(event) => {
                 event.stopPropagation();
-                executeEmailAction(email.isRead ? "mark-unread" : "mark-read", [
-                  email.id,
-                ]);
+                onAction(email.isRead ? "mark-unread" : "mark-read", [email.id]);
               }}
             >
               {email.isRead ? (
@@ -120,7 +124,7 @@ export function EmailRow({
               size="icon-sm"
               onClick={(event) => {
                 event.stopPropagation();
-                executeEmailAction(isStarred ? "unstar" : "star", [email.id]);
+                onAction(isStarred ? "unstar" : "star", [email.id]);
               }}
             >
               <StarIcon
@@ -134,7 +138,7 @@ export function EmailRow({
               size="icon-sm"
               onClick={(event) => {
                 event.stopPropagation();
-                executeEmailAction("trash", [email.id]);
+                onAction("trash", [email.id]);
               }}
             >
               <TrashIcon className="size-3.5" fill="red" />

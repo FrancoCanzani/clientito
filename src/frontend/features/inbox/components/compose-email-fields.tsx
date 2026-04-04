@@ -17,6 +17,7 @@ import {
 import DOMPurify from "dompurify";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { htmlToPlainText } from "../utils/html-to-plain-text";
 import { useGrammarCheck } from "../hooks/use-grammar-check";
 import { AttachmentBar } from "./attachment-bar";
 import { ComposeEditor } from "./compose-editor";
@@ -68,11 +69,6 @@ function ForwardedMessagePreview({ html }: { html: string }) {
   );
 }
 
-function htmlToPlainText(html: string): string {
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return div.textContent ?? "";
-}
 
 function plainTextToHtml(text: string): string {
   return text

@@ -5,8 +5,9 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { SearchResultsList } from "@/features/inbox/components/search/search-results-list";
 import { SearchSuggestionsList } from "@/features/inbox/components/search/search-suggestions-list";
 import {
-  inboxSearchResultsInfiniteQueryOptions,
-  inboxSearchSuggestionsQueryOptions,
+  fetchSearchEmails,
+  fetchSearchSuggestions,
+  INBOX_SEARCH_PAGE_SIZE,
 } from "@/features/inbox/queries";
 import type { EmailListItem } from "@/features/inbox/types";
 import { openEmail as openInboxEmail } from "@/features/inbox/utils/open-email";
@@ -18,26 +19,29 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
 
-const searchRoute = getRouteApi("/_dashboard/inbox/$id/search");
+const searchRoute = getRouteApi("/_dashboard/$mailboxId/inbox/search");
 
-export default function InboxSearchPage({
-  mailboxId,
-  search,
-}: {
-  mailboxId: number | null;
-  search: {
-    q: string;
-    includeJunk?: boolean;
-  };
-}) {
+function normalizeQuery(query: string) {
+  return query.trim().replace(/\s+/g, " ");
+}
+
+export default function InboxSearchPage() {
+  const { mailboxId } = searchRoute.useParams();
+  const { suggestions, initialResults } = searchRoute.useLoaderData();
+  const search = searchRoute.useSearch();
   const navigate = searchRoute.useNavigate();
   const queryClient = useQueryClient();
   const routeQuery = search.q ?? "";
 
   const [query, setSearchQuery] = useState(routeQuery);
+
+  useEffect(() => {
+    setSearchQuery(routeQuery);
+  }, [routeQuery]);
+
   const updateQuery = useDebouncedCallback((nextQuery: string) => {
     navigate({
       search: (prev) => ({
@@ -51,7 +55,7 @@ export default function InboxSearchPage({
   const scope = useMemo(
     () => ({
       q: routeQuery,
-      mailboxId: mailboxId ?? undefined,
+      mailboxId,
       includeJunk: search.includeJunk,
     }),
     [routeQuery, search.includeJunk, mailboxId],
@@ -59,10 +63,55 @@ export default function InboxSearchPage({
 
   useSetPageContext(useMemo(() => ({ route: "inbox-search" }), []));
 
-  const resultsQuery = useInfiniteQuery(
-    inboxSearchResultsInfiniteQueryOptions(scope),
-  );
-  const suggestionsQuery = useQuery(inboxSearchSuggestionsQueryOptions(scope));
+  const resultsQuery = useInfiniteQuery({
+    queryKey: [
+      "emails",
+      "search",
+      normalizeQuery(scope.q),
+      scope.mailboxId,
+      "inbox",
+      scope.includeJunk ?? false,
+    ] as const,
+    initialPageParam: 0,
+    enabled: normalizeQuery(scope.q).length >= 2,
+    initialData: initialResults
+      ? {
+          pages: [initialResults],
+          pageParams: [0],
+        }
+      : undefined,
+    queryFn: ({ pageParam }) =>
+      fetchSearchEmails({
+        ...scope,
+        q: normalizeQuery(scope.q),
+        limit: INBOX_SEARCH_PAGE_SIZE,
+        offset: pageParam,
+      }),
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.hasMore
+        ? lastPage.pagination.offset + lastPage.pagination.limit
+        : undefined,
+    staleTime: 30_000,
+  });
+
+  const suggestionsQuery = useQuery({
+    queryKey: [
+      "emails",
+      "search",
+      "suggestions",
+      normalizeQuery(scope.q),
+      scope.mailboxId,
+      "inbox",
+      scope.includeJunk ?? false,
+    ] as const,
+    queryFn: () =>
+      fetchSearchSuggestions({
+        ...scope,
+        q: normalizeQuery(scope.q),
+      }),
+    initialData: suggestions,
+    staleTime: 30_000,
+  });
 
   const results = useMemo(
     () => resultsQuery.data?.pages.flatMap((page) => page.data) ?? [],
@@ -105,19 +154,17 @@ export default function InboxSearchPage({
   }
 
   function openEmail(email: EmailListItem) {
-    const routeMailboxId =
-      email.mailboxId != null ? String(email.mailboxId) : "all";
-
+    const routeMailboxId = email.mailboxId ?? mailboxId;
+    if (routeMailboxId == null) return;
     openInboxEmail(queryClient, navigate, routeMailboxId, email);
   }
 
   const hiddenJunkCount =
     resultsQuery.data?.pages[0]?.searchMeta?.hiddenJunkCount ?? 0;
-  const canToggleJunk =
-    hiddenJunkCount > 0 || search.includeJunk === true;
+  const canToggleJunk = hiddenJunkCount > 0 || search.includeJunk === true;
 
   return (
-    <div className="flex min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col">
+    <div className="flex min-h-0 h-full w-full max-w-3xl min-w-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-5">
         <PageHeader
           title={
@@ -184,17 +231,15 @@ export default function InboxSearchPage({
             </div>
           )}
 
-          <div className="flex min-h-0 flex-1 flex-col">
-            <SearchResultsList
-              query={routeQuery.trim()}
-              results={results}
-              isPending={resultsQuery.isPending}
-              hasNextPage={resultsQuery.hasNextPage ?? false}
-              isFetchingNextPage={resultsQuery.isFetchingNextPage}
-              loadMoreRef={loadMoreRef}
-              onOpenEmail={openEmail}
-            />
-          </div>
+          <SearchResultsList
+            query={routeQuery.trim()}
+            results={results}
+            isPending={resultsQuery.isPending}
+            hasNextPage={resultsQuery.hasNextPage ?? false}
+            isFetchingNextPage={resultsQuery.isFetchingNextPage}
+            loadMoreRef={loadMoreRef}
+            onOpenEmail={openEmail}
+          />
         </div>
       </div>
     </div>

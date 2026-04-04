@@ -10,13 +10,14 @@ import {
   dismissProposedEvent,
   editProposedEvent,
 } from "@/features/calendar/mutations";
-import { agendaEventsQueryOptions } from "@/features/calendar/queries";
 import type { AgendaEvent } from "@/features/calendar/types";
 import { ArrowRightIcon } from "@phosphor-icons/react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link, getRouteApi } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+
+const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
 function groupByDay(events: AgendaEvent[]) {
   const groups = new Map<string, { date: Date; events: AgendaEvent[] }>();
@@ -39,30 +40,19 @@ function groupByDay(events: AgendaEvent[]) {
 }
 
 export function AgendaPanel({
-  days = 7,
+  events,
   showEmptyState = true,
   hideProposed = false,
   showHeader = false,
 }: {
-  days?: number;
+  events: AgendaEvent[];
   showEmptyState?: boolean;
   hideProposed?: boolean;
   showHeader?: boolean;
 }) {
+  const { mailboxId } = mailboxRoute.useParams();
   const queryClient = useQueryClient();
   const [approvingId, setApprovingId] = useState<number | null>(null);
-
-  const { from, to } = useMemo(() => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const end = new Date(start);
-    end.setDate(end.getDate() + days);
-    return { from: start.toISOString(), to: end.toISOString() };
-  }, [days]);
-
-  const eventsQuery = useQuery({
-    ...agendaEventsQueryOptions({ from, to }),
-  });
 
   const approveMutation = useMutation({
     mutationFn: approveProposedEvent,
@@ -93,29 +83,21 @@ export function AgendaPanel({
   });
 
   const dayGroups = useMemo(() => {
-    let events = eventsQuery.data ?? [];
+    let filtered = events;
     if (hideProposed) {
-      events = events.filter((e) => e.status !== "pending");
+      filtered = filtered.filter((e) => e.status !== "pending");
     }
-    return groupByDay(events);
-  }, [eventsQuery.data, hideProposed]);
-
-  if (eventsQuery.isError) {
-    return null;
-  }
+    return groupByDay(filtered);
+  }, [events, hideProposed]);
 
   if (dayGroups.length === 0) {
-    if (!showEmptyState) {
-      return null;
-    }
+    if (!showEmptyState) return null;
 
     return (
       <Empty className="min-h-0 flex-1 border-0 p-0">
         <EmptyHeader>
           <EmptyTitle>No upcoming events</EmptyTitle>
-          <EmptyDescription>
-            Your calendar is clear for the next {days} days.
-          </EmptyDescription>
+          <EmptyDescription>Your calendar is clear.</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
@@ -126,7 +108,11 @@ export function AgendaPanel({
       {showHeader && (
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">Today</p>
-          <Link to="/agenda" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+          <Link
+            to="/$mailboxId/agenda"
+            params={{ mailboxId }}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
             Agenda
             <ArrowRightIcon className="size-3" />
           </Link>

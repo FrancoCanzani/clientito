@@ -1,19 +1,29 @@
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { useEmail } from "@/features/inbox/context/email-context";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useEmailData } from "@/features/inbox/hooks/use-email-data";
+import type { EmailInboxAction } from "@/features/inbox/hooks/use-email-inbox-actions";
+import type { EmailListItem } from "@/features/inbox/types";
 import { VIEW_LABELS } from "@/features/inbox/utils/inbox-filters";
 import { Link } from "@tanstack/react-router";
 import { EmailContextMenu } from "./email-context-menu";
 import { EmailRow } from "./email-row";
 
-export function EmailList() {
+export function EmailList({
+  emailData,
+  onOpen,
+  onAction,
+}: {
+  emailData: ReturnType<typeof useEmailData>;
+  onOpen: (email: EmailListItem) => void;
+  onAction: (action: EmailInboxAction, ids?: string[]) => void;
+}) {
   const {
     view,
     mailboxId,
@@ -22,8 +32,7 @@ export function EmailList() {
     hasNextPage,
     isFetchingNextPage,
     loadMoreRef,
-  } = useEmail();
-
+  } = emailData;
   const pageTitle = VIEW_LABELS[view];
 
   return (
@@ -40,8 +49,8 @@ export function EmailList() {
             <>
               <Button asChild variant={"ghost"}>
                 <Link
-                  to="/inbox/$id"
-                  params={{ id: mailboxId != null ? String(mailboxId) : "all" }}
+                  to="/$mailboxId/inbox"
+                  params={{ mailboxId }}
                   search={{ compose: true }}
                 >
                   New Email
@@ -55,7 +64,7 @@ export function EmailList() {
           <div className="space-y-5">
             {sections.map((section) => (
               <section key={section.label} className="space-y-1.5">
-                <div className="sticky top-12 z-10 bg-background py-2 my-2 text-xs text-muted-foreground">
+                <div className="sticky top-12 z-10 bg-background py-2 text-xs text-muted-foreground">
                   {section.label}
                 </div>
                 <div className="space-y-1">
@@ -63,8 +72,18 @@ export function EmailList() {
                     const email = group.representative;
 
                     return (
-                      <EmailContextMenu key={email.id} targetEmail={email}>
-                        <EmailRow group={group} isOpen={false} />
+                      <EmailContextMenu
+                        key={email.id}
+                        targetEmail={email}
+                        onAction={onAction}
+                      >
+                        <EmailRow
+                          group={group}
+                          isOpen={false}
+                          view={view}
+                          onOpen={onOpen}
+                          onAction={onAction}
+                        />
                       </EmailContextMenu>
                     );
                   })}

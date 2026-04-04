@@ -1,3 +1,4 @@
+import { zValidator } from "@hono/zod-validator";
 import type { Hono } from "hono";
 import { streamText } from "ai";
 import {
@@ -31,6 +32,7 @@ import { STANDARD_LABELS } from "../../lib/email/types";
 import type { AppRouteEnv } from "../types";
 import { hasEmailLabel } from "../inbox/emails/utils";
 import { getDayBoundsUtc } from "../../lib/utils";
+import { z } from "zod";
 
 const REPLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const FALLBACK_WINDOW_MS = 48 * 60 * 60 * 1000;
@@ -121,10 +123,15 @@ function shouldSurfaceReplyAction(input: {
 function shouldSurfaceCreateTaskAction(
   action: NonNullable<ReturnType<typeof getStoredEmailTriage>>["actions"][number],
 ) {
+  const taskTitle =
+    typeof action.payload?.taskTitle === "string"
+      ? action.payload.taskTitle.trim()
+      : "";
+
   return (
     action.status === "pending" &&
     action.type === "create_task" &&
-    Boolean(action.payload?.taskTitle?.trim())
+    Boolean(taskTitle)
   );
 }
 
@@ -140,6 +147,7 @@ export async function buildBriefing(input: {
   db: AppRouteEnv["Variables"]["db"];
   env: Env;
   userId: string;
+  mailboxId: number;
 }): Promise<BriefingData> {
   const now = Date.now();
   const { start: dayStart, end: dayEnd } = getTodayBounds(now);
@@ -153,6 +161,7 @@ export async function buildBriefing(input: {
     .where(
       and(
         eq(emails.userId, input.userId),
+        eq(emails.mailboxId, input.mailboxId),
         isNotNull(emails.threadId),
         not(hasEmailLabel(STANDARD_LABELS.TRASH)),
         not(hasEmailLabel(STANDARD_LABELS.SPAM)),
@@ -198,32 +207,49 @@ export async function buildBriefing(input: {
         ),
       )
       .leftJoin(emailIntelligence, eq(emailIntelligence.emailId, emails.id))
-      .where(eq(emails.userId, input.userId))
+      .where(
+        and(
+          eq(emails.userId, input.userId),
+          eq(emails.mailboxId, input.mailboxId),
+        ),
+      )
       .orderBy(desc(emails.date)),
     input.db
       .select({ count: sql<number>`count(*)` })
       .from(tasks)
+      .innerJoin(emails, eq(tasks.sourceEmailId, emails.id))
       .where(
         and(
           eq(tasks.userId, input.userId),
           ne(tasks.status, "done"),
           gte(tasks.dueAt, dayStart),
           lt(tasks.dueAt, dayEnd),
+          eq(emails.mailboxId, input.mailboxId),
         ),
       ),
     input.db
       .select({ count: sql<number>`count(*)` })
       .from(tasks)
-      .where(and(eq(tasks.userId, input.userId), ne(tasks.status, "done"), lt(tasks.dueAt, now))),
+      .innerJoin(emails, eq(tasks.sourceEmailId, emails.id))
+      .where(
+        and(
+          eq(tasks.userId, input.userId),
+          ne(tasks.status, "done"),
+          lt(tasks.dueAt, now),
+          eq(emails.mailboxId, input.mailboxId),
+        ),
+      ),
     input.db
       .select({ id: tasks.id, title: tasks.title, dueAt: tasks.dueAt })
       .from(tasks)
+      .innerJoin(emails, eq(tasks.sourceEmailId, emails.id))
       .where(
         and(
           eq(tasks.userId, input.userId),
           ne(tasks.status, "done"),
           gte(tasks.dueAt, dayStart),
           lt(tasks.dueAt, dayEnd),
+          eq(emails.mailboxId, input.mailboxId),
         ),
       )
       .orderBy(tasks.dueAt)
@@ -231,7 +257,15 @@ export async function buildBriefing(input: {
     input.db
       .select({ id: tasks.id, title: tasks.title, dueAt: tasks.dueAt })
       .from(tasks)
-      .where(and(eq(tasks.userId, input.userId), ne(tasks.status, "done"), lt(tasks.dueAt, now)))
+      .innerJoin(emails, eq(tasks.sourceEmailId, emails.id))
+      .where(
+        and(
+          eq(tasks.userId, input.userId),
+          ne(tasks.status, "done"),
+          lt(tasks.dueAt, now),
+          eq(emails.mailboxId, input.mailboxId),
+        ),
+      )
       .orderBy(tasks.dueAt)
       .limit(5),
     input.db
@@ -256,10 +290,10 @@ export async function buildBriefing(input: {
     const allMailboxes = await getUserMailboxes(input.db, input.userId);
     const dayStartIso = new Date(dayStart).toISOString();
     const dayEndIso = new Date(dayEnd).toISOString();
-    for (const mailbox of allMailboxes) {
-      if (!mailbox.historyId || mailbox.authState !== "ok") continue;
+    const mailbox = allMailboxes.find((candidate) => candidate.id === input.mailboxId);
+    if (mailbox && mailbox.historyId && mailbox.authState === "ok") {
       try {
-        const token = await getGmailTokenForMailbox(input.db, mailbox.id, {
+        const token = await getGmailTokenForMailbox(input.db, input.mailboxId, {
           GOOGLE_CLIENT_ID: input.env.GOOGLE_CLIENT_ID,
           GOOGLE_CLIENT_SECRET: input.env.GOOGLE_CLIENT_SECRET,
         });
@@ -280,7 +314,7 @@ export async function buildBriefing(input: {
         }
       } catch (error) {
         console.error("Briefing: failed to fetch calendar events", {
-          mailboxId: mailbox.id,
+          mailboxId: input.mailboxId,
           error,
         });
       }
@@ -335,7 +369,7 @@ export async function buildBriefing(input: {
           type: "briefing_email",
           title: getSenderLabel(row),
           reason: row.subject?.trim() || "New message",
-          href: `/inbox/all/email/${row.id}`,
+          href: `/${row.mailboxId}/inbox/email/${row.id}`,
           emailId: row.id,
           threadId: row.threadId,
           fromAddr: row.fromAddr,
@@ -351,12 +385,28 @@ export async function buildBriefing(input: {
 
     for (const action of intelligence.actions) {
       if (shouldSurfaceCreateTaskAction(action)) {
+        const taskTitle =
+          typeof action.payload?.taskTitle === "string"
+            ? action.payload.taskTitle
+            : null;
+        const taskDueAt =
+          typeof action.payload?.taskDueAt === "number"
+            ? action.payload.taskDueAt
+            : null;
+        const taskPriority =
+          action.payload?.taskPriority === "urgent" ||
+          action.payload?.taskPriority === "high" ||
+          action.payload?.taskPriority === "medium" ||
+          action.payload?.taskPriority === "low"
+            ? action.payload.taskPriority
+            : null;
+
         emailActionItems.push({
           id: `email-action-${row.id}-${action.id}`,
           type: "email_action",
           title: getSenderLabel(row),
           reason: buildEmailReason(intelligence.briefingSentence, action.label),
-          href: `/inbox/all/email/${row.id}`,
+          href: `/${row.mailboxId}/inbox/email/${row.id}`,
           emailId: row.id,
           actionId: action.id,
           actionType: "create_task",
@@ -367,9 +417,9 @@ export async function buildBriefing(input: {
           mailboxId: row.mailboxId,
           messageId: row.messageId,
           urgency: intelligence.urgency,
-          taskTitle: action.payload?.taskTitle ?? null,
-          taskDueAt: (action.payload?.taskDueAt as number | null) ?? null,
-          taskPriority: action.payload?.taskPriority ?? null,
+          taskTitle,
+          taskDueAt,
+          taskPriority,
         });
         emailIdsWithActions.add(row.id);
         continue;
@@ -395,7 +445,7 @@ export async function buildBriefing(input: {
         type: "email_action",
         title: getSenderLabel(row),
         reason: buildEmailReason(intelligence.briefingSentence, action.label),
-        href: `/inbox/all/email/${row.id}`,
+        href: `/${row.mailboxId}/inbox/email/${row.id}`,
         emailId: row.id,
         actionId: action.id,
         actionType: action.type,
@@ -417,7 +467,7 @@ export async function buildBriefing(input: {
         type: "briefing_email",
         title: getSenderLabel(row),
         reason: intelligence.briefingSentence ?? "",
-        href: `/inbox/all/email/${row.id}`,
+        href: `/${row.mailboxId}/inbox/email/${row.id}`,
         emailId: row.id,
         threadId: row.threadId,
         fromAddr: row.fromAddr,
@@ -436,7 +486,7 @@ export async function buildBriefing(input: {
         type: "calendar_suggestion",
         title: suggestion.title,
         reason: buildEmailReason(intelligence.briefingSentence, suggestion.sourceText),
-        href: `/inbox/all/email/${row.id}`,
+        href: `/${row.mailboxId}/inbox/email/${row.id}`,
         emailId: row.id,
         fromName: row.fromName,
         proposedEventId: suggestion.id,
@@ -461,7 +511,7 @@ export async function buildBriefing(input: {
         type: "overdue_task" as const,
         title: task.title,
         reason: buildTaskReason(task, "overdue_task"),
-        href: "/tasks",
+        href: `/${input.mailboxId}/tasks`,
       })),
     ...dueTodayTaskRows
       .filter((task) => !decidedTasks.has(task.id))
@@ -470,7 +520,7 @@ export async function buildBriefing(input: {
         type: "due_today_task" as const,
         title: task.title,
         reason: buildTaskReason(task, "due_today_task"),
-        href: "/tasks",
+        href: `/${input.mailboxId}/tasks`,
       })),
     ...calendarSuggestionItems,
     ...calendarEvents.map((event, index) => ({
@@ -480,7 +530,7 @@ export async function buildBriefing(input: {
       reason: event.isAllDay
         ? "All day"
         : `${new Date(event.startAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – ${new Date(event.endAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`,
-      href: "/agenda",
+      href: `/${input.mailboxId}/agenda`,
       eventStart: event.startAt,
       eventEnd: event.endAt,
       eventLocation: event.location,
@@ -508,6 +558,14 @@ const STREAM_SYSTEM = [
   "No markdown, no bullets, no headings.",
   "If there are no items, write a short sentence saying everything looks clear.",
 ].join(" ");
+
+const briefingQuerySchema = z.object({
+  mailboxId: z.coerce.number().int().positive(),
+});
+
+const briefingStreamSchema = z.object({
+  mailboxId: z.number().int().positive(),
+});
 
 function buildStreamPrompt(
   items: BriefingItem[],
@@ -538,21 +596,33 @@ function buildStreamPrompt(
 }
 
 export function registerGetBriefing(app: Hono<AppRouteEnv>) {
-  app.get("/briefing", async (c) => {
+  app.get("/briefing", zValidator("query", briefingQuerySchema), async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
-    const briefing = await buildBriefing({ db, env: c.env, userId: user.id });
+    const { mailboxId } = c.req.valid("query");
+    const briefing = await buildBriefing({
+      db,
+      env: c.env,
+      userId: user.id,
+      mailboxId,
+    });
     return c.json({ data: briefing }, 200);
   });
 }
 
 export function registerPostBriefingStream(app: Hono<AppRouteEnv>) {
-  app.post("/briefing/stream", async (c) => {
+  app.post("/briefing/stream", zValidator("json", briefingStreamSchema), async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
     const env = c.env;
+    const { mailboxId } = c.req.valid("json");
 
-    const briefing = await buildBriefing({ db, env, userId: user.id });
+    const briefing = await buildBriefing({
+      db,
+      env,
+      userId: user.id,
+      mailboxId,
+    });
 
     try {
       const workersAI = createWorkersAI({ binding: env.AI });

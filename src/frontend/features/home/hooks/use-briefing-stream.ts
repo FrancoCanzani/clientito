@@ -1,30 +1,42 @@
 import { useCompletion } from "@ai-sdk/react";
 import { useCallback, useEffect, useRef } from "react";
 
-let cachedStreamText = "";
+const streamCache = new Map<number, string>();
 
-export function useBriefingStream(enabled = false) {
+export function useBriefingStream(mailboxId: number, enabled = false) {
   const hasTriggered = useRef(false);
 
   const { completion, isLoading, error, complete } = useCompletion({
     api: "/api/ai/briefing/stream",
+    id: `briefing-stream-${mailboxId}`,
     credentials: "same-origin",
     streamProtocol: "text",
     onFinish: (_prompt, text) => {
-      cachedStreamText = text;
+      streamCache.set(mailboxId, text);
     },
   });
 
   useEffect(() => {
+    hasTriggered.current = false;
+  }, [mailboxId]);
+
+  const cachedStreamText = streamCache.get(mailboxId) ?? "";
+
+  useEffect(() => {
     if (!enabled || hasTriggered.current || cachedStreamText) return;
     hasTriggered.current = true;
-    complete("");
-  }, [enabled, complete]);
+    complete("", {
+      body: { mailboxId },
+    });
+  }, [enabled, complete, cachedStreamText, mailboxId]);
 
   const retry = useCallback(() => {
-    cachedStreamText = "";
-    complete("");
-  }, [complete]);
+    streamCache.delete(mailboxId);
+    hasTriggered.current = true;
+    complete("", {
+      body: { mailboxId },
+    });
+  }, [complete, mailboxId]);
 
   const text = completion || cachedStreamText;
 
@@ -35,4 +47,3 @@ export function useBriefingStream(enabled = false) {
     retry,
   };
 }
-

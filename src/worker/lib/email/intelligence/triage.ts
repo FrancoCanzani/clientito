@@ -382,7 +382,7 @@ export async function processEmailIntelligence(
       .update(emailIntelligence)
       .set({
         mailboxId: nextEmail.mailboxId,
-        category,
+        category: normalized.category,
         urgency: output.urgency,
         summary: null,
         briefingSentence: normalized.briefingSentence,

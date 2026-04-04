@@ -10,19 +10,15 @@ const tasksSearchSchema = z.object({
   completed: z.coerce.boolean().optional(),
 });
 
-export const Route = createFileRoute("/_dashboard/tasks")({
+export const Route = createFileRoute("/_dashboard/$mailboxId/tasks")({
   validateSearch: tasksSearchSchema,
-
   loaderDeps: ({ search }) => ({
     view: search.view ?? "all",
     sort: search.sort,
   }),
-
-  loader: ({ deps }) => {
-    return fetchTasks({
+  loader: ({ deps }) =>
+    fetchTasks({
       view: deps.view === "all" ? undefined : deps.view,
-    });
-  },
-
+    }),
   component: TasksPage,
 });

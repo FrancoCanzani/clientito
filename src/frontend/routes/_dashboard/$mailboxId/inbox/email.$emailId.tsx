@@ -1,6 +1,5 @@
 import EmailDetailPage from "@/features/inbox/pages/email-detail-page";
 import { fetchEmailDetail } from "@/features/inbox/queries";
-import { queryClient } from "@/lib/query-client";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
@@ -18,17 +17,10 @@ const emailDetailSearchSchema = z.object({
     .optional(),
 });
 
-export const Route = createFileRoute("/_dashboard/inbox/$id/email/$emailId")({
+export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/email/$emailId")({
   validateSearch: emailDetailSearchSchema,
   loader: async ({ params }) => {
-    const email = await queryClient.ensureQueryData(
-      {
-        queryKey: ["email-detail", params.emailId],
-        queryFn: () => fetchEmailDetail(params.emailId),
-        staleTime: 60_000,
-      },
-    );
-
+    const email = await fetchEmailDetail(params.emailId);
     return { email };
   },
   staleTime: 60_000,

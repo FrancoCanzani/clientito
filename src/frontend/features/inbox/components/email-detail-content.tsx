@@ -32,7 +32,7 @@ import { EmailOverviewPanel } from "./email-overview-panel";
 import { QuickReply, type QuickReplyHandle } from "./quick-reply";
 import { MessageBody, ThreadMessageCard } from "./thread-message-card";
 
-const detailRoute = getRouteApi("/_dashboard/inbox/$id/email/$emailId");
+const detailRoute = getRouteApi("/_dashboard/$mailboxId/inbox/email/$emailId");
 
 function buildRecipientRows(
   email: ReturnType<typeof detailRoute.useLoaderData>["email"],

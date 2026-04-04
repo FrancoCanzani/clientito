@@ -1,6 +1,7 @@
 export type AgendaEvent = {
   id: string;
   source: "google" | "proposed";
+  mailboxId?: number | null;
   title: string;
   startAt: number;
   endAt: number;

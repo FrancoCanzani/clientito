@@ -4,23 +4,29 @@ import type { AgendaEvent } from "./types";
 type AgendaEventsScope = {
   from: string;
   to: string;
+  mailboxId: number;
 };
 
 export async function fetchAgendaEvents(
   from: string,
   to: string,
+  mailboxId: number,
 ): Promise<AgendaEvent[]> {
-  const params = new URLSearchParams({ from, to });
+  const params = new URLSearchParams({ from, to, mailboxId: String(mailboxId) });
   const response = await fetch(`/api/calendar/events?${params}`);
   if (!response.ok) throw new Error("Failed to fetch calendar events");
   const json = await response.json();
   return (json as { data: AgendaEvent[] }).data;
 }
 
-export function agendaEventsQueryOptions({ from, to }: AgendaEventsScope) {
+export function agendaEventsQueryOptions({
+  from,
+  to,
+  mailboxId,
+}: AgendaEventsScope) {
   return queryOptions({
-    queryKey: ["calendar-events", from, to] as const,
-    queryFn: () => fetchAgendaEvents(from, to),
+    queryKey: ["calendar-events", mailboxId, from, to] as const,
+    queryFn: () => fetchAgendaEvents(from, to, mailboxId),
     staleTime: 60_000,
   });
 }

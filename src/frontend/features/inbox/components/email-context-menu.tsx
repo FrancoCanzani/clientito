@@ -13,17 +13,18 @@ import {
   WarningIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { useEmail } from "../context/email-context";
+import type { EmailInboxAction } from "@/features/inbox/hooks/use-email-inbox-actions";
 import type { EmailListItem } from "../types";
 
 export function EmailContextMenu({
   children,
   targetEmail,
+  onAction,
 }: {
   children: ReactNode;
   targetEmail: EmailListItem;
+  onAction: (action: EmailInboxAction, ids?: string[]) => void;
 }) {
-  const { executeEmailAction } = useEmail();
   const isRead = targetEmail.isRead;
   const isStarred = targetEmail.labelIds.includes("STARRED");
 
@@ -34,23 +35,21 @@ export function EmailContextMenu({
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem
-          onSelect={() => executeEmailAction("archive", [targetEmail.id])}
+          onSelect={() => onAction("archive", [targetEmail.id])}
         >
           <ArchiveIcon className="size-3.5" />
           Archive
         </ContextMenuItem>
 
         <ContextMenuItem
-          onSelect={() => executeEmailAction("spam", [targetEmail.id])}
+          onSelect={() => onAction("spam", [targetEmail.id])}
         >
           <WarningIcon className="size-3.5" />
           Move to spam
         </ContextMenuItem>
         <ContextMenuItem
           onSelect={() =>
-            executeEmailAction(isRead ? "mark-unread" : "mark-read", [
-              targetEmail.id,
-            ])
+            onAction(isRead ? "mark-unread" : "mark-read", [targetEmail.id])
           }
         >
           {isRead ? (
@@ -62,7 +61,7 @@ export function EmailContextMenu({
         </ContextMenuItem>
         <ContextMenuItem
           onSelect={() =>
-            executeEmailAction(isStarred ? "unstar" : "star", [targetEmail.id])
+            onAction(isStarred ? "unstar" : "star", [targetEmail.id])
           }
         >
           <StarIcon
@@ -73,7 +72,7 @@ export function EmailContextMenu({
         </ContextMenuItem>
         <ContextMenuItem
           variant="destructive"
-          onSelect={() => executeEmailAction("trash", [targetEmail.id])}
+          onSelect={() => onAction("trash", [targetEmail.id])}
         >
           <TrashIcon className="size-3.5" />
           Move to trash

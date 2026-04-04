@@ -1,6 +1,6 @@
-import type { ShortcutScope } from "@/config/shortcuts";
-import { useHotkeysContext } from "react-hotkeys-hook";
+import type { ShortcutScope } from "@/lib/hotkeys/shortcuts";
 import { useEffect } from "react";
+import { useHotkeysContext } from "react-hotkeys-hook";
 
 export function useHotkeyScope(scope: ShortcutScope) {
   const { enableScope, disableScope } = useHotkeysContext();

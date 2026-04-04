@@ -1,5 +1,5 @@
-import { getShortcutsByScope } from "@/config/shortcuts";
-import { useShortcuts } from "@/lib/hotkeys";
+import { getShortcutsByScope } from "@/lib/hotkeys/shortcuts";
+import { useShortcuts } from "@/lib/hotkeys/use-shortcuts";
 import { useMemo } from "react";
 
 const homeShortcuts = getShortcutsByScope("home");

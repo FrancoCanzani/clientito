@@ -1,11 +1,15 @@
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
+import { useMailboxes } from "@/hooks/use-mailboxes";
+import { getPreferredMailboxId } from "@/features/inbox/utils/mailbox";
 import { Button } from "./ui/button";
 
 const FOOTER_LINKS = ["Privacy", "Terms", "Security"];
 
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
+  const accounts = useMailboxes().data?.accounts ?? [];
+  const preferredMailboxId = getPreferredMailboxId(accounts);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background text-foreground antialiased">
@@ -22,7 +26,14 @@ export default function LandingPage() {
               className="text-xl capitalize"
             >
               {isAuthenticated ? (
-                <Link to="/inbox/$id" params={{ id: "all" }}>
+                <Link
+                  to={preferredMailboxId ? "/$mailboxId/inbox" : "/get-started"}
+                  params={
+                    preferredMailboxId
+                      ? { mailboxId: String(preferredMailboxId) }
+                      : undefined
+                  }
+                >
                   Go to inbox
                 </Link>
               ) : (

@@ -8,6 +8,8 @@ import {
   startFullSync,
 } from "@/features/home/mutations";
 import { useAuth } from "@/hooks/use-auth";
+import { useMailboxes } from "@/hooks/use-mailboxes";
+import { getPreferredMailboxId } from "@/features/inbox/utils/mailbox";
 import { SpinnerGapIcon } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -37,6 +39,8 @@ export default function GetStartedPage() {
   const navigate = useNavigate();
   const [selectedMonths, setSelectedMonths] = useState<number>(12);
   const { user } = useAuth();
+  const accounts = useMailboxes().data?.accounts ?? [];
+  const preferredMailboxId = getPreferredMailboxId(accounts);
 
   const syncStatusQuery = useSyncStatus({
     staleTime: 0,
@@ -152,9 +156,14 @@ export default function GetStartedPage() {
           )}
           <Button
             variant={isSyncDone ? "default" : "outline"}
-            onClick={() =>
-              navigate({ to: "/inbox/$id", params: { id: "all" } })
-            }
+            onClick={() => {
+              if (!preferredMailboxId) return;
+              navigate({
+                to: "/$mailboxId/inbox",
+                params: { mailboxId: preferredMailboxId },
+              });
+            }}
+            disabled={!preferredMailboxId}
           >
             Go to inbox
           </Button>

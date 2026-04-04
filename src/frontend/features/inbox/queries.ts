@@ -1,7 +1,3 @@
-import {
-  infiniteQueryOptions,
-  queryOptions,
-} from "@tanstack/react-query";
 import type { EmailView } from "./utils/inbox-filters";
 import type {
   ContactSuggestion,
@@ -197,80 +193,7 @@ export const INBOX_SEARCH_PAGE_SIZE = 30;
 
 export function getEmailListQueryKey(
   view: EmailView,
-  mailboxId: number | null,
+  mailboxId: number,
 ) {
-  return ["emails", view, mailboxId ?? "all"] as const;
-}
-
-export function emailListInfiniteQueryOptions({
-  view,
-  mailboxId,
-}: {
-  view: EmailView;
-  mailboxId: number | null;
-}) {
-  return infiniteQueryOptions({
-    queryKey: getEmailListQueryKey(view, mailboxId),
-    queryFn: ({ pageParam }) =>
-      fetchEmails({
-        view,
-        limit: EMAIL_LIST_PAGE_SIZE,
-        offset: pageParam,
-        mailboxId: mailboxId ?? undefined,
-      }),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) =>
-      lastPage?.pagination?.hasMore
-        ? lastPage.pagination.offset + lastPage.pagination.limit
-        : undefined,
-    refetchInterval: 15_000,
-    refetchIntervalInBackground: false,
-  });
-}
-
-export function inboxSearchResultsInfiniteQueryOptions(params: InboxSearchScope) {
-  return infiniteQueryOptions({
-    queryKey: [
-      "emails",
-      "search",
-      normalizeSearchQuery(params.q),
-      params.mailboxId ?? "all",
-      params.view ?? "all",
-      params.includeJunk ?? false,
-    ] as const,
-    initialPageParam: 0,
-    enabled: normalizeSearchQuery(params.q).length >= 2,
-    queryFn: ({ pageParam }) =>
-      fetchSearchEmails({
-        ...params,
-        q: normalizeSearchQuery(params.q),
-        limit: INBOX_SEARCH_PAGE_SIZE,
-        offset: pageParam,
-      }),
-    getNextPageParam: (lastPage) =>
-      lastPage.pagination.hasMore
-        ? lastPage.pagination.offset + lastPage.pagination.limit
-        : undefined,
-    staleTime: 30_000,
-  });
-}
-
-export function inboxSearchSuggestionsQueryOptions(params: InboxSearchScope) {
-  return queryOptions({
-    queryKey: [
-      "emails",
-      "search",
-      "suggestions",
-      normalizeSearchQuery(params.q),
-      params.mailboxId ?? "all",
-      params.view ?? "all",
-      params.includeJunk ?? false,
-    ] as const,
-    queryFn: () =>
-      fetchSearchSuggestions({
-        ...params,
-        q: normalizeSearchQuery(params.q),
-      }),
-    staleTime: 30_000,
-  });
+  return ["emails", view, mailboxId] as const;
 }

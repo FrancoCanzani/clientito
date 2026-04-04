@@ -289,10 +289,25 @@ export function makeReadTools(
         "Build a short briefing from the signed-in user's email and task state. Use this when the user asks for a briefing, summary of what needs attention, or an overview of their inbox.",
       inputSchema: z.object({}),
       execute: async () => {
+        const mailboxId = (await getUserMailboxes(db, userId))[0]?.id;
+        if (!mailboxId) {
+          return {
+            text: "",
+            generatedAt: Date.now(),
+            counts: {
+              actionNeeded: 0,
+              dueToday: 0,
+              overdue: 0,
+            },
+            items: [],
+          };
+        }
+
         return buildBriefing({
           db,
           env,
           userId,
+          mailboxId,
         });
       },
     }),

@@ -1,25 +1,32 @@
 import { PageHeader } from "@/components/page-header";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { unsubscribe } from "@/features/subscriptions/queries";
-import type { Subscription, UnsubscribeResult } from "@/features/subscriptions/types";
+import type {
+  Subscription,
+  UnsubscribeResult,
+} from "@/features/subscriptions/types";
 import { getRouteApi } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-const route = getRouteApi("/_dashboard/inbox/$id/subscriptions");
+const route = getRouteApi("/_dashboard/$mailboxId/inbox/subscriptions");
 
 export default function SubscriptionsPage() {
   const { subscriptions } = route.useLoaderData();
   const [items, setItems] = useState(subscriptions);
 
+  useEffect(() => {
+    setItems(subscriptions);
+  }, [subscriptions]);
+
   return (
-    <div className="flex min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col gap-4 py-4">
+    <div className="flex min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col gap-4">
       <PageHeader
         title={
           <div className="flex items-center gap-2">
@@ -63,11 +70,13 @@ function SubscriptionRow({
   subscription: Subscription;
   onRemove: (fromAddr: string) => void;
 }) {
-  const [status, setStatus] = useState<
-    "idle" | "loading" | "done" | "manual"
-  >(subscription.status === "pending_manual" ? "manual" : "idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "manual">(
+    subscription.status === "pending_manual" ? "manual" : "idle",
+  );
   const [manualUrl, setManualUrl] = useState<string | null>(
-    subscription.status === "pending_manual" ? subscription.unsubscribeUrl : null,
+    subscription.status === "pending_manual"
+      ? subscription.unsubscribeUrl
+      : null,
   );
 
   const handleUnsubscribe = async () => {
@@ -81,7 +90,10 @@ function SubscriptionRow({
 
       if (result.success) {
         setStatus("done");
-        toast("Unsubscribed from " + (subscription.fromName ?? subscription.fromAddr));
+        toast(
+          "Unsubscribed from " +
+            (subscription.fromName ?? subscription.fromAddr),
+        );
         onRemove(subscription.fromAddr);
       } else if (result.method === "manual" && result.url) {
         setStatus("manual");

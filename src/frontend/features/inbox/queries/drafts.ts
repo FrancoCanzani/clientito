@@ -1,5 +1,3 @@
-import { queryOptions } from "@tanstack/react-query";
-
 export type DraftItem = {
   id: number;
   composeKey: string;
@@ -17,7 +15,7 @@ export type DraftItem = {
 };
 
 export function getDraftsQueryKey(mailboxId: number | null) {
-  return ["drafts", mailboxId ?? "all"] as const;
+  return ["drafts", mailboxId ?? "none"] as const;
 }
 
 export async function fetchDrafts(mailboxId: number | null): Promise<DraftItem[]> {
@@ -36,11 +34,4 @@ export async function deleteDraft(id: number): Promise<void> {
     method: "DELETE",
   });
   if (!response.ok) throw new Error("Failed to delete draft");
-}
-
-export function draftsQueryOptions(mailboxId: number | null) {
-  return queryOptions({
-    queryKey: getDraftsQueryKey(mailboxId),
-    queryFn: () => fetchDrafts(mailboxId),
-  });
 }

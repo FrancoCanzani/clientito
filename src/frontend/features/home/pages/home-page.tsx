@@ -18,14 +18,15 @@ import { useHotkeyScope } from "@/lib/hotkeys/use-scope";
 import { getRouteApi } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 
-const homeRoute = getRouteApi("/_dashboard/home");
+const homeRoute = getRouteApi("/_dashboard/$mailboxId/home");
 
 export default function HomePage() {
-  const briefing = homeRoute.useLoaderData();
+  const { briefing, events } = homeRoute.useLoaderData();
+  const { mailboxId } = homeRoute.useParams();
   const { user } = useAuth();
   const greeting = getGreeting(user?.name);
   const hasItems = briefing.items.length > 0;
-  const stream = useBriefingStream(hasItems && !briefing.text);
+  const stream = useBriefingStream(mailboxId, hasItems && !briefing.text);
   const briefingText = briefing.text || stream.text;
 
   const queue = useDecisionQueue(briefing.items);
@@ -94,7 +95,12 @@ export default function HomePage() {
         </Empty>
       )}
 
-      <AgendaPanel days={1} showEmptyState={false} hideProposed showHeader />
+      <AgendaPanel
+        events={events}
+        showEmptyState={false}
+        hideProposed
+        showHeader
+      />
 
       {showCards && (
         <div className="md:flex hidden items-center justify-between pt-1 text-xs text-muted-foreground">

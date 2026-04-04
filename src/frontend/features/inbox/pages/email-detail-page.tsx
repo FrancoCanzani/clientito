@@ -1,26 +1,22 @@
 import { ComposePanel } from "@/features/inbox/components/compose-panel";
 import { EmailDetailContent } from "@/features/inbox/components/email-detail-content";
 import { useRegisterEmailCommandHandler } from "@/features/inbox/hooks/use-email-command-state";
+import { useForwardCompose } from "@/features/inbox/hooks/use-forward-compose";
 import { useHotkeyScope } from "@/lib/hotkeys/use-scope";
 import { patchEmail } from "@/features/inbox/mutations";
-import type {
-  ComposeInitial,
-  EmailListItem,
-  EmailListResponse,
-} from "@/features/inbox/types";
+import type { ComposeInitial, EmailListItem, EmailListResponse } from "@/features/inbox/types";
 import { buildForwardedEmailHtml } from "@/features/inbox/utils/build-forwarded-html";
 import { openEmail as openInboxEmail } from "@/features/inbox/utils/open-email";
 import { useSetPageContext } from "@/hooks/use-page-context";
-import { parseMailboxId } from "@/lib/utils";
 import {
   useMutation,
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
 import { getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
-const detailRoute = getRouteApi("/_dashboard/inbox/$id/email/$emailId");
+const detailRoute = getRouteApi("/_dashboard/$mailboxId/inbox/email/$emailId");
 
 export default function EmailDetailPage() {
   useHotkeyScope("inbox");
@@ -30,17 +26,9 @@ export default function EmailDetailPage() {
   const navigate = useNavigate();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const mailboxId = parseMailboxId(params.id);
+  const { mailboxId } = params;
 
-  const [composeInitial, setComposeInitial] = useState<
-    ComposeInitial | undefined
-  >();
-  const [forwardOpen, setForwardOpen] = useState(false);
-
-  const closeForward = () => {
-    setForwardOpen(false);
-    setComposeInitial(undefined);
-  };
+  const { forwardOpen, composeInitial, openForward, closeForward } = useForwardCompose();
 
   useSetPageContext(
     useMemo(() => {
@@ -68,7 +56,7 @@ export default function EmailDetailPage() {
     const cached = queryClient.getQueryData<InfiniteData<EmailListResponse>>([
       "emails",
       search.context ?? "inbox",
-      mailboxId ?? "all",
+      mailboxId,
     ]);
     if (!cached) return [] as EmailListItem[];
     return cached.pages.flatMap((page) => page.data);
@@ -96,16 +84,22 @@ export default function EmailDetailPage() {
 
     const nextEmail = orderedEmailById.get(nextId);
     if (nextEmail) {
-      openInboxEmail(queryClient, navigate, params.id, nextEmail, {
+      openInboxEmail(
+        queryClient,
+        navigate,
+        nextEmail.mailboxId ?? mailboxId,
+        nextEmail,
+        {
         context: search.context ?? "inbox",
         replace: true,
-      });
+        },
+      );
       return;
     }
 
     navigate({
-      to: "/inbox/$id/email/$emailId",
-      params: { id: params.id, emailId: nextId },
+      to: "/$mailboxId/inbox/email/$emailId",
+      params: { mailboxId, emailId: nextId },
       search: {
         context:
           search.context && search.context !== "inbox"
@@ -165,8 +159,7 @@ export default function EmailDetailPage() {
   const handleForward = useCallback(
     (initial?: ComposeInitial) => {
       if (initial) {
-        setComposeInitial(initial);
-        setForwardOpen(true);
+        openForward(initial);
         return;
       }
 
@@ -176,10 +169,9 @@ export default function EmailDetailPage() {
           : `Fwd: ${email.subject}`
         : "Fwd:";
       const bodyHtml = buildForwardedEmailHtml(email);
-      setComposeInitial({ mailboxId: email.mailboxId, subject, bodyHtml });
-      setForwardOpen(true);
+      openForward({ mailboxId: email.mailboxId, subject, bodyHtml });
     },
-    [email],
+    [email, openForward],
   );
 
   useRegisterEmailCommandHandler(

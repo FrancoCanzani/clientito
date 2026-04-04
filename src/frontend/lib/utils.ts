@@ -5,18 +5,27 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function parseMailboxId(id: string): number | undefined {
-  if (id === "all") return undefined;
-  const n = Number(id);
-  return Number.isFinite(n) && n > 0 ? n : undefined;
-}
+export function normalizeAgentText(text: string): string {
+  const trimmed = text.trim();
 
-export function getActiveInboxId(pathname: string): string {
-  const match = pathname.match(/^\/inbox\/(?!search(?:\/|$))([^/]+)/);
-  return match?.[1] ?? "all";
-}
+  // Guard against streamed continuation glitches that replay the exact same
+  // assistant message body twice inside a single text part.
+  if (
+    trimmed.length < 160 ||
+    (!trimmed.includes("\n") && !trimmed.includes(". "))
+  ) {
+    return text;
+  }
 
-export function getSearchMailboxId(pathname: string): number | undefined {
-  const match = pathname.match(/^\/inbox\/(?!search(?:\/|$))([^/]+)/);
-  return match ? parseMailboxId(match[1]) : undefined;
+  for (let unitLength = 80; unitLength <= trimmed.length / 2; unitLength += 1) {
+    const unit = trimmed.slice(0, unitLength).trim();
+    const remainder = trimmed.slice(unitLength).trim();
+
+    if (!remainder) continue;
+    if (remainder === unit) {
+      return unit;
+    }
+  }
+
+  return text;
 }

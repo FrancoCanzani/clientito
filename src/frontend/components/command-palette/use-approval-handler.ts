@@ -1,5 +1,5 @@
-import { openCompose } from "@/features/inbox/components/compose-bridge";
-import { shouldIgnoreHotkeyTarget } from "@/lib/hotkeys";
+import { openCompose } from "@/features/inbox/components/open-compose";
+import { shouldIgnoreHotkeyTarget } from "@/lib/hotkeys/use-shortcuts";
 import type { QueryClient } from "@tanstack/react-query";
 import type { UIMessage } from "ai";
 import { getToolName, isToolUIPart } from "ai";

@@ -38,7 +38,7 @@ export function getMailboxDisplayEmail(
   return null;
 }
 
-async function fetchAccounts(): Promise<{ accounts: MailboxAccount[] }> {
+export async function fetchAccounts(): Promise<{ accounts: MailboxAccount[] }> {
   const response = await fetch("/api/settings/accounts");
   if (!response.ok) {
     throw new Error("Failed to fetch accounts");
@@ -47,7 +47,7 @@ async function fetchAccounts(): Promise<{ accounts: MailboxAccount[] }> {
   return json.data;
 }
 
-const accountsQueryOptions = queryOptions({
+export const accountsQueryOptions = queryOptions({
   queryKey: ["accounts"] as const,
   queryFn: fetchAccounts,
   staleTime: 30_000,

@@ -125,9 +125,15 @@ export function AgendaEventRow({
 
       {isPending && event.proposedId != null && (
         <div className="flex shrink-0 items-center gap-0.5">
-          {event.emailId && (
+          {event.emailId && event.mailboxId && (
             <Button variant="ghost" size="sm" className="h-6 text-[11px]" asChild>
-              <Link to="/inbox/$id/email/$emailId" params={{ id: "all", emailId: String(event.emailId) }}>
+              <Link
+                to="/$mailboxId/inbox/email/$emailId"
+                params={{
+                  mailboxId: event.mailboxId,
+                  emailId: String(event.emailId),
+                }}
+              >
                 <EnvelopeOpenIcon className="size-3" />
               </Link>
             </Button>

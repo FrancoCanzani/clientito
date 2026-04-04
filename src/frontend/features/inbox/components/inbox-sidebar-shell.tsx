@@ -7,7 +7,6 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
-import type { EmailView } from "@/features/inbox/utils/inbox-filters";
 import { useAuth } from "@/hooks/use-auth";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -24,48 +23,11 @@ import {
   TrashIcon,
   TrayIcon,
   WarningCircleIcon,
-  type Icon,
 } from "@phosphor-icons/react";
-import { Link } from "@tanstack/react-router";
+import { Link, getRouteApi, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-export type MailSidebarItem =
-  | EmailView
-  | "drafts"
-  | "search"
-  | "filters"
-  | "subscriptions";
-
-type InboxSidebarShellProps = {
-  mailboxId: number | null;
-  activeItem: MailSidebarItem;
-  children: ReactNode;
-};
-
-const primaryNavItems: Array<{
-  key: MailSidebarItem;
-  label: string;
-  icon: Icon;
-}> = [
-  { key: "inbox", label: "Inbox", icon: TrayIcon },
-  { key: "important", label: "Important", icon: FlagIcon },
-  { key: "drafts", label: "Drafts", icon: FileDashedIcon },
-  { key: "starred", label: "Starred", icon: StarIcon },
-  { key: "sent", label: "Sent", icon: PaperPlaneTiltIcon },
-  { key: "archived", label: "Archive", icon: ArchiveIcon },
-  { key: "spam", label: "Spam", icon: WarningCircleIcon },
-  { key: "trash", label: "Trash", icon: TrashIcon },
-];
-
-const secondaryNavItems: Array<{
-  key: "search" | "subscriptions" | "filters";
-  label: string;
-  icon: Icon;
-}> = [
-  { key: "search", label: "Search", icon: MagnifyingGlassIcon },
-  { key: "subscriptions", label: "Subscriptions", icon: NewspaperIcon },
-  { key: "filters", label: "Filters", icon: FunnelIcon },
-];
+const mailboxRoute = getRouteApi("/_dashboard/$mailboxId/inbox");
 
 function formatDisplayName(
   name: string | null | undefined,
@@ -87,19 +49,17 @@ function InboxIdentity({
   mailboxId,
   className,
 }: {
-  mailboxId: number | null;
+  mailboxId: number;
   className?: string;
 }) {
   const { user } = useAuth();
   const accounts = useMailboxes().data?.accounts ?? [];
   const activeMailbox =
-    mailboxId == null
-      ? null
-      : (accounts.find((account) => account.mailboxId === mailboxId) ?? null);
+    accounts.find((account) => account.mailboxId === mailboxId) ?? null;
   const activeEmail =
     (activeMailbox ? getMailboxDisplayEmail(activeMailbox) : null) ??
     user?.email ??
-    "All accounts";
+    "Inbox";
   const displayName = formatDisplayName(user?.name, activeEmail);
 
   return (
@@ -112,173 +72,190 @@ function InboxIdentity({
   );
 }
 
-function SidebarNav({
-  activeItem,
-  mailboxParam,
-}: {
-  activeItem: MailSidebarItem;
-  mailboxParam: string;
-}) {
+function SidebarNav() {
+  const { mailboxId } = mailboxRoute.useParams();
+  const currentRouteId = useRouterState({
+    select: (state) => state.matches[state.matches.length - 1]?.routeId,
+  });
+  const search = useRouterState({
+    select: (state) =>
+      state.location.search as {
+        view?: unknown;
+        context?: unknown;
+      },
+  });
+  const activeView =
+    currentRouteId === "/_dashboard/$mailboxId/inbox/drafts"
+      ? "drafts"
+      : currentRouteId === "/_dashboard/$mailboxId/inbox/starred" ||
+          (currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
+            search.context === "starred")
+        ? "starred"
+        : currentRouteId === "/_dashboard/$mailboxId/inbox/sent" ||
+            (currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
+              search.context === "sent")
+          ? "sent"
+          : currentRouteId === "/_dashboard/$mailboxId/inbox/archived" ||
+              (currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
+                search.context === "archived")
+            ? "archived"
+            : currentRouteId === "/_dashboard/$mailboxId/inbox/spam" ||
+                (currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
+                  search.context === "spam")
+              ? "spam"
+              : currentRouteId === "/_dashboard/$mailboxId/inbox/trash" ||
+                  (currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
+                    search.context === "trash")
+                ? "trash"
+                : currentRouteId === "/_dashboard/$mailboxId/inbox/search"
+                  ? "search"
+                  : currentRouteId === "/_dashboard/$mailboxId/inbox/subscriptions"
+                    ? "subscriptions"
+                    : currentRouteId === "/_dashboard/$mailboxId/inbox/filters"
+                      ? "filters"
+                      : search.view === "important"
+                        ? "important"
+                        : "inbox";
+
   return (
     <SidebarMenu>
-      {primaryNavItems.map((item) => {
-        const Icon = item.icon;
-        const isRootItem = item.key === "inbox" || item.key === "important";
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "inbox"}>
+          <Link to="/$mailboxId/inbox" params={{ mailboxId }}>
+            <TrayIcon />
+            <span>Inbox</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
 
-        return (
-          <SidebarMenuItem key={item.key}>
-            <SidebarMenuButton asChild isActive={activeItem === item.key}>
-              {item.key === "drafts" ? (
-                <Link
-                  to="/inbox/$id/drafts"
-                  params={{ id: mailboxParam }}
-                  activeOptions={{ exact: true }}
-                >
-                  <Icon />
-                  <span>{item.label}</span>
-                </Link>
-              ) : item.key === "starred" ? (
-                <Link
-                  to="/inbox/$id/starred"
-                  params={{ id: mailboxParam }}
-                  activeOptions={{ exact: true }}
-                >
-                  <Icon />
-                  <span>{item.label}</span>
-                </Link>
-              ) : item.key === "sent" ? (
-                <Link
-                  to="/inbox/$id/sent"
-                  params={{ id: mailboxParam }}
-                  activeOptions={{ exact: true }}
-                >
-                  <Icon />
-                  <span>{item.label}</span>
-                </Link>
-              ) : item.key === "archived" ? (
-                <Link
-                  to="/inbox/$id/archived"
-                  params={{ id: mailboxParam }}
-                  activeOptions={{ exact: true }}
-                >
-                  <Icon />
-                  <span>{item.label}</span>
-                </Link>
-              ) : item.key === "spam" ? (
-                <Link
-                  to="/inbox/$id/spam"
-                  params={{ id: mailboxParam }}
-                  activeOptions={{ exact: true }}
-                >
-                  <Icon />
-                  <span>{item.label}</span>
-                </Link>
-              ) : item.key === "trash" ? (
-                <Link
-                  to="/inbox/$id/trash"
-                  params={{ id: mailboxParam }}
-                  activeOptions={{ exact: true }}
-                >
-                  <Icon />
-                  <span>{item.label}</span>
-                </Link>
-              ) : (
-                <Link
-                  to="/inbox/$id"
-                  params={{ id: mailboxParam }}
-                  activeOptions={{ exact: true, includeSearch: false }}
-                  search={{
-                    view: isRootItem && item.key === "important"
-                      ? "important"
-                      : undefined,
-                    compose: undefined,
-                  }}
-                >
-                  <Icon />
-                  <span>{item.label}</span>
-                </Link>
-              )}
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        );
-      })}
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "important"}>
+          <Link
+            to="/$mailboxId/inbox"
+            params={{ mailboxId }}
+            search={{ view: "important" }}
+          >
+            <FlagIcon />
+            <span>Important</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
 
-      {secondaryNavItems.map((item) => {
-        const Icon = item.icon;
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "drafts"}>
+          <Link to="/$mailboxId/inbox/drafts" params={{ mailboxId }}>
+            <FileDashedIcon />
+            <span>Drafts</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
 
-        return (
-          <SidebarMenuItem key={item.key}>
-            <SidebarMenuButton asChild isActive={activeItem === item.key}>
-              {item.key === "search" ? (
-                <Link
-                  to="/inbox/$id/search"
-                  params={{ id: mailboxParam }}
-                  activeOptions={{ exact: true }}
-                >
-                  <Icon />
-                  <span>{item.label}</span>
-                </Link>
-              ) : (
-                <Link
-                  to={
-                    item.key === "filters"
-                      ? "/inbox/$id/filters"
-                      : "/inbox/$id/subscriptions"
-                  }
-                  params={{ id: mailboxParam }}
-                  activeOptions={{ exact: true }}
-                >
-                  <Icon />
-                  <span>{item.label}</span>
-                </Link>
-              )}
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        );
-      })}
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "starred"}>
+          <Link to="/$mailboxId/inbox/starred" params={{ mailboxId }}>
+            <StarIcon />
+            <span>Starred</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "sent"}>
+          <Link to="/$mailboxId/inbox/sent" params={{ mailboxId }}>
+            <PaperPlaneTiltIcon />
+            <span>Sent</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "archived"}>
+          <Link to="/$mailboxId/inbox/archived" params={{ mailboxId }}>
+            <ArchiveIcon />
+            <span>Archive</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "spam"}>
+          <Link to="/$mailboxId/inbox/spam" params={{ mailboxId }}>
+            <WarningCircleIcon />
+            <span>Spam</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "trash"}>
+          <Link to="/$mailboxId/inbox/trash" params={{ mailboxId }}>
+            <TrashIcon />
+            <span>Trash</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "search"}>
+          <Link to="/$mailboxId/inbox/search" params={{ mailboxId }}>
+            <MagnifyingGlassIcon />
+            <span>Search</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "subscriptions"}>
+          <Link to="/$mailboxId/inbox/subscriptions" params={{ mailboxId }}>
+            <NewspaperIcon />
+            <span>Subscriptions</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "filters"}>
+          <Link to="/$mailboxId/inbox/filters" params={{ mailboxId }}>
+            <FunnelIcon />
+            <span>Filters</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
     </SidebarMenu>
   );
 }
 
 export function InboxSidebarShell({
-  mailboxId,
-  activeItem,
   children,
-}: InboxSidebarShellProps) {
-  const mailboxParam = mailboxId != null ? String(mailboxId) : "all";
+}: {
+  children: ReactNode;
+}) {
   const isMobile = useIsMobile();
+  const { mailboxId } = mailboxRoute.useParams();
 
   return (
-    <SidebarProvider>
-      {isMobile ? (
+    <SidebarProvider className="min-h-0">
+      {isMobile && (
         <Sidebar>
           <SidebarHeader className="gap-3 px-3 pt-5 pb-3">
             <InboxIdentity mailboxId={mailboxId} />
           </SidebarHeader>
 
           <SidebarContent className="px-2 pb-4">
-            <SidebarNav
-              activeItem={activeItem}
-              mailboxParam={mailboxParam}
-            />
+            <SidebarNav />
           </SidebarContent>
         </Sidebar>
-      ) : null}
+      )}
 
-      <div className="mx-auto flex w-full max-w-[64rem] min-w-0 gap-8 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-5xl min-w-0 flex-1 gap-8 px-4">
         <aside className="sticky top-4 hidden w-56 shrink-0 self-start md:block">
           <div className="space-y-4 py-5">
             <InboxIdentity mailboxId={mailboxId} />
-            <SidebarNav
-              activeItem={activeItem}
-              mailboxParam={mailboxParam}
-            />
+            <SidebarNav />
           </div>
         </aside>
 
-        <main className="min-w-0 w-full max-w-3xl flex-1">
-          {children}
-        </main>
+        <main className="flex-1 min-w-0">{children}</main>
       </div>
     </SidebarProvider>
   );
