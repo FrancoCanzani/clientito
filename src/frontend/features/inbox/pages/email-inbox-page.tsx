@@ -4,6 +4,7 @@ import {
   EmailProvider,
   useEmail,
 } from "@/features/inbox/context/email-context";
+import { useHotkeyScope } from "@/lib/hotkeys/use-scope";
 import { useSetPageContext } from "@/hooks/use-page-context";
 import { getRouteApi } from "@tanstack/react-router";
 import { useMemo } from "react";
@@ -11,6 +12,7 @@ import { useMemo } from "react";
 const emailsRoute = getRouteApi("/_dashboard/inbox/$id/");
 
 function InboxContent() {
+  useHotkeyScope("inbox");
   const navigate = emailsRoute.useNavigate();
   const search = emailsRoute.useSearch();
 

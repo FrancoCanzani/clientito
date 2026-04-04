@@ -105,7 +105,12 @@ export function toEmailListResponse(row: {
             category: row.intelligenceCategory,
             urgency: row.intelligenceUrgency,
             briefingSentence: row.intelligenceBriefingSentence,
-            suspiciousJson: row.intelligenceSuspiciousJson,
+            suspiciousJson: row.intelligenceSuspiciousJson ?? {
+              isSuspicious: false,
+              kind: null,
+              reason: null,
+              confidence: null,
+            },
             actionsJson: row.intelligenceActionsJson ?? [],
             calendarEventsJson: row.intelligenceCalendarEventsJson ?? [],
           }

@@ -65,7 +65,10 @@ export function registerPostBriefingDecision(app: Hono<AppRouteEnv>) {
           action.id === actionId
             ? {
                 ...action,
-                status: decision === "dismissed" ? "dismissed" : "executed",
+                status:
+                  decision === "dismissed"
+                    ? ("dismissed" as const)
+                    : ("executed" as const),
                 executedAt: decision !== "dismissed" ? now : action.executedAt,
                 updatedAt: now,
               }

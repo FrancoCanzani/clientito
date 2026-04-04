@@ -32,7 +32,7 @@ import type { AppRouteEnv } from "../types";
 import { hasEmailLabel } from "../inbox/emails/utils";
 import { getDayBoundsUtc } from "../../lib/utils";
 
-const REPLY_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+const REPLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 type BriefingItem = {
   id: string;
@@ -91,7 +91,8 @@ function buildEmailReason(reason: string | null, fallback: string) {
 function shouldSurfaceBriefingEmail(intelligence: NonNullable<ReturnType<typeof getStoredEmailTriage>>) {
   return (
     (intelligence.category === "action_needed" ||
-      intelligence.category === "important") &&
+      intelligence.category === "important" ||
+      intelligence.category === "notification") &&
     intelligence.urgency !== "low" &&
     Boolean(intelligence.briefingSentence?.trim())
   );
@@ -169,6 +170,7 @@ export async function buildBriefing(input: {
         intelligenceCategory: emailIntelligence.category,
         intelligenceUrgency: emailIntelligence.urgency,
         intelligenceBriefingSentence: emailIntelligence.briefingSentence,
+        intelligenceSuspiciousJson: emailIntelligence.suspiciousJson,
         intelligenceActionsJson: emailIntelligence.actionsJson,
         intelligenceCalendarEventsJson: emailIntelligence.calendarEventsJson,
       })
@@ -294,6 +296,12 @@ export async function buildBriefing(input: {
       category: row.intelligenceCategory,
       urgency: row.intelligenceUrgency,
       briefingSentence: row.intelligenceBriefingSentence,
+      suspiciousJson: row.intelligenceSuspiciousJson ?? {
+        isSuspicious: false,
+        kind: null,
+        reason: null,
+        confidence: null,
+      },
       actionsJson: row.intelligenceActionsJson ?? [],
       calendarEventsJson: row.intelligenceCalendarEventsJson ?? [],
     });

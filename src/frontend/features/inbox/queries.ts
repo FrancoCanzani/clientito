@@ -7,7 +7,6 @@ import type {
   EmailThreadItem,
   EmailDetailIntelligence,
   EmailDetailItem,
-  EmailListItem,
   EmailListResponse,
   InboxSearchScope,
   InboxSearchSuggestionsResponse,

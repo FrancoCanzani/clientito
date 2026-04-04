@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAttachmentUpload } from "../hooks/use-attachment-upload";
-import { useLocalDraft } from "../hooks/use-local-draft";
+import { useDraft } from "../hooks/use-draft";
 import { useUndoSend } from "../hooks/use-undo-send";
 import { sendEmail } from "../mutations";
 import type { ComposeInitial } from "../types";
@@ -11,16 +11,6 @@ import { buildPlainForwardedHtml } from "../utils/build-forwarded-html";
 
 type UseComposeEmailOptions = {
   onSent?: () => void;
-};
-
-type ComposeDraft = {
-  mailboxId: number | null;
-  to: string;
-  cc: string;
-  bcc: string;
-  subject: string;
-  body: string;
-  forwardedContent: string;
 };
 
 function splitPlainForwardedContent(content: string) {
@@ -111,20 +101,21 @@ function createComposeDraft(initial?: ComposeInitial) {
   };
 }
 
-export function getComposeInitialKey(initial?: ComposeInitial) {
+export function getComposePanelKey(initial?: ComposeInitial) {
   if (initial?.composeKey) {
     return initial.composeKey;
   }
 
-  return [
-    initial?.mailboxId ?? "",
-    initial?.to ?? "",
-    initial?.cc ?? "",
-    initial?.bcc ?? "",
-    initial?.subject ?? "",
-    initial?.body ?? "",
-    initial?.bodyHtml ?? "",
-  ].join("\u0001");
+  return JSON.stringify({
+    mailboxId: initial?.mailboxId ?? null,
+    to: initial?.to ?? "",
+    cc: initial?.cc ?? "",
+    bcc: initial?.bcc ?? "",
+    subject: initial?.subject ?? "",
+    threadId: initial?.threadId ?? null,
+    body: initial?.body ?? "",
+    bodyHtml: initial?.bodyHtml ?? "",
+  });
 }
 
 export function useComposeEmail(
@@ -133,52 +124,48 @@ export function useComposeEmail(
 ) {
   const queryClient = useQueryClient();
   const mailboxesQuery = useMailboxes();
-  const composeKey = getComposeInitialKey(initial);
+  const composeKey = getComposePanelKey(initial);
   const [draft, setDraft] = useState(() => createComposeDraft(initial));
   const [loadingDraft, setLoadingDraft] = useState(true);
-
-  // Load saved draft from server on mount
-  useEffect(() => {
-    let cancelled = false;
-    useLocalDraft.load(composeKey).then((saved) => {
-      if (cancelled) return;
-      if (saved) {
-        const normalizedSaved = saved as Partial<ComposeDraft>;
-        if (typeof normalizedSaved.forwardedContent === "string") {
-          setDraft({
-            mailboxId: normalizedSaved.mailboxId ?? null,
-            to: normalizedSaved.to ?? "",
-            cc: normalizedSaved.cc ?? "",
-            bcc: normalizedSaved.bcc ?? "",
-            subject: normalizedSaved.subject ?? "",
-            body: normalizedSaved.body ?? "",
-            forwardedContent: normalizedSaved.forwardedContent,
-          });
-        } else {
-          const split = splitForwardedContent(normalizedSaved.body ?? "");
-          setDraft({
-            mailboxId: normalizedSaved.mailboxId ?? null,
-            to: normalizedSaved.to ?? "",
-            cc: normalizedSaved.cc ?? "",
-            bcc: normalizedSaved.bcc ?? "",
-            subject: normalizedSaved.subject ?? "",
-            body: split.body,
-            forwardedContent: split.forwardedContent,
-          });
-        }
-      }
-      setLoadingDraft(false);
-    });
-    return () => { cancelled = true; };
-  }, [composeKey]);
-
-  const { clearDraft } = useLocalDraft(composeKey, draft);
   const attachments = useAttachmentUpload();
   const bodyRef = useRef(draft.body);
   const [sendPending, setSendPending] = useState(false);
 
   const threadId = initial?.threadId;
   const { mailboxId, to, cc, bcc, subject, body, forwardedContent } = draft;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    useDraft.load(composeKey).then((savedDraft) => {
+      if (cancelled) return;
+
+      if (savedDraft) {
+        setDraft({
+          mailboxId: savedDraft.mailboxId ?? null,
+          to: savedDraft.to ?? "",
+          cc: savedDraft.cc ?? "",
+          bcc: savedDraft.bcc ?? "",
+          subject: savedDraft.subject ?? "",
+          body: savedDraft.body ?? "",
+          forwardedContent: savedDraft.forwardedContent ?? "",
+        });
+        bodyRef.current = savedDraft.body ?? "";
+      } else {
+        const nextDraft = createComposeDraft(initial);
+        setDraft(nextDraft);
+        bodyRef.current = nextDraft.body;
+      }
+
+      setLoadingDraft(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [composeKey, initial]);
+
+  const serverDraft = useDraft(composeKey, draft);
   const availableMailboxes = useMemo(
     () =>
       (mailboxesQuery.data?.accounts ?? []).filter(
@@ -223,6 +210,15 @@ export function useComposeEmail(
     setDraft((current) => ({ ...current, body: value }));
   };
 
+  const clearDraft = useCallback(async () => {
+    await serverDraft.clearDraft();
+    const nextDraft = createComposeDraft(initial);
+    bodyRef.current = nextDraft.body;
+    attachments.clear();
+    setSendPending(false);
+    setDraft(nextDraft);
+  }, [attachments, initial, serverDraft]);
+
   // Snapshot draft state at trigger time so the undo-send closure captures
   // the values that were current when the user pressed Send.
   const draftSnapshotRef = useRef(draft);
@@ -248,9 +244,6 @@ export function useComposeEmail(
     onSuccess: () => {
       clearDraft();
       toast.success("Email sent");
-      setSendPending(false);
-      setDraft(createComposeDraft());
-      attachments.clear();
       queryClient.invalidateQueries({ queryKey: ["emails"] });
       queryClient.invalidateQueries({ queryKey: ["drafts"] });
       if (threadId) {

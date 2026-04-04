@@ -65,8 +65,8 @@ export function EmailRow({
       </div>
 
       <div className="shrink-0">
-        <div className="relative flex min-w-24 justify-end text-xs text-muted-foreground">
-          <div className="flex items-center gap-2 group-hover:invisible">
+        <div className="relative flex md:min-w-24 justify-end text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 md:group-hover:invisible">
             {isStarred && (
               <StarIcon
                 className="size-3.5 text-yellow-400"
@@ -85,7 +85,7 @@ export function EmailRow({
             </span>
           </div>
 
-          <div className="absolute inset-y-0 right-0 hidden items-center justify-end group-hover:flex">
+          <div className="absolute inset-y-0 right-0 hidden items-center justify-end md:group-hover:flex">
             <IconButton
               label="Archive"
               variant="ghost"

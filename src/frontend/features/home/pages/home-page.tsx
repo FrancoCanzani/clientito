@@ -10,10 +10,11 @@ import { AgendaPanel } from "@/features/calendar/components/agenda-panel";
 import { BriefingText } from "@/features/home/components/briefing-text";
 import { CardStack } from "@/features/home/components/card-stack";
 import { useBriefingStream } from "@/features/home/hooks/use-briefing-stream";
-import { useDecisionKeyboard } from "@/features/home/hooks/use-decision-keyboard";
 import { useDecisionQueue } from "@/features/home/hooks/use-decision-queue";
 import { getGreeting } from "@/features/home/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { useHomeHotkeys } from "@/lib/hotkeys/home-hotkeys";
+import { useHotkeyScope } from "@/lib/hotkeys/use-scope";
 import { getRouteApi } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 
@@ -29,15 +30,15 @@ export default function HomePage() {
 
   const queue = useDecisionQueue(briefing.items);
 
-  useDecisionKeyboard({
+  useHotkeyScope("home");
+  useHomeHotkeys({
     navigateUp: queue.navigateUp,
     navigateDown: queue.navigateDown,
     toggleEditing: queue.toggleEditing,
     cancelEditing: queue.cancelEditing,
-    sendActiveReply: queue.confirmActive,
-    skipActive: queue.skipActive,
-    archiveActive: queue.archiveActive,
-    enabled: true,
+    confirm: queue.confirmActive,
+    skip: queue.skipActive,
+    archiveCard: queue.archiveActive,
   });
 
   const isAnimating = stream.isStreaming;
@@ -96,7 +97,7 @@ export default function HomePage() {
       <AgendaPanel days={1} showEmptyState={false} hideProposed showHeader />
 
       {showCards && (
-        <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground">
+        <div className="md:flex hidden items-center justify-between pt-1 text-xs text-muted-foreground">
           <span>{queue.visibleItems.length} items remaining</span>
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">

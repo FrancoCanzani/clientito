@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { DecisionQueue } from "@/features/home/components/card-stack";
 import type { HomeBriefingItem } from "@/features/home/queries";
+import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
@@ -149,6 +150,7 @@ function getPrimaryAction({
 export function TriageCard({
   item,
   queue,
+  isActive,
 }: {
   item: HomeBriefingItem;
   queue: DecisionQueue;
@@ -181,37 +183,36 @@ export function TriageCard({
   }, [isEditing]);
 
   return (
-    <div className="overflow-hidden rounded-md border border-border/40">
-      <button
-        type="button"
-        className="block w-full text-start text-pretty"
-        onClick={() => navigate({ to: item.href })}
-      >
-        <p className="text-sm px-4 py-3 rounded-b-md shadow-xs">
-          {(item.type === "email_action" ||
-            item.type === "briefing_email" ||
-            item.type === "calendar_suggestion") && (
-            <>
-              <span className="font-medium">{senderName}</span>
-              <span className="ml-1">{inlineSummaryText}</span>
-            </>
-          )}
-          {(item.type === "overdue_task" || item.type === "due_today_task") && (
-            <>
-              <span>{item.type === "overdue_task" ? "Overdue" : "Today"}</span>
-              <span className="ml-1">{inlineSummaryText}</span>
-            </>
-          )}
-          {item.type !== "email_action" &&
-            item.type !== "briefing_email" &&
-            item.type !== "calendar_suggestion" &&
-            item.type !== "overdue_task" &&
-            item.type !== "due_today_task" &&
-            inlineSummaryText}
-        </p>
-      </button>
+    <div
+      className={cn(
+        "overflow-hidden rounded-md border border-border/40 transition-colors",
+        isActive && "border-primary/60 ring-1 ring-primary/30",
+      )}
+    >
+      <div className="text-sm px-4 py-3 rounded-b-md shadow-xs text-pretty">
+        {(item.type === "email_action" ||
+          item.type === "briefing_email" ||
+          item.type === "calendar_suggestion") && (
+          <>
+            <span className="font-medium">{senderName}</span>
+            <span className="ml-1">{inlineSummaryText}</span>
+          </>
+        )}
+        {(item.type === "overdue_task" || item.type === "due_today_task") && (
+          <>
+            <span>{item.type === "overdue_task" ? "Overdue" : "Today"}</span>
+            <span className="ml-1">{inlineSummaryText}</span>
+          </>
+        )}
+        {item.type !== "email_action" &&
+          item.type !== "briefing_email" &&
+          item.type !== "calendar_suggestion" &&
+          item.type !== "overdue_task" &&
+          item.type !== "due_today_task" &&
+          inlineSummaryText}
+      </div>
 
-      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between bg-muted">
+      <div className="flex gap-3 px-4 py-3 items-center justify-between bg-muted">
         <div className="flex min-w-0 items-center gap-2.5 text-muted-foreground text-xs">
           <div className="min-w-0 truncate">
             <span className="mr-1 font-medium text-primary">

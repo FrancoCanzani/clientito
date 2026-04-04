@@ -56,6 +56,11 @@ export const QuickReply = forwardRef<
     onSent: () => setOpen(false),
   });
 
+  const handleClose = () => {
+    compose.clearDraft();
+    setOpen(false);
+  };
+
   useImperativeHandle(ref, () => ({
     scrollIntoViewAndFocus: (draft?: string) => {
       if (draft) {
@@ -93,7 +98,7 @@ export const QuickReply = forwardRef<
           <span className="flex-1 text-xs text-muted-foreground">Reply</span>
           <button
             type="button"
-            onClick={() => setOpen(false)}
+            onClick={handleClose}
             className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             aria-label="Discard reply"
           >
@@ -103,7 +108,7 @@ export const QuickReply = forwardRef<
         <div className="min-h-0 flex-1 overflow-y-auto">
           <ComposeEmailFields
             compose={compose}
-            onEscape={() => setOpen(false)}
+            onEscape={handleClose}
             editorAutoFocus
             showAccountSwitcher={false}
           />

@@ -136,7 +136,7 @@ If the URL contains a relevant entity ID such as an email ID, note ID, person ID
 Do not claim page-specific context unless it is supported by the current URL or by tool results.`;
 }
 
-export class Agent extends AIChatAgent<Env> {
+export class AgentSQLite extends AIChatAgent<Env> {
   async onConnect(connection: Connection, ctx: ConnectionContext) {
     const session = await auth(this.env).api.getSession({
       headers: ctx.request.headers,
@@ -158,7 +158,7 @@ export class Agent extends AIChatAgent<Env> {
     onFinish: StreamTextOnFinishCallback<ToolSet>,
     options?: OnChatMessageOptions,
   ) {
-    const { connection, request } = getCurrentAgent<Agent>();
+    const { connection, request } = getCurrentAgent<AgentSQLite>();
     const connectionAuth = (connection?.state ?? null) as AuthConnectionState | null;
 
     let userId = connectionAuth?.userId ?? null;
@@ -246,3 +246,8 @@ export class Agent extends AIChatAgent<Env> {
     });
   }
 }
+
+// Keep the legacy Durable Object class export so Cloudflare can still load the
+// old namespace referenced by prior migrations, while the active binding uses
+// AgentSQLite.
+export class Agent extends AgentSQLite {}

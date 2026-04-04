@@ -1,23 +1,11 @@
 import { openCompose } from "@/features/inbox/components/compose-bridge";
-import { useHotkey } from "@tanstack/react-hotkeys";
+import { shouldIgnoreHotkeyTarget } from "@/lib/hotkeys";
 import type { QueryClient } from "@tanstack/react-query";
 import type { UIMessage } from "ai";
 import { getToolName, isToolUIPart } from "ai";
 import { useCallback, useMemo } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 import type { PaletteMode } from "./types";
-
-function shouldIgnoreApprovalHotkeyTarget(target: EventTarget | null) {
-  const element =
-    target instanceof HTMLElement
-      ? target
-      : target instanceof Node
-        ? target.parentElement
-        : null;
-
-  if (!element) return false;
-  if (element.isContentEditable) return true;
-  return Boolean(element.closest("textarea, [role='textbox']"));
-}
 
 function invalidateAll(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -82,16 +70,12 @@ export function useApprovalHandler({
     [addToolApprovalResponse],
   );
 
-  useHotkey(
-    "Y",
+  const enabled = mode === "agent" && !!firstPendingApproval;
+
+  useHotkeys(
+    "y",
     (event) => {
-      if (
-        mode !== "agent" ||
-        !firstPendingApproval ||
-        shouldIgnoreApprovalHotkeyTarget(event.target)
-      ) {
-        return;
-      }
+      if (!firstPendingApproval || shouldIgnoreHotkeyTarget(event.target)) return;
       event.preventDefault();
       handleApprove(
         firstPendingApproval.id,
@@ -99,23 +83,19 @@ export function useApprovalHandler({
         firstPendingApproval.args,
       );
     },
-    { preventDefault: false, stopPropagation: false },
+    { enabled, enableOnFormTags: false },
+    [handleApprove, firstPendingApproval],
   );
 
-  useHotkey(
-    "N",
+  useHotkeys(
+    "n",
     (event) => {
-      if (
-        mode !== "agent" ||
-        !firstPendingApproval ||
-        shouldIgnoreApprovalHotkeyTarget(event.target)
-      ) {
-        return;
-      }
+      if (!firstPendingApproval || shouldIgnoreHotkeyTarget(event.target)) return;
       event.preventDefault();
       handleDiscard(firstPendingApproval.id);
     },
-    { preventDefault: false, stopPropagation: false },
+    { enabled, enableOnFormTags: false },
+    [handleDiscard, firstPendingApproval],
   );
 
   return { handleApprove, handleDiscard };

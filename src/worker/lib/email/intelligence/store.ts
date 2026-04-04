@@ -1,13 +1,17 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { Database } from "../../../db/client";
-import { emailIntelligence, emails, type CalendarSuggestion } from "../../../db/schema";
+import {
+  emailIntelligence,
+  emails,
+  type CalendarSuggestion,
+  type EmailSuspiciousFlag,
+} from "../../../db/schema";
 import { STANDARD_LABELS } from "../types";
 import {
   deriveActionBuckets,
   ELIGIBILITY_WINDOW_MS,
   MAX_THREAD_MESSAGES,
   type EmailContextRow,
-  type EmailSuspiciousFlag,
   type StoredEmailTriage,
 } from "./common";
 

@@ -232,6 +232,7 @@ export function makeReadTools(
             intelligenceCategory: emailIntelligence.category,
             intelligenceUrgency: emailIntelligence.urgency,
             intelligenceBriefingSentence: emailIntelligence.briefingSentence,
+            intelligenceSuspiciousJson: emailIntelligence.suspiciousJson,
             intelligenceActionsJson: emailIntelligence.actionsJson,
             intelligenceCalendarEventsJson: emailIntelligence.calendarEventsJson,
           })
@@ -250,6 +251,12 @@ export function makeReadTools(
                 category: email.intelligenceCategory,
                 urgency: email.intelligenceUrgency,
                 briefingSentence: email.intelligenceBriefingSentence,
+                suspiciousJson: email.intelligenceSuspiciousJson ?? {
+                  isSuspicious: false,
+                  kind: null,
+                  reason: null,
+                  confidence: null,
+                },
                 actionsJson: email.intelligenceActionsJson ?? [],
                 calendarEventsJson: email.intelligenceCalendarEventsJson ?? [],
               }

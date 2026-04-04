@@ -287,6 +287,8 @@ export async function fetchMessagesBatch(
   messageIds: string[],
   format: GmailMessageFormat = "full",
 ): Promise<Map<string, GmailMessage | null>> {
+  if (messageIds.length === 0) return new Map();
+
   const results = new Map<string, GmailMessage | null>();
 
   for (let i = 0; i < messageIds.length; i += GMAIL_BATCH_MAX_SIZE) {

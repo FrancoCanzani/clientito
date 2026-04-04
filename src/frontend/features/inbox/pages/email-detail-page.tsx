@@ -1,6 +1,7 @@
 import { ComposePanel } from "@/features/inbox/components/compose-panel";
 import { EmailDetailContent } from "@/features/inbox/components/email-detail-content";
 import { useRegisterEmailCommandHandler } from "@/features/inbox/hooks/use-email-command-state";
+import { useHotkeyScope } from "@/lib/hotkeys/use-scope";
 import { patchEmail } from "@/features/inbox/mutations";
 import type {
   ComposeInitial,
@@ -22,6 +23,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 const detailRoute = getRouteApi("/_dashboard/inbox/$id/email/$emailId");
 
 export default function EmailDetailPage() {
+  useHotkeyScope("inbox");
   const params = detailRoute.useParams();
   const { email } = detailRoute.useLoaderData();
   const navigate = useNavigate();

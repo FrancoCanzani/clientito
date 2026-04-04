@@ -1,53 +1,99 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "petit",
-  "main": "./src/worker/index.ts",
-  "compatibility_date": "2025-10-08",
-  "compatibility_flags": ["nodejs_compat"],
-  "observability": {
-    "enabled": true
-  },
-  "upload_source_maps": true,
-  "durable_objects": {
-    "bindings": [{ "name": "Agent", "class_name": "Agent" }]
-  },
-  "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["EmailAgent"] },
-    {
-      "tag": "v2",
-      "renamed_classes": [{ "from": "EmailAgent", "to": "Agent" }]
-    }
-  ],
-  "assets": {
-    "directory": "./dist/client",
-    "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/sdk/*", "/agents/*"]
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "petit-db",
-      "database_id": "LOCAL",
-      "migrations_dir": "drizzle"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "NOTES_IMAGES",
-      "bucket_name": "petit-notes-images"
-    },
-    {
-      "binding": "ATTACHMENTS",
-      "bucket_name": "petit-attachments"
-    }
-  ],
-  "vars": {
-    "BETTER_AUTH_URL": "http://localhost:5173"
-  },
-  "ai": {
-    "binding": "AI"
-  },
-  "triggers": {
-    "crons": ["*/1 * * * *", "*/5 * * * *"]
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "petit",
+	"main": "./src/worker/index.ts",
+	"compatibility_date": "2025-10-08",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"observability": {
+		"enabled": true
+	},
+	"upload_source_maps": true,
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "Agent",
+				"class_name": "AgentSQLite"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"EmailAgent"
+			]
+		},
+		{
+			"tag": "v2",
+			"renamed_classes": [
+				{
+					"from": "EmailAgent",
+					"to": "Agent"
+				}
+			]
+		},
+		{
+			"tag": "v3",
+			"new_sqlite_classes": [
+				"AgentSQLite"
+			]
+		}
+	],
+	"assets": {
+		"directory": "./dist/client",
+		"not_found_handling": "single-page-application",
+		"run_worker_first": [
+			"/api/*",
+			"/sdk/*",
+			"/agents/*"
+		]
+	},
+		"d1_databases": [
+			{
+				"binding": "DB",
+				"database_name": "petit-db",
+				"database_id": "de15a119-b406-4b57-9158-063f939849fe",
+				"migrations_dir": "drizzle"
+			}
+		],
+	"r2_buckets": [
+		{
+			"binding": "NOTES_IMAGES",
+			"bucket_name": "petit-notes-images"
+		},
+		{
+			"binding": "ATTACHMENTS",
+			"bucket_name": "petit-attachments"
+		}
+	],
+		"vars": {
+			"BETTER_AUTH_URL": "https://petit.francocanzani.workers.dev"
+		},
+	"ai": {
+		"binding": "AI"
+	},
+	"queues": {
+		"producers": [
+			{
+				"queue": "petit-sync",
+				"binding": "SYNC_QUEUE"
+			}
+		],
+		"consumers": [
+			{
+				"queue": "petit-sync",
+				"max_batch_size": 1,
+				"max_retries": 3,
+				"dead_letter_queue": "petit-sync-dlq"
+			}
+		]
+	},
+	"triggers": {
+		"crons": [
+			"*/1 * * * *",
+			"*/5 * * * *"
+		]
+	}
 }

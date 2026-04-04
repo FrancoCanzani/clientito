@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as GetStartedRouteImport } from './routes/get-started'
 import { Route as DocsRouteRouteImport } from './routes/docs/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -18,7 +19,6 @@ import { Route as DocsSlugRouteImport } from './routes/docs/$slug'
 import { Route as DashboardTasksRouteImport } from './routes/_dashboard/tasks'
 import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
 import { Route as DashboardHomeRouteImport } from './routes/_dashboard/home'
-import { Route as DashboardGetStartedRouteImport } from './routes/_dashboard/get-started'
 import { Route as DashboardDraftsRouteImport } from './routes/_dashboard/drafts'
 import { Route as DashboardAgendaRouteImport } from './routes/_dashboard/agenda'
 import { Route as DashboardInboxSearchRouteImport } from './routes/_dashboard/inbox/search'
@@ -30,6 +30,11 @@ import { Route as DashboardInboxIdEmailEmailIdRouteImport } from './routes/_dash
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GetStartedRoute = GetStartedRouteImport.update({
+  id: '/get-started',
+  path: '/get-started',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsRouteRoute = DocsRouteRouteImport.update({
@@ -69,11 +74,6 @@ const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
 const DashboardHomeRoute = DashboardHomeRouteImport.update({
   id: '/home',
   path: '/home',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardGetStartedRoute = DashboardGetStartedRouteImport.update({
-  id: '/get-started',
-  path: '/get-started',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardDraftsRoute = DashboardDraftsRouteImport.update({
@@ -117,10 +117,10 @@ const DashboardInboxIdEmailEmailIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/docs': typeof DocsRouteRouteWithChildren
+  '/get-started': typeof GetStartedRoute
   '/login': typeof LoginRoute
   '/agenda': typeof DashboardAgendaRoute
   '/drafts': typeof DashboardDraftsRoute
-  '/get-started': typeof DashboardGetStartedRoute
   '/home': typeof DashboardHomeRoute
   '/settings': typeof DashboardSettingsRoute
   '/tasks': typeof DashboardTasksRoute
@@ -134,10 +134,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/get-started': typeof GetStartedRoute
   '/login': typeof LoginRoute
   '/agenda': typeof DashboardAgendaRoute
   '/drafts': typeof DashboardDraftsRoute
-  '/get-started': typeof DashboardGetStartedRoute
   '/home': typeof DashboardHomeRoute
   '/settings': typeof DashboardSettingsRoute
   '/tasks': typeof DashboardTasksRoute
@@ -154,10 +154,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_dashboard': typeof DashboardRouteRouteWithChildren
   '/docs': typeof DocsRouteRouteWithChildren
+  '/get-started': typeof GetStartedRoute
   '/login': typeof LoginRoute
   '/_dashboard/agenda': typeof DashboardAgendaRoute
   '/_dashboard/drafts': typeof DashboardDraftsRoute
-  '/_dashboard/get-started': typeof DashboardGetStartedRoute
   '/_dashboard/home': typeof DashboardHomeRoute
   '/_dashboard/settings': typeof DashboardSettingsRoute
   '/_dashboard/tasks': typeof DashboardTasksRoute
@@ -174,10 +174,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/docs'
+    | '/get-started'
     | '/login'
     | '/agenda'
     | '/drafts'
-    | '/get-started'
     | '/home'
     | '/settings'
     | '/tasks'
@@ -191,10 +191,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/get-started'
     | '/login'
     | '/agenda'
     | '/drafts'
-    | '/get-started'
     | '/home'
     | '/settings'
     | '/tasks'
@@ -210,10 +210,10 @@ export interface FileRouteTypes {
     | '/'
     | '/_dashboard'
     | '/docs'
+    | '/get-started'
     | '/login'
     | '/_dashboard/agenda'
     | '/_dashboard/drafts'
-    | '/_dashboard/get-started'
     | '/_dashboard/home'
     | '/_dashboard/settings'
     | '/_dashboard/tasks'
@@ -230,6 +230,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
   DocsRouteRoute: typeof DocsRouteRouteWithChildren
+  GetStartedRoute: typeof GetStartedRoute
   LoginRoute: typeof LoginRoute
 }
 
@@ -240,6 +241,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/get-started': {
+      id: '/get-started'
+      path: '/get-started'
+      fullPath: '/get-started'
+      preLoaderRoute: typeof GetStartedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs': {
@@ -298,13 +306,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHomeRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
-    '/_dashboard/get-started': {
-      id: '/_dashboard/get-started'
-      path: '/get-started'
-      fullPath: '/get-started'
-      preLoaderRoute: typeof DashboardGetStartedRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
     '/_dashboard/drafts': {
       id: '/_dashboard/drafts'
       path: '/drafts'
@@ -360,7 +361,6 @@ declare module '@tanstack/react-router' {
 interface DashboardRouteRouteChildren {
   DashboardAgendaRoute: typeof DashboardAgendaRoute
   DashboardDraftsRoute: typeof DashboardDraftsRoute
-  DashboardGetStartedRoute: typeof DashboardGetStartedRoute
   DashboardHomeRoute: typeof DashboardHomeRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardTasksRoute: typeof DashboardTasksRoute
@@ -374,7 +374,6 @@ interface DashboardRouteRouteChildren {
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAgendaRoute: DashboardAgendaRoute,
   DashboardDraftsRoute: DashboardDraftsRoute,
-  DashboardGetStartedRoute: DashboardGetStartedRoute,
   DashboardHomeRoute: DashboardHomeRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardTasksRoute: DashboardTasksRoute,
@@ -407,6 +406,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   DocsRouteRoute: DocsRouteRouteWithChildren,
+  GetStartedRoute: GetStartedRoute,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport

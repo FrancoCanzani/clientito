@@ -26,8 +26,9 @@ import draftsRoutes from "./routes/inbox/drafts/router";
 import tasksRoutes from "./routes/tasks/router";
 import type { AppRouteEnv } from "./routes/types";
 import { handleScheduled } from "./scheduled";
+import { handleSyncQueue, type SyncQueueMessage } from "./queue";
 
-export { Agent } from "./agent/agent";
+export { Agent, AgentSQLite } from "./agent/agent";
 
 const app = new Hono<AppRouteEnv>();
 
@@ -91,5 +92,8 @@ export default {
   },
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(handleScheduled(event, env));
+  },
+  async queue(batch: MessageBatch<SyncQueueMessage>, env: Env) {
+    await handleSyncQueue(batch, env);
   },
 };

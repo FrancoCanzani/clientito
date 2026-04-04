@@ -20,21 +20,20 @@ type ServerDraft = DraftState & {
   createdAt: number;
 };
 
-function isDraftEmpty(d: DraftState): boolean {
+function isDraftEmpty(draft: DraftState): boolean {
   return (
-    !d.to &&
-    !d.cc &&
-    !d.bcc &&
-    !d.subject &&
-    (!d.body || d.body === "<p></p>" || d.body === "<p><br></p>") &&
-    !d.forwardedContent
+    !draft.to &&
+    !draft.cc &&
+    !draft.bcc &&
+    !draft.subject &&
+    (!draft.body ||
+      draft.body === "<p></p>" ||
+      draft.body === "<p><br></p>") &&
+    !draft.forwardedContent
   );
 }
 
-async function saveDraft(
-  composeKey: string,
-  draft: DraftState,
-): Promise<void> {
+async function saveDraft(composeKey: string, draft: DraftState): Promise<void> {
   await fetch("/api/inbox/drafts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -58,32 +57,33 @@ async function deleteDraftByKey(composeKey: string): Promise<void> {
   );
 }
 
-export function useLocalDraft(composeKey: string, draft: DraftState) {
+export function useDraft(composeKey: string, draft: DraftState) {
   const queryClient = useQueryClient();
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      const d = draftRef.current;
-      if (isDraftEmpty(d)) {
-        deleteDraftByKey(composeKey);
+      const currentDraft = draftRef.current;
+      if (isDraftEmpty(currentDraft)) {
+        void deleteDraftByKey(composeKey);
       } else {
-        saveDraft(composeKey, d);
+        void saveDraft(composeKey, currentDraft);
       }
     }, SAVE_DELAY_MS);
+
     return () => clearTimeout(timer);
   }, [draft, composeKey]);
 
   return {
-    clearDraft: () => {
-      deleteDraftByKey(composeKey);
+    clearDraft: async () => {
+      await deleteDraftByKey(composeKey);
       queryClient.invalidateQueries({ queryKey: ["drafts"] });
     },
   };
 }
 
-useLocalDraft.load = async function loadDraft(
+useDraft.load = async function loadDraft(
   composeKey: string,
 ): Promise<DraftState | null> {
   try {
@@ -91,17 +91,19 @@ useLocalDraft.load = async function loadDraft(
       `/api/inbox/drafts/by-key?composeKey=${encodeURIComponent(composeKey)}`,
     );
     if (!response.ok) return null;
+
     const json = (await response.json()) as { data: ServerDraft | null };
     if (!json.data) return null;
-    const d = json.data;
+
+    const draft = json.data;
     return {
-      mailboxId: d.mailboxId ?? null,
-      to: d.to,
-      cc: d.cc,
-      bcc: d.bcc,
-      subject: d.subject,
-      body: d.body,
-      forwardedContent: d.forwardedContent ?? "",
+      mailboxId: draft.mailboxId ?? null,
+      to: draft.to,
+      cc: draft.cc,
+      bcc: draft.bcc,
+      subject: draft.subject,
+      body: draft.body,
+      forwardedContent: draft.forwardedContent ?? "",
     };
   } catch {
     return null;

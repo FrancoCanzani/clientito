@@ -98,6 +98,8 @@ type ProcessMessagesInput = {
   progressOffset?: number;
   progressTotal?: number;
   minDateMs?: number | null;
+  /** Skip inline AI triage during bulk imports — the cron will handle it. */
+  skipInlineIntelligence?: boolean;
 };
 
 async function processMessageIds({
@@ -113,6 +115,7 @@ async function processMessageIds({
   progressOffset = 0,
   progressTotal,
   minDateMs,
+  skipInlineIntelligence = false,
 }: ProcessMessagesInput): Promise<GmailSyncResult> {
   const result: GmailSyncResult = {
     processed: 0,
@@ -383,7 +386,7 @@ async function processMessageIds({
           candidateRows.map((row) => row.id),
         );
 
-        if (env && intelligenceEmailIds.length > 0) {
+        if (env && intelligenceEmailIds.length > 0 && !skipInlineIntelligence) {
           await processInlineEmailIntelligence(db, env, intelligenceEmailIds);
         }
       } catch (error) {
@@ -451,6 +454,8 @@ export async function startFullGmailSync(
       pageToken = page.nextPageToken;
     } while (pageToken);
 
+    console.log(`[full-sync] mailbox=${mailboxId} listed ${allMessageIds.length} messages, query=${gmailQuery ?? "all"}`);
+
     await onProgress?.("fetching", 0, allMessageIds.length);
     const result = await processMessageIds({
       db,
@@ -464,6 +469,7 @@ export async function startFullGmailSync(
       progressOffset: 0,
       progressTotal: allMessageIds.length,
       minDateMs: effectiveCutoffAt,
+      skipInlineIntelligence: true,
     });
 
     if (historyIdBeforeFullSync) {
@@ -493,7 +499,11 @@ export async function startFullGmailSync(
     result.historyId = latestHistoryId;
 
     await persistMailboxHistoryState(db, mailboxId, latestHistoryId);
+    console.log(`[full-sync] mailbox=${mailboxId} done: inserted=${result.inserted} skipped=${result.skipped}`);
     return result;
+  } catch (error) {
+    console.error(`[full-sync] mailbox=${mailboxId} failed`, error instanceof Error ? error.message : error);
+    throw error;
   } finally {
     if (options?.skipLock !== true) {
       await releaseMailboxSyncLock(db, mailboxId);

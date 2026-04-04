@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { createPortal } from "react-dom";
 import type { ComposeInitial } from "../types";
 import { ComposeEmailFields } from "./compose-email-fields";
-import { getComposeInitialKey, useComposeEmail } from "./compose-email-state";
+import { getComposePanelKey, useComposeEmail } from "./compose-email-state";
 
 export function ComposePanel({
   open,
@@ -16,7 +16,7 @@ export function ComposePanel({
   onOpenChange: (open: boolean) => void;
   initial?: ComposeInitial;
 }) {
-  const composeKey = getComposeInitialKey(initial);
+  const composeKey = getComposePanelKey(initial);
 
   if (typeof document === "undefined") {
     return null;
@@ -48,8 +48,8 @@ function ComposePanelBody({
   });
   const hasInitialRecipient = (initial?.to?.trim().length ?? 0) > 0;
 
-  const handleClose = () => {
-    compose.clearDraft();
+  const handleClose = async () => {
+    await compose.clearDraft();
     onOpenChange(false);
   };
 
@@ -70,7 +70,9 @@ function ComposePanelBody({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.15 }}
-        onClick={handleClose}
+        onClick={() => {
+          void handleClose();
+        }}
       />
       <motion.div
         className="fixed inset-x-0 bottom-0 z-50 antialiased sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-160"
@@ -86,7 +88,9 @@ function ComposePanelBody({
               type="button"
               variant="ghost"
               size="icon"
-              onClick={handleClose}
+              onClick={() => {
+                void handleClose();
+              }}
               aria-label="Close compose"
             >
               <XIcon className="size-3" />
@@ -96,7 +100,9 @@ function ComposePanelBody({
             <ComposeEmailFields
               compose={compose}
               bodyClassName="min-h-50 text-sm leading-relaxed"
-              onEscape={handleClose}
+              onEscape={() => {
+                void handleClose();
+              }}
               recipientAutoFocus={!hasInitialRecipient}
               editorAutoFocus={hasInitialRecipient}
             />
