@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AgendaPanel } from "@/features/calendar/components/agenda-panel";
 import { BriefingText } from "@/features/home/components/briefing-text";
 import { useBriefingStream } from "@/features/home/hooks/use-briefing-stream";
@@ -25,6 +26,18 @@ export default function HomePage() {
 
       {stream.text && (
         <BriefingText text={stream.text} />
+      )}
+      {!stream.text && stream.isStreaming && (
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            Preparing today&apos;s briefing...
+          </p>
+          <div className="space-y-1.5">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-5/6" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+        </div>
       )}
       {!stream.text && stream.error && (
         <motion.div

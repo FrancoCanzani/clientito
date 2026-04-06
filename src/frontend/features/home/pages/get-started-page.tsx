@@ -159,8 +159,8 @@ export default function GetStartedPage() {
             onClick={() => {
               if (!preferredMailboxId) return;
               navigate({
-                to: "/$mailboxId/inbox",
-                params: { mailboxId: preferredMailboxId },
+                to: "/$mailboxId/inbox/folders/$folder",
+                params: { mailboxId: preferredMailboxId, folder: "inbox" },
               });
             }}
             disabled={!preferredMailboxId}

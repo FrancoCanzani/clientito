@@ -93,11 +93,19 @@ export function useEmailInboxActions({
   );
 
   const closeEmail = useCallback(() => {
+    if (view === "important") {
+      navigate({
+        to: "/$mailboxId/inbox/labels/$label",
+        params: { mailboxId, label: "important" },
+      });
+      return;
+    }
+
     navigate({
-      to: "/$mailboxId/inbox",
-      params: { mailboxId },
+      to: "/$mailboxId/inbox/folders/$folder",
+      params: { mailboxId, folder: view },
     });
-  }, [navigate, mailboxId]);
+  }, [navigate, mailboxId, view]);
 
   const openEmail = useCallback(
     (email: EmailListItem) => {

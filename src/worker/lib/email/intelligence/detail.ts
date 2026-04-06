@@ -1,7 +1,11 @@
 import { eq } from "drizzle-orm";
 import type { Database } from "../../../db/client";
+import type {
+  CalendarSuggestion,
+  EmailAction,
+  EmailSuspiciousFlag,
+} from "../../../db/schema";
 import { emailIntelligence } from "../../../db/schema";
-import type { CalendarSuggestion, EmailAction, EmailSuspiciousFlag } from "../../../db/schema";
 import { buildSessionAffinityKey } from "../../ai/session-affinity";
 import {
   buildSourceHash,
@@ -40,31 +44,81 @@ function extractOnDemandResult(row: {
   calendarEventsJson: CalendarSuggestion[] | null;
 }): EmailOnDemandResult {
   const actions = row.actionsJson ?? [];
-  const replyAction = actions.find((a) => a.type === "reply" && a.status === "pending");
-  const taskAction = actions.find((a) => a.type === "create_task" && a.status === "pending");
-  const calendarSuggestion = (row.calendarEventsJson ?? []).find((e) => e.status === "pending") ?? null;
+  const replyAction = actions.find(
+    (a) => a.type === "reply" && a.status === "pending",
+  );
+  const taskAction = actions.find(
+    (a) => a.type === "create_task" && a.status === "pending",
+  );
+  const calendarSuggestion =
+    (row.calendarEventsJson ?? []).find((e) => e.status === "pending") ?? null;
 
-  const replyDraft = typeof replyAction?.payload.draft === "string"
-    ? replyAction.payload.draft
-    : null;
+  const replyDraft =
+    typeof replyAction?.payload.draft === "string"
+      ? replyAction.payload.draft
+      : null;
 
   const taskSuggestion = taskAction
     ? {
-        title: typeof taskAction.payload.taskTitle === "string" ? taskAction.payload.taskTitle : "",
-        dueAt: typeof taskAction.payload.taskDueAt === "number" ? taskAction.payload.taskDueAt : null,
-        priority: ["urgent", "high", "medium", "low"].includes(String(taskAction.payload.taskPriority))
-          ? (taskAction.payload.taskPriority as "urgent" | "high" | "medium" | "low")
+        title:
+          typeof taskAction.payload.taskTitle === "string"
+            ? taskAction.payload.taskTitle
+            : "",
+        dueAt:
+          typeof taskAction.payload.taskDueAt === "number"
+            ? taskAction.payload.taskDueAt
+            : null,
+        priority: ["urgent", "high", "medium", "low"].includes(
+          String(taskAction.payload.taskPriority),
+        )
+          ? (taskAction.payload.taskPriority as
+              | "urgent"
+              | "high"
+              | "medium"
+              | "low")
           : null,
       }
     : null;
 
   return {
     summary: row.summary,
-    suspicious: row.suspiciousJson ?? { isSuspicious: false, kind: null, reason: null, confidence: null },
+    suspicious: row.suspiciousJson ?? {
+      isSuspicious: false,
+      kind: null,
+      reason: null,
+      confidence: null,
+    },
     replyDraft,
     taskSuggestion: taskSuggestion?.title ? taskSuggestion : null,
     calendarSuggestion,
   };
+}
+
+function hasOnDemandContent(result: EmailOnDemandResult): boolean {
+  return Boolean(
+    result.summary ||
+      result.replyDraft ||
+      result.taskSuggestion ||
+      result.calendarSuggestion ||
+      result.suspicious.isSuspicious,
+  );
+}
+
+export async function getStoredEmailOnDemand(
+  db: Database,
+  emailId: number,
+): Promise<EmailOnDemandResult | null> {
+  const rows = await db
+    .select()
+    .from(emailIntelligence)
+    .where(eq(emailIntelligence.emailId, emailId))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+
+  const result = extractOnDemandResult(row);
+  return hasOnDemandContent(result) ? result : null;
 }
 
 export async function generateEmailOnDemand(
@@ -87,12 +141,10 @@ export async function generateEmailOnDemand(
 
   const existing = rows[0] ?? null;
 
-  // Cache hit: on-demand has already run for this content
   if (existing?.summary && existing.sourceHash === currentHash) {
     return extractOnDemandResult(existing);
   }
 
-  // Generate on-demand analysis
   const prompt = buildThreadPrompt(email, threadMessages);
   const { object } = await generateStructuredEmailObject({
     env,
@@ -120,27 +172,30 @@ export async function generateEmailOnDemand(
       .where(eq(emailIntelligence.emailId, emailId));
   } else {
     // Background triage hasn't run yet — insert a placeholder row
-    await db.insert(emailIntelligence).values({
-      emailId,
-      userId: email.userId,
-      mailboxId: email.mailboxId,
-      status: "pending",
-      summary: normalized.summary,
-      actionsJson: normalized.actions,
-      calendarEventsJson: normalized.calendarEvents,
-      sourceHash: currentHash,
-      attemptCount: 0,
-      createdAt: now,
-      updatedAt: now,
-    }).onConflictDoUpdate({
-      target: [emailIntelligence.emailId],
-      set: {
+    await db
+      .insert(emailIntelligence)
+      .values({
+        emailId,
+        userId: email.userId,
+        mailboxId: email.mailboxId,
+        status: "pending",
         summary: normalized.summary,
         actionsJson: normalized.actions,
         calendarEventsJson: normalized.calendarEvents,
+        sourceHash: currentHash,
+        attemptCount: 0,
+        createdAt: now,
         updatedAt: now,
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: [emailIntelligence.emailId],
+        set: {
+          summary: normalized.summary,
+          actionsJson: normalized.actions,
+          calendarEventsJson: normalized.calendarEvents,
+          updatedAt: now,
+        },
+      });
   }
 
   const replyAction = normalized.actions.find((a) => a.type === "reply");
@@ -148,14 +203,34 @@ export async function generateEmailOnDemand(
 
   return {
     summary: normalized.summary,
-    suspicious: existing?.suspiciousJson ?? { isSuspicious: false, kind: null, reason: null, confidence: null },
-    replyDraft: typeof replyAction?.payload.draft === "string" ? replyAction.payload.draft : null,
+    suspicious: existing?.suspiciousJson ?? {
+      isSuspicious: false,
+      kind: null,
+      reason: null,
+      confidence: null,
+    },
+    replyDraft:
+      typeof replyAction?.payload.draft === "string"
+        ? replyAction.payload.draft
+        : null,
     taskSuggestion: taskAction
       ? {
-          title: typeof taskAction.payload.taskTitle === "string" ? taskAction.payload.taskTitle : "",
-          dueAt: typeof taskAction.payload.taskDueAt === "number" ? taskAction.payload.taskDueAt : null,
-          priority: ["urgent", "high", "medium", "low"].includes(String(taskAction.payload.taskPriority))
-            ? (taskAction.payload.taskPriority as "urgent" | "high" | "medium" | "low")
+          title:
+            typeof taskAction.payload.taskTitle === "string"
+              ? taskAction.payload.taskTitle
+              : "",
+          dueAt:
+            typeof taskAction.payload.taskDueAt === "number"
+              ? taskAction.payload.taskDueAt
+              : null,
+          priority: ["urgent", "high", "medium", "low"].includes(
+            String(taskAction.payload.taskPriority),
+          )
+            ? (taskAction.payload.taskPriority as
+                | "urgent"
+                | "high"
+                | "medium"
+                | "low")
             : null,
         }
       : null,

@@ -22,12 +22,13 @@ export function useInboxHotkeys() {
       compose: () => {
         if (!activeMailboxId) return;
         const onInbox = router.state.matches.some(
-          (match) => match.routeId === "/_dashboard/$mailboxId/inbox/",
+          (match) =>
+            match.routeId.startsWith("/_dashboard/$mailboxId/inbox"),
         );
         if (!onInbox) {
           void navigate({
-            to: "/$mailboxId/inbox",
-            params: { mailboxId: activeMailboxId },
+            to: "/$mailboxId/inbox/folders/$folder",
+            params: { mailboxId: activeMailboxId, folder: "inbox" },
           });
         }
         openCompose({ mailboxId: activeMailboxId });

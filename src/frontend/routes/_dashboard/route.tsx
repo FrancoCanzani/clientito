@@ -20,11 +20,9 @@ export const Route = createFileRoute("/_dashboard")({
 function DashboardLayout() {
   return (
     <AppProviders>
-      <div className="flex min-h-dvh flex-col antialiased">
-        <main className="flex w-full flex-1 flex-col px-4 py-4 pb-24">
-          <div className="flex flex-1 flex-col">
-            <Outlet />
-          </div>
+      <div className="flex min-h-dvh min-w-0 flex-col">
+        <main className="flex w-full min-w-0 flex-1 flex-col px-4 py-4 pb-24">
+          <Outlet />
         </main>
         <CommandPalette />
       </div>

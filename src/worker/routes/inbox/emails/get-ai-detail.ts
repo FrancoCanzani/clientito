@@ -2,7 +2,10 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emails } from "../../../db/schema";
-import { generateEmailOnDemand } from "../../../lib/email/intelligence/detail";
+import {
+  generateEmailOnDemand,
+  getStoredEmailOnDemand,
+} from "../../../lib/email/intelligence/detail";
 import type { AppRouteEnv } from "../../types";
 import { emailDetailParamsSchema } from "./schemas";
 
@@ -26,15 +29,11 @@ export function registerGetEmailAIDetail(api: Hono<AppRouteEnv>) {
 
       try {
         const result = await generateEmailOnDemand(db, env, emailId);
-
-        if (!result) {
-          return c.json({ data: null }, 200);
-        }
-
-        return c.json({ data: result }, 200);
+        return c.json({ data: result ?? null }, 200);
       } catch (error) {
         console.error("On-demand email analysis failed", { emailId, error });
-        return c.json({ data: null }, 200);
+        const fallback = await getStoredEmailOnDemand(db, emailId);
+        return c.json({ data: fallback }, 200);
       }
     },
   );

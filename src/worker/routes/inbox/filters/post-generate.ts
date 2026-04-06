@@ -1,11 +1,10 @@
 import { desc, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { createOpenAI } from "@ai-sdk/openai";
 import { Output, generateText } from "ai";
-import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
 import { emails } from "../../../db/schema";
-import { buildSessionAffinityKey, withSessionAffinity } from "../../../lib/ai/session-affinity";
 import { AI_MODELS } from "../../../lib/constants";
 import type { AppRouteEnv } from "../../types";
 
@@ -52,17 +51,13 @@ export function registerGenerateFilter(app: Hono<AppRouteEnv>) {
       .slice(0, 15)
       .join("\n");
 
-    const workersAI = createWorkersAI({ binding: c.env.AI });
-    const sessionAffinityKey = buildSessionAffinityKey("filters-generate", user.id);
+    const openai = createOpenAI({ apiKey: c.env.OPENAI_API_KEY });
     let lastError: unknown = null;
 
     for (const modelName of AI_MODELS) {
       try {
         const { output: filter } = await generateText({
-          model: workersAI(
-            modelName,
-            withSessionAffinity(sessionAffinityKey),
-          ),
+          model: openai.responses(modelName),
           output: Output.object({ schema: filterOutputSchema }),
           prompt: `You are an email filter generator. The user describes what they want in plain English and you create an email filter.
 

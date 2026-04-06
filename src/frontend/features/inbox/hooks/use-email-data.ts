@@ -1,7 +1,4 @@
-import {
-  EMAIL_LIST_PAGE_SIZE,
-  fetchEmails,
-} from "@/features/inbox/queries";
+import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/inbox/queries";
 import type { EmailListResponse } from "@/features/inbox/types";
 import { buildThreadSections } from "@/features/inbox/utils/build-thread-sections";
 import { groupEmailsByThread } from "@/features/inbox/utils/group-emails-by-thread";
@@ -17,7 +14,7 @@ export function useEmailData({
 }: {
   view: EmailView;
   mailboxId: number;
-  initialPage: EmailListResponse;
+  initialPage?: EmailListResponse;
 }) {
   const emailsQuery = useInfiniteQuery({
     queryKey: ["emails", view, mailboxId],
@@ -29,10 +26,14 @@ export function useEmailData({
         offset: pageParam,
       }),
     initialPageParam: 0,
-    initialData: {
-      pages: [initialPage],
-      pageParams: [0],
-    },
+    ...(initialPage
+      ? {
+          initialData: {
+            pages: [initialPage],
+            pageParams: [0],
+          },
+        }
+      : {}),
     getNextPageParam: (lastPage) =>
       lastPage?.pagination?.hasMore
         ? lastPage.pagination.offset + lastPage.pagination.limit
@@ -68,6 +69,7 @@ export function useEmailData({
 
   const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } =
     emailsQuery;
+
   const loadMoreRef = useIntersectionObserver<HTMLDivElement>({
     root: null,
     rootMargin: "200px 0px",

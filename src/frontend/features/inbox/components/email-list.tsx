@@ -76,7 +76,6 @@ export function EmailList({
                     >
                       <EmailRow
                         group={group}
-                        isOpen={false}
                         view={view}
                         onOpen={onOpen}
                         onAction={onAction}

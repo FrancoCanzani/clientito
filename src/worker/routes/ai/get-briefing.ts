@@ -1,5 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Hono } from "hono";
+import { createOpenAI } from "@ai-sdk/openai";
+import { generateText } from "ai";
 import { and, eq, gte, lt, ne } from "drizzle-orm";
 import { buildSessionAffinityKey, withSessionAffinity } from "../../lib/ai/session-affinity";
 import { FALLBACK_MODEL, PRIMARY_MODEL } from "../../lib/constants";
@@ -194,50 +196,6 @@ function buildFallbackBriefing(context: BriefingContext): string {
   return parts.join(" ");
 }
 
-function extractBriefingText(payload: unknown): string {
-  if (!payload || typeof payload !== "object") return "";
-
-  const data = payload as Record<string, unknown>;
-
-  if (typeof data.response === "string") {
-    return data.response;
-  }
-
-  if (typeof data.result === "string") {
-    return data.result;
-  }
-
-  const choices = Array.isArray(data.choices) ? data.choices : [];
-  if (choices.length > 0 && choices[0] && typeof choices[0] === "object") {
-    const firstChoice = choices[0] as Record<string, unknown>;
-
-    if (typeof firstChoice.text === "string") {
-      return firstChoice.text;
-    }
-
-    const message = firstChoice.message;
-    if (message && typeof message === "object") {
-      const content = (message as Record<string, unknown>).content;
-      if (typeof content === "string") {
-        return content;
-      }
-      if (Array.isArray(content)) {
-        const text = content
-          .map((part) => {
-            if (!part || typeof part !== "object") return "";
-            const typedPart = part as Record<string, unknown>;
-            if (typeof typedPart.text === "string") return typedPart.text;
-            return "";
-          })
-          .join("");
-        if (text) return text;
-      }
-    }
-  }
-
-  return "";
-}
-
 export function registerPostBriefingStream(app: Hono<AppRouteEnv>) {
   app.post("/briefing/stream", zValidator("json", briefingStreamSchema), async (c) => {
     const db = c.get("db");
@@ -253,25 +211,22 @@ export function registerPostBriefingStream(app: Hono<AppRouteEnv>) {
     });
 
     const sessionAffinityKey = buildSessionAffinityKey("briefing", user.id, mailboxId);
-    const messages = [
-      { role: "system" as const, content: STREAM_SYSTEM },
-      { role: "user" as const, content: buildStreamPrompt(context) },
-    ];
+    const openai = createOpenAI({
+      apiKey: env.OPENAI_API_KEY,
+      headers: withSessionAffinity(sessionAffinityKey).extraHeaders,
+    });
+    const prompt = buildStreamPrompt(context);
 
     try {
       for (const model of [PRIMARY_MODEL, FALLBACK_MODEL]) {
         try {
-          const payload = await env.AI.run(
-            model as keyof AiModels,
-            {
-              messages,
-              max_tokens: 300,
-            },
-            {
-              extraHeaders: withSessionAffinity(sessionAffinityKey).extraHeaders,
-            },
-          );
-          const text = extractBriefingText(payload).trim();
+          const result = await generateText({
+            model: openai.responses(model),
+            system: STREAM_SYSTEM,
+            prompt,
+            maxOutputTokens: 300,
+          });
+          const text = result.text.trim();
           if (text) {
             return new Response(text, {
               headers: {

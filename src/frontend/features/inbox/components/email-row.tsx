@@ -1,6 +1,7 @@
 import { IconButton } from "@/components/ui/icon-button";
+import type { EmailInboxAction } from "@/features/inbox/hooks/use-email-inbox-actions";
 import { fetchEmailDetailAI } from "@/features/inbox/queries";
-import { useQueryClient } from "@tanstack/react-query";
+import type { EmailView } from "@/features/inbox/utils/inbox-filters";
 import { cn } from "@/lib/utils";
 import {
   ArchiveIcon,
@@ -10,21 +11,18 @@ import {
   StarIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import type { EmailInboxAction } from "@/features/inbox/hooks/use-email-inbox-actions";
-import type { EmailView } from "@/features/inbox/utils/inbox-filters";
+import { useQueryClient } from "@tanstack/react-query";
 import type { EmailListItem } from "../types";
 import { formatInboxRowDate } from "../utils/formatters";
 import type { ThreadGroup } from "../utils/group-emails-by-thread";
 
 export function EmailRow({
   group,
-  isOpen,
   view,
   onOpen,
   onAction,
 }: {
   group: ThreadGroup;
-  isOpen: boolean;
   view: EmailView;
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
@@ -44,7 +42,6 @@ export function EmailRow({
       : email.fromName || email.fromAddr;
 
   const prefetchAi = () => {
-    if (email.isRead) return;
     void queryClient.prefetchQuery({
       queryKey: ["email-ai-detail", email.id],
       queryFn: () => fetchEmailDetailAI(email.id),
@@ -55,12 +52,8 @@ export function EmailRow({
     <div
       role="button"
       tabIndex={0}
-      className={cn(
-        "flex w-full group items-center gap-2 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40 cursor-default",
-        isOpen && "bg-muted/50",
-      )}
+      className="flex w-full group items-center gap-2 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40 cursor-default"
       onMouseEnter={prefetchAi}
-      onFocus={prefetchAi}
       onClick={() => onOpen(email)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -125,7 +118,9 @@ export function EmailRow({
               size="icon-sm"
               onClick={(event) => {
                 event.stopPropagation();
-                onAction(email.isRead ? "mark-unread" : "mark-read", [email.id]);
+                onAction(email.isRead ? "mark-unread" : "mark-read", [
+                  email.id,
+                ]);
               }}
             >
               {email.isRead ? (

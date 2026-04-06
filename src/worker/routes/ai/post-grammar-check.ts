@@ -1,9 +1,8 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
-import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
-import { buildSessionAffinityKey, withSessionAffinity } from "../../lib/ai/session-affinity";
 import { AI_MODELS } from "../../lib/constants";
 import type { AppRouteEnv } from "../types";
 
@@ -26,18 +25,13 @@ export function registerPostGrammarCheck(app: Hono<AppRouteEnv>) {
     zValidator("json", grammarCheckBodySchema),
     async (c) => {
       const { text } = c.req.valid("json");
-      const user = c.get("user")!;
-      const workersAI = createWorkersAI({ binding: c.env.AI });
-      const sessionAffinityKey = buildSessionAffinityKey("grammar-check", user.id);
+      const openai = createOpenAI({ apiKey: c.env.OPENAI_API_KEY });
       let lastError: unknown = null;
 
       for (const modelName of AI_MODELS) {
         try {
           const result = await generateText({
-            model: workersAI(
-              modelName,
-              withSessionAffinity(sessionAffinityKey),
-            ),
+            model: openai.responses(modelName),
             system: GRAMMAR_SYSTEM,
             prompt: text,
             maxOutputTokens: 4000,

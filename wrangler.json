@@ -71,9 +71,6 @@
 		"vars": {
 			"BETTER_AUTH_URL": "https://petit.francocanzani.workers.dev"
 		},
-	"ai": {
-		"binding": "AI"
-	},
 	"queues": {
 		"producers": [
 			{

@@ -77,55 +77,51 @@ function SidebarNav() {
   const currentRouteId = useRouterState({
     select: (state) => state.matches[state.matches.length - 1]?.routeId,
   });
+  const currentFolder = useRouterState({
+    select: (state) =>
+      state.matches.find(
+        (match) => match.routeId === "/_dashboard/$mailboxId/inbox/folders/$folder",
+      )?.params.folder,
+  });
+  const currentLabel = useRouterState({
+    select: (state) =>
+      state.matches.find(
+        (match) => match.routeId === "/_dashboard/$mailboxId/inbox/labels/$label",
+      )?.params.label,
+  });
   const search = useRouterState({
     select: (state) =>
       state.location.search as {
-        view?: unknown;
         context?: unknown;
       },
   });
   const activeView =
-    currentRouteId === "/_dashboard/$mailboxId/inbox/drafts"
-      ? "drafts"
-      : currentRouteId === "/_dashboard/$mailboxId/inbox/starred" ||
-          (currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
-            search.context === "starred")
-        ? "starred"
-        : currentRouteId === "/_dashboard/$mailboxId/inbox/sent" ||
-            (currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
-              search.context === "sent")
-          ? "sent"
-          : currentRouteId === "/_dashboard/$mailboxId/inbox/archived" ||
-              (currentRouteId ===
-                "/_dashboard/$mailboxId/inbox/email/$emailId" &&
-                search.context === "archived")
-            ? "archived"
-            : currentRouteId === "/_dashboard/$mailboxId/inbox/spam" ||
-                (currentRouteId ===
-                  "/_dashboard/$mailboxId/inbox/email/$emailId" &&
-                  search.context === "spam")
-              ? "spam"
-              : currentRouteId === "/_dashboard/$mailboxId/inbox/trash" ||
-                  (currentRouteId ===
-                    "/_dashboard/$mailboxId/inbox/email/$emailId" &&
-                    search.context === "trash")
-                ? "trash"
-                : currentRouteId === "/_dashboard/$mailboxId/inbox/search"
-                  ? "search"
-                  : currentRouteId ===
-                      "/_dashboard/$mailboxId/inbox/subscriptions"
-                    ? "subscriptions"
-                    : currentRouteId === "/_dashboard/$mailboxId/inbox/filters"
-                      ? "filters"
-                      : search.view === "important"
-                        ? "important"
-                        : "inbox";
+    currentRouteId === "/_dashboard/$mailboxId/inbox/search"
+      ? "search"
+      : currentRouteId === "/_dashboard/$mailboxId/inbox/subscriptions"
+        ? "subscriptions"
+      : currentRouteId === "/_dashboard/$mailboxId/inbox/filters"
+        ? "filters"
+          : currentRouteId === "/_dashboard/$mailboxId/inbox/drafts"
+            ? "drafts"
+          : currentFolder
+            ? currentFolder
+            : currentLabel === "important"
+              ? "important"
+              : currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId"
+                ? search.context === "important"
+                  ? "important"
+                  : search.context ?? "inbox"
+                : "inbox";
 
   return (
     <SidebarMenu>
       <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "inbox"}>
-          <Link to="/$mailboxId/inbox" params={{ mailboxId }}>
+          <Link
+            to="/$mailboxId/inbox/folders/$folder"
+            params={{ mailboxId, folder: "inbox" }}
+          >
             <TrayIcon />
             <span>Inbox</span>
           </Link>
@@ -135,12 +131,71 @@ function SidebarNav() {
       <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "important"}>
           <Link
-            to="/$mailboxId/inbox"
-            params={{ mailboxId }}
-            search={{ view: "important" }}
+            to="/$mailboxId/inbox/labels/$label"
+            params={{ mailboxId, label: "important" }}
           >
             <FlagIcon />
             <span>Important</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "starred"}>
+          <Link
+            to="/$mailboxId/inbox/folders/$folder"
+            params={{ mailboxId, folder: "starred" }}
+          >
+            <StarIcon />
+            <span>Starred</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "sent"}>
+          <Link
+            to="/$mailboxId/inbox/folders/$folder"
+            params={{ mailboxId, folder: "sent" }}
+          >
+            <PaperPlaneTiltIcon />
+            <span>Sent</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "archived"}>
+          <Link
+            to="/$mailboxId/inbox/folders/$folder"
+            params={{ mailboxId, folder: "archived" }}
+          >
+            <ArchiveIcon />
+            <span>Archive</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "spam"}>
+          <Link
+            to="/$mailboxId/inbox/folders/$folder"
+            params={{ mailboxId, folder: "spam" }}
+          >
+            <WarningCircleIcon />
+            <span>Spam</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={activeView === "trash"}>
+          <Link
+            to="/$mailboxId/inbox/folders/$folder"
+            params={{ mailboxId, folder: "trash" }}
+          >
+            <TrashIcon />
+            <span>Trash</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -150,51 +205,6 @@ function SidebarNav() {
           <Link to="/$mailboxId/inbox/drafts" params={{ mailboxId }}>
             <FileDashedIcon />
             <span>Drafts</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "starred"}>
-          <Link to="/$mailboxId/inbox/starred" params={{ mailboxId }}>
-            <StarIcon />
-            <span>Starred</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "sent"}>
-          <Link to="/$mailboxId/inbox/sent" params={{ mailboxId }}>
-            <PaperPlaneTiltIcon />
-            <span>Sent</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "archived"}>
-          <Link to="/$mailboxId/inbox/archived" params={{ mailboxId }}>
-            <ArchiveIcon />
-            <span>Archive</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "spam"}>
-          <Link to="/$mailboxId/inbox/spam" params={{ mailboxId }}>
-            <WarningCircleIcon />
-            <span>Spam</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "trash"}>
-          <Link to="/$mailboxId/inbox/trash" params={{ mailboxId }}>
-            <TrashIcon />
-            <span>Trash</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -254,8 +264,7 @@ export function InboxSidebarShell({ children }: { children: ReactNode }) {
             <SidebarNav />
           </div>
         </aside>
-
-        <main className="flex-1 h-full">{children}</main>
+        <main className="min-w-0 flex-1">{children}</main>{" "}
       </div>
     </SidebarProvider>
   );

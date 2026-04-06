@@ -14,7 +14,11 @@ export function EmailAiPanel({
   intelligence,
   onReply,
   onCreateTask,
+  onApproveCalendarSuggestion,
+  onDismissCalendarSuggestion,
   createTaskPending,
+  approveCalendarSuggestionPending,
+  dismissCalendarSuggestionPending,
 }: {
   intelligence: EmailDetailIntelligence;
   onReply: (draft?: string) => void;
@@ -23,7 +27,11 @@ export function EmailAiPanel({
     dueAt: number | null;
     priority: "urgent" | "high" | "medium" | "low" | null;
   }) => void;
+  onApproveCalendarSuggestion: (suggestionId: number) => void;
+  onDismissCalendarSuggestion: (suggestionId: number) => void;
   createTaskPending: boolean;
+  approveCalendarSuggestionPending: boolean;
+  dismissCalendarSuggestionPending: boolean;
 }) {
   return (
     <section className="space-y-4 rounded-md border border-border/40 p-3">
@@ -91,7 +99,13 @@ export function EmailAiPanel({
 
       {intelligence.calendarSuggestion &&
         intelligence.calendarSuggestion.status === "pending" && (
-          <CalendarSuggestionRow suggestion={intelligence.calendarSuggestion} />
+          <CalendarSuggestionRow
+            suggestion={intelligence.calendarSuggestion}
+            onApprove={onApproveCalendarSuggestion}
+            onDismiss={onDismissCalendarSuggestion}
+            approvePending={approveCalendarSuggestionPending}
+            dismissPending={dismissCalendarSuggestionPending}
+          />
         )}
     </section>
   );
@@ -139,21 +153,50 @@ function SuspiciousWarning({
 
 function CalendarSuggestionRow({
   suggestion,
+  onApprove,
+  onDismiss,
+  approvePending,
+  dismissPending,
 }: {
   suggestion: CalendarSuggestion;
+  onApprove: (suggestionId: number) => void;
+  onDismiss: (suggestionId: number) => void;
+  approvePending: boolean;
+  dismissPending: boolean;
 }) {
   const dateStr = suggestion.isAllDay
     ? new Date(suggestion.startAt).toLocaleDateString()
     : new Date(suggestion.startAt).toLocaleString();
 
   return (
-    <div className="flex items-start gap-2 border-t border-border/70 pt-3">
-      <CalendarIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-      <div className="min-w-0">
-        <p className="text-xs font-medium text-foreground">
-          {suggestion.title}
-        </p>
-        <p className="text-xs text-muted-foreground">{dateStr}</p>
+    <div className="space-y-2 border-t border-border/70 pt-3">
+      <div className="flex items-start gap-2">
+        <CalendarIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-foreground">
+            {suggestion.title}
+          </p>
+          <p className="text-xs text-muted-foreground">{dateStr}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="border-dashed"
+          disabled={approvePending}
+          onClick={() => onApprove(suggestion.id)}
+        >
+          {approvePending ? "Adding..." : "Add to agenda"}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={dismissPending}
+          onClick={() => onDismiss(suggestion.id)}
+        >
+          Dismiss
+        </Button>
       </div>
     </div>
   );

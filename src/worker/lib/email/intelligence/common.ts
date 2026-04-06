@@ -1,5 +1,5 @@
 import { Output, generateText } from "ai";
-import { createWorkersAI } from "workers-ai-provider";
+import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import {
   type CalendarSuggestion,
@@ -7,7 +7,6 @@ import {
   type EmailSuspiciousFlag,
   type FilterActions,
 } from "../../../db/schema";
-import { withSessionAffinity } from "../../ai/session-affinity";
 import { AI_MODELS } from "../../constants";
 import { truncate, withRetry } from "../../utils";
 
@@ -406,7 +405,12 @@ export async function generateStructuredEmailObject<T extends z.ZodTypeAny>(inpu
   schema: T;
   sessionAffinityKey: string;
 }) {
-  const workersAI = createWorkersAI({ binding: input.env.AI });
+  const openai = createOpenAI({
+    apiKey: input.env.OPENAI_API_KEY,
+    headers: {
+      "x-session-affinity": input.sessionAffinityKey,
+    },
+  });
   let lastError: unknown = null;
 
   for (const modelName of EMAIL_INTELLIGENCE_MODELS) {
@@ -414,10 +418,7 @@ export async function generateStructuredEmailObject<T extends z.ZodTypeAny>(inpu
       const result = await withRetry(
         () =>
           generateText({
-            model: workersAI(
-              modelName,
-              withSessionAffinity(input.sessionAffinityKey),
-            ),
+            model: openai.responses(modelName),
             prompt: input.prompt,
             system: input.system,
             maxOutputTokens: 1200,

@@ -16,7 +16,7 @@ import { deleteDraft, type DraftItem } from "../queries/drafts";
 import type { ComposeInitial } from "../types";
 import { htmlToPlainText } from "../utils/html-to-plain-text";
 
-const draftsRoute = getRouteApi("/_dashboard/$mailboxId/inbox/drafts");
+const route = getRouteApi("/_dashboard/$mailboxId/inbox/drafts");
 
 function draftToComposeInitial(draft: DraftItem): ComposeInitial {
   const body = draft.forwardedContent
@@ -36,7 +36,7 @@ function draftToComposeInitial(draft: DraftItem): ComposeInitial {
 }
 
 export default function DraftsPage() {
-  const drafts = draftsRoute.useLoaderData();
+  const { drafts } = route.useLoaderData();
   const router = useRouter();
   const [editingDraft, setEditingDraft] = useState<ComposeInitial | null>(null);
 

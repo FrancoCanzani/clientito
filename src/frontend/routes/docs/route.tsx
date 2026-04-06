@@ -33,7 +33,7 @@ function DocsLayout() {
   return (
     <SidebarProvider defaultOpen>
       <div
-        className="flex min-h-dvh w-full bg-background text-[#171411] font-['Times_New_Roman',Times,serif] [&_button]:font-['Times_New_Roman',Times,serif]"
+        className="flex w-full bg-background text-[#171411] font-['Times_New_Roman',Times,serif] [&_button]:font-['Times_New_Roman',Times,serif]"
         style={docsSidebarVars}
       >
         <Sidebar
