@@ -24,6 +24,7 @@ import {
   WarningIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { unsubscribe } from "../../subscriptions/queries";
@@ -48,6 +49,7 @@ export function EmailActionBar({
   onReply,
 }: ActionBarProps) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { user } = useAuth();
   const mailboxesQuery = useMailboxes();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -57,6 +59,7 @@ export function EmailActionBar({
   const showReplyAll = availableMailboxes.length > 1;
 
   const isStarred = email.labelIds.includes("STARRED");
+  const isInInbox = email.labelIds.includes("INBOX");
   const isSnoozed =
     email.snoozedUntil != null && email.snoozedUntil > Date.now();
   const hasUnsubscribe = !!(email.unsubscribeUrl || email.unsubscribeEmail);
@@ -66,6 +69,7 @@ export function EmailActionBar({
     queryClient.invalidateQueries({
       queryKey: ["email-detail", email.id],
     });
+    void router.invalidate();
   };
 
   const useEmailPatch = (
@@ -87,10 +91,10 @@ export function EmailActionBar({
     });
 
   const archiveMutation = useEmailPatch(
-    { archived: true },
+    { archived: isInInbox },
     {
-      successMessage: "Archived",
-      errorMessage: "Failed to archive",
+      successMessage: isInInbox ? "Archived" : "Moved to inbox",
+      errorMessage: isInInbox ? "Failed to archive" : "Failed to move to inbox",
       closeAfter: true,
     },
   );
@@ -217,7 +221,7 @@ export function EmailActionBar({
   const menuItems: MenuItem[] = [
     {
       icon: ArchiveIcon,
-      label: "Archive",
+      label: isInInbox ? "Archive" : "Move to inbox",
       shortcut: "E",
       action: () => archiveMutation.mutate(),
     },

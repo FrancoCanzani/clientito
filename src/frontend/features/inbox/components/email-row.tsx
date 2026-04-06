@@ -1,4 +1,6 @@
 import { IconButton } from "@/components/ui/icon-button";
+import { fetchEmailDetailAI } from "@/features/inbox/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import {
   ArchiveIcon,
@@ -27,8 +29,12 @@ export function EmailRow({
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
 }) {
+  const queryClient = useQueryClient();
   const email: EmailListItem = group.representative;
   const isStarred = email.labelIds.includes("STARRED");
+  const isInInbox = email.labelIds.includes("INBOX");
+  const archiveAction = isInInbox ? "archive" : "move-to-inbox";
+  const archiveLabel = isInInbox ? "Archive" : "Move to inbox";
   const threadCount = group.threadCount;
   const participantLabel =
     view === "sent"
@@ -36,6 +42,14 @@ export function EmailRow({
         ? `To: ${email.toAddr}`
         : "To: (unknown recipient)"
       : email.fromName || email.fromAddr;
+
+  const prefetchAi = () => {
+    if (email.isRead) return;
+    void queryClient.prefetchQuery({
+      queryKey: ["email-ai-detail", email.id],
+      queryFn: () => fetchEmailDetailAI(email.id),
+    });
+  };
 
   return (
     <div
@@ -45,6 +59,8 @@ export function EmailRow({
         "flex w-full group items-center gap-2 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40 cursor-default",
         isOpen && "bg-muted/50",
       )}
+      onMouseEnter={prefetchAi}
+      onFocus={prefetchAi}
       onClick={() => onOpen(email)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -93,12 +109,12 @@ export function EmailRow({
 
           <div className="absolute inset-y-0 right-0 hidden items-center justify-end md:group-hover:flex">
             <IconButton
-              label="Archive"
+              label={archiveLabel}
               variant="ghost"
               size="icon-sm"
               onClick={(event) => {
                 event.stopPropagation();
-                onAction("archive", [email.id]);
+                onAction(archiveAction, [email.id]);
               }}
             >
               <ArchiveIcon className="size-3.5" />

@@ -27,6 +27,9 @@ export function EmailContextMenu({
 }) {
   const isRead = targetEmail.isRead;
   const isStarred = targetEmail.labelIds.includes("STARRED");
+  const isInInbox = targetEmail.labelIds.includes("INBOX");
+  const archiveAction = isInInbox ? "archive" : "move-to-inbox";
+  const archiveLabel = isInInbox ? "Archive" : "Move to inbox";
 
   return (
     <ContextMenu>
@@ -35,10 +38,10 @@ export function EmailContextMenu({
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem
-          onSelect={() => onAction("archive", [targetEmail.id])}
+          onSelect={() => onAction(archiveAction, [targetEmail.id])}
         >
           <ArchiveIcon className="size-3.5" />
-          Archive
+          {archiveLabel}
         </ContextMenuItem>
 
         <ContextMenuItem

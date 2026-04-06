@@ -1,23 +1,22 @@
 import { desc, eq, inArray, or } from "drizzle-orm";
 import type { Database } from "../../../db/client";
-import { emailIntelligence, emails, type EmailAction, type FilterActions } from "../../../db/schema";
+import { emailIntelligence, emails, type FilterActions } from "../../../db/schema";
 import { applyEmailPatch } from "../../../routes/inbox/emails/internal/mutation";
+import { buildSessionAffinityKey } from "../../ai/session-affinity";
 import { truncate } from "../../utils";
 import { createEmailProvider } from "../index";
 import { getUserFilters } from "../user-filters";
 import {
   buildFilterPrompt,
-  buildSharedActionRules,
   buildSourceHash,
   buildThreadPrompt,
   EMAIL_INTELLIGENCE_SCHEMA_VERSION,
   emailTriageOutputSchema,
-  ensureCreateTaskAction,
   generateStructuredEmailObject,
-  INLINE_PROCESS_LIMIT,
-  MAX_RETRY_ATTEMPTS,
   normalizeEmailTriageOutput,
   normalizeMatchedFilterIds,
+  INLINE_PROCESS_LIMIT,
+  MAX_RETRY_ATTEMPTS,
   type ActiveEmailFilter,
   type EmailContextRow,
 } from "./common";
@@ -29,119 +28,28 @@ import {
 
 const TRIAGE_SYSTEM = [
   "## Role",
-  "You are an email triage assistant. Classify the email for inbox surfacing and home briefing, not deep detail view.",
+  "You are an email classifier. Classify the email for inbox surfacing.",
   "Return one JSON object matching the requested schema.",
   "",
   "## Classification",
   "- category:",
   "  - action_needed: the user must do something — pay, reply, sign, approve, renew, or meet a deadline. Government, tax, legal, and financial deadlines are always action_needed.",
-  "  - important: high-value updates the user should know about but that don't require a response (e.g. shipping confirmations, account security alerts, personal messages that are FYI).",
-  "  - notification: automated alerts, status updates, policy changes, product announcements. Most bulk emails from companies (GitHub, services, platforms) are notifications, NOT important.",
+  "  - important: high-value updates the user should know about but that don't require a response.",
+  "  - notification: automated alerts, status updates, policy changes, product announcements.",
   "  - newsletter: recurring content digests, blog roundups, marketing.",
   "  - transactional: receipts, order confirmations, password resets.",
-  "- urgency: high for items with a deadline within 7 days or needing attention today, medium for items needing attention this week, low for informational.",
-  "- briefingSentence: 1-2 sentences summarizing what the sender wants and why it matters, or null if the email is routine. Be specific — include names, dates, and amounts when relevant.",
-  "- Be consistent: if you see the same sender and same type of email, classify it the same way every time.",
+  "- urgency: high for items with a deadline within 7 days, medium for this week, low for informational.",
   "",
-  buildSharedActionRules(),
-  "",
-  "## Commitment & Deadline Extraction",
-  "- ALWAYS suggest a create_task action when the email contains any of these signals:",
-  "  - A payment is due or overdue (bills, invoices, debts, subscriptions).",
-  "  - A document needs to be signed, submitted, or uploaded.",
-  "  - A verification or identity check is required.",
-  "  - An account action is required before a deadline (e.g. review, renew, cancel).",
-  "  - An event needs to be confirmed or attended.",
-  "  - A reply or response is explicitly expected by a date.",
-  "  - An item expires, locks, or gets deleted by a date.",
-  "- Extract the deadline as taskDueAt whenever a date is mentioned or implied (e.g. 'within 7 days', 'before April 10').",
-  "- Set taskPriority to 'urgent' if the deadline is within 3 days or the email indicates immediate action.",
-  "- The taskTitle should be a clear, actionable imperative (e.g. 'Pay Aquaservice balance of 34.58€', 'Sign DocuSign addendum for mandate n°43615', 'Verify identity on Revolut').",
-  "",
-  "## Calendar Events",
-  "- calendarEvents: only include high-signal date or meeting suggestions with enough detail to present to the user.",
+  "## Safety",
+  "- Set suspicious.isSuspicious=true only when there are concrete scam or impersonation signals.",
+  "- Use suspicious.kind for phishing, impersonation, credential_harvest, or payment_fraud.",
+  "- Use suspicious.reason to explain the strongest signal in one short sentence.",
+  "- If the email appears normal or you are unsure, set isSuspicious=false and other suspicious fields to null.",
   "",
   "## Filter Matching",
   "- matchedFilterIds: include only the provided filter IDs that clearly match this email.",
   "- If no provided filters clearly match, return an empty array.",
 ].join("\n");
-
-async function generateEmailTriage(
-  env: Env,
-  prompt: string,
-  filters: ActiveEmailFilter[],
-) {
-  const result = await generateStructuredEmailObject({
-    env,
-    prompt,
-    system: TRIAGE_SYSTEM,
-    schema: emailTriageOutputSchema,
-  });
-
-  return {
-    output: result.object,
-    matchedFilterIds: normalizeMatchedFilterIds(
-      result.object.matchedFilterIds,
-      filters,
-    ),
-    model: result.model,
-  };
-}
-
-async function updateEmailActionExecution(
-  db: Database,
-  env: Env,
-  email: EmailContextRow,
-  action: EmailAction,
-) {
-  if (!email.mailboxId) {
-    return {
-      ...action,
-      status: "failed" as const,
-      error: "Missing mailbox",
-      updatedAt: Date.now(),
-    };
-  }
-
-  if (action.type === "archive") {
-    const provider = await createEmailProvider(db, env, email.mailboxId);
-    const nextState = applyEmailPatch(email, { archived: true, isRead: true });
-    if (nextState.addLabelIds.length > 0 || nextState.removeLabelIds.length > 0) {
-      await provider.modifyLabels(
-        [email.providerMessageId],
-        nextState.addLabelIds,
-        nextState.removeLabelIds,
-      );
-    }
-
-    await db.update(emails).set(nextState.dbUpdates).where(eq(emails.id, email.id));
-
-    return {
-      ...action,
-      status: "executed" as const,
-      error: null,
-      executedAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-  }
-
-  if (action.type === "snooze" && typeof action.payload.until === "number") {
-    await db
-      .update(emails)
-      .set({ snoozedUntil: action.payload.until })
-      .where(eq(emails.id, email.id));
-
-    return {
-      ...action,
-      status: "executed" as const,
-      error: null,
-      executedAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-  }
-
-  return action;
-}
 
 async function applyFilterActions(
   db: Database,
@@ -234,10 +142,7 @@ export async function enqueueEmailIntelligence(
   const threadIds = [...new Set(rows.map((row) => row.threadId).filter((id): id is string => Boolean(id)))];
   const latestThreadRows = threadIds.length
     ? await db
-        .select({
-          id: emails.id,
-          threadId: emails.threadId,
-        })
+        .select({ id: emails.id, threadId: emails.threadId })
         .from(emails)
         .where(inArray(emails.threadId, threadIds))
         .orderBy(desc(emails.date))
@@ -308,6 +213,7 @@ export async function processEmailIntelligence(
     .limit(1);
 
   const existing = existingRows[0] ?? null;
+
   if (
     existing?.status === "ready" &&
     existing.sourceHash === nextSourceHash &&
@@ -345,57 +251,54 @@ export async function processEmailIntelligence(
     const prompt = [buildThreadPrompt(email, threadMessages), buildFilterPrompt(activeFilters)]
       .filter(Boolean)
       .join("\n");
-    const { output, matchedFilterIds, model } = await generateEmailTriage(
-      env,
-      prompt,
-      activeFilters,
-    );
-    const triage = normalizeEmailTriageOutput(emailId, output, now);
+
+    const { output, matchedFilterIds, model } = await (async () => {
+      const result = await generateStructuredEmailObject({
+        env,
+        prompt,
+        system: TRIAGE_SYSTEM,
+        schema: emailTriageOutputSchema,
+        sessionAffinityKey: buildSessionAffinityKey(
+          "email-intelligence-triage",
+          email.userId,
+          emailId,
+        ),
+      });
+      return {
+        output: result.object,
+        matchedFilterIds: normalizeMatchedFilterIds(result.object.matchedFilterIds, activeFilters),
+        model: result.model,
+      };
+    })();
+
+    const triage = normalizeEmailTriageOutput(output);
+
     const { email: nextEmail, categoryOverride } = await applyFilterActions(
       db,
       env,
       email,
       activeFilters.filter((filter) => matchedFilterIds.includes(filter.id)),
     );
-    if (categoryOverride) triage.category = categoryOverride;
-    const normalized = ensureCreateTaskAction(emailId, triage, now);
 
-    const actions: EmailAction[] = [];
-    for (const action of normalized.actions) {
-      if (action.trustLevel === "auto") {
-        try {
-          actions.push(await updateEmailActionExecution(db, env, nextEmail, action));
-        } catch (error) {
-          actions.push({
-            ...action,
-            status: "failed",
-            error: error instanceof Error ? error.message : "Action failed",
-            updatedAt: Date.now(),
-          });
-        }
-      } else {
-        actions.push(action);
-      }
-    }
+    const category = categoryOverride ?? triage.category;
+    const contentChanged = existing?.sourceHash !== nextSourceHash;
 
     await db
       .update(emailIntelligence)
       .set({
         mailboxId: nextEmail.mailboxId,
-        category: normalized.category,
-        urgency: output.urgency,
-        summary: null,
-        briefingSentence: normalized.briefingSentence,
-        suspiciousJson: normalized.suspicious,
-        actionsJson: actions,
-        calendarEventsJson: normalized.calendarEvents,
+        category,
+        urgency: triage.urgency,
+        suspiciousJson: triage.suspicious,
+        // Clear stale on-demand data only when email content changed
+        ...(contentChanged ? { summary: null, actionsJson: [], calendarEventsJson: [] } : {}),
         status: "ready",
         sourceHash: nextSourceHash,
         model,
         schemaVersion: EMAIL_INTELLIGENCE_SCHEMA_VERSION,
         error: null,
-        lastProcessedAt: Date.now(),
-        updatedAt: Date.now(),
+        lastProcessedAt: now,
+        updatedAt: now,
       })
       .where(eq(emailIntelligence.emailId, emailId));
 
@@ -411,10 +314,9 @@ export async function processEmailIntelligence(
       .update(emailIntelligence)
       .set({
         status: "error",
-        error:
-          error instanceof Error ? truncate(error.message, 500) : "Unknown error",
-        lastProcessedAt: Date.now(),
-        updatedAt: Date.now(),
+        error: error instanceof Error ? truncate(error.message, 500) : "Unknown error",
+        lastProcessedAt: now,
+        updatedAt: now,
       })
       .where(eq(emailIntelligence.emailId, emailId));
 
@@ -439,7 +341,7 @@ export async function processPendingEmailIntelligence(
         eq(emailIntelligence.status, "error"),
       ),
     )
-    .orderBy(emailIntelligence.updatedAt)
+    .orderBy(emailIntelligence.createdAt)
     .limit(limit);
 
   let processed = 0;
@@ -449,10 +351,7 @@ export async function processPendingEmailIntelligence(
       await processEmailIntelligence(db, env, row.emailId);
       processed += 1;
     } catch (error) {
-      console.error("Pending email triage failed", {
-        emailId: row.emailId,
-        error,
-      });
+      console.error("Pending email triage failed", { emailId: row.emailId, error });
     }
   }
 

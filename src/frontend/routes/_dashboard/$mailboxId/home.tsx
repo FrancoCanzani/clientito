@@ -1,6 +1,6 @@
 import { fetchAgendaEvents } from "@/features/calendar/queries";
 import HomePage from "@/features/home/pages/home-page";
-import { fetchBriefing } from "@/features/home/queries";
+import { fetchTasks } from "@/features/tasks/queries";
 import { createFileRoute } from "@tanstack/react-router";
 
 function getTodayRange() {
@@ -14,11 +14,13 @@ function getTodayRange() {
 export const Route = createFileRoute("/_dashboard/$mailboxId/home")({
   loader: async ({ params }) => {
     const { from, to } = getTodayRange();
-    const [briefing, events] = await Promise.all([
-      fetchBriefing(params.mailboxId),
+    const now = Date.now();
+    const [events, dueTodayTasks, overdueTasks] = await Promise.all([
       fetchAgendaEvents(from, to, params.mailboxId),
+      fetchTasks({ dueToday: true, limit: 10 }),
+      fetchTasks({ dueBefore: now, limit: 5 }),
     ]);
-    return { briefing, events };
+    return { events, dueTodayTasks: dueTodayTasks.data, overdueTasks: overdueTasks.data };
   },
   component: HomePage,
 });

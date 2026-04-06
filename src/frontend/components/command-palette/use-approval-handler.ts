@@ -1,4 +1,4 @@
-import { openCompose } from "@/features/inbox/components/open-compose";
+import { openCompose } from "@/features/inbox/components/compose-events";
 import { shouldIgnoreHotkeyTarget } from "@/lib/hotkeys/use-shortcuts";
 import type { QueryClient } from "@tanstack/react-query";
 import type { UIMessage } from "ai";

@@ -1,4 +1,4 @@
-import SpamPage from "@/features/inbox/pages/spam-page";
+import { EmailListPage } from "@/features/inbox/pages/email-list-page";
 import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/inbox/queries";
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -10,5 +10,11 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/spam")({
       limit: EMAIL_LIST_PAGE_SIZE,
       offset: 0,
     }),
-  component: SpamPage,
+  component: function SpamPage() {
+    const { mailboxId } = Route.useParams();
+    const initialPage = Route.useLoaderData();
+    return (
+      <EmailListPage view="spam" mailboxId={mailboxId} initialPage={initialPage} />
+    );
+  },
 });

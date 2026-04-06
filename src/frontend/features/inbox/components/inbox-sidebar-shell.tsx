@@ -96,20 +96,24 @@ function SidebarNav() {
               search.context === "sent")
           ? "sent"
           : currentRouteId === "/_dashboard/$mailboxId/inbox/archived" ||
-              (currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
+              (currentRouteId ===
+                "/_dashboard/$mailboxId/inbox/email/$emailId" &&
                 search.context === "archived")
             ? "archived"
             : currentRouteId === "/_dashboard/$mailboxId/inbox/spam" ||
-                (currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
+                (currentRouteId ===
+                  "/_dashboard/$mailboxId/inbox/email/$emailId" &&
                   search.context === "spam")
               ? "spam"
               : currentRouteId === "/_dashboard/$mailboxId/inbox/trash" ||
-                  (currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId" &&
+                  (currentRouteId ===
+                    "/_dashboard/$mailboxId/inbox/email/$emailId" &&
                     search.context === "trash")
                 ? "trash"
                 : currentRouteId === "/_dashboard/$mailboxId/inbox/search"
                   ? "search"
-                  : currentRouteId === "/_dashboard/$mailboxId/inbox/subscriptions"
+                  : currentRouteId ===
+                      "/_dashboard/$mailboxId/inbox/subscriptions"
                     ? "subscriptions"
                     : currentRouteId === "/_dashboard/$mailboxId/inbox/filters"
                       ? "filters"
@@ -225,11 +229,7 @@ function SidebarNav() {
   );
 }
 
-export function InboxSidebarShell({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export function InboxSidebarShell({ children }: { children: ReactNode }) {
   const isMobile = useIsMobile();
   const { mailboxId } = mailboxRoute.useParams();
 
@@ -255,7 +255,7 @@ export function InboxSidebarShell({
           </div>
         </aside>
 
-        <main className="flex-1 min-w-0">{children}</main>
+        <main className="flex-1 h-full">{children}</main>
       </div>
     </SidebarProvider>
   );

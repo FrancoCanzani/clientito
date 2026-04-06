@@ -68,10 +68,10 @@ export type EmailIntelligenceUrgency = "high" | "medium" | "low";
 
 export type EmailAction = {
   id: string;
-  type: "reply" | "archive" | "label" | "snooze" | "create_task";
+  type: "reply" | "create_task";
   label: string;
   payload: Record<string, unknown>;
-  trustLevel: "auto" | "approve";
+  trustLevel: "approve";
   status: "pending" | "executed" | "dismissed" | "failed";
   error: string | null;
   executedAt: number | null;
@@ -104,21 +104,19 @@ export type EmailSuspiciousFlag = {
 export type EmailIntelligence = {
   category: EmailIntelligenceCategory;
   urgency: EmailIntelligenceUrgency;
-  briefingSentence: string | null;
   suspicious: EmailSuspiciousFlag;
-  actions: EmailAction[];
-  calendarEvents: CalendarSuggestion[];
-  autoExecute: string[];
-  requiresApproval: string[];
 };
 
 export type EmailDetailIntelligence = {
   summary: string | null;
   suspicious: EmailSuspiciousFlag;
-  actions: EmailAction[];
-  calendarEvents: CalendarSuggestion[];
-  autoExecute: string[];
-  requiresApproval: string[];
+  replyDraft: string | null;
+  taskSuggestion: {
+    title: string;
+    dueAt: number | null;
+    priority: "urgent" | "high" | "medium" | "low" | null;
+  } | null;
+  calendarSuggestion: CalendarSuggestion | null;
 };
 
 export type EmailListItem = {

@@ -1,23 +1,20 @@
 import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { TrashIcon } from "@phosphor-icons/react";
-import { formatDistanceToNow } from "date-fns";
 import { getRouteApi, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
+import { useState } from "react";
 import { ComposePanel } from "../components/compose-panel";
+import { deleteDraft, type DraftItem } from "../queries/drafts";
 import type { ComposeInitial } from "../types";
 import { htmlToPlainText } from "../utils/html-to-plain-text";
-import {
-  deleteDraft,
-  type DraftItem,
-} from "../queries/drafts";
 
 const draftsRoute = getRouteApi("/_dashboard/$mailboxId/inbox/drafts");
 
@@ -39,28 +36,22 @@ function draftToComposeInitial(draft: DraftItem): ComposeInitial {
 }
 
 export default function DraftsPage() {
-  const loadedDrafts = draftsRoute.useLoaderData();
+  const drafts = draftsRoute.useLoaderData();
   const router = useRouter();
-  const [drafts, setDrafts] = useState(loadedDrafts);
   const [editingDraft, setEditingDraft] = useState<ComposeInitial | null>(null);
-
-  useEffect(() => {
-    setDrafts(loadedDrafts);
-  }, [loadedDrafts]);
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     await deleteDraft(id);
-    setDrafts((current) => current.filter((draft) => draft.id !== id));
     void router.invalidate();
   };
 
   return (
-    <div className="flex min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col">
+    <>
       <PageHeader
         title={
           <div className="flex items-center gap-2">
-            <SidebarTrigger className="h-10 w-10 md:hidden [&>svg]:size-5" />
+            <SidebarTrigger className="md:hidden" />
             <span>Drafts</span>
           </div>
         }
@@ -126,6 +117,6 @@ export default function DraftsPage() {
           }
         }}
       />
-    </div>
+    </>
   );
 }

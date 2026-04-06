@@ -9,7 +9,7 @@ import {
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
-import { getRouteApi } from "@tanstack/react-router";
+import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
@@ -17,6 +17,7 @@ const mailboxRoute = getRouteApi("/_dashboard/$mailboxId/inbox");
 
 export type EmailInboxAction =
   | "archive"
+  | "move-to-inbox"
   | "trash"
   | "spam"
   | "mark-read"
@@ -35,6 +36,7 @@ const actionPayloads: Record<
   }
 > = {
   archive: { archived: true },
+  "move-to-inbox": { archived: false },
   trash: { trashed: true },
   spam: { spam: true },
   "mark-read": { isRead: true },
@@ -45,6 +47,7 @@ const actionPayloads: Record<
 
 const actionLabels: Record<EmailInboxAction, { one: string; many: (n: number) => string }> = {
   archive: { one: "Conversation archived", many: (n) => `${n} conversations archived` },
+  "move-to-inbox": { one: "Conversation moved to inbox", many: (n) => `${n} conversations moved to inbox` },
   trash: { one: "Conversation moved to trash", many: (n) => `${n} conversations moved to trash` },
   spam: { one: "Conversation reported as spam", many: (n) => `${n} conversations reported as spam` },
   "mark-read": { one: "Conversation marked as read", many: (n) => `${n} conversations marked as read` },
@@ -55,6 +58,7 @@ const actionLabels: Record<EmailInboxAction, { one: string; many: (n: number) =>
 
 const REMOVES_FROM_LIST: Set<EmailInboxAction> = new Set([
   "archive",
+  "move-to-inbox",
   "trash",
   "spam",
 ]);
@@ -80,6 +84,7 @@ export function useEmailInboxActions({
 }) {
   const navigate = mailboxRoute.useNavigate();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const pendingRef = useRef<PendingAction | null>(null);
 
   const emailsQueryKey = useMemo(
@@ -118,6 +123,7 @@ export function useEmailInboxActions({
         for (const id of ids) {
           queryClient.invalidateQueries({ queryKey: ["email-detail", id] });
         }
+        void router.invalidate();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Action failed");
       } finally {
@@ -127,7 +133,7 @@ export function useEmailInboxActions({
         }
       }
     },
-    [queryClient],
+    [queryClient, router],
   );
 
   const executeEmailAction = useCallback(

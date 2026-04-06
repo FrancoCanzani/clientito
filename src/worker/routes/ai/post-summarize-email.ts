@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { emails } from "../../db/schema";
-import { generateEmailDetailIntelligence } from "../../lib/email/intelligence/detail";
+import { generateEmailOnDemand } from "../../lib/email/intelligence/detail";
 import type { AppRouteEnv } from "../types";
 
 const summarizeEmailBodySchema = z.object({
@@ -27,7 +27,7 @@ export function registerPostSummarizeEmail(app: Hono<AppRouteEnv>) {
 
       if (!emailRow[0]) return c.json({ error: "Email not found" }, 404);
 
-      const intelligence = await generateEmailDetailIntelligence(db, c.env, emailId);
+      const intelligence = await generateEmailOnDemand(db, c.env, emailId);
 
       if (!intelligence) {
         return c.json({ error: "AI summary unavailable" }, 503 as never);

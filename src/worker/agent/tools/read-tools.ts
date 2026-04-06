@@ -2,18 +2,17 @@ import { tool } from "ai";
 import { and, asc, desc, eq, gt, isNotNull, isNull, like, lte, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
-import { emailIntelligence, emails, tasks } from "../../db/schema";
+import { emailIntelligence, emails, tasks, type EmailAction } from "../../db/schema";
 import { listEvents } from "../../lib/calendar/google";
 import {
   getStoredEmailTriage,
 } from "../../lib/email/intelligence/store";
-import { getStoredReplyDraft } from "../../lib/email/intelligence/common";
 import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
 import { getUserMailboxes } from "../../lib/email/mailbox-state";
 import { syncAllMailboxes } from "../../lib/email/sync";
 import { STANDARD_LABELS } from "../../lib/email/types";
 import { getDayBoundsUtc } from "../../lib/utils";
-import { buildBriefing } from "../../routes/ai/get-briefing";
+import { buildBriefingContext } from "../../routes/ai/get-briefing";
 import { hasEmailLabel } from "../../routes/inbox/emails/utils";
 
 type InboxView =
@@ -136,6 +135,16 @@ function formatEmailDate(dateMs: number | null) {
   };
 }
 
+function getPendingReplyDraft(actions: EmailAction[] | null | undefined) {
+  const replyAction = (actions ?? []).find(
+    (action) => action.type === "reply" && action.status === "pending",
+  );
+
+  return typeof replyAction?.payload?.draft === "string"
+    ? replyAction.payload.draft
+    : null;
+}
+
 export function makeReadTools(
   db: Database,
   userId: string,
@@ -231,10 +240,8 @@ export function makeReadTools(
             intelligenceStatus: emailIntelligence.status,
             intelligenceCategory: emailIntelligence.category,
             intelligenceUrgency: emailIntelligence.urgency,
-            intelligenceBriefingSentence: emailIntelligence.briefingSentence,
             intelligenceSuspiciousJson: emailIntelligence.suspiciousJson,
             intelligenceActionsJson: emailIntelligence.actionsJson,
-            intelligenceCalendarEventsJson: emailIntelligence.calendarEventsJson,
           })
           .from(emails)
           .leftJoin(emailIntelligence, eq(emailIntelligence.emailId, emails.id))
@@ -250,15 +257,12 @@ export function makeReadTools(
                 status: email.intelligenceStatus,
                 category: email.intelligenceCategory,
                 urgency: email.intelligenceUrgency,
-                briefingSentence: email.intelligenceBriefingSentence,
                 suspiciousJson: email.intelligenceSuspiciousJson ?? {
                   isSuspicious: false,
                   kind: null,
                   reason: null,
                   confidence: null,
                 },
-                actionsJson: email.intelligenceActionsJson ?? [],
-                calendarEventsJson: email.intelligenceCalendarEventsJson ?? [],
               }
             : null,
         );
@@ -279,7 +283,7 @@ export function makeReadTools(
           messageId: email.messageId,
           intelligenceStatus: email.intelligenceStatus ?? null,
           intelligence,
-          draftReply: getStoredReplyDraft(intelligence),
+          draftReply: getPendingReplyDraft(email.intelligenceActionsJson),
           ...formatEmailDate(email.date),
         };
       },
@@ -291,19 +295,10 @@ export function makeReadTools(
       execute: async () => {
         const mailboxId = (await getUserMailboxes(db, userId))[0]?.id;
         if (!mailboxId) {
-          return {
-            text: "",
-            generatedAt: Date.now(),
-            counts: {
-              actionNeeded: 0,
-              dueToday: 0,
-              overdue: 0,
-            },
-            items: [],
-          };
+          return { tasks: [], events: [] };
         }
 
-        return buildBriefing({
+        return buildBriefingContext({
           db,
           env,
           userId,

@@ -16,12 +16,7 @@ export type EmailIntelligenceCategory =
 
 export type EmailIntelligenceUrgency = "high" | "medium" | "low";
 
-export type EmailActionType =
-  | "reply"
-  | "archive"
-  | "label"
-  | "snooze"
-  | "create_task";
+export type EmailActionType = "reply" | "create_task";
 
 export type EmailActionTrustLevel = "auto" | "approve";
 
@@ -84,7 +79,6 @@ export type PersistedEmailIntelligence = {
   category: EmailIntelligenceCategory;
   urgency: EmailIntelligenceUrgency;
   summary: string;
-  briefingSentence: string | null;
   suspicious: EmailSuspiciousFlag;
   actions: EmailAction[];
   calendarEvents: CalendarSuggestion[];
@@ -212,7 +206,6 @@ export const emailIntelligence = sqliteTable(
     category: text("category").$type<EmailIntelligenceCategory>(),
     urgency: text("urgency").$type<EmailIntelligenceUrgency>(),
     summary: text("summary"),
-    briefingSentence: text("briefing_sentence"),
     suspiciousJson: text("suspicious_json", { mode: "json" })
       .$type<EmailSuspiciousFlag>()
       .notNull()
@@ -455,34 +448,5 @@ export const drafts = sqliteTable(
   (table) => [
     uniqueIndex("drafts_user_compose_key_idx").on(table.userId, table.composeKey),
     index("drafts_user_updated_idx").on(table.userId, table.updatedAt),
-  ],
-);
-
-export const briefingDecisions = sqliteTable(
-  "briefing_decisions",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    itemType: text("item_type").$type<"email_action" | "task" | "calendar_suggestion">().notNull(),
-    referenceId: integer("reference_id").notNull(),
-    decision: text("decision")
-      .$type<"pending" | "dismissed" | "replied" | "archived" | "approved">()
-      .notNull()
-      .default("pending"),
-    createdAt: integer("created_at").notNull(),
-    updatedAt: integer("updated_at").notNull(),
-  },
-  (table) => [
-    uniqueIndex("briefing_decisions_user_type_ref_idx").on(
-      table.userId,
-      table.itemType,
-      table.referenceId,
-    ),
-    index("briefing_decisions_user_decision_idx").on(
-      table.userId,
-      table.decision,
-    ),
   ],
 );

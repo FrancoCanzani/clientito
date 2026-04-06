@@ -1,6 +1,6 @@
 import { useAgentChat } from "@cloudflare/ai-chat/react";
 import { useAgent } from "agents/react";
-import { getComposerBody, isComposerOpen } from "@/features/inbox/components/compose-bridge";
+import { getComposerBody, isComposerOpen } from "@/features/inbox/components/compose-editor-ref";
 import { useAuth } from "./use-auth";
 import { usePageContext } from "./use-page-context";
 

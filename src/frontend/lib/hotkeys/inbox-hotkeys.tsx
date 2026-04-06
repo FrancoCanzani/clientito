@@ -1,3 +1,4 @@
+import { openCompose } from "@/features/inbox/components/compose-events";
 import { issueEmailCommand } from "@/features/inbox/hooks/use-email-command-state";
 import { getShortcutsByScope } from "@/lib/hotkeys/shortcuts";
 import { useShortcuts } from "@/lib/hotkeys/use-shortcuts";
@@ -18,14 +19,19 @@ export function useInboxHotkeys() {
 
   const handlers = useMemo(
     () => ({
-      compose: () =>
-        activeMailboxId
-          ? navigate({
-              to: "/$mailboxId/inbox",
-              params: { mailboxId: activeMailboxId },
-              search: { compose: true },
-            })
-          : undefined,
+      compose: () => {
+        if (!activeMailboxId) return;
+        const onInbox = router.state.matches.some(
+          (match) => match.routeId === "/_dashboard/$mailboxId/inbox/",
+        );
+        if (!onInbox) {
+          void navigate({
+            to: "/$mailboxId/inbox",
+            params: { mailboxId: activeMailboxId },
+          });
+        }
+        openCompose({ mailboxId: activeMailboxId });
+      },
       archive: () => issueEmailCommand({ type: "archive" }),
       trash: () => issueEmailCommand({ type: "trash" }),
       navigateNext: () => issueEmailCommand({ type: "navigate-next" }),

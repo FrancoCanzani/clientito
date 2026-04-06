@@ -218,7 +218,6 @@ function buildAccountCommands(
                   currentContext === "important"
                     ? "important"
                     : undefined,
-                compose: undefined,
               },
             });
           }

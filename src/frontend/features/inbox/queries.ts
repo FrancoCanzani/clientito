@@ -107,28 +107,11 @@ export async function fetchEmailDetail(
 
 export async function fetchEmailDetailAI(
   emailId: string,
-): Promise<EmailDetailIntelligence> {
+): Promise<EmailDetailIntelligence | null> {
   const response = await fetch(`/api/inbox/emails/${emailId}/ai`);
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    const message =
-      payload && typeof payload.error === "string"
-        ? payload.error
-        : "Failed to fetch email AI detail";
-    throw new Error(message);
-  }
-
-  const json = await response.json();
-  return json.data;
-}
-
-export async function fetchEmailSummary(
-  emailId: string,
-): Promise<string | null> {
-  const response = await fetch(`/api/inbox/emails/${emailId}/ai/summary`);
   if (!response.ok) return null;
   const json = await response.json();
-  return json.data?.summary ?? null;
+  return json.data ?? null;
 }
 
 export async function fetchEmailThread(
@@ -190,10 +173,3 @@ export async function fetchSearchSuggestions(
 
 export const EMAIL_LIST_PAGE_SIZE = 60;
 export const INBOX_SEARCH_PAGE_SIZE = 30;
-
-export function getEmailListQueryKey(
-  view: EmailView,
-  mailboxId: number,
-) {
-  return ["emails", view, mailboxId] as const;
-}

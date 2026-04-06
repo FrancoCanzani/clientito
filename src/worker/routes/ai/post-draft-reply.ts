@@ -3,8 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { emails } from "../../db/schema";
-import { getStoredReplyDraft } from "../../lib/email/intelligence/common";
-import { generateEmailDetailIntelligence } from "../../lib/email/intelligence/detail";
+import { generateEmailOnDemand } from "../../lib/email/intelligence/detail";
 import type { AppRouteEnv } from "../types";
 
 const draftReplyBodySchema = z.object({
@@ -28,13 +27,13 @@ export async function generateDraftForEmail(input: {
 
   if (!emailRow[0]) return null;
 
-  const intelligence = await generateEmailDetailIntelligence(
+  const intelligence = await generateEmailOnDemand(
     db,
     input.env,
     emailId,
   );
 
-  return getStoredReplyDraft(intelligence);
+  return intelligence?.replyDraft ?? null;
 }
 
 export function registerPostDraftReply(app: Hono<AppRouteEnv>) {

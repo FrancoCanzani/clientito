@@ -1,7 +1,12 @@
 import { Error } from "@/components/error";
-import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { Loading } from "@/components/loading";
+import type { QueryClient } from "@tanstack/react-query";
+import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 
-export const Route = createRootRoute({
-  component: () => <Outlet />,
-  errorComponent: Error,
-});
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
+  {
+    component: () => <Outlet />,
+    errorComponent: Error,
+    pendingComponent: Loading,
+  },
+);

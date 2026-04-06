@@ -1,42 +1,39 @@
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useEmailAiActions } from "@/features/inbox/hooks/use-email-ai-actions";
-import { patchEmail } from "@/features/inbox/mutations";
-import {
-  fetchEmailSummary,
-  fetchEmailThread,
-  fetchEmailDetailAI,
-} from "@/features/inbox/queries";
-import { fetchTasks } from "@/features/tasks/queries";
+import type {
+  EmailDetailIntelligence,
+  EmailDetailItem,
+  EmailListItem,
+  EmailThreadItem,
+} from "@/features/inbox/types";
 import {
   ArrowLeftIcon,
   CaretDownIcon,
   CaretUpIcon,
   PaperclipIcon,
 } from "@phosphor-icons/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi } from "@tanstack/react-router";
 import {
-  useEffect,
+  forwardRef,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
-  type RefObject,
 } from "react";
-import { toast } from "sonner";
+import type { ComposeInitial } from "../types";
 import { formatEmailDetailDate } from "../utils/formatters";
 import { AttachmentItem } from "./attachment-item";
 import { EmailActionBar } from "./email-action-bar";
-import { EmailOverviewPanel } from "./email-overview-panel";
+import { EmailAiPanel, EmailAiPanelLoading } from "./email-ai-panel";
+import { MessageBody } from "./message-body";
 import { QuickReply, type QuickReplyHandle } from "./quick-reply";
-import { MessageBody, ThreadMessageCard } from "./thread-message-card";
+import { ThreadMessageCard } from "./thread-message-card";
 
-const detailRoute = getRouteApi("/_dashboard/$mailboxId/inbox/email/$emailId");
+export type EmailDetailContentHandle = {
+  triggerReply: (draft?: string) => void;
+};
 
-function buildRecipientRows(
-  email: ReturnType<typeof detailRoute.useLoaderData>["email"],
-) {
+function buildRecipientRows(email: EmailListItem) {
   return [
     {
       label: "From",
@@ -44,159 +41,100 @@ function buildRecipientRows(
         ? `${email.fromName} <${email.fromAddr}>`
         : email.fromAddr,
     },
-    { label: "To", value: email.toAddr ?? "me" },
-    ...(email.ccAddr ? [{ label: "Cc", value: email.ccAddr }] : []),
+    { label: "To", value: (email as EmailDetailItem).toAddr ?? "me" },
+    ...((email as EmailDetailItem).ccAddr
+      ? [{ label: "Cc", value: (email as EmailDetailItem).ccAddr! }]
+      : []),
   ];
 }
 
-export function EmailDetailContent({
-  onClose,
-  onBack,
-  onPrev,
-  onNext,
-  hasPrev = false,
-  hasNext = false,
-  onForward,
-  replyTriggerRef,
-}: {
-  onClose?: () => void;
-  onBack?: () => void;
-  onPrev?: () => void;
-  onNext?: () => void;
-  hasPrev?: boolean;
-  hasNext?: boolean;
-  onForward: (initial: import("../types").ComposeInitial) => void;
-  replyTriggerRef?: RefObject<{ trigger: () => void } | null>;
-}) {
-  const { email } = detailRoute.useLoaderData();
-  const queryClient = useQueryClient();
-  const formattedDate = formatEmailDetailDate(email.date);
+export const EmailDetailContent = forwardRef<
+  EmailDetailContentHandle,
+  {
+    email: EmailDetailItem;
+    threadMessages: EmailThreadItem[];
+    threadError: boolean;
+    intelligence: EmailDetailIntelligence | null;
+    aiLoading: boolean;
+    aiError: boolean;
+    onReply: (draft?: string) => void;
+    onCreateTask: (suggestion: {
+      title: string;
+      dueAt: number | null;
+      priority: "urgent" | "high" | "medium" | "low" | null;
+    }) => void;
+    createTaskPending: boolean;
+    onClose?: () => void;
+    onBack?: () => void;
+    onPrev?: () => void;
+    onNext?: () => void;
+    hasPrev?: boolean;
+    hasNext?: boolean;
+    onForward: (initial: ComposeInitial) => void;
+  }
+>(function EmailDetailContent(
+  {
+    email,
+    threadMessages,
+    threadError,
+    intelligence,
+    aiLoading,
+    aiError,
+    onReply,
+    onCreateTask,
+    createTaskPending,
+    onClose,
+    onBack,
+    onPrev,
+    onNext,
+    hasPrev = false,
+    hasNext = false,
+    onForward,
+  },
+  ref,
+) {
   const quickReplyRef = useRef<QuickReplyHandle>(null);
   const [threadExpansionOverrides, setThreadExpansionOverrides] = useState<
     Map<string, boolean>
   >(() => new Map());
 
-  const threadQuery = useQuery({
-    queryKey: ["email-thread", email.threadId],
-    queryFn: () => fetchEmailThread(email.threadId!),
-    enabled: Boolean(email.threadId),
-    staleTime: 60_000,
-  });
-
-  const detailAIQuery = useQuery({
-    queryKey: ["email-ai-detail", email.id],
-    queryFn: () => fetchEmailDetailAI(email.id),
-    staleTime: 5 * 60_000,
-    gcTime: 10 * 60_000,
-    retry: 2,
-  });
-  const intelligence = detailAIQuery.data ?? null;
-
-  const linkedTasksQuery = useQuery({
-    queryKey: ["tasks", "source-email", Number(email.id)],
-    queryFn: () => fetchTasks({ sourceEmailId: Number(email.id) }),
-    enabled: intelligence != null,
-    staleTime: 60_000,
-  });
-  const linkedTasks = linkedTasksQuery.data?.data ?? [];
-
-  const { aiActionMutation, handleAiAction } = useEmailAiActions({
-    email,
-    onClose,
-    onReplyRequested: (draft) =>
+  useImperativeHandle(ref, () => ({
+    triggerReply: (draft?: string) =>
       quickReplyRef.current?.scrollIntoViewAndFocus(draft),
-  });
+  }));
 
-  const summaryQuery = useQuery({
-    queryKey: ["email-ai-summary", email.id],
-    queryFn: () => fetchEmailSummary(email.id),
-    enabled: intelligence != null && !intelligence.summary,
-    staleTime: 5 * 60_000,
-    gcTime: 10 * 60_000,
-  });
-  const summary = intelligence?.summary || summaryQuery.data || null;
+  const formattedDate = formatEmailDetailDate(email.date);
+  const subject = email.subject ?? "(no subject)";
+  const recipientRows = buildRecipientRows(email);
 
-  const markSpamMutation = useMutation({
-    mutationFn: async () => {
-      await patchEmail(email.id, { spam: true });
-    },
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["emails"] }),
-        queryClient.invalidateQueries({ queryKey: ["email-detail", email.id] }),
-        queryClient.invalidateQueries({
-          queryKey: ["email-ai-detail", email.id],
-        }),
-        email.threadId
-          ? queryClient.invalidateQueries({
-              queryKey: ["email-thread", email.threadId],
-            })
-          : Promise.resolve(),
-      ]);
-      toast.success("Moved to spam");
-      onClose?.();
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to move email to spam",
-      );
-    },
-  });
-
-  const threadMessages = useMemo(() => {
-    if (!email.threadId) return [email];
-    return threadQuery.data?.length ? threadQuery.data : [email];
-  }, [email, threadQuery.data]);
-
-  const defaultExpandedThreadIds = useMemo(() => {
+  const defaultExpandedIds = useMemo(() => {
     const next = new Set<string>();
-    const selectedThreadMessage = threadMessages.find(
-      (threadMessage) => threadMessage.id === email.id,
-    );
-    if (selectedThreadMessage) {
-      next.add(selectedThreadMessage.id);
-    } else {
-      next.add(email.id);
-    }
+    const selected = threadMessages.find((m) => m.id === email.id);
+    next.add(selected ? selected.id : email.id);
     return next;
   }, [email.id, threadMessages]);
 
-  const isThreadMessageExpanded = (messageId: string) =>
+  const isExpanded = (messageId: string) =>
     threadExpansionOverrides.get(messageId) ??
-    defaultExpandedThreadIds.has(messageId);
+    defaultExpandedIds.has(messageId);
 
-  const toggleThreadMessage = (messageId: string) => {
+  const toggleMessage = (messageId: string) => {
     setThreadExpansionOverrides((current) => {
       const next = new Map(current);
-      next.set(messageId, !isThreadMessageExpanded(messageId));
+      next.set(messageId, !isExpanded(messageId));
       return next;
     });
   };
 
-  const showThreadTimeline = Boolean(
-    email.threadId && threadMessages.length > 1,
-  );
-  const hasSelectedAttachments = email.attachments.length > 0;
-  const subject = email.subject ?? "(no subject)";
-  const recipientRows = buildRecipientRows(email);
-
-  useEffect(() => {
-    if (replyTriggerRef) {
-      replyTriggerRef.current = {
-        trigger: () => quickReplyRef.current?.scrollIntoViewAndFocus(),
-      };
-    }
-    return () => {
-      if (replyTriggerRef) replyTriggerRef.current = null;
-    };
-  }, [replyTriggerRef]);
+  const showThread = Boolean(email.threadId && threadMessages.length > 1);
+  const hasAttachments = email.attachments.length > 0;
 
   return (
     <div className="flex w-full min-w-0 flex-col space-y-8">
-      <div className="sticky top-0 z-10 w-full bg-background pt-5">
+      <div className="sticky top-0 z-10 w-full bg-background pt-5 pb-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-0.5">
-            <SidebarTrigger className="h-10 w-10 md:hidden [&_svg]:size-5" />
+            <SidebarTrigger className="md:hidden" />
             <Button type="button" variant="ghost" onClick={() => onBack?.()}>
               <ArrowLeftIcon className="size-3.5" />
               Back
@@ -255,36 +193,33 @@ export function EmailDetailContent({
 
       <div className="w-full">
         <div className="space-y-8">
+          {aiLoading && !intelligence && <EmailAiPanelLoading />}
+
           {intelligence && (
-            <EmailOverviewPanel
+            <EmailAiPanel
               intelligence={intelligence}
-              summary={summary}
-              summaryLoading={summaryQuery.isFetching}
-              onAiAction={handleAiAction}
-              aiActionPending={aiActionMutation.isPending}
-              linkedTasks={linkedTasks}
-              onMarkSpam={() => markSpamMutation.mutate()}
-              spamPending={markSpamMutation.isPending}
+              onReply={onReply}
+              onCreateTask={onCreateTask}
+              createTaskPending={createTaskPending}
             />
           )}
 
-          {detailAIQuery.isError && (
+          {aiError && !intelligence && (
             <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              We could not load the AI overview.
+              Could not load AI overview.
             </p>
           )}
 
-          {threadQuery.isError && showThreadTimeline && (
+          {threadError && showThread && (
             <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              We could not load the full thread.
+              Could not load the full thread.
             </p>
           )}
 
-          {showThreadTimeline ? (
+          {showThread ? (
             <section className="space-y-3">
               <div className="space-y-2">
                 {threadMessages.map((threadEmail) => {
-                  const isExpanded = isThreadMessageExpanded(threadEmail.id);
                   const isSelectedMessage = threadEmail.id === email.id;
 
                   return (
@@ -292,8 +227,8 @@ export function EmailDetailContent({
                       key={threadEmail.id}
                       email={threadEmail}
                       body={isSelectedMessage ? email : threadEmail}
-                      expanded={isExpanded}
-                      onToggle={() => toggleThreadMessage(threadEmail.id)}
+                      expanded={isExpanded(threadEmail.id)}
+                      onToggle={() => toggleMessage(threadEmail.id)}
                       attachments={isSelectedMessage ? email.attachments : []}
                     />
                   );
@@ -306,22 +241,20 @@ export function EmailDetailContent({
                 <MessageBody detail={email} />
               </div>
 
-              {hasSelectedAttachments && (
+              {hasAttachments && (
                 <section className="mt-5 space-y-3 border-t border-border/70 pt-5">
                   <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                     <PaperclipIcon className="size-3" />
                     Attachments
                   </div>
-                  {email.attachments.length > 0 ? (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {email.attachments.map((attachment) => (
-                        <AttachmentItem
-                          key={attachment.attachmentId}
-                          attachment={attachment}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {email.attachments.map((attachment) => (
+                      <AttachmentItem
+                        key={attachment.attachmentId}
+                        attachment={attachment}
+                      />
+                    ))}
+                  </div>
                 </section>
               )}
             </div>
@@ -332,4 +265,4 @@ export function EmailDetailContent({
       </div>
     </div>
   );
-}
+});

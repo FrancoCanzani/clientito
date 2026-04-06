@@ -1,5 +1,4 @@
 import { CommandPalette } from "@/components/command-palette/command-palette";
-import { Loading } from "@/components/loading";
 import { AppProviders } from "@/components/providers";
 import { getDashboardGate } from "@/features/home/dashboard-gate";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
@@ -16,7 +15,6 @@ export const Route = createFileRoute("/_dashboard")({
     }
   },
   component: DashboardLayout,
-  pendingComponent: Loading,
 });
 
 function DashboardLayout() {

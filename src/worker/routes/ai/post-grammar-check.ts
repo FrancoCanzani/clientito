@@ -1,8 +1,10 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { generateText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
+import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
+import { buildSessionAffinityKey, withSessionAffinity } from "../../lib/ai/session-affinity";
+import { AI_MODELS } from "../../lib/constants";
 import type { AppRouteEnv } from "../types";
 
 const grammarCheckBodySchema = z.object({
@@ -24,16 +26,32 @@ export function registerPostGrammarCheck(app: Hono<AppRouteEnv>) {
     zValidator("json", grammarCheckBodySchema),
     async (c) => {
       const { text } = c.req.valid("json");
+      const user = c.get("user")!;
+      const workersAI = createWorkersAI({ binding: c.env.AI });
+      const sessionAffinityKey = buildSessionAffinityKey("grammar-check", user.id);
+      let lastError: unknown = null;
 
-      const openai = createOpenAI({ apiKey: c.env.OPENAI_API_KEY });
-      const result = await generateText({
-        model: openai("gpt-5.4-mini"),
-        system: GRAMMAR_SYSTEM,
-        prompt: text,
-        maxOutputTokens: 4000,
-      });
+      for (const modelName of AI_MODELS) {
+        try {
+          const result = await generateText({
+            model: workersAI(
+              modelName,
+              withSessionAffinity(sessionAffinityKey),
+            ),
+            system: GRAMMAR_SYSTEM,
+            prompt: text,
+            maxOutputTokens: 4000,
+          });
 
-      return c.json({ data: { corrected: result.text.trim() } }, 200);
+          return c.json({ data: { corrected: result.text.trim() } }, 200);
+        } catch (error) {
+          lastError = error;
+          console.error("Grammar check failed", { model: modelName, error });
+        }
+      }
+
+      console.error("Grammar check failed for all models", { error: lastError });
+      return c.json({ error: "Grammar check unavailable" }, 503 as never);
     },
   );
 }

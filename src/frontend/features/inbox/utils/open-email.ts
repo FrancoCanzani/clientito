@@ -1,6 +1,7 @@
-import type { EmailView } from "@/features/inbox/utils/inbox-filters";
 import { markEmailRead } from "@/features/inbox/mutations";
+import { fetchEmailDetailAI } from "@/features/inbox/queries";
 import type { EmailListItem, EmailListResponse } from "@/features/inbox/types";
+import type { EmailView } from "@/features/inbox/utils/inbox-filters";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 
 type NavigateToEmail = (options: {
@@ -17,6 +18,11 @@ export function openEmail(
   email: Pick<EmailListItem, "id" | "isRead">,
   options?: { replace?: boolean; context?: EmailView },
 ) {
+  void queryClient.prefetchQuery({
+    queryKey: ["email-ai-detail", email.id],
+    queryFn: () => fetchEmailDetailAI(email.id),
+  });
+
   navigate({
     to: "/$mailboxId/inbox/email/$emailId",
     params: { mailboxId: routeMailboxId, emailId: email.id },
@@ -49,8 +55,7 @@ export function openEmail(
 
   queryClient.setQueryData(
     ["email-detail", email.id],
-    (old: EmailListItem | undefined) =>
-      old ? { ...old, isRead: true } : old,
+    (old: EmailListItem | undefined) => (old ? { ...old, isRead: true } : old),
   );
 
   markEmailRead(email.id).catch(() => {

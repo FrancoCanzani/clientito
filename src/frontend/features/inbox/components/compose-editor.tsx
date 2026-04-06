@@ -6,7 +6,7 @@ import { useComposeEditor } from "../hooks/use-compose-editor";
 import {
   registerComposeEditor,
   unregisterComposeEditor,
-} from "./compose-bridge";
+} from "./compose-editor-ref";
 import { ComposeBubbleMenu } from "./compose-bubble-menu";
 
 type ComposeEditorProps = {

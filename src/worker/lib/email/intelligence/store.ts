@@ -8,7 +8,6 @@ import {
 } from "../../../db/schema";
 import { STANDARD_LABELS } from "../types";
 import {
-  deriveActionBuckets,
   ELIGIBILITY_WINDOW_MS,
   MAX_THREAD_MESSAGES,
   type EmailContextRow,
@@ -21,10 +20,7 @@ type StoredTriageRow =
       | "status"
       | "category"
       | "urgency"
-      | "briefingSentence"
       | "suspiciousJson"
-      | "actionsJson"
-      | "calendarEventsJson"
     >
   | null
   | undefined;
@@ -39,26 +35,15 @@ function serializeStoredEmailTriage(row: StoredTriageRow): StoredEmailTriage | n
     return null;
   }
 
-  const actions = row.actionsJson ?? [];
-  const calendarEvents = row.calendarEventsJson ?? [];
-  const buckets = deriveActionBuckets(actions);
-
-  const suspicious = row.suspiciousJson ?? {
-    isSuspicious: false,
-    kind: null,
-    reason: null,
-    confidence: null,
-  } satisfies EmailSuspiciousFlag;
-
   return {
     category: row.category,
     urgency: row.urgency,
-    briefingSentence: row.briefingSentence ?? null,
-    suspicious,
-    actions,
-    calendarEvents,
-    autoExecute: buckets.autoExecute,
-    requiresApproval: buckets.requiresApproval,
+    suspicious: row.suspiciousJson ?? {
+      isSuspicious: false,
+      kind: null,
+      reason: null,
+      confidence: null,
+    } satisfies EmailSuspiciousFlag,
   };
 }
 

@@ -56,7 +56,7 @@ import type {
 import {
   enqueueEmailIntelligence,
   processInlineEmailIntelligence,
-} from "../../intelligence/triage";
+} from "../../intelligence/background-intelligence";
 import { STANDARD_LABELS } from "../../types";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";

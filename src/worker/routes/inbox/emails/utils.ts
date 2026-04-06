@@ -33,10 +33,7 @@ export const emailIntelligenceSelection = {
   intelligenceStatus: emailIntelligence.status,
   intelligenceCategory: emailIntelligence.category,
   intelligenceUrgency: emailIntelligence.urgency,
-  intelligenceBriefingSentence: emailIntelligence.briefingSentence,
   intelligenceSuspiciousJson: emailIntelligence.suspiciousJson,
-  intelligenceActionsJson: emailIntelligence.actionsJson,
-  intelligenceCalendarEventsJson: emailIntelligence.calendarEventsJson,
 } as const;
 
 export function hasEmailLabel(label: string) {
@@ -69,10 +66,7 @@ export function toEmailListResponse(row: {
   intelligenceStatus: "pending" | "ready" | "error" | null;
   intelligenceCategory: import("../../../db/schema").EmailIntelligenceCategory | null;
   intelligenceUrgency: import("../../../db/schema").EmailIntelligenceUrgency | null;
-  intelligenceBriefingSentence: string | null;
   intelligenceSuspiciousJson: import("../../../db/schema").EmailSuspiciousFlag | null;
-  intelligenceActionsJson: import("../../../db/schema").EmailAction[] | null;
-  intelligenceCalendarEventsJson: import("../../../db/schema").CalendarSuggestion[] | null;
 }) {
   const labelIds = row.labelIds ?? [];
   return {
@@ -104,15 +98,12 @@ export function toEmailListResponse(row: {
             status: row.intelligenceStatus,
             category: row.intelligenceCategory,
             urgency: row.intelligenceUrgency,
-            briefingSentence: row.intelligenceBriefingSentence,
             suspiciousJson: row.intelligenceSuspiciousJson ?? {
               isSuspicious: false,
               kind: null,
               reason: null,
               confidence: null,
             },
-            actionsJson: row.intelligenceActionsJson ?? [],
-            calendarEventsJson: row.intelligenceCalendarEventsJson ?? [],
           }
         : null,
     ),
@@ -143,10 +134,7 @@ export function toEmailDetailResponse(row: {
   intelligenceStatus: "pending" | "ready" | "error" | null;
   intelligenceCategory: import("../../../db/schema").EmailIntelligenceCategory | null;
   intelligenceUrgency: import("../../../db/schema").EmailIntelligenceUrgency | null;
-  intelligenceBriefingSentence: string | null;
   intelligenceSuspiciousJson: import("../../../db/schema").EmailSuspiciousFlag | null;
-  intelligenceActionsJson: import("../../../db/schema").EmailAction[] | null;
-  intelligenceCalendarEventsJson: import("../../../db/schema").CalendarSuggestion[] | null;
 }) {
   return {
     ...toEmailListResponse(row),

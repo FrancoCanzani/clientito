@@ -5,9 +5,9 @@ import { Output, generateText } from "ai";
 import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
 import { emails } from "../../../db/schema";
+import { buildSessionAffinityKey, withSessionAffinity } from "../../../lib/ai/session-affinity";
+import { AI_MODELS } from "../../../lib/constants";
 import type { AppRouteEnv } from "../../types";
-
-const MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
 
 const generateSchema = z.object({
   prompt: z.string().min(1).max(500),
@@ -53,11 +53,18 @@ export function registerGenerateFilter(app: Hono<AppRouteEnv>) {
       .join("\n");
 
     const workersAI = createWorkersAI({ binding: c.env.AI });
+    const sessionAffinityKey = buildSessionAffinityKey("filters-generate", user.id);
+    let lastError: unknown = null;
 
-    const { output: filter } = await generateText({
-      model: workersAI(MODEL),
-      output: Output.object({ schema: filterOutputSchema }),
-      prompt: `You are an email filter generator. The user describes what they want in plain English and you create an email filter.
+    for (const modelName of AI_MODELS) {
+      try {
+        const { output: filter } = await generateText({
+          model: workersAI(
+            modelName,
+            withSessionAffinity(sessionAffinityKey),
+          ),
+          output: Output.object({ schema: filterOutputSchema }),
+          prompt: `You are an email filter generator. The user describes what they want in plain English and you create an email filter.
 
 The filter has three parts:
 1. "name" — a short human-readable name for the filter (3-6 words)
@@ -70,8 +77,16 @@ ${senderSample}
 User request: "${prompt}"
 
 Generate the filter.`,
-    });
+        });
 
-    return c.json({ data: filter });
+        return c.json({ data: filter });
+      } catch (error) {
+        lastError = error;
+        console.error("Filter generation failed", { model: modelName, error });
+      }
+    }
+
+    console.error("Filter generation failed for all models", { error: lastError });
+    return c.json({ error: "Filter generation unavailable" }, 503 as never);
   });
 }
