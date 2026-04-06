@@ -8,7 +8,7 @@ import {
   CaretUpIcon,
 } from "@phosphor-icons/react";
 import type { ComposeInitial } from "../types";
-import { EmailActionBar } from "./email-action-bar";
+import { EmailActions } from "./email-actions";
 
 export function EmailDetailHeader({
   email,
@@ -42,7 +42,6 @@ export function EmailDetailHeader({
           </Button>
           <IconButton
             label="Previous"
-            shortcut="K"
             onClick={() => onPrev?.()}
             disabled={!hasPrev}
           >
@@ -50,7 +49,6 @@ export function EmailDetailHeader({
           </IconButton>
           <IconButton
             label="Next"
-            shortcut="J"
             onClick={() => onNext?.()}
             disabled={!hasNext}
           >
@@ -58,7 +56,7 @@ export function EmailDetailHeader({
           </IconButton>
         </div>
 
-        <EmailActionBar
+        <EmailActions
           email={email}
           onClose={onClose}
           onForward={onForward}

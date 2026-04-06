@@ -22,7 +22,6 @@ import type {
 export const GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 const GMAIL_PAGE_SIZE = 500;
 export const MESSAGE_CHUNK_SIZE = 50;
-export const CHUNK_DELAY_MS = 1_000;
 
 const GMAIL_MAX_RATE_LIMIT_RETRIES = 5;
 const GMAIL_RETRY_BASE_DELAY_MS = 1_000;
@@ -36,7 +35,6 @@ const GMAIL_RATE_LIMIT_REASONS = new Set([
 
 const TOKEN_REFRESH_BUFFER_MS = 60_000;
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
-export { sleep } from "../../../utils";
 
 function parseRetryAfterMs(retryAfter: string | null): number | null {
   if (!retryAfter) return null;

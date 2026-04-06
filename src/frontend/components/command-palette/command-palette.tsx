@@ -1,4 +1,3 @@
-import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 import {
   CaretDownIcon,
@@ -29,8 +28,6 @@ export function CommandPalette() {
   useAgentInvalidation(state.status, queryClient);
 
   const { handleApprove, handleDiscard } = useApprovalHandler({
-    messages: state.messages,
-    mode: state.mode,
     addToolApprovalResponse: state.addToolApprovalResponse,
     close: state.close,
     queryClient,
@@ -147,9 +144,6 @@ export function CommandPalette() {
               placeholder="Navigate or ask the agent..."
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
-          )}
-          {!state.open && state.mode !== "agent" && (
-            <Kbd className="ml-auto shrink-0">⌘K</Kbd>
           )}
           {state.mode !== "agent" && normalizedQuery && (
             <button

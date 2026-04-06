@@ -1,10 +1,12 @@
 import { EmailDetailView } from "@/features/inbox/pages/email-detail-view";
 import { getRouteApi } from "@tanstack/react-router";
 
-const detailRoute = getRouteApi("/_dashboard/$mailboxId/inbox/email/$emailId");
+const detailRoute = getRouteApi(
+  "/_dashboard/$mailboxId/inbox/folders/$folder/email/$emailId",
+);
 
-export default function EmailDetailPage() {
-  const { mailboxId, emailId } = detailRoute.useParams();
+export default function FolderEmailDetailPage() {
+  const { mailboxId, folder, emailId } = detailRoute.useParams();
   const { email } = detailRoute.useLoaderData();
   const navigate = detailRoute.useNavigate();
 
@@ -13,11 +15,11 @@ export default function EmailDetailPage() {
       email={email}
       mailboxId={mailboxId}
       emailId={emailId}
-      view="inbox"
+      view={folder}
       onNavigateToEmail={(nextEmailId) =>
         navigate({
-          to: "/$mailboxId/inbox/email/$emailId",
-          params: { mailboxId, emailId: nextEmailId },
+          to: "/$mailboxId/inbox/folders/$folder/email/$emailId",
+          params: { mailboxId, folder, emailId: nextEmailId },
           replace: true,
         })}
     />

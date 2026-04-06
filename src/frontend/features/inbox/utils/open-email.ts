@@ -4,12 +4,26 @@ import type { EmailListItem, EmailListResponse } from "@/features/inbox/types";
 import type { EmailView } from "@/features/inbox/utils/inbox-filters";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 
-type NavigateToEmail = (options: {
-  to: "/$mailboxId/inbox/email/$emailId";
-  params: { mailboxId: number; emailId: string };
-  search?: { context?: EmailView };
-  replace?: boolean;
-}) => void;
+type FolderView = Exclude<EmailView, "inbox" | "important">;
+
+type NavigateToEmail = (
+  options:
+    | {
+        to: "/$mailboxId/inbox/email/$emailId";
+        params: { mailboxId: number; emailId: string };
+        replace?: boolean;
+      }
+    | {
+        to: "/$mailboxId/inbox/folders/$folder/email/$emailId";
+        params: { mailboxId: number; folder: FolderView; emailId: string };
+        replace?: boolean;
+      }
+    | {
+        to: "/$mailboxId/inbox/labels/$label/email/$emailId";
+        params: { mailboxId: number; label: "important"; emailId: string };
+        replace?: boolean;
+      },
+) => void;
 
 export function openEmail(
   queryClient: QueryClient,
@@ -23,17 +37,26 @@ export function openEmail(
     queryFn: () => fetchEmailDetailAI(email.id),
   });
 
-  navigate({
-    to: "/$mailboxId/inbox/email/$emailId",
-    params: { mailboxId: routeMailboxId, emailId: email.id },
-    search: {
-      context:
-        options?.context && options.context !== "inbox"
-          ? options.context
-          : undefined,
-    },
-    replace: options?.replace,
-  });
+  const context = options?.context ?? "inbox";
+  if (context === "important") {
+    navigate({
+      to: "/$mailboxId/inbox/labels/$label/email/$emailId",
+      params: { mailboxId: routeMailboxId, label: "important", emailId: email.id },
+      replace: options?.replace,
+    });
+  } else if (context !== "inbox") {
+    navigate({
+      to: "/$mailboxId/inbox/folders/$folder/email/$emailId",
+      params: { mailboxId: routeMailboxId, folder: context, emailId: email.id },
+      replace: options?.replace,
+    });
+  } else {
+    navigate({
+      to: "/$mailboxId/inbox/email/$emailId",
+      params: { mailboxId: routeMailboxId, emailId: email.id },
+      replace: options?.replace,
+    });
+  }
 
   if (email.isRead) return;
 

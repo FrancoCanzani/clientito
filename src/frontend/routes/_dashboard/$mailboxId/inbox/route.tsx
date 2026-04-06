@@ -1,10 +1,13 @@
+import { InboxComposeProvider } from "@/features/inbox/components/inbox-compose-provider";
 import { InboxSidebarShell } from "@/features/inbox/components/inbox-sidebar-shell";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/inbox")({
   component: () => (
-    <InboxSidebarShell>
-      <Outlet />
-    </InboxSidebarShell>
+    <InboxComposeProvider>
+      <InboxSidebarShell>
+        <Outlet />
+      </InboxSidebarShell>
+    </InboxComposeProvider>
   ),
 });

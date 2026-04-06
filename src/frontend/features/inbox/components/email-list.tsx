@@ -7,12 +7,11 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { openCompose } from "@/features/inbox/components/compose-events";
+import { useInboxCompose } from "@/features/inbox/components/inbox-compose-provider";
 import { useEmailData } from "@/features/inbox/hooks/use-email-data";
 import type { EmailInboxAction } from "@/features/inbox/hooks/use-email-inbox-actions";
 import type { EmailListItem } from "@/features/inbox/types";
 import { VIEW_LABELS } from "@/features/inbox/utils/inbox-filters";
-import { EmailContextMenu } from "./email-context-menu";
 import { EmailRow } from "./email-row";
 
 export function EmailList({
@@ -26,13 +25,13 @@ export function EmailList({
 }) {
   const {
     view,
-    mailboxId,
     displayRows,
     sections,
     hasNextPage,
     isFetchingNextPage,
     loadMoreRef,
   } = emailData;
+  const { openCompose } = useInboxCompose();
   const pageTitle = VIEW_LABELS[view];
 
   return (
@@ -46,11 +45,7 @@ export function EmailList({
         }
         actions={
           view === "inbox" && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => openCompose({ mailboxId })}
-            >
+            <Button type="button" variant="ghost" onClick={() => openCompose()}>
               New Email
             </Button>
           )
@@ -69,18 +64,13 @@ export function EmailList({
                   const email = group.representative;
 
                   return (
-                    <EmailContextMenu
+                    <EmailRow
                       key={email.id}
-                      targetEmail={email}
+                      group={group}
+                      view={view}
+                      onOpen={onOpen}
                       onAction={onAction}
-                    >
-                      <EmailRow
-                        group={group}
-                        view={view}
-                        onOpen={onOpen}
-                        onAction={onAction}
-                      />
-                    </EmailContextMenu>
+                    />
                   );
                 })}
               </div>

@@ -15,12 +15,7 @@ import {
 import aiRoutes from "./routes/ai/router";
 import calendarRoutes from "./routes/calendar/router";
 import healthRoutes from "./routes/health/router";
-import emailsRoutes from "./routes/inbox/emails/router";
-import filtersRoutes from "./routes/inbox/filters/router";
 import inboxRoutes from "./routes/inbox/router";
-import searchRoutes from "./routes/inbox/search/router";
-import subscriptionsRoutes from "./routes/inbox/subscriptions/router";
-import syncRoutes from "./routes/inbox/sync/router";
 import settingsRoutes from "./routes/settings/router";
 import draftsRoutes from "./routes/inbox/drafts/router";
 import tasksRoutes from "./routes/tasks/router";
@@ -56,9 +51,6 @@ app.onError((err, c) => {
 app.use("*", authMiddleware);
 
 app.use("/api/auth/*", authLimiter);
-app.use("/api/sync/start", strictLimiter);
-app.use("/api/sync/recover", strictLimiter);
-app.use("/api/emails/send", strictLimiter);
 app.use("/api/inbox/sync/start", strictLimiter);
 app.use("/api/inbox/sync/recover", strictLimiter);
 app.use("/api/inbox/emails/send", strictLimiter);
@@ -72,17 +64,12 @@ app.all("/api/auth/*", async (c) => {
 
 app.route("/api/health", healthRoutes);
 app.route("/api/inbox", inboxRoutes);
-app.route("/api/sync", syncRoutes);
-app.route("/api/emails", emailsRoutes);
 app.route("/api/ai", aiRoutes);
 
 app.route("/api/inbox/drafts", draftsRoutes);
 app.route("/api/tasks", tasksRoutes);
 app.route("/api/calendar", calendarRoutes);
 app.route("/api/settings", settingsRoutes);
-app.route("/api/search", searchRoutes);
-app.route("/api/subscriptions", subscriptionsRoutes);
-app.route("/api/filters", filtersRoutes);
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {

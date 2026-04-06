@@ -101,6 +101,14 @@ export function useEmailInboxActions({
       return;
     }
 
+    if (view === "inbox") {
+      navigate({
+        to: "/$mailboxId/inbox",
+        params: { mailboxId },
+      });
+      return;
+    }
+
     navigate({
       to: "/$mailboxId/inbox/folders/$folder",
       params: { mailboxId, folder: view },

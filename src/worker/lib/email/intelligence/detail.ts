@@ -237,30 +237,3 @@ export async function generateEmailOnDemand(
     calendarSuggestion: normalized.calendarEvents[0] ?? null,
   };
 }
-
-export async function updateCalendarSuggestionStatus(
-  db: Database,
-  emailId: number,
-  suggestionId: number,
-  status: "approved" | "dismissed",
-) {
-  const rows = await db
-    .select()
-    .from(emailIntelligence)
-    .where(eq(emailIntelligence.emailId, emailId))
-    .limit(1);
-
-  const row = rows[0];
-  if (!row) return;
-
-  const calendarEvents = (row.calendarEventsJson ?? []).map((entry) =>
-    entry.id === suggestionId
-      ? { ...entry, status, updatedAt: Date.now() }
-      : entry,
-  );
-
-  await db
-    .update(emailIntelligence)
-    .set({ calendarEventsJson: calendarEvents, updatedAt: Date.now() })
-    .where(eq(emailIntelligence.emailId, emailId));
-}

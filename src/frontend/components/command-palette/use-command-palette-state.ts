@@ -105,10 +105,13 @@ export function useCommandPaletteState() {
     setAgentInput("");
   }, [agentInput, submitAgentMessage]);
 
-  // Cmd+K to open and focus, Escape to close / exit agent mode
+  // Cmd/Ctrl+K opens the palette and Escape exits/ closes it.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "k" && (event.metaKey || event.ctrlKey)) {
+      const isCommandK =
+        (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
+
+      if (isCommandK) {
         event.preventDefault();
         setOpen(true);
         focusDelayed(inputRef);
@@ -128,6 +131,7 @@ export function useCommandPaletteState() {
         });
       }
     }
+
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);

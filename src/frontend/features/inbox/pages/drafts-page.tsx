@@ -7,11 +7,10 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useInboxCompose } from "@/features/inbox/components/inbox-compose-provider";
 import { TrashIcon } from "@phosphor-icons/react";
 import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
-import { useState } from "react";
-import { ComposePanel } from "../components/compose-panel";
 import { deleteDraft, type DraftItem } from "../queries/drafts";
 import type { ComposeInitial } from "../types";
 import { htmlToPlainText } from "../utils/html-to-plain-text";
@@ -38,7 +37,7 @@ function draftToComposeInitial(draft: DraftItem): ComposeInitial {
 export default function DraftsPage() {
   const { drafts } = route.useLoaderData();
   const router = useRouter();
-  const [editingDraft, setEditingDraft] = useState<ComposeInitial | null>(null);
+  const { openCompose } = useInboxCompose();
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -73,7 +72,7 @@ export default function DraftsPage() {
               key={draft.id}
               type="button"
               className="group flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
-              onClick={() => setEditingDraft(draftToComposeInitial(draft))}
+              onClick={() => openCompose(draftToComposeInitial(draft))}
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
@@ -107,16 +106,6 @@ export default function DraftsPage() {
         </div>
       )}
 
-      <ComposePanel
-        open={editingDraft != null}
-        initial={editingDraft ?? undefined}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingDraft(null);
-            void router.invalidate();
-          }
-        }}
-      />
     </>
   );
 }

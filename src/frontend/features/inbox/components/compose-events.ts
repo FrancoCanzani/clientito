@@ -1,27 +1,30 @@
 import type { ComposeInitial } from "../types";
 
-const openComposeListeners = new Set<(initial: ComposeInitial) => void>();
-let pending: ComposeInitial | null = null;
+const openComposeListeners = new Set<(initial?: ComposeInitial) => void>();
+let hasPending = false;
+let pendingInitial: ComposeInitial | undefined;
 
 export function registerOpenComposeListener(
-  listener: (initial: ComposeInitial) => void,
+  listener: (initial?: ComposeInitial) => void,
 ) {
   openComposeListeners.add(listener);
-  if (pending) {
-    listener(pending);
-    pending = null;
+  if (hasPending) {
+    listener(pendingInitial);
+    hasPending = false;
+    pendingInitial = undefined;
   }
   return () => {
     openComposeListeners.delete(listener);
   };
 }
 
-export function openCompose(initial: ComposeInitial) {
+export function openCompose(initial?: ComposeInitial) {
   if (openComposeListeners.size > 0) {
     for (const listener of openComposeListeners) {
       listener(initial);
     }
   } else {
-    pending = initial;
+    pendingInitial = initial;
+    hasPending = true;
   }
 }

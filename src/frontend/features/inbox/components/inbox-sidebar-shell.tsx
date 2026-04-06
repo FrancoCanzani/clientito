@@ -80,20 +80,14 @@ function SidebarNav() {
   const currentFolder = useRouterState({
     select: (state) =>
       state.matches.find(
-        (match) => match.routeId === "/_dashboard/$mailboxId/inbox/folders/$folder",
+        (match) => match.routeId === "/_dashboard/$mailboxId/inbox/folders/$folder/",
       )?.params.folder,
   });
   const currentLabel = useRouterState({
     select: (state) =>
       state.matches.find(
-        (match) => match.routeId === "/_dashboard/$mailboxId/inbox/labels/$label",
+        (match) => match.routeId === "/_dashboard/$mailboxId/inbox/labels/$label/",
       )?.params.label,
-  });
-  const search = useRouterState({
-    select: (state) =>
-      state.location.search as {
-        context?: unknown;
-      },
   });
   const activeView =
     currentRouteId === "/_dashboard/$mailboxId/inbox/search"
@@ -108,20 +102,13 @@ function SidebarNav() {
             ? currentFolder
             : currentLabel === "important"
               ? "important"
-              : currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId"
-                ? search.context === "important"
-                  ? "important"
-                  : search.context ?? "inbox"
-                : "inbox";
+              : "inbox";
 
   return (
     <SidebarMenu>
       <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "inbox"}>
-          <Link
-            to="/$mailboxId/inbox/folders/$folder"
-            params={{ mailboxId, folder: "inbox" }}
-          >
+          <Link to="/$mailboxId/inbox" params={{ mailboxId }}>
             <TrayIcon />
             <span>Inbox</span>
           </Link>

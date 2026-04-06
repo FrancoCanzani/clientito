@@ -26,7 +26,7 @@ export function GrammarDiffView({
 
   return (
     <div className={cn("flex flex-col", className)}>
-      <div className="min-h-[120px] flex-1 whitespace-pre-wrap text-[13px] leading-relaxed">
+      <div className="min-h-30 flex-1 whitespace-pre-wrap text-[13px] leading-relaxed">
         {parts.map((part, i) => {
           if (part.added) {
             return (
