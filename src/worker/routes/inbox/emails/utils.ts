@@ -3,7 +3,7 @@ import { emailIntelligence, emails } from "../../../db/schema";
 import type { AttachmentMeta } from "../../../lib/email";
 import {
   getIntelligenceStatus,
-  getStoredEmailTriage,
+  getStoredEmailClassification,
 } from "../../../lib/email/intelligence/store";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
@@ -92,7 +92,7 @@ export function toEmailListResponse(row: {
     intelligenceStatus: getIntelligenceStatus(
       row.intelligenceStatus ? { status: row.intelligenceStatus } : null,
     ),
-    intelligence: getStoredEmailTriage(
+    intelligence: getStoredEmailClassification(
       row.intelligenceStatus
         ? {
             status: row.intelligenceStatus,
@@ -107,39 +107,6 @@ export function toEmailListResponse(row: {
           }
         : null,
     ),
-  };
-}
-
-export function toEmailDetailResponse(row: {
-  id: number;
-  mailboxId: number | null;
-  providerMessageId: string;
-  fromAddr: string;
-  fromName: string | null;
-  toAddr: string | null;
-  ccAddr: string | null;
-  subject: string | null;
-  snippet: string | null;
-  bodyText: string | null;
-  bodyHtml: string | null;
-  threadId: string | null;
-  date: number;
-  direction: "sent" | "received" | null;
-  isRead: boolean;
-  labelIds: string[] | null;
-  createdAt: number;
-  unsubscribeUrl: string | null;
-  unsubscribeEmail: string | null;
-  snoozedUntil: number | null;
-  intelligenceStatus: "pending" | "ready" | "error" | null;
-  intelligenceCategory: import("../../../db/schema").EmailIntelligenceCategory | null;
-  intelligenceUrgency: import("../../../db/schema").EmailIntelligenceUrgency | null;
-  intelligenceSuspiciousJson: import("../../../db/schema").EmailSuspiciousFlag | null;
-}) {
-  return {
-    ...toEmailListResponse(row),
-    bodyText: row.bodyText,
-    bodyHtml: row.bodyHtml,
   };
 }
 

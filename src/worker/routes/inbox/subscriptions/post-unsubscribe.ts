@@ -46,10 +46,7 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
               status: "unsubscribed",
               method: "one-click",
             });
-            return c.json(
-              { data: { method: "one-click", fromAddr, success: true } },
-              200,
-            );
+            return c.json({ method: "one-click", fromAddr, success: true }, 200);
           }
         } catch (error) {
           console.warn("One-click unsubscribe failed, falling back", {
@@ -68,12 +65,10 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
         });
         return c.json(
           {
-            data: {
-              method: "manual",
-              fromAddr,
-              url: unsubscribeUrl,
-              success: false,
-            },
+            method: "manual",
+            fromAddr,
+            url: unsubscribeUrl,
+            success: false,
           },
           200,
         );
@@ -108,10 +103,7 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
             status: "unsubscribed",
             method: "mailto",
           });
-          return c.json(
-            { data: { method: "mailto", fromAddr, success: true } },
-            200,
-          );
+          return c.json({ method: "mailto", fromAddr, success: true }, 200);
         } catch (error) {
           return c.json(
             {

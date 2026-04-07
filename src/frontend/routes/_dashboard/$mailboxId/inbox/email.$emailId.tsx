@@ -1,6 +1,6 @@
-import EmailDetailPage from "@/features/inbox/pages/email-detail-page";
-import { fetchEmailDetail, fetchEmailDetailAI } from "@/features/inbox/queries";
-import { emailIdParamsSchema } from "@/features/inbox/routes/schemas";
+import { EmailDetailView } from "@/features/email/inbox/pages/email-detail-view";
+import { fetchEmailDetail, fetchEmailDetailAI } from "@/features/email/inbox/queries";
+import { emailIdParamsSchema } from "@/features/email/inbox/routes/schemas";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute(
@@ -25,5 +25,26 @@ export const Route = createFileRoute(
   },
   staleTime: 60_000,
   gcTime: 10 * 60_000,
-  component: EmailDetailPage,
+  component: EmailDetailRoutePage,
 });
+
+function EmailDetailRoutePage() {
+  const { mailboxId, emailId } = Route.useParams();
+  const { email } = Route.useLoaderData();
+  const navigate = Route.useNavigate();
+
+  return (
+    <EmailDetailView
+      email={email}
+      mailboxId={mailboxId}
+      emailId={emailId}
+      view="inbox"
+      onNavigateToEmail={(nextEmailId) =>
+        navigate({
+          to: "/$mailboxId/inbox/email/$emailId",
+          params: { mailboxId, emailId: nextEmailId },
+          replace: true,
+        })}
+    />
+  );
+}

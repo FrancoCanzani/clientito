@@ -46,7 +46,6 @@ const AUTOMATED_LOCAL_SUBSTRINGS = [
   "newsletter",
   "digest",
   "quora.com",
-  "francocanzani=gmail.com",
 ];
 
 const AUTOMATED_DOMAIN_PATTERNS = [
@@ -94,7 +93,10 @@ function hasRandomizedLocalPart(localPart: string): boolean {
   return digitCount >= 4 || hyphenCount >= 3 || vowelCount <= 3;
 }
 
-export function isAutomatedSender(email: string, name?: string | null): boolean {
+export function isAutomatedSender(
+  email: string,
+  name?: string | null,
+): boolean {
   const normalized = email.trim().toLowerCase();
   const at = normalized.indexOf("@");
   const localPart = at >= 0 ? normalized.slice(0, at) : normalized;
@@ -113,11 +115,7 @@ export function isAutomatedSender(email: string, name?: string | null): boolean 
     return true;
   }
 
-  if (
-    AUTOMATED_DOMAIN_PATTERNS.some((pattern) =>
-      domain.includes(pattern),
-    )
-  ) {
+  if (AUTOMATED_DOMAIN_PATTERNS.some((pattern) => domain.includes(pattern))) {
     return true;
   }
 

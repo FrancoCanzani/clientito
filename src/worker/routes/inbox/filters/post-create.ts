@@ -49,6 +49,6 @@ export function registerCreateFilter(app: Hono<AppRouteEnv>) {
       })
       .returning();
 
-    return c.json({ data: row }, 201);
+    return c.json(row, 201);
   });
 }

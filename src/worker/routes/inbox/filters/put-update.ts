@@ -46,6 +46,6 @@ export function registerUpdateFilter(app: Hono<AppRouteEnv>) {
       .returning();
 
     if (!row) return c.json({ error: "Not found" }, 404);
-    return c.json({ data: row });
+    return c.json(row);
   });
 }

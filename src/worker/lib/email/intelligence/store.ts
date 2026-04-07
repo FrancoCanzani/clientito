@@ -8,13 +8,14 @@ import {
 } from "../../../db/schema";
 import { STANDARD_LABELS } from "../types";
 import {
+  DEFAULT_SUSPICIOUS_FLAG,
   ELIGIBILITY_WINDOW_MS,
   MAX_THREAD_MESSAGES,
   type EmailContextRow,
-  type StoredEmailTriage,
+  type StoredEmailClassification,
 } from "./common";
 
-type StoredTriageRow =
+type StoredClassificationRow =
   | Pick<
       typeof emailIntelligence.$inferSelect,
       | "status"
@@ -30,7 +31,15 @@ export type CalendarSuggestionMatch = {
   suggestion: CalendarSuggestion;
 };
 
-function serializeStoredEmailTriage(row: StoredTriageRow): StoredEmailTriage | null {
+export function getIntelligenceStatus(
+  row: Pick<typeof emailIntelligence.$inferSelect, "status"> | null | undefined,
+) {
+  return row?.status ?? null;
+}
+
+export function getStoredEmailClassification(
+  row: StoredClassificationRow,
+): StoredEmailClassification | null {
   if (!row || row.status !== "ready" || !row.category || !row.urgency) {
     return null;
   }
@@ -38,25 +47,9 @@ function serializeStoredEmailTriage(row: StoredTriageRow): StoredEmailTriage | n
   return {
     category: row.category,
     urgency: row.urgency,
-    suspicious: row.suspiciousJson ?? {
-      isSuspicious: false,
-      kind: null,
-      reason: null,
-      confidence: null,
-    } satisfies EmailSuspiciousFlag,
+    suspicious: row.suspiciousJson ?? DEFAULT_SUSPICIOUS_FLAG satisfies EmailSuspiciousFlag,
   };
 }
-
-export function getIntelligenceStatus(
-  row: Pick<typeof emailIntelligence.$inferSelect, "status"> | null | undefined,
-) {
-  return row?.status ?? null;
-}
-
-export function getStoredEmailTriage(row: StoredTriageRow) {
-  return serializeStoredEmailTriage(row);
-}
-
 
 export function isEmailEligibleForIntelligence(
   email: Pick<
@@ -85,7 +78,15 @@ export function isEmailEligibleForIntelligence(
   );
 }
 
-export async function loadEmailContext(db: Database, emailId: number) {
+export async function loadEmailContext(
+  db: Database,
+  emailId: number,
+  userId?: string,
+) {
+  const emailWhere = userId
+    ? and(eq(emails.id, emailId), eq(emails.userId, userId))
+    : eq(emails.id, emailId);
+
   const emailRows = await db
     .select({
       id: emails.id,
@@ -108,7 +109,7 @@ export async function loadEmailContext(db: Database, emailId: number) {
       snoozedUntil: emails.snoozedUntil,
     })
     .from(emails)
-    .where(eq(emails.id, emailId))
+    .where(emailWhere)
     .limit(1);
 
   const email = emailRows[0];
@@ -153,12 +154,7 @@ export async function findCalendarSuggestionById(
   const rows = await db
     .select()
     .from(emailIntelligence)
-    .where(
-      and(
-        eq(emailIntelligence.userId, userId),
-        eq(emailIntelligence.status, "ready"),
-      ),
-    );
+    .where(eq(emailIntelligence.userId, userId));
 
   for (const row of rows) {
     const suggestion = (row.calendarEventsJson ?? []).find(

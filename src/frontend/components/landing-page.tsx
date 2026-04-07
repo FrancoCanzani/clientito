@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { useMailboxes } from "@/hooks/use-mailboxes";
-import { getPreferredMailboxId } from "@/features/inbox/utils/mailbox";
+import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
 import { Button } from "./ui/button";
 
 const FOOTER_LINKS = ["Privacy", "Terms", "Security"];

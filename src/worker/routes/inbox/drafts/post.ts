@@ -4,7 +4,6 @@ import { and, eq } from "drizzle-orm";
 import { drafts } from "../../../db/schema";
 import type { AppRouteEnv } from "../../types";
 import { upsertDraftBodySchema } from "./schemas";
-import { DRAFT_COLUMNS } from "./utils";
 
 export function registerPostDrafts(api: Hono<AppRouteEnv>) {
   return api.post("/", zValidator("json", upsertDraftBodySchema), async (c) => {
@@ -26,9 +25,9 @@ export function registerPostDrafts(api: Hono<AppRouteEnv>) {
         .update(drafts)
         .set({
           mailboxId: body.mailboxId ?? null,
-          toAddr: body.to,
-          ccAddr: body.cc,
-          bccAddr: body.bcc,
+          toAddr: body.toAddr,
+          ccAddr: body.ccAddr,
+          bccAddr: body.bccAddr,
           subject: body.subject,
           body: body.body,
           forwardedContent: body.forwardedContent,
@@ -39,12 +38,13 @@ export function registerPostDrafts(api: Hono<AppRouteEnv>) {
         .where(eq(drafts.id, existing[0].id));
 
       const rows = await db
-        .select(DRAFT_COLUMNS)
+        .select()
         .from(drafts)
         .where(eq(drafts.id, existing[0].id))
         .limit(1);
 
-      return c.json({ data: rows[0]! }, 200);
+      const { userId: _userId, ...row } = rows[0]!;
+      return c.json(row, 200);
     }
 
     const inserted = await db
@@ -53,9 +53,9 @@ export function registerPostDrafts(api: Hono<AppRouteEnv>) {
         userId: user.id,
         composeKey: body.composeKey,
         mailboxId: body.mailboxId ?? null,
-        toAddr: body.to,
-        ccAddr: body.cc,
-        bccAddr: body.bcc,
+        toAddr: body.toAddr,
+        ccAddr: body.ccAddr,
+        bccAddr: body.bccAddr,
         subject: body.subject,
         body: body.body,
         forwardedContent: body.forwardedContent,
@@ -67,11 +67,12 @@ export function registerPostDrafts(api: Hono<AppRouteEnv>) {
       .returning({ id: drafts.id });
 
     const rows = await db
-      .select(DRAFT_COLUMNS)
+      .select()
       .from(drafts)
       .where(eq(drafts.id, inserted[0]!.id))
       .limit(1);
 
-    return c.json({ data: rows[0]! }, 201);
+    const { userId: _userId, ...row } = rows[0]!;
+    return c.json(row, 201);
   });
 }

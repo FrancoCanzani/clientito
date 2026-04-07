@@ -7,7 +7,7 @@ import type { AppRouteEnv } from "../../types";
 import {
   emailIntelligenceSelection,
   emailSummarySelection,
-  toEmailDetailResponse,
+  toEmailListResponse,
 } from "./utils";
 import { emailThreadParamsSchema } from "./schemas";
 
@@ -34,7 +34,14 @@ export function registerGetEmailThread(api: Hono<AppRouteEnv>) {
         .where(and(eq(emails.threadId, threadId), eq(emails.userId, user.id)))
         .orderBy(asc(emails.date));
 
-      return c.json({ data: rows.map(toEmailDetailResponse) }, 200);
+      return c.json(
+        rows.map((row) => ({
+          ...toEmailListResponse(row),
+          bodyText: row.bodyText,
+          bodyHtml: row.bodyHtml,
+        })),
+        200,
+      );
     },
   );
 }

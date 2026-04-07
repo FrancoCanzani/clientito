@@ -1,6 +1,6 @@
-import InboxFolderPage from "@/features/inbox/pages/inbox-folder-page";
-import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/inbox/queries";
-import { folderParamsSchema } from "@/features/inbox/routes/schemas";
+import { InboxListView } from "@/features/email/inbox/pages/inbox-list-view";
+import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/email/inbox/queries";
+import { folderParamsSchema } from "@/features/email/inbox/routes/schemas";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute(
@@ -20,5 +20,18 @@ export const Route = createFileRoute(
       }),
     };
   },
-  component: InboxFolderPage,
+  component: FolderRoutePage,
 });
+
+function FolderRoutePage() {
+  const { mailboxId, folder } = Route.useParams();
+  const { initialPage } = Route.useLoaderData();
+
+  return (
+    <InboxListView
+      view={folder}
+      mailboxId={mailboxId}
+      initialPage={initialPage}
+    />
+  );
+}

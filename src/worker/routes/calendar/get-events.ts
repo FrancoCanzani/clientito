@@ -1,14 +1,17 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Hono } from "hono";
 import { z } from "zod";
-import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
+import {
+  listEvents,
+  type GoogleCalendarEvent,
+} from "../../lib/calendar/google";
 import { getUserMailboxes } from "../../lib/email/mailbox-state";
-import { listEvents, type GoogleCalendarEvent } from "../../lib/calendar/google";
+import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
 import type { AppRouteEnv } from "../types";
 
 const querySchema = z.object({
-  from: z.string().datetime(),
-  to: z.string().datetime(),
+  from: z.iso.datetime(),
+  to: z.iso.datetime(),
   mailboxId: z.coerce.number().int().positive(),
 });
 
@@ -82,6 +85,6 @@ export function registerGetCalendarEvents(api: Hono<AppRouteEnv>) {
         });
       }
     }
-    return c.json({ data: googleEvents.sort((a, b) => a.startAt - b.startAt) }, 200);
+    return c.json(googleEvents.sort((a, b) => a.startAt - b.startAt), 200);
   });
 }

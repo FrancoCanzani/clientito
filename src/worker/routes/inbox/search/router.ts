@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { requireAuth } from "../../../middleware/auth";
 import type { AppRouteEnv } from "../../types";
-import { registerContactSearch } from "./contacts";
-import { registerEmailSearch } from "./emails";
-import { registerSearchSuggestions } from "./suggestions";
+import { registerContactSearch } from "./get-contacts";
+import { registerEmailSearch } from "./get-emails";
+import { registerSearchSuggestions } from "./get-suggestions";
 
 const searchRoutes = new Hono<AppRouteEnv>();
 

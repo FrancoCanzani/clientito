@@ -3,8 +3,6 @@ import type { Hono } from "hono";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { and, eq, gte, lt, ne } from "drizzle-orm";
-import { buildSessionAffinityKey, withSessionAffinity } from "../../lib/ai/session-affinity";
-import { FALLBACK_MODEL, PRIMARY_MODEL } from "../../lib/constants";
 import { emails, tasks } from "../../db/schema";
 import { listEvents } from "../../lib/calendar/google";
 import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
@@ -210,39 +208,26 @@ export function registerPostBriefingStream(app: Hono<AppRouteEnv>) {
       mailboxId,
     });
 
-    const sessionAffinityKey = buildSessionAffinityKey("briefing", user.id, mailboxId);
     const openai = createOpenAI({
       apiKey: env.OPENAI_API_KEY,
-      headers: withSessionAffinity(sessionAffinityKey).extraHeaders,
     });
     const prompt = buildStreamPrompt(context);
 
     try {
-      for (const model of [PRIMARY_MODEL, FALLBACK_MODEL]) {
-        try {
-          const result = await generateText({
-            model: openai.responses(model),
-            system: STREAM_SYSTEM,
-            prompt,
-            maxOutputTokens: 300,
-          });
-          const text = result.text.trim();
-          if (text) {
-            return new Response(text, {
-              headers: {
-                "Content-Type": "text/plain; charset=utf-8",
-                "Cache-Control": "no-store",
-              },
-            });
-          }
-        } catch (modelError) {
-          console.error("Briefing generation failed for model", {
-            userId: user.id,
-            mailboxId,
-            model,
-            error: modelError,
-          });
-        }
+      const result = await generateText({
+        model: openai.responses("gpt-5.4-mini"),
+        system: STREAM_SYSTEM,
+        prompt,
+        maxOutputTokens: 300,
+      });
+      const text = result.text.trim();
+      if (text) {
+        return new Response(text, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "no-store",
+          },
+        });
       }
 
       return new Response(buildFallbackBriefing(context), {

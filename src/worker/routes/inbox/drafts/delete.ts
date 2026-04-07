@@ -20,7 +20,7 @@ export function registerDeleteDrafts(api: Hono<AppRouteEnv>) {
           and(eq(drafts.userId, user.id), eq(drafts.composeKey, composeKey)),
         );
 
-      return c.json({ data: { deleted: true } }, 200);
+      return c.json({ deleted: true }, 200);
     },
   );
 
@@ -33,6 +33,6 @@ export function registerDeleteDrafts(api: Hono<AppRouteEnv>) {
       .delete(drafts)
       .where(and(eq(drafts.id, id), eq(drafts.userId, user.id)));
 
-    return c.json({ data: { deleted: true } }, 200);
+    return c.json({ deleted: true }, 200);
   });
 }

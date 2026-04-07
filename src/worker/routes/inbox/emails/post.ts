@@ -98,7 +98,7 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
         .returning({ id: scheduledEmails.id });
 
       return c.json(
-        { data: { scheduledId: rows[0].id, scheduledFor: input.scheduledFor } },
+        { scheduledId: rows[0].id, scheduledFor: input.scheduledFor },
         201,
       );
     }
@@ -169,11 +169,9 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
 
       return c.json(
         {
-          data: {
-            providerMessageId: result.providerMessageId,
-            threadId: result.threadId,
-            projected,
-          },
+          providerMessageId: result.providerMessageId,
+          threadId: result.threadId,
+          projected,
         },
         200,
       );

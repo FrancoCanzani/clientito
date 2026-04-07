@@ -5,15 +5,15 @@ import { emailIntelligence, emails } from "../../../db/schema";
 import { createEmailProvider } from "../../../lib/email";
 import { syncAllMailboxes } from "../../../lib/email/sync";
 import type { AppRouteEnv } from "../../types";
+import { emailDetailParamsSchema, emailDetailQuerySchema } from "./schemas";
 import {
   buildAttachmentUrl,
   emailIntelligenceSelection,
   emailSummarySelection,
   HAS_ATTACHMENT_LABEL,
   resolveInlineCidImages,
-  toEmailDetailResponse,
+  toEmailListResponse,
 } from "./utils";
-import { emailDetailParamsSchema, emailDetailQuerySchema } from "./schemas";
 
 export function registerGetEmail(api: Hono<AppRouteEnv>) {
   api.get(
@@ -48,7 +48,11 @@ export function registerGetEmail(api: Hono<AppRouteEnv>) {
       const first = row[0];
       if (!first) return c.json({ error: "Email not found" }, 404);
 
-      const baseEmail = toEmailDetailResponse(first);
+      const baseEmail = {
+        ...toEmailListResponse(first),
+        bodyText: first.bodyText,
+        bodyHtml: first.bodyHtml,
+      };
       let resolvedBodyText = baseEmail.bodyText;
       let resolvedBodyHtml = baseEmail.bodyHtml;
       let attachments: Array<{
@@ -69,8 +73,14 @@ export function registerGetEmail(api: Hono<AppRouteEnv>) {
         let reconnectRequired = false;
 
         try {
-          const provider = await createEmailProvider(db, c.env, first.mailboxId);
-          const rawMessage = await provider.fetchMessage(baseEmail.providerMessageId);
+          const provider = await createEmailProvider(
+            db,
+            c.env,
+            first.mailboxId,
+          );
+          const rawMessage = await provider.fetchMessage(
+            baseEmail.providerMessageId,
+          );
 
           resolvedBodyText = rawMessage.bodyText ?? resolvedBodyText;
           resolvedBodyHtml = rawMessage.bodyHtml ?? resolvedBodyHtml;
@@ -117,7 +127,11 @@ export function registerGetEmail(api: Hono<AppRouteEnv>) {
           });
         } catch (error) {
           try {
-            const provider = await createEmailProvider(db, c.env, first.mailboxId);
+            const provider = await createEmailProvider(
+              db,
+              c.env,
+              first.mailboxId,
+            );
             reconnectRequired = provider.isReconnectError(error);
           } catch {
             reconnectRequired = false;
@@ -140,12 +154,10 @@ export function registerGetEmail(api: Hono<AppRouteEnv>) {
 
       return c.json(
         {
-          data: {
-            ...baseEmail,
-            resolvedBodyText,
-            resolvedBodyHtml,
-            attachments,
-          },
+          ...baseEmail,
+          resolvedBodyText,
+          resolvedBodyHtml,
+          attachments,
         },
         200,
       );

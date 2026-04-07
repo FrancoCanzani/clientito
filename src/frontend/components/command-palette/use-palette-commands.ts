@@ -1,8 +1,8 @@
-import { VIEW_VALUES, type EmailView } from "@/features/inbox/utils/inbox-filters";
+import { VIEW_VALUES, type EmailView } from "@/features/email/inbox/utils/inbox-filters";
 import { useLogout } from "@/hooks/use-auth";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import { useTheme } from "@/hooks/use-theme";
-import { getPreferredMailboxId } from "@/features/inbox/utils/mailbox";
+import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
 import {
   AtIcon,
   CalendarDotsIcon,

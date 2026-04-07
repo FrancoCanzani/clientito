@@ -9,7 +9,7 @@ import {
 } from "@/features/home/mutations";
 import { useAuth } from "@/hooks/use-auth";
 import { useMailboxes } from "@/hooks/use-mailboxes";
-import { getPreferredMailboxId } from "@/features/inbox/utils/mailbox";
+import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
 import { SpinnerGapIcon } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";

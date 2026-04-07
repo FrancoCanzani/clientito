@@ -1,8 +1,7 @@
-import { desc, eq, inArray, or } from "drizzle-orm";
+import { eq, inArray, or, sql } from "drizzle-orm";
 import type { Database } from "../../../db/client";
 import { emailIntelligence, emails, type FilterActions } from "../../../db/schema";
 import { applyEmailPatch } from "../../../routes/inbox/emails/internal/mutation";
-import { buildSessionAffinityKey } from "../../ai/session-affinity";
 import { truncate } from "../../utils";
 import { createEmailProvider } from "../index";
 import { getUserFilters } from "../user-filters";
@@ -11,9 +10,9 @@ import {
   buildSourceHash,
   buildThreadPrompt,
   EMAIL_INTELLIGENCE_SCHEMA_VERSION,
-  emailTriageOutputSchema,
+  emailClassificationOutputSchema,
   generateStructuredEmailObject,
-  normalizeEmailTriageOutput,
+  normalizeEmailClassificationOutput,
   normalizeMatchedFilterIds,
   INLINE_PROCESS_LIMIT,
   MAX_RETRY_ATTEMPTS,
@@ -21,12 +20,12 @@ import {
   type EmailContextRow,
 } from "./common";
 import {
-  getStoredEmailTriage,
+  getStoredEmailClassification,
   isEmailEligibleForIntelligence,
   loadEmailContext,
 } from "./store";
 
-const TRIAGE_SYSTEM = [
+const CLASSIFICATION_SYSTEM = [
   "## Role",
   "You are an email classifier. Classify the email for inbox surfacing.",
   "Return one JSON object matching the requested schema.",
@@ -61,7 +60,7 @@ async function applyFilterActions(
     (filter) => Boolean(filter.actions) && Object.keys(filter.actions).length > 0,
   );
   if (matchedFilters.length === 0) {
-    return { email, categoryOverride: null as FilterActions["applyCategory"] | null };
+    return { categoryOverride: null as FilterActions["applyCategory"] | null };
   }
 
   let categoryOverride: FilterActions["applyCategory"] | null = null;
@@ -78,7 +77,7 @@ async function applyFilterActions(
   }
 
   if (Object.keys(mutation).length === 0) {
-    return { email, categoryOverride };
+    return { categoryOverride };
   }
 
   const patch = applyEmailPatch(email, mutation);
@@ -98,23 +97,7 @@ async function applyFilterActions(
     );
   }
 
-  return {
-    email: {
-      ...email,
-      ...patch.dbUpdates,
-      labelIds: patch.labelIds,
-      isRead:
-        typeof patch.dbUpdates.isRead === "boolean"
-          ? patch.dbUpdates.isRead
-          : email.isRead,
-      snoozedUntil:
-        typeof patch.dbUpdates.snoozedUntil === "number" ||
-        patch.dbUpdates.snoozedUntil === null
-          ? patch.dbUpdates.snoozedUntil
-          : email.snoozedUntil,
-    },
-    categoryOverride,
-  };
+  return { categoryOverride };
 }
 
 export async function enqueueEmailIntelligence(
@@ -140,18 +123,21 @@ export async function enqueueEmailIntelligence(
     .where(inArray(emails.id, emailIds));
 
   const threadIds = [...new Set(rows.map((row) => row.threadId).filter((id): id is string => Boolean(id)))];
-  const latestThreadRows = threadIds.length
+  const latestThreadDates = threadIds.length
     ? await db
-        .select({ id: emails.id, threadId: emails.threadId })
+        .select({
+          threadId: emails.threadId,
+          latestDate: sql<number>`max(${emails.date})`,
+        })
         .from(emails)
         .where(inArray(emails.threadId, threadIds))
-        .orderBy(desc(emails.date))
+        .groupBy(emails.threadId)
     : [];
 
-  const latestByThread = new Map<string, number>();
-  for (const row of latestThreadRows) {
-    if (!row.threadId || latestByThread.has(row.threadId)) continue;
-    latestByThread.set(row.threadId, row.id);
+  const latestDateByThread = new Map<string, number>();
+  for (const row of latestThreadDates) {
+    if (!row.threadId || !Number.isFinite(row.latestDate)) continue;
+    latestDateByThread.set(row.threadId, row.latestDate);
   }
 
   const eligible = rows.filter((row) =>
@@ -159,7 +145,7 @@ export async function enqueueEmailIntelligence(
       {
         ...row,
         isLatestInThread: row.threadId
-          ? latestByThread.get(row.threadId) === row.id
+          ? latestDateByThread.get(row.threadId) === row.date
           : true,
       },
       now,
@@ -194,7 +180,7 @@ export async function enqueueEmailIntelligence(
   return eligible.map((row) => row.id);
 }
 
-export async function processEmailIntelligence(
+async function processEmailIntelligence(
   db: Database,
   env: Env,
   emailId: number,
@@ -220,7 +206,7 @@ export async function processEmailIntelligence(
     existing.category &&
     existing.urgency
   ) {
-    return getStoredEmailTriage(existing);
+    return getStoredEmailClassification(existing);
   }
 
   await db
@@ -252,49 +238,40 @@ export async function processEmailIntelligence(
       .filter(Boolean)
       .join("\n");
 
-    const { output, matchedFilterIds, model } = await (async () => {
-      const result = await generateStructuredEmailObject({
-        env,
-        prompt,
-        system: TRIAGE_SYSTEM,
-        schema: emailTriageOutputSchema,
-        sessionAffinityKey: buildSessionAffinityKey(
-          "email-intelligence-triage",
-          email.userId,
-          emailId,
-        ),
-      });
-      return {
-        output: result.object,
-        matchedFilterIds: normalizeMatchedFilterIds(result.object.matchedFilterIds, activeFilters),
-        model: result.model,
-      };
-    })();
+    const result = await generateStructuredEmailObject({
+      env,
+      prompt,
+      system: CLASSIFICATION_SYSTEM,
+      schema: emailClassificationOutputSchema,
+    });
+    const matchedFilterIds = normalizeMatchedFilterIds(
+      result.object.matchedFilterIds,
+      activeFilters,
+    );
+    const classification = normalizeEmailClassificationOutput(result.object);
 
-    const triage = normalizeEmailTriageOutput(output);
-
-    const { email: nextEmail, categoryOverride } = await applyFilterActions(
+    const { categoryOverride } = await applyFilterActions(
       db,
       env,
       email,
       activeFilters.filter((filter) => matchedFilterIds.includes(filter.id)),
     );
 
-    const category = categoryOverride ?? triage.category;
+    const category = categoryOverride ?? classification.category;
     const contentChanged = existing?.sourceHash !== nextSourceHash;
 
     await db
       .update(emailIntelligence)
       .set({
-        mailboxId: nextEmail.mailboxId,
+        mailboxId: email.mailboxId,
         category,
-        urgency: triage.urgency,
-        suspiciousJson: triage.suspicious,
+        urgency: classification.urgency,
+        suspiciousJson: classification.suspicious,
         // Clear stale on-demand data only when email content changed
         ...(contentChanged ? { summary: null, actionsJson: [], calendarEventsJson: [] } : {}),
         status: "ready",
         sourceHash: nextSourceHash,
-        model,
+        model: result.model,
         schemaVersion: EMAIL_INTELLIGENCE_SCHEMA_VERSION,
         error: null,
         lastProcessedAt: now,
@@ -308,7 +285,7 @@ export async function processEmailIntelligence(
       .where(eq(emailIntelligence.emailId, emailId))
       .limit(1);
 
-    return getStoredEmailTriage(latest[0]);
+    return getStoredEmailClassification(latest[0]);
   } catch (error) {
     await db
       .update(emailIntelligence)
@@ -351,7 +328,7 @@ export async function processPendingEmailIntelligence(
       await processEmailIntelligence(db, env, row.emailId);
       processed += 1;
     } catch (error) {
-      console.error("Pending email triage failed", { emailId: row.emailId, error });
+      console.error("Pending email classification failed", { emailId: row.emailId, error });
     }
   }
 

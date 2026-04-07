@@ -1,6 +1,6 @@
-import FolderEmailDetailPage from "@/features/inbox/pages/folder-email-detail-page";
-import { fetchEmailDetail, fetchEmailDetailAI } from "@/features/inbox/queries";
-import { folderEmailParamsSchema } from "@/features/inbox/routes/schemas";
+import FolderPage from "@/features/email/inbox/pages/folder-page";
+import { fetchEmailDetail, fetchEmailDetailAI } from "@/features/email/inbox/queries";
+import { folderEmailParamsSchema } from "@/features/email/inbox/routes/schemas";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute(
@@ -25,5 +25,5 @@ export const Route = createFileRoute(
   },
   staleTime: 60_000,
   gcTime: 10 * 60_000,
-  component: FolderEmailDetailPage,
+  component: FolderPage,
 });

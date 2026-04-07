@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { requireAuth } from "../../../middleware/auth";
 import type { AppRouteEnv } from "../../types";
-import { registerGetFilters } from "./get-all";
+import { registerGetFilters } from "./get-filters";
 import { registerCreateFilter } from "./post-create";
 import { registerUpdateFilter } from "./put-update";
 import { registerDeleteFilter } from "./delete";

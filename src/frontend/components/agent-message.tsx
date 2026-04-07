@@ -3,9 +3,9 @@ import {
   getComposerBody,
   isComposerOpen,
   setComposerBody,
-} from "@/features/inbox/components/compose-editor-ref";
-import { fetchEmailDetail } from "@/features/inbox/queries";
-import type { EmailDetailItem } from "@/features/inbox/types";
+} from "@/features/email/inbox/components/compose-editor-ref";
+import { fetchEmailDetail } from "@/features/email/inbox/queries";
+import type { EmailDetailItem } from "@/features/email/inbox/types";
 import { cn, normalizeAgentText } from "@/lib/utils";
 import { CheckIcon, PencilSimpleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";

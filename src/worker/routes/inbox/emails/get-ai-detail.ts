@@ -1,7 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
-import { emails } from "../../../db/schema";
 import {
   generateEmailOnDemand,
   getStoredEmailOnDemand,
@@ -19,21 +17,14 @@ export function registerGetEmailAIDetail(api: Hono<AppRouteEnv>) {
       const env = c.env;
       const { emailId } = c.req.valid("param");
 
-      const emailRow = await db
-        .select({ id: emails.id })
-        .from(emails)
-        .where(and(eq(emails.id, emailId), eq(emails.userId, user.id)))
-        .limit(1);
-
-      if (!emailRow[0]) return c.json({ error: "Email not found" }, 404);
-
       try {
-        const result = await generateEmailOnDemand(db, env, emailId);
-        return c.json({ data: result ?? null }, 200);
+        const result = await generateEmailOnDemand(db, env, emailId, user.id);
+        if (!result) return c.json({ error: "Email not found" }, 404);
+        return c.json(result, 200);
       } catch (error) {
         console.error("On-demand email analysis failed", { emailId, error });
-        const fallback = await getStoredEmailOnDemand(db, emailId);
-        return c.json({ data: fallback }, 200);
+        const fallback = await getStoredEmailOnDemand(db, emailId, user.id);
+        return c.json(fallback ?? null, 200);
       }
     },
   );

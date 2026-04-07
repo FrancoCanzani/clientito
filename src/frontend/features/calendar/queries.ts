@@ -15,8 +15,7 @@ export async function fetchAgendaEvents(
   const params = new URLSearchParams({ from, to, mailboxId: String(mailboxId) });
   const response = await fetch(`/api/calendar/events?${params}`);
   if (!response.ok) throw new Error("Failed to fetch calendar events");
-  const json = await response.json();
-  return (json as { data: AgendaEvent[] }).data;
+  return (await response.json()) as AgendaEvent[];
 }
 
 export function agendaEventsQueryOptions({

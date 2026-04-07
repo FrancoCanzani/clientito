@@ -20,6 +20,6 @@ export type SyncStatus = {
 export async function fetchSyncStatus(): Promise<SyncStatus> {
   const response = await fetch("/api/inbox/sync/status");
   if (!response.ok) throw { status: response.status };
-  const json = await response.json();
-  return json.data;
+  const json: SyncStatus = await response.json();
+  return json;
 }

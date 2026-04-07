@@ -1,7 +1,7 @@
-import LabelEmailDetailPage from "@/features/inbox/pages/label-email-detail-page";
-import { fetchEmailDetail, fetchEmailDetailAI } from "@/features/inbox/queries";
+import LabelPage from "@/features/email/inbox/pages/label-page";
+import { fetchEmailDetail, fetchEmailDetailAI } from "@/features/email/inbox/queries";
 import { createFileRoute } from "@tanstack/react-router";
-import { labelEmailParamsSchema } from "@/features/inbox/routes/schemas";
+import { labelEmailParamsSchema } from "@/features/email/inbox/routes/schemas";
 
 export const Route = createFileRoute(
   "/_dashboard/$mailboxId/inbox/labels/$label/email/$emailId",
@@ -25,5 +25,5 @@ export const Route = createFileRoute(
   },
   staleTime: 60_000,
   gcTime: 10 * 60_000,
-  component: LabelEmailDetailPage,
+  component: LabelPage,
 });

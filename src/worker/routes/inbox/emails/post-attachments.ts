@@ -51,6 +51,6 @@ export function registerUploadAttachments(api: Hono<AppRouteEnv>) {
       });
     }
 
-    return c.json({ data: results }, 200);
+    return c.json(results, 200);
   });
 }

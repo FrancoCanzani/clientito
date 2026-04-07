@@ -3,7 +3,6 @@ import { zValidator } from "@hono/zod-validator";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { z } from "zod";
-import { AI_MODELS } from "../../lib/constants";
 import type { AppRouteEnv } from "../types";
 
 const grammarCheckBodySchema = z.object({
@@ -26,26 +25,19 @@ export function registerPostGrammarCheck(app: Hono<AppRouteEnv>) {
     async (c) => {
       const { text } = c.req.valid("json");
       const openai = createOpenAI({ apiKey: c.env.OPENAI_API_KEY });
-      let lastError: unknown = null;
+      try {
+        const result = await generateText({
+          model: openai.responses("gpt-5.4-mini"),
+          system: GRAMMAR_SYSTEM,
+          prompt: text,
+          maxOutputTokens: 4000,
+        });
 
-      for (const modelName of AI_MODELS) {
-        try {
-          const result = await generateText({
-            model: openai.responses(modelName),
-            system: GRAMMAR_SYSTEM,
-            prompt: text,
-            maxOutputTokens: 4000,
-          });
-
-          return c.json({ data: { corrected: result.text.trim() } }, 200);
-        } catch (error) {
-          lastError = error;
-          console.error("Grammar check failed", { model: modelName, error });
-        }
+        return c.json({ corrected: result.text.trim() }, 200);
+      } catch (error) {
+        console.error("Grammar check failed", { model: "gpt-5.4-mini", error });
+        return c.json({ error: "Grammar check unavailable" }, 503 as never);
       }
-
-      console.error("Grammar check failed for all models", { error: lastError });
-      return c.json({ error: "Grammar check unavailable" }, 503 as never);
     },
   );
 }

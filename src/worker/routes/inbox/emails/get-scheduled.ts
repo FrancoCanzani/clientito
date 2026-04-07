@@ -28,7 +28,7 @@ export function registerGetScheduledEmails(api: Hono<AppRouteEnv>) {
       .orderBy(desc(scheduledEmails.scheduledFor))
       .limit(50);
 
-    return c.json({ data: rows });
+    return c.json(rows);
   });
 
   api.delete("/scheduled/:id", async (c) => {
@@ -56,6 +56,6 @@ export function registerGetScheduledEmails(api: Hono<AppRouteEnv>) {
       return c.json({ error: "Scheduled email not found or already sent" }, 404);
     }
 
-    return c.json({ data: { id: rows[0].id } });
+    return c.json({ id: rows[0].id });
   });
 }

@@ -4,7 +4,6 @@ import { and, desc, eq } from "drizzle-orm";
 import { drafts } from "../../../db/schema";
 import type { AppRouteEnv } from "../../types";
 import { deleteDraftByKeyQuerySchema, getDraftsQuerySchema } from "./schemas";
-import { DRAFT_COLUMNS } from "./utils";
 
 export function registerGetDrafts(api: Hono<AppRouteEnv>) {
   api.get("/", zValidator("query", getDraftsQuerySchema), async (c) => {
@@ -13,7 +12,7 @@ export function registerGetDrafts(api: Hono<AppRouteEnv>) {
     const { mailboxId } = c.req.valid("query");
 
     const rows = await db
-      .select(DRAFT_COLUMNS)
+      .select()
       .from(drafts)
       .where(
         mailboxId == null
@@ -22,7 +21,7 @@ export function registerGetDrafts(api: Hono<AppRouteEnv>) {
       )
       .orderBy(desc(drafts.updatedAt));
 
-    return c.json({ data: rows }, 200);
+    return c.json(rows.map(({ userId: _userId, ...row }) => row), 200);
   });
 
   api.get(
@@ -34,16 +33,17 @@ export function registerGetDrafts(api: Hono<AppRouteEnv>) {
       const { composeKey } = c.req.valid("query");
 
       const rows = await db
-        .select(DRAFT_COLUMNS)
+        .select()
         .from(drafts)
         .where(and(eq(drafts.userId, user.id), eq(drafts.composeKey, composeKey)))
         .limit(1);
 
       if (!rows[0]) {
-        return c.json({ data: null }, 200);
+        return c.json(null, 200);
       }
 
-      return c.json({ data: rows[0] }, 200);
+      const { userId: _userId, ...row } = rows[0];
+      return c.json(row, 200);
     },
   );
 }

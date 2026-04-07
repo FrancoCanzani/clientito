@@ -5,7 +5,6 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { Output, generateText } from "ai";
 import { z } from "zod";
 import { emails } from "../../../db/schema";
-import { AI_MODELS } from "../../../lib/constants";
 import type { AppRouteEnv } from "../../types";
 
 const generateSchema = z.object({
@@ -52,14 +51,11 @@ export function registerGenerateFilter(app: Hono<AppRouteEnv>) {
       .join("\n");
 
     const openai = createOpenAI({ apiKey: c.env.OPENAI_API_KEY });
-    let lastError: unknown = null;
-
-    for (const modelName of AI_MODELS) {
-      try {
-        const { output: filter } = await generateText({
-          model: openai.responses(modelName),
-          output: Output.object({ schema: filterOutputSchema }),
-          prompt: `You are an email filter generator. The user describes what they want in plain English and you create an email filter.
+    try {
+      const { output: filter } = await generateText({
+        model: openai.responses("gpt-5.4-mini"),
+        output: Output.object({ schema: filterOutputSchema }),
+        prompt: `You are an email filter generator. The user describes what they want in plain English and you create an email filter.
 
 The filter has three parts:
 1. "name" — a short human-readable name for the filter (3-6 words)
@@ -72,16 +68,15 @@ ${senderSample}
 User request: "${prompt}"
 
 Generate the filter.`,
-        });
+      });
 
-        return c.json({ data: filter });
-      } catch (error) {
-        lastError = error;
-        console.error("Filter generation failed", { model: modelName, error });
-      }
+      return c.json(filter);
+    } catch (error) {
+      console.error("Filter generation failed", {
+        model: "gpt-5.4-mini",
+        error,
+      });
+      return c.json({ error: "Filter generation unavailable" }, 503 as never);
     }
-
-    console.error("Filter generation failed for all models", { error: lastError });
-    return c.json({ error: "Filter generation unavailable" }, 503 as never);
   });
 }

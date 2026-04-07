@@ -1,7 +1,7 @@
 import GetStartedPage from "@/features/home/pages/get-started-page";
 import { getDashboardGate } from "@/features/home/dashboard-gate";
 import { fetchAccounts } from "@/hooks/use-mailboxes";
-import { getPreferredMailboxId } from "@/features/inbox/utils/mailbox";
+import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/get-started")({

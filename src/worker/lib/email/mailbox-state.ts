@@ -5,7 +5,7 @@ import { mailboxes, syncJobs } from "../../db/schema";
 import { type SyncJobErrorClass } from "./providers/google/errors";
 import type { SyncWindowMonths } from "./sync-preferences";
 
-export const SYNC_LOCK_TTL_MS = 4 * 60_000;
+const SYNC_LOCK_TTL_MS = 4 * 60_000;
 const STALE_SYNC_JOB_MESSAGE = "Sync job stalled or timed out.";
 
 export type SyncJobKind = "full" | "incremental";
@@ -35,7 +35,7 @@ function toTimestamp(value: Date | number | null | undefined): number | null {
   return typeof value === "number" ? value : null;
 }
 
-export async function getCurrentGoogleAccounts(db: Database, userId: string) {
+async function getCurrentGoogleAccounts(db: Database, userId: string) {
   const allGoogleAccounts = await db
     .select({
       id: account.id,
@@ -481,7 +481,7 @@ export async function markSyncJobFailed(
     .where(eq(mailboxes.id, mailboxId));
 }
 
-export async function expireStaleSyncJobs(
+async function expireStaleSyncJobs(
   db: Database,
   mailboxId: number,
 ): Promise<boolean> {

@@ -1,6 +1,6 @@
-import InboxLabelPage from "@/features/inbox/pages/inbox-label-page";
-import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/inbox/queries";
-import { labelParamsSchema } from "@/features/inbox/routes/schemas";
+import { InboxListView } from "@/features/email/inbox/pages/inbox-list-view";
+import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/email/inbox/queries";
+import { labelParamsSchema } from "@/features/email/inbox/routes/schemas";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute(
@@ -20,5 +20,18 @@ export const Route = createFileRoute(
       }),
     };
   },
-  component: InboxLabelPage,
+  component: LabelRoutePage,
 });
+
+function LabelRoutePage() {
+  const { mailboxId, label } = Route.useParams();
+  const { initialPage } = Route.useLoaderData();
+
+  return (
+    <InboxListView
+      view={label}
+      mailboxId={mailboxId}
+      initialPage={initialPage}
+    />
+  );
+}

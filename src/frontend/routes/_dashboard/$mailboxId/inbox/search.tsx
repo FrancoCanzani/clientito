@@ -1,9 +1,9 @@
-import InboxSearchPage from "@/features/inbox/pages/inbox-search-page";
+import InboxSearchPage from "@/features/email/inbox/pages/inbox-search-page";
 import {
   fetchSearchEmails,
   fetchSearchSuggestions,
   INBOX_SEARCH_PAGE_SIZE,
-} from "@/features/inbox/queries";
+} from "@/features/email/inbox/queries";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 

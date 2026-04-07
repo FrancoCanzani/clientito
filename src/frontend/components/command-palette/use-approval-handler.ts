@@ -1,4 +1,4 @@
-import { openCompose } from "@/features/inbox/components/compose-events";
+import { openCompose } from "@/features/email/inbox/components/compose-events";
 import type { QueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 

@@ -32,7 +32,7 @@ export function registerPostSync(api: Hono<AppRouteEnv>) {
       months,
     });
 
-    return c.json({ data: { status: "started" } }, 202);
+    return c.json({ status: "started" }, 202);
   });
 
   api.post("/incremental", zValidator("json", syncRequestSchema), async (c) => {
@@ -57,7 +57,7 @@ export function registerPostSync(api: Hono<AppRouteEnv>) {
       return c.json({ error: result.error }, 500);
     }
 
-    return c.json({ data: { status: result.status } }, 200);
+    return c.json({ status: result.status }, 200);
   });
 
   api.post("/recover", async (c) => {
@@ -75,6 +75,6 @@ export function registerPostSync(api: Hono<AppRouteEnv>) {
       mailboxId: mailbox.id,
     });
 
-    return c.json({ data: { status: "started" } }, 202);
+    return c.json({ status: "started" }, 202);
   });
 }

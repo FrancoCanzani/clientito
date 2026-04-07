@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { requireAuth } from "../../../middleware/auth";
 import type { AppRouteEnv } from "../../types";
-import { registerGetSubscriptions } from "./get-all";
+import { registerGetSubscriptions } from "./get-subscriptions";
 import { registerPostUnsubscribe } from "./post-unsubscribe";
 
 const subscriptionsRoutes = new Hono<AppRouteEnv>();

@@ -2,22 +2,25 @@ import { Output, generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import {
-  type CalendarSuggestion,
-  type EmailAction,
   type EmailSuspiciousFlag,
   type FilterActions,
 } from "../../../db/schema";
-import { AI_MODELS } from "../../constants";
 import { truncate, withRetry } from "../../utils";
 
-export const EMAIL_INTELLIGENCE_MODELS = AI_MODELS;
+const EMAIL_INTELLIGENCE_MODEL = "gpt-5.4-mini";
 export const EMAIL_INTELLIGENCE_SCHEMA_VERSION = 1;
 export const MAX_THREAD_MESSAGES = 6;
 export const INLINE_PROCESS_LIMIT = 5;
 export const MAX_RETRY_ATTEMPTS = 3;
 export const ELIGIBILITY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+export const DEFAULT_SUSPICIOUS_FLAG: EmailSuspiciousFlag = {
+  isSuspicious: false,
+  kind: null,
+  reason: null,
+  confidence: null,
+};
 
-export const suspiciousFlagOutputSchema = z.object({
+const suspiciousFlagOutputSchema = z.object({
   isSuspicious: z.boolean(),
   kind: z.enum([
     "phishing",
@@ -29,8 +32,8 @@ export const suspiciousFlagOutputSchema = z.object({
   confidence: z.enum(["low", "medium", "high"]).nullable(),
 });
 
-/** Background triage: classification only */
-export const emailTriageOutputSchema = z.object({
+/** Background email classification only */
+export const emailClassificationOutputSchema = z.object({
   category: z.enum([
     "important",
     "action_needed",
@@ -43,24 +46,7 @@ export const emailTriageOutputSchema = z.object({
   matchedFilterIds: z.array(z.number().int().positive()),
 });
 
-/** On-demand analysis: triggered when user opens an email */
-export const emailOnDemandOutputSchema = z.object({
-  summary: z.string().trim().min(1).max(500),
-  replyDraft: z.string().trim().max(2000).nullable(),
-  taskSuggestion: z.object({
-    title: z.string().trim().min(1).max(200),
-    dueAt: z.string().trim().max(100).nullable(),
-    priority: z.enum(["urgent", "high", "medium", "low"]).nullable(),
-  }).nullable(),
-  calendarSuggestion: z.object({
-    title: z.string().trim().min(1).max(200),
-    proposedDate: z.string().trim().min(1).max(100),
-    sourceText: z.string().trim().min(1).max(500),
-  }).nullable(),
-});
-
-export type EmailTriageOutput = z.infer<typeof emailTriageOutputSchema>;
-export type EmailOnDemandOutput = z.infer<typeof emailOnDemandOutputSchema>;
+export type EmailClassificationOutput = z.infer<typeof emailClassificationOutputSchema>;
 
 export type ActiveEmailFilter = {
   id: number;
@@ -68,7 +54,7 @@ export type ActiveEmailFilter = {
   actions: FilterActions;
 };
 
-export type StoredEmailTriage = {
+export type StoredEmailClassification = {
   category: "important" | "action_needed" | "newsletter" | "notification" | "transactional";
   urgency: "high" | "medium" | "low";
   suspicious: EmailSuspiciousFlag;
@@ -95,7 +81,7 @@ export type EmailContextRow = {
   snoozedUntil: number | null;
 };
 
-export function compactText(value: string | null | undefined, maxLength: number): string {
+function compactText(value: string | null | undefined, maxLength: number): string {
   if (!value) return "";
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
@@ -112,44 +98,11 @@ async function sha256(input: string): Promise<string> {
   return toHex(digest);
 }
 
-function stableNumber(input: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return Math.abs(hash >>> 0) || 1;
-}
-
-function stableActionId(
-  emailId: number,
-  action: { type: string; label: string; payload: Record<string, unknown> },
-) {
-  return `${action.type}-${stableNumber(`${emailId}:${action.label}:${JSON.stringify(action.payload)}`).toString(36)}`;
-}
-
-function stableCalendarSuggestionId(
-  emailId: number,
-  suggestion: { title: string; proposedDate: string; sourceText: string },
-) {
-  return stableNumber(
-    `${emailId}:${suggestion.title}:${suggestion.proposedDate}:${suggestion.sourceText}`,
-  );
-}
-
-function isDateOnly(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-function normalizeSummary(value: string) {
-  return truncate(value.replace(/\s+/g, " ").trim(), 500);
-}
-
 function normalizeSuspiciousFlag(
-  suspicious: EmailTriageOutput["suspicious"],
+  suspicious: EmailClassificationOutput["suspicious"],
 ): EmailSuspiciousFlag {
   if (!suspicious?.isSuspicious) {
-    return { isSuspicious: false, kind: null, reason: null, confidence: null };
+    return DEFAULT_SUSPICIOUS_FLAG;
   }
 
   const reason = typeof suspicious.reason === "string"
@@ -164,164 +117,14 @@ function normalizeSuspiciousFlag(
   };
 }
 
-function normalizeReplyDraft(payload: Record<string, unknown>) {
-  const draft = typeof payload.draft === "string" ? payload.draft.trim() : "";
-  return draft.length > 0 ? truncate(draft, 2000) : null;
-}
-
-function normalizeAction(
-  emailId: number,
-  action: { type: EmailAction["type"]; label: string; payload: Record<string, unknown>; trustLevel: EmailAction["trustLevel"] },
-  now: number,
-): EmailAction | null {
-  const label = truncate(action.label.replace(/\s+/g, " ").trim(), 120);
-  if (!label) return null;
-
-  const payload = { ...action.payload };
-
-  if (action.type === "reply") {
-    const draft = normalizeReplyDraft(payload);
-    if (!draft) return null;
-    payload.draft = draft;
-  }
-
-  if (action.type === "create_task") {
-    const taskTitle =
-      typeof payload.taskTitle === "string" ? payload.taskTitle.trim() : "";
-    if (!taskTitle) return null;
-    payload.taskTitle = truncate(taskTitle, 200);
-
-    const taskDueAt =
-      typeof payload.taskDueAt === "string" ? payload.taskDueAt.trim() : "";
-    if (taskDueAt) {
-      const parsed = new Date(taskDueAt).getTime();
-      payload.taskDueAt = Number.isFinite(parsed) ? parsed : null;
-    } else {
-      payload.taskDueAt = null;
-    }
-
-    const validPriorities = ["urgent", "high", "medium", "low"];
-    payload.taskPriority = validPriorities.includes(String(payload.taskPriority))
-      ? payload.taskPriority
-      : null;
-
-    payload.taskStatus = "todo";
-  }
-
-  return {
-    id: stableActionId(emailId, { type: action.type, label, payload }),
-    type: action.type,
-    label,
-    payload,
-    trustLevel: "approve",
-    status: "pending",
-    error: null,
-    executedAt: null,
-    updatedAt: now,
-  };
-}
-
-function normalizeCalendarSuggestion(
-  emailId: number,
-  suggestion: { title: string; proposedDate: string; sourceText: string },
-  now: number,
-): CalendarSuggestion | null {
-  const proposedDate = suggestion.proposedDate.trim();
-  const title = truncate(suggestion.title.replace(/\s+/g, " ").trim(), 200);
-  const sourceText = truncate(suggestion.sourceText.replace(/\s+/g, " ").trim(), 500);
-
-  if (!title || !sourceText) return null;
-
-  let startAt = 0;
-  let endAt = 0;
-  let allDay = false;
-
-  if (isDateOnly(proposedDate)) {
-    startAt = new Date(`${proposedDate}T00:00:00.000Z`).getTime();
-    endAt = startAt + 24 * 60 * 60 * 1000;
-    allDay = true;
-  } else {
-    startAt = new Date(proposedDate).getTime();
-    endAt = startAt + 60 * 60 * 1000;
-  }
-
-  if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || startAt <= 0) {
-    return null;
-  }
-
-  return {
-    id: stableCalendarSuggestionId(emailId, { title, proposedDate, sourceText }),
-    title,
-    proposedDate,
-    startAt,
-    endAt,
-    isAllDay: allDay,
-    confidence: "high",
-    sourceText,
-    status: "pending",
-    location: null,
-    attendees: null,
-    googleEventId: null,
-    updatedAt: now,
-  };
-}
-
-export function normalizeEmailTriageOutput(
-  output: EmailTriageOutput,
-): StoredEmailTriage {
+export function normalizeEmailClassificationOutput(
+  output: EmailClassificationOutput,
+): StoredEmailClassification {
   return {
     category: output.category,
     urgency: output.urgency,
     suspicious: normalizeSuspiciousFlag(output.suspicious),
   };
-}
-
-export function normalizeEmailOnDemandOutput(
-  emailId: number,
-  output: EmailOnDemandOutput,
-  now: number,
-): { summary: string; actions: EmailAction[]; calendarEvents: CalendarSuggestion[] } {
-  const actions: EmailAction[] = [];
-
-  if (output.replyDraft) {
-    const action = normalizeAction(
-      emailId,
-      {
-        type: "reply",
-        label: "Reply",
-        payload: { draft: output.replyDraft },
-        trustLevel: "approve",
-      },
-      now,
-    );
-    if (action) actions.push(action);
-  }
-
-  if (output.taskSuggestion) {
-    const action = normalizeAction(
-      emailId,
-      {
-        type: "create_task",
-        label: output.taskSuggestion.title,
-        payload: {
-          taskTitle: output.taskSuggestion.title,
-          taskDueAt: output.taskSuggestion.dueAt,
-          taskPriority: output.taskSuggestion.priority,
-        },
-        trustLevel: "approve",
-      },
-      now,
-    );
-    if (action) actions.push(action);
-  }
-
-  const calendarEvents: CalendarSuggestion[] = [];
-  if (output.calendarSuggestion) {
-    const event = normalizeCalendarSuggestion(emailId, output.calendarSuggestion, now);
-    if (event) calendarEvents.push(event);
-  }
-
-  return { summary: normalizeSummary(output.summary), actions, calendarEvents };
 }
 
 export function normalizeMatchedFilterIds(
@@ -403,46 +206,29 @@ export async function generateStructuredEmailObject<T extends z.ZodTypeAny>(inpu
   prompt: string;
   system: string;
   schema: T;
-  sessionAffinityKey: string;
 }) {
   const openai = createOpenAI({
     apiKey: input.env.OPENAI_API_KEY,
-    headers: {
-      "x-session-affinity": input.sessionAffinityKey,
-    },
   });
-  let lastError: unknown = null;
 
-  for (const modelName of EMAIL_INTELLIGENCE_MODELS) {
-    try {
-      const result = await withRetry(
-        () =>
-          generateText({
-            model: openai.responses(modelName),
-            prompt: input.prompt,
-            system: input.system,
-            maxOutputTokens: 1200,
-            output: Output.object({ schema: input.schema }),
-          }),
-        {
-          maxRetries: 2,
-          baseDelayMs: 1000,
-          label: `email-intelligence:${modelName}`,
-        },
-      );
+  const result = await withRetry(
+    () =>
+      generateText({
+        model: openai.responses(EMAIL_INTELLIGENCE_MODEL),
+        prompt: input.prompt,
+        system: input.system,
+        maxOutputTokens: 1200,
+        output: Output.object({ schema: input.schema }),
+      }),
+    {
+      maxRetries: 2,
+      baseDelayMs: 1000,
+      label: `email-intelligence:${EMAIL_INTELLIGENCE_MODEL}`,
+    },
+  );
 
-      return {
-        object: result.output as z.infer<T>,
-        model: modelName,
-      };
-    } catch (error) {
-      lastError = error;
-      console.error("Email intelligence failed", {
-        model: modelName,
-        error,
-      });
-    }
-  }
-
-  throw lastError ?? new Error("No email intelligence model succeeded");
+  return {
+    object: result.output as z.infer<T>,
+    model: EMAIL_INTELLIGENCE_MODEL,
+  };
 }

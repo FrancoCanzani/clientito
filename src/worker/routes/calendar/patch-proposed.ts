@@ -17,7 +17,7 @@ const bodySchema = z.object({
   location: z.string().max(500).optional(),
   startAt: z.number().int().positive().optional(),
   endAt: z.number().int().positive().optional(),
-  attendees: z.array(z.string().email()).optional(),
+  attendees: z.array(z.email()).optional(),
 });
 
 export function registerPatchProposed(api: Hono<AppRouteEnv>) {
@@ -41,8 +41,12 @@ export function registerPatchProposed(api: Hono<AppRouteEnv>) {
         ...(input.location !== undefined ? { location: input.location } : {}),
         ...(input.startAt !== undefined ? { startAt: input.startAt } : {}),
         ...(input.endAt !== undefined ? { endAt: input.endAt } : {}),
-        ...(input.attendees !== undefined ? { attendees: input.attendees } : {}),
-        ...(input.description !== undefined ? { sourceText: input.description } : {}),
+        ...(input.attendees !== undefined
+          ? { attendees: input.attendees }
+          : {}),
+        ...(input.description !== undefined
+          ? { sourceText: input.description }
+          : {}),
       });
 
       return c.json({ data: { updated: true } }, 200);

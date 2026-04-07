@@ -7,9 +7,9 @@ export const draftIdParamsSchema = z.object({
 export const upsertDraftBodySchema = z.object({
   composeKey: z.string().min(1),
   mailboxId: z.number().int().positive().nullable().optional(),
-  to: z.string().default(""),
-  cc: z.string().default(""),
-  bcc: z.string().default(""),
+  toAddr: z.string().default(""),
+  ccAddr: z.string().default(""),
+  bccAddr: z.string().default(""),
   subject: z.string().default(""),
   body: z.string().default(""),
   forwardedContent: z.string().default(""),

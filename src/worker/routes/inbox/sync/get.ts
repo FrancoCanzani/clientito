@@ -87,18 +87,16 @@ export function registerGetSync(api: Hono<AppRouteEnv>) {
 
     return c.json(
       {
-        data: {
-          state: workflowState,
-          hasSynced,
-          historyId: mailbox?.historyId ?? null,
-          lastSync: mailbox?.lastSuccessfulSyncAt ?? null,
-          phase: activeJob?.phase ?? null,
-          progressCurrent: activeJob?.progressCurrent ?? null,
-          progressTotal: activeJob?.progressTotal ?? null,
-          error: errorMessage,
-          needsMailboxConnect,
-          needsGoogleReconnect,
-        },
+        state: workflowState,
+        hasSynced,
+        historyId: mailbox?.historyId ?? null,
+        lastSync: mailbox?.lastSuccessfulSyncAt ?? null,
+        phase: activeJob?.phase ?? null,
+        progressCurrent: activeJob?.progressCurrent ?? null,
+        progressTotal: activeJob?.progressTotal ?? null,
+        error: errorMessage,
+        needsMailboxConnect,
+        needsGoogleReconnect,
       },
       200,
     );
