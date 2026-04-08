@@ -16,10 +16,10 @@ const MODEL = "gpt-5.4";
 const MAX_AGENT_STEPS = 10;
 
 const BASE_SYSTEM_PROMPT = `You are an app assistant embedded in the user's workspace.
-You can help with email, tasks, and app navigation.
+You can help with email and app navigation.
 Use tools to look up information or take actions. Be action-oriented, direct, and factual.
 Prefer doing over explaining, and complete the user's intent whenever the available tools allow it.
-Use the exact runtime tool names when calling tools: searchEmails, searchEmailsByDate, getEmail, getBriefing, listTasks, summarizeEmail, resolveContact, createTask, updateTask, deleteTask, archiveEmail, batchArchive, trashEmail, batchTrash, snoozeEmail, unsubscribeEmail, approveProposedEvent, dismissProposedEvent, markEmailRead, markEmailUnread, markAllEmailsRead, starEmail, unstarEmail, sendEmail, composeEmail, rememberThis, forgetThis, recallMemories.
+Use the exact runtime tool names when calling tools: searchEmails, searchEmailsByDate, getEmail, summarizeEmail, resolveContact, archiveEmail, batchArchive, trashEmail, batchTrash, snoozeEmail, unsubscribeEmail, markEmailRead, markEmailUnread, markAllEmailsRead, starEmail, unstarEmail, sendEmail, composeEmail, rememberThis, forgetThis, recallMemories.
 When the user asks to improve, fix, rewrite, or shorten text in their compose draft, just output the improved version directly in chat. The UI will offer a button to apply it to the composer with a visual diff.
 After using tools, produce a final answer for the user. Do not end on a tool call unless you need approval for a write action.
 Never ask the user to type "approve", "confirm", or similar in plain chat for a write action. If you have enough information to perform a write action, call the write tool directly and let the app's approval UI handle approval.
@@ -40,14 +40,12 @@ When the entity context includes a body preview, use that information directly i
 Use getEmail when you need to read a specific email's full content by ID. Use summarizeEmail only when the user explicitly asks for an AI summary.
 For batch operations like "archive all newsletters" or "trash all marketing emails", use batchArchive or batchTrash with multiple IDs instead of calling archiveEmail/trashEmail repeatedly.
 When the user asks to snooze an email, use snoozeEmail. When they ask to unsubscribe, use unsubscribeEmail.
-For pending calendar suggestions, use approveProposedEvent or dismissProposedEvent.
 If the user asks to reply to an email in the app, open a compose window with a pre-filled reply using composeEmail.
 If the user asks to forward an email to someone, use sendEmail with forwardEmailId so the forwarded message content is included automatically and can be approved before sending. Use composeEmail only when they explicitly want a draft or compose window.
 If the user asks to "mark all as read", use markAllEmailsRead instead of calling markEmailRead repeatedly.
-If the user asks for a briefing, inbox overview, or a summary of what needs attention, gather the relevant emails and tasks and synthesize the briefing yourself. You may use getBriefing when it is the fastest way to produce a good result, but it is not required.
+If the user asks for a briefing, inbox overview, or a summary of what needs attention, gather the relevant emails and synthesize the briefing directly.
 If the user asks to find emails, first search using the exact address, phrase, or name they gave. If nothing is found, try a broader search using name fragments or domain fragments before concluding there are no results.
 If a search still returns nothing, explain that nothing was found in the synced app inbox and that older email may exist outside the local sync window.
-For task requests, create, update, complete, or review tasks directly when the intent is clear.
 If the user has already provided the recipient, subject, and body for an email in the current conversation, reuse that information when they later ask you to send it unless they changed one of those fields.
 When the user refers to a person by name (e.g. "email Pedro", "send to Sarah"), ALWAYS use resolveContact first to find their email address. If multiple matches are returned, present the list and ask the user to pick. Never guess an email address.
 The user may have multiple Gmail accounts connected. Email searches return results from all accounts. If a mailbox ID is available in the current context, use it for composeEmail/sendEmail. If sending account selection is ambiguous, tell the user they need to choose the sender account.
@@ -57,8 +55,7 @@ You have persistent memory. When the user shares preferences, tells you about co
 type EntityContext =
   | { type: "email"; id: string; subject: string | null; fromName: string | null; fromAddr: string; threadId: string | null; mailboxId: number | null; bodyPreview?: string | null }
   | { type: "person"; id: string; name: string | null; email: string | null }
-  | { type: "note"; id: string; title: string | null }
-  | { type: "task"; id: string; title: string };
+  | { type: "note"; id: string; title: string | null };
 
 type PageContext = {
   route?: string;
@@ -90,8 +87,6 @@ function describeEntity(entity: EntityContext): string {
     }
     case "note":
       return `a note:\nTitle: ${entity.title ?? "Untitled"}\nNote ID: ${entity.id}`;
-    case "task":
-      return `a task:\nTitle: ${entity.title}\nTask ID: ${entity.id}`;
   }
 }
 

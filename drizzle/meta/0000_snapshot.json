@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "eb94bc6b-040f-495c-972e-3c67f2c01498",
+  "id": "b7bd8112-a32e-4c5b-bd44-53bcac7ba992",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "account": {
@@ -358,8 +358,8 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "briefing_decisions": {
-      "name": "briefing_decisions",
+    "drafts": {
+      "name": "drafts",
       "columns": {
         "id": {
           "name": "id",
@@ -375,33 +375,80 @@
           "notNull": true,
           "autoincrement": false
         },
-        "item_type": {
-          "name": "item_type",
+        "compose_key": {
+          "name": "compose_key",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "reference_id": {
-          "name": "reference_id",
+        "mailbox_id": {
+          "name": "mailbox_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
-        "decision": {
-          "name": "decision",
+        "to_addr": {
+          "name": "to_addr",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'pending'"
+          "default": "''"
         },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
+        "cc_addr": {
+          "name": "cc_addr",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "bcc_addr": {
+          "name": "bcc_addr",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "forwarded_content": {
+          "name": "forwarded_content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "thread_id": {
+          "name": "thread_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "attachment_keys": {
+          "name": "attachment_keys",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "updated_at": {
@@ -410,31 +457,37 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         }
       },
       "indexes": {
-        "briefing_decisions_user_type_ref_idx": {
-          "name": "briefing_decisions_user_type_ref_idx",
+        "drafts_user_compose_key_idx": {
+          "name": "drafts_user_compose_key_idx",
           "columns": [
             "user_id",
-            "item_type",
-            "reference_id"
+            "compose_key"
           ],
           "isUnique": true
         },
-        "briefing_decisions_user_decision_idx": {
-          "name": "briefing_decisions_user_decision_idx",
+        "drafts_user_updated_idx": {
+          "name": "drafts_user_updated_idx",
           "columns": [
             "user_id",
-            "decision"
+            "updated_at"
           ],
           "isUnique": false
         }
       },
       "foreignKeys": {
-        "briefing_decisions_user_id_user_id_fk": {
-          "name": "briefing_decisions_user_id_user_id_fk",
-          "tableFrom": "briefing_decisions",
+        "drafts_user_id_user_id_fk": {
+          "name": "drafts_user_id_user_id_fk",
+          "tableFrom": "drafts",
           "tableTo": "user",
           "columnsFrom": [
             "user_id"
@@ -609,23 +662,16 @@
           "notNull": false,
           "autoincrement": false
         },
-        "briefing_sentence": {
-          "name": "briefing_sentence",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "actions_json": {
-          "name": "actions_json",
+        "suspicious_json": {
+          "name": "suspicious_json",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'[]'"
+          "default": "'{\"isSuspicious\":false,\"kind\":null,\"reason\":null,\"confidence\":null}'"
         },
-        "calendar_events_json": {
-          "name": "calendar_events_json",
+        "actions_json": {
+          "name": "actions_json",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -1767,120 +1813,6 @@
           "tableTo": "mailboxes",
           "columnsFrom": [
             "mailbox_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "tasks": {
-      "name": "tasks",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "due_at": {
-          "name": "due_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "priority": {
-          "name": "priority",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'low'"
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'todo'"
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "tasks_user_status_idx": {
-          "name": "tasks_user_status_idx",
-          "columns": [
-            "user_id",
-            "status"
-          ],
-          "isUnique": false
-        },
-        "tasks_user_due_idx": {
-          "name": "tasks_user_due_idx",
-          "columns": [
-            "user_id",
-            "due_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "tasks_user_id_user_id_fk": {
-          "name": "tasks_user_id_user_id_fk",
-          "tableFrom": "tasks",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
           ],
           "columnsTo": [
             "id"

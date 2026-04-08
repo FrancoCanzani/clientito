@@ -1,9 +1,9 @@
 import { and, eq, lte } from "drizzle-orm";
 import type { Database } from "../db/client";
 import { mailboxes, scheduledEmails } from "../db/schema";
-import { createEmailProvider } from "../lib/email";
-import { resolveOutgoingMailbox } from "../lib/email/mailbox-state";
-import { appendSignature } from "../lib/email/signature";
+import { createEmailProvider } from "../lib/gmail/resolver";
+import { resolveOutgoingMailbox } from "../lib/gmail/sync/state";
+import { appendSignature } from "../lib/gmail/mailbox/signature";
 
 async function sendScheduledEmail(
   db: Database,

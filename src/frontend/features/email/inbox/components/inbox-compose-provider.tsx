@@ -20,10 +20,10 @@ type InboxComposeContextValue = {
 };
 
 const InboxComposeContext = createContext<InboxComposeContextValue | null>(null);
-const inboxRoute = getRouteApi("/_dashboard/$mailboxId/inbox");
+const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
 export function InboxComposeProvider({ children }: { children: ReactNode }) {
-  const { mailboxId } = inboxRoute.useParams();
+  const { mailboxId } = mailboxRoute.useParams();
   const [isOpen, setIsOpen] = useState(false);
   const [initial, setInitial] = useState<ComposeInitial | undefined>();
 

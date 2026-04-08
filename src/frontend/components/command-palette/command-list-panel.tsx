@@ -33,13 +33,11 @@ function CommandGroup({
 export function CommandListPanel({
   visibleNavigationCommands,
   accountCommands,
-  taskNavigationCommands,
   actionCommands,
   enterAgentMode,
 }: {
   visibleNavigationCommands: PaletteCommand[];
   accountCommands: PaletteCommand[];
-  taskNavigationCommands: PaletteCommand[];
   actionCommands: PaletteCommand[];
   enterAgentMode: (initialQuery?: string) => void;
 }) {
@@ -51,7 +49,6 @@ export function CommandListPanel({
         </Command.Empty>
 
         <CommandGroup heading="Accounts" commands={accountCommands} />
-        <CommandGroup heading="Task Views" commands={taskNavigationCommands} />
         <CommandGroup
           heading="Navigation"
           commands={visibleNavigationCommands}

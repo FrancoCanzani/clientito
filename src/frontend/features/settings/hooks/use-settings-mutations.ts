@@ -2,7 +2,7 @@ import {
   beginGmailConnection,
   runIncrementalSync,
   startFullSync,
-} from "@/features/home/mutations";
+} from "@/features/onboarding/mutations";
 import {
   deleteAccount,
   updateMailboxSignature,

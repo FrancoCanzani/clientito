@@ -4,8 +4,8 @@ import type { Database } from "../../../db/client";
 import {
   getMailboxSyncSnapshot,
   resolveMailbox,
-} from "../../../lib/email/mailbox-state";
-import { catchUpMailboxOnDemand } from "../../../lib/email/providers/google/sync";
+} from "../../../lib/gmail/sync/state";
+import { catchUpMailboxOnDemand } from "../../../lib/gmail/sync/engine";
 import type { AppRouteEnv } from "../../types";
 import { syncRequestSchema } from "./schemas";
 

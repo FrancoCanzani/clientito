@@ -1,27 +1,28 @@
-import { EmailDetailView } from "@/features/email/inbox/pages/email-detail-view";
+import { EmailList } from "@/features/email/inbox/components/email-list";
+import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
+import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
+import { useSetPageContext } from "@/hooks/use-page-context";
 import { getRouteApi } from "@tanstack/react-router";
+import { useMemo } from "react";
 
-const route = getRouteApi(
-  "/_dashboard/$mailboxId/inbox/folders/$folder/email/$emailId",
-);
+const route = getRouteApi("/_dashboard/$mailboxId/$folder/");
 
 export default function FolderPage() {
-  const { mailboxId, folder, emailId } = route.useParams();
-  const { email } = route.useLoaderData();
-  const navigate = route.useNavigate();
+  const { mailboxId, folder } = route.useParams();
+  const { initialPage } = route.useLoaderData();
+  const emailData = useEmailData({ view: folder, mailboxId, initialPage });
+  const { openEmail, executeEmailAction } = useEmailInboxActions({
+    view: folder,
+    mailboxId,
+  });
+
+  useSetPageContext(useMemo(() => ({ route: "inbox" }), []));
 
   return (
-    <EmailDetailView
-      email={email}
-      mailboxId={mailboxId}
-      emailId={emailId}
-      view={folder}
-      onNavigateToEmail={(nextEmailId) =>
-        navigate({
-          to: "/$mailboxId/inbox/folders/$folder/email/$emailId",
-          params: { mailboxId, folder, emailId: nextEmailId },
-          replace: true,
-        })}
+    <EmailList
+      emailData={emailData}
+      onOpen={openEmail}
+      onAction={executeEmailAction}
     />
   );
 }

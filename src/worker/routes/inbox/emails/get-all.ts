@@ -2,8 +2,8 @@ import { zValidator } from "@hono/zod-validator";
 import { and, desc, eq, gt, isNull, like, lte, or, sql } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emailIntelligence, emails } from "../../../db/schema";
-import { syncAllMailboxes } from "../../../lib/email/sync";
-import { STANDARD_LABELS } from "../../../lib/email/types";
+import { catchUpAllMailboxes } from "../../../lib/gmail/sync/engine";
+import { STANDARD_LABELS } from "../../../lib/gmail/types";
 import type { AppRouteEnv } from "../../types";
 import {
   emailIntelligenceSelection,
@@ -41,7 +41,7 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
 
     if (offset === 0) {
       c.executionCtx.waitUntil(
-        syncAllMailboxes(db, c.env, user.id).catch((err) => {
+        catchUpAllMailboxes(db, c.env, user.id).catch((err) => {
           console.error("Background sync failed (email list)", err);
         }),
       );

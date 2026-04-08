@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, asc, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emailIntelligence, emails } from "../../../db/schema";
-import { syncAllMailboxes } from "../../../lib/email/sync";
+import { catchUpAllMailboxes } from "../../../lib/gmail/sync/engine";
 import type { AppRouteEnv } from "../../types";
 import {
   emailIntelligenceSelection,
@@ -20,7 +20,11 @@ export function registerGetEmailThread(api: Hono<AppRouteEnv>) {
       const user = c.get("user")!;
 
       const { threadId } = c.req.valid("param");
-      await syncAllMailboxes(db, c.env, user.id);
+      c.executionCtx.waitUntil(
+        catchUpAllMailboxes(db, c.env, user.id).catch((err) => {
+          console.error("Background sync failed (thread)", err);
+        }),
+      );
 
       const rows = await db
         .select({

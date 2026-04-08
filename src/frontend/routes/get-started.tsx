@@ -1,5 +1,5 @@
-import GetStartedPage from "@/features/home/pages/get-started-page";
-import { getDashboardGate } from "@/features/home/dashboard-gate";
+import GetStartedPage from "@/features/onboarding/pages/get-started-page";
+import { getDashboardGate } from "@/features/onboarding/dashboard-gate";
 import { fetchAccounts } from "@/hooks/use-mailboxes";
 import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
 import { createFileRoute, redirect } from "@tanstack/react-router";
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/get-started")({
         throw redirect({ to: "/login" });
       }
       throw redirect({
-        to: "/$mailboxId/home",
+        to: "/$mailboxId/inbox",
         params: { mailboxId },
       });
     }

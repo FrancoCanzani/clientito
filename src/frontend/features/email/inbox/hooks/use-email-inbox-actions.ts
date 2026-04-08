@@ -10,7 +10,7 @@ import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { toast } from "sonner";
 
-const mailboxRoute = getRouteApi("/_dashboard/$mailboxId/inbox");
+const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
 export type EmailInboxAction =
   | "archive"

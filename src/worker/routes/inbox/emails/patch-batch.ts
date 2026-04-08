@@ -3,7 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { Hono } from "hono";
 import type { Database } from "../../../db/client";
 import { emails } from "../../../db/schema";
-import { createEmailProvider } from "../../../lib/email";
+import { createEmailProvider } from "../../../lib/gmail/resolver";
 import { chunkArray } from "../../../lib/utils";
 import type { AppRouteEnv } from "../../types";
 import { applyEmailPatch } from "./internal/mutation";

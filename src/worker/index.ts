@@ -13,12 +13,10 @@ import {
   strictLimiter,
 } from "./middleware/rate-limit";
 import aiRoutes from "./routes/ai/router";
-import calendarRoutes from "./routes/calendar/router";
 import healthRoutes from "./routes/health/router";
 import inboxRoutes from "./routes/inbox/router";
 import settingsRoutes from "./routes/settings/router";
 import draftsRoutes from "./routes/inbox/drafts/router";
-import tasksRoutes from "./routes/tasks/router";
 import type { AppRouteEnv } from "./routes/types";
 import { handleScheduled } from "./scheduled";
 import { handleSyncQueue, type SyncQueueMessage } from "./queue";
@@ -67,8 +65,6 @@ app.route("/api/inbox", inboxRoutes);
 app.route("/api/ai", aiRoutes);
 
 app.route("/api/inbox/drafts", draftsRoutes);
-app.route("/api/tasks", tasksRoutes);
-app.route("/api/calendar", calendarRoutes);
 app.route("/api/settings", settingsRoutes);
 
 export default {

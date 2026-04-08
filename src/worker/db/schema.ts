@@ -16,7 +16,7 @@ export type EmailIntelligenceCategory =
 
 export type EmailIntelligenceUrgency = "high" | "medium" | "low";
 
-export type EmailActionType = "reply" | "create_task";
+export type EmailActionType = "reply";
 
 export type EmailActionTrustLevel = "auto" | "approve";
 
@@ -25,10 +25,6 @@ export type EmailActionStatus =
   | "executed"
   | "dismissed"
   | "failed";
-
-export type CalendarSuggestionConfidence = "high" | "low";
-
-export type CalendarSuggestionStatus = "pending" | "approved" | "dismissed";
 
 export type EmailSuspiciousKind =
   | "phishing"
@@ -50,22 +46,6 @@ export type EmailAction = {
   updatedAt: number;
 };
 
-export type CalendarSuggestion = {
-  id: number;
-  title: string;
-  proposedDate: string;
-  startAt: number;
-  endAt: number;
-  isAllDay: boolean;
-  confidence: CalendarSuggestionConfidence;
-  sourceText: string;
-  status: CalendarSuggestionStatus;
-  location: string | null;
-  attendees: string[] | null;
-  googleEventId: string | null;
-  updatedAt: number;
-};
-
 export type EmailSuspiciousFlag = {
   isSuspicious: boolean;
   kind: EmailSuspiciousKind | null;
@@ -81,7 +61,6 @@ export type PersistedEmailIntelligence = {
   summary: string;
   suspicious: EmailSuspiciousFlag;
   actions: EmailAction[];
-  calendarEvents: CalendarSuggestion[];
   autoExecute: string[];
   requiresApproval: string[];
 };
@@ -219,10 +198,6 @@ export const emailIntelligence = sqliteTable(
       .$type<EmailAction[]>()
       .notNull()
       .default([]),
-    calendarEventsJson: text("calendar_events_json", { mode: "json" })
-      .$type<CalendarSuggestion[]>()
-      .notNull()
-      .default([]),
     status: text("status")
       .$type<EmailIntelligenceStatus>()
       .notNull()
@@ -243,41 +218,6 @@ export const emailIntelligence = sqliteTable(
     index("email_intelligence_mailbox_idx").on(table.mailboxId),
   ],
 );
-
-export type TaskStatus = "backlog" | "todo" | "in_progress" | "done";
-
-export const tasks = sqliteTable(
-  "tasks",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    title: text("title").notNull(),
-    description: text("description"),
-    sourceEmailId: integer("source_email_id").references(() => emails.id, {
-      onDelete: "set null",
-    }),
-    dueAt: integer("due_at"),
-    priority: text("priority")
-      .$type<"urgent" | "high" | "medium" | "low">()
-      .notNull()
-      .default("low"),
-    status: text("status")
-      .$type<TaskStatus>()
-      .notNull()
-      .default("todo"),
-    completedAt: integer("completed_at"),
-    position: integer("position").notNull().default(0),
-    createdAt: integer("created_at").notNull(),
-  },
-  (table) => [
-    index("tasks_user_status_idx").on(table.userId, table.status),
-    index("tasks_user_due_idx").on(table.userId, table.dueAt),
-    index("tasks_user_source_email_idx").on(table.userId, table.sourceEmailId),
-  ],
-);
-
 
 export const emailFilters = sqliteTable(
   "email_filters",

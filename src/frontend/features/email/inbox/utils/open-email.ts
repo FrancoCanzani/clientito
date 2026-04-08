@@ -14,7 +14,7 @@ type NavigateToEmail = (
         replace?: boolean;
       }
     | {
-        to: "/$mailboxId/inbox/folders/$folder/email/$emailId";
+        to: "/$mailboxId/$folder/email/$emailId";
         params: { mailboxId: number; folder: FolderView; emailId: string };
         replace?: boolean;
       }
@@ -46,7 +46,7 @@ export function openEmail(
     });
   } else if (context !== "inbox") {
     navigate({
-      to: "/$mailboxId/inbox/folders/$folder/email/$emailId",
+      to: "/$mailboxId/$folder/email/$emailId",
       params: { mailboxId: routeMailboxId, folder: context, emailId: email.id },
       replace: options?.replace,
     });

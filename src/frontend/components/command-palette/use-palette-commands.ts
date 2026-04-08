@@ -1,14 +1,11 @@
 import { VIEW_VALUES, type EmailView } from "@/features/email/inbox/utils/inbox-filters";
+import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
 import { useLogout } from "@/hooks/use-auth";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import { useTheme } from "@/hooks/use-theme";
-import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
 import {
   AtIcon,
-  CalendarDotsIcon,
-  CheckSquareIcon,
   GearIcon,
-  HouseSimpleIcon,
   MoonIcon,
   SignOutIcon,
   SunIcon,
@@ -23,33 +20,15 @@ function paletteIcon(Icon: React.ComponentType<{ className?: string }>) {
 }
 
 function buildNavigationCommands(
-  runNavigation: (target: "home" | "tasks" | "docs" | "settings" | "agenda") => void,
+  runNavigation: (target: "settings") => void,
   navigateToInbox: () => void,
 ): PaletteCommand[] {
   return [
-    {
-      id: "home",
-      label: "Home",
-      icon: paletteIcon(HouseSimpleIcon),
-      onSelect: () => runNavigation("home"),
-    },
     {
       id: "inbox",
       label: "Inbox",
       icon: paletteIcon(TrayIcon),
       onSelect: navigateToInbox,
-    },
-    {
-      id: "tasks",
-      label: "Tasks",
-      icon: paletteIcon(CheckSquareIcon),
-      onSelect: () => runNavigation("tasks"),
-    },
-    {
-      id: "agenda",
-      label: "Agenda",
-      icon: paletteIcon(CalendarDotsIcon),
-      onSelect: () => runNavigation("agenda"),
     },
     {
       id: "settings",
@@ -92,22 +71,7 @@ function buildAccountCommands(
         label: `Switch to ${label}`,
         icon: paletteIcon(AtIcon),
         onSelect: () => {
-          if (currentRouteId === "/_dashboard/$mailboxId/home") {
-            navigate({
-              to: "/$mailboxId/home",
-              params: { mailboxId },
-            });
-          } else if (currentRouteId === "/_dashboard/$mailboxId/agenda") {
-            navigate({
-              to: "/$mailboxId/agenda",
-              params: { mailboxId },
-            });
-          } else if (currentRouteId === "/_dashboard/$mailboxId/tasks") {
-            navigate({
-              to: "/$mailboxId/tasks",
-              params: { mailboxId },
-            });
-          } else if (currentRouteId === "/_dashboard/$mailboxId/inbox/search") {
+          if (currentRouteId === "/_dashboard/$mailboxId/inbox/search") {
             navigate({
               to: "/$mailboxId/inbox/search",
               params: { mailboxId },
@@ -140,14 +104,11 @@ function buildAccountCommands(
               params: { mailboxId },
             });
           } else if (
-            currentRouteId?.startsWith("/_dashboard/$mailboxId/inbox")
+            currentRouteId?.startsWith("/_dashboard/$mailboxId/inbox") ||
+            currentRouteId === "/_dashboard/$mailboxId/$folder/" ||
+            currentRouteId === "/_dashboard/$mailboxId/$folder/email/$emailId"
           ) {
-            if (currentLabel === "important") {
-              navigate({
-                to: "/$mailboxId/inbox/labels/$label",
-                params: { mailboxId, label: "important" },
-              });
-            } else if (currentMailboxView === "important") {
+            if (currentLabel === "important" || currentMailboxView === "important") {
               navigate({
                 to: "/$mailboxId/inbox/labels/$label",
                 params: { mailboxId, label: "important" },
@@ -159,7 +120,7 @@ function buildAccountCommands(
               });
             } else if (currentMailboxView) {
               navigate({
-                to: "/$mailboxId/inbox/folders/$folder",
+                to: "/$mailboxId/$folder",
                 params: { mailboxId, folder: currentMailboxView },
               });
             } else {
@@ -179,33 +140,6 @@ function buildAccountCommands(
         },
       } satisfies PaletteCommand;
     });
-}
-
-function buildTaskViewCommands(
-  isTasksRoute: boolean,
-  mailboxId: number | null,
-  navigate: ReturnType<typeof useNavigate>,
-  close: () => void,
-): PaletteCommand[] {
-  if (!isTasksRoute || mailboxId == null) return [];
-
-  return ([
-    { view: "all", label: "All Tasks" },
-    { view: "today", label: "Due Today" },
-    { view: "upcoming", label: "Upcoming" },
-  ] as const).map(({ view, label }) => ({
-    id: `task-view-${view}`,
-    label,
-    icon: paletteIcon(CheckSquareIcon),
-    onSelect: () => {
-      navigate({
-        to: "/$mailboxId/tasks",
-        params: { mailboxId },
-        search: (prev) => ({ ...prev, view: view === "all" ? undefined : view }),
-      });
-      close();
-    },
-  }));
 }
 
 function buildActionCommands(opts: {
@@ -261,16 +195,16 @@ export function usePaletteCommands({
   const defaultMailboxId = activeMailboxId ?? getPreferredMailboxId(accounts);
   const isMailboxRoute = activeMailboxId != null;
   const isEmailsRoute = matches.some((match) =>
-    match.routeId.startsWith("/_dashboard/$mailboxId/inbox"),
+    match.routeId.startsWith("/_dashboard/$mailboxId/inbox") ||
+    match.routeId === "/_dashboard/$mailboxId/$folder/" ||
+    match.routeId === "/_dashboard/$mailboxId/$folder/email/$emailId",
   );
-  const isTasksRoute = currentRouteId === "/_dashboard/$mailboxId/tasks";
-  const isHomeRoute = currentRouteId === "/_dashboard/$mailboxId/home";
   const routeSearch = router.state.location.search as {
     q?: unknown;
     includeJunk?: unknown;
   };
   const currentFolder = matches.find(
-    (match) => match.routeId === "/_dashboard/$mailboxId/inbox/folders/$folder/",
+    (match) => match.routeId === "/_dashboard/$mailboxId/$folder/",
   )?.params.folder;
   const currentLabel = matches.find(
     (match) => match.routeId === "/_dashboard/$mailboxId/inbox/labels/$label/",
@@ -300,43 +234,19 @@ export function usePaletteCommands({
   }, [close, defaultMailboxId, navigate]);
 
   const runNavigation = useCallback(
-    (target: "home" | "tasks" | "docs" | "settings" | "agenda") => {
-      if (target === "tasks") {
-        if (defaultMailboxId != null) {
-          navigate({
-            to: "/$mailboxId/tasks",
-            params: { mailboxId: defaultMailboxId },
-          });
-        } else {
-          navigate({ to: "/get-started" });
-        }
-      } else if (target === "docs") {
-        navigate({ to: "/docs" });
-      } else if (target === "settings") {
+    (target: "settings") => {
+      if (target === "settings") {
         navigate({ to: "/settings" });
-      } else if (defaultMailboxId != null) {
-        navigate({
-          to: target === "home" ? "/$mailboxId/home" : "/$mailboxId/agenda",
-          params: { mailboxId: defaultMailboxId },
-        });
-      } else {
-        navigate({ to: "/get-started" });
       }
-
       close();
     },
-    [close, defaultMailboxId, navigate],
+    [close, navigate],
   );
 
   const navigationCommands = useMemo(() => {
     const all = buildNavigationCommands(runNavigation, navigateToInbox);
-    return all.filter((cmd) => {
-      if (isEmailsRoute && cmd.id === "inbox") return false;
-      if (isTasksRoute && cmd.id === "tasks") return false;
-      if (isHomeRoute && cmd.id === "home") return false;
-      return true;
-    });
-  }, [runNavigation, navigateToInbox, isEmailsRoute, isTasksRoute, isHomeRoute]);
+    return all.filter((cmd) => !(isEmailsRoute && cmd.id === "inbox"));
+  }, [runNavigation, navigateToInbox, isEmailsRoute]);
 
   const accountCommands = useMemo(
     () =>
@@ -365,11 +275,6 @@ export function usePaletteCommands({
     ],
   );
 
-  const taskViewCommands = useMemo(
-    () => buildTaskViewCommands(isTasksRoute, defaultMailboxId, navigate, close),
-    [isTasksRoute, defaultMailboxId, navigate, close],
-  );
-
   const actionCommands = useMemo(
     () =>
       buildActionCommands({
@@ -389,24 +294,17 @@ export function usePaletteCommands({
         "What should I follow up on here?",
       ];
     }
-    if (isTasksRoute) {
-      return [
-        "What should I prioritize today?",
-        "Show overdue tasks",
-        "Create a follow-up task plan",
-      ];
-    }
+
     return [
-      "What needs my attention today?",
+      "What needs my attention in email today?",
       "Find emails I should reply to",
-      "Create a task from my current context",
+      "Draft a concise response for this sender",
     ];
-  }, [isEmailsRoute, isTasksRoute]);
+  }, [isEmailsRoute]);
 
   return {
     visibleNavigationCommands: navigationCommands,
     accountCommands,
-    taskNavigationCommands: taskViewCommands,
     actionCommands,
     agentSuggestions,
   };

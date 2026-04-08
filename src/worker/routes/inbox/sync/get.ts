@@ -4,9 +4,8 @@ import { mailboxes } from "../../../db/schema";
 import {
   ensureGoogleMailboxesForUser,
   getMailboxSyncSnapshot,
-  getUserMailboxes,
-} from "../../../lib/email/mailbox-state";
-import { syncAllMailboxes } from "../../../lib/email/sync";
+} from "../../../lib/gmail/sync/state";
+import { catchUpAllMailboxes } from "../../../lib/gmail/sync/engine";
 import type { AppRouteEnv } from "../../types";
 
 type SyncWorkflowState =
@@ -24,7 +23,10 @@ export function registerGetSync(api: Hono<AppRouteEnv>) {
 
     await ensureGoogleMailboxesForUser(db, user.id);
 
-    const userMailboxes = await getUserMailboxes(db, user.id);
+    const userMailboxes = await db
+      .select()
+      .from(mailboxes)
+      .where(eq(mailboxes.userId, user.id));
     const firstMailbox = userMailboxes[0] ?? null;
 
     const snapshot = firstMailbox
@@ -77,7 +79,7 @@ export function registerGetSync(api: Hono<AppRouteEnv>) {
 
     // Trigger catch-up for all mailboxes
     c.executionCtx.waitUntil(
-      syncAllMailboxes(db, c.env, user.id).catch((err) => {
+      catchUpAllMailboxes(db, c.env, user.id).catch((err) => {
         console.error("Background catch-up failed", {
           userId: user.id,
           error: err instanceof Error ? err.message : String(err),

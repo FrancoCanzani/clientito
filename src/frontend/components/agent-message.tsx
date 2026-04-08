@@ -17,7 +17,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 const toolLabels: Record<string, string> = {
-  createTask: "Create task",
   archiveEmail: "Archive email",
   batchArchive: "Archive emails",
   trashEmail: "Trash email",
@@ -28,11 +27,8 @@ const toolLabels: Record<string, string> = {
   composeEmail: "Compose email",
   searchEmails: "Search emails",
   resolveContact: "Look up contact",
-  listTasks: "List tasks",
   summarizeEmail: "Summarize email",
   getEmail: "Read email",
-  approveProposedEvent: "Approve event",
-  dismissProposedEvent: "Dismiss event",
 };
 
 function humanizeToolName(toolName: string): string {
@@ -53,16 +49,6 @@ function isPresent(value: unknown) {
 function formatGenericValue(value: unknown): string {
   if (typeof value === "string") return value;
   return JSON.stringify(value);
-}
-
-function formatDueAt(value: unknown): string | null {
-  if (typeof value !== "number" || Number.isNaN(value)) return null;
-
-  try {
-    return new Date(value).toLocaleString();
-  } catch {
-    return String(value);
-  }
 }
 
 function ToolField({
@@ -229,56 +215,6 @@ function ToolArgs({
     case "sendEmail":
     case "composeEmail":
       return <EmailActionArgs args={args} />;
-    case "createTask": {
-      return (
-        <div className="space-y-3">
-          {isPresent(args.title) && (
-            <ToolField
-              label="Title"
-              value={<p className="text-balance">{String(args.title)}</p>}
-            />
-          )}
-          {isPresent(args.dueAt) && (
-            <ToolField
-              label="Due"
-              value={formatDueAt(args.dueAt) ?? String(args.dueAt)}
-            />
-          )}
-        </div>
-      );
-    }
-    case "updateTask": {
-      return (
-        <div className="space-y-3">
-          {isPresent(args.taskId) && (
-            <ToolField label="Task ID" value={String(args.taskId)} />
-          )}
-          {isPresent(args.title) && (
-            <ToolField
-              label="Title"
-              value={<p className="text-balance">{String(args.title)}</p>}
-            />
-          )}
-          {isPresent(args.status) && (
-            <ToolField label="Status" value={String(args.status)} />
-          )}
-          {isPresent(args.priority) && (
-            <ToolField label="Priority" value={String(args.priority)} />
-          )}
-          {args.dueAt !== undefined && (
-            <ToolField
-              label="Due"
-              value={
-                args.dueAt === null
-                  ? "Clear due date"
-                  : (formatDueAt(args.dueAt) ?? String(args.dueAt))
-              }
-            />
-          )}
-        </div>
-      );
-    }
-    case "deleteTask":
     case "archiveEmail":
     case "trashEmail":
     case "snoozeEmail":
@@ -286,21 +222,13 @@ function ToolArgs({
     case "markEmailRead":
     case "markEmailUnread":
     case "starEmail":
-    case "unstarEmail":
-    case "approveProposedEvent":
-    case "dismissProposedEvent": {
-      const fieldLabel = toolName.includes("Task")
-        ? "Task ID"
-        : toolName.includes("Proposed") || toolName.includes("Event")
-          ? "Event ID"
-          : "Email ID";
-      const idValue =
-        args.taskId ?? args.emailId ?? args.proposedId;
+    case "unstarEmail": {
+      const idValue = args.emailId;
 
       return (
         <div className="space-y-3">
           {isPresent(idValue) && (
-            <ToolField label={fieldLabel} value={String(idValue)} />
+            <ToolField label="Email ID" value={String(idValue)} />
           )}
         </div>
       );

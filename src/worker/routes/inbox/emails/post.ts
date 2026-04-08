@@ -1,8 +1,8 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Hono } from "hono";
-import { createEmailProvider } from "../../../lib/email";
-import { resolveOutgoingMailbox } from "../../../lib/email/mailbox-state";
-import { appendSignature } from "../../../lib/email/signature";
+import { createEmailProvider } from "../../../lib/gmail/resolver";
+import { resolveOutgoingMailbox } from "../../../lib/gmail/sync/state";
+import { appendSignature } from "../../../lib/gmail/mailbox/signature";
 import { sleep } from "../../../lib/utils";
 import { and, eq } from "drizzle-orm";
 import { emails, mailboxes, scheduledEmails } from "../../../db/schema";

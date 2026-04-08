@@ -3,13 +3,14 @@ import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { z } from "zod";
 import { account } from "../../../db/auth-schema";
-import { createEmailProvider } from "../../../lib/email";
-import { ensureMailbox, getUserMailboxes } from "../../../lib/email/mailbox-state";
+import { mailboxes } from "../../../db/schema";
+import { createEmailProvider } from "../../../lib/gmail/resolver";
+import { ensureMailbox } from "../../../lib/gmail/sync/state";
 import {
   markEmailSubscriptionStatus,
   normalizeUnsubscribeEmail,
   normalizeUnsubscribeUrl,
-} from "../../../lib/email/subscriptions";
+} from "../../../lib/gmail/subscriptions/service";
 import type { AppRouteEnv } from "../../types";
 
 const unsubscribeSchema = z.object({
@@ -77,7 +78,10 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
       if (unsubscribeEmail) {
         try {
           // Resolve mailbox for sending
-          const userMailboxes = await getUserMailboxes(db, user.id);
+          const userMailboxes = await db
+            .select()
+            .from(mailboxes)
+            .where(eq(mailboxes.userId, user.id));
           let mailbox = userMailboxes[0];
           if (!mailbox) {
             const googleAccount = await db.query.account.findFirst({

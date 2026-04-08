@@ -6,7 +6,7 @@ import { useAttachmentUpload } from "../hooks/use-attachment-upload";
 import { loadDraft, useDraft } from "../hooks/use-draft";
 import { useUndoSend } from "../hooks/use-undo-send";
 import { sendEmail } from "../mutations";
-import { getDraftsQueryKey } from "../queries/drafts";
+import { getDraftsQueryKey } from "../queries";
 import type { ComposeInitial, DraftState } from "../types";
 import { buildPlainForwardedHtml } from "../utils/build-forwarded-html";
 

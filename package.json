@@ -14,7 +14,6 @@
   "dependencies": {
     "@ai-sdk/openai": "^3.0.41",
     "@ai-sdk/react": "^3.0.107",
-    "@atlaskit/pragmatic-drag-and-drop": "^1.7.9",
     "@cloudflare/ai-chat": "^0.1.8",
     "@hono/zod-validator": "^0.7.6",
     "@phosphor-icons/react": "^2.1.10",
@@ -26,7 +25,6 @@
     "agents": "^0.7.5",
     "ai": "^6.0.100",
     "better-auth": "^1.4.19",
-    "chrono-node": "^2.9.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   getMailboxSyncPreferences,
   resolveMailbox,
-} from "../../lib/email/mailbox-state";
+} from "../../lib/gmail/sync/state";
 import type { AppRouteEnv } from "../types";
 
 const syncSettingsQuerySchema = z.object({

@@ -1,1 +1,0 @@
-ALTER TABLE `email_intelligence` DROP COLUMN `briefing_sentence`;

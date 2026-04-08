@@ -13,7 +13,7 @@ import {
 import type { Hono } from "hono";
 import { z } from "zod";
 import { emailIntelligence, emails } from "../../../db/schema";
-import { STANDARD_LABELS } from "../../../lib/email/types";
+import { STANDARD_LABELS } from "../../../lib/gmail/types";
 import type { AppRouteEnv } from "../../types";
 import {
   HAS_ATTACHMENT_LABEL,

@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1774989745069,
-      "tag": "0000_flashy_pandemic",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1775222869503,
-      "tag": "0001_useful_kate_bishop",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1775237251389,
-      "tag": "0002_shallow_wendigo",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1775239422029,
-      "tag": "0003_cuddly_pixie",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1775424280789,
-      "tag": "0005_thin_unus",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1775427319793,
-      "tag": "0005_heavy_warstar",
+      "when": 1775674073243,
+      "tag": "0000_milky_rage",
       "breakpoints": true
     }
   ]

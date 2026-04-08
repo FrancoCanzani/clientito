@@ -1,10 +1,10 @@
 import { sql } from "drizzle-orm";
 import { emailIntelligence, emails } from "../../../db/schema";
-import type { AttachmentMeta } from "../../../lib/email";
+import type { AttachmentMeta } from "../../../lib/gmail/types";
 import {
   getIntelligenceStatus,
   getStoredEmailClassification,
-} from "../../../lib/email/intelligence/store";
+} from "../../../lib/gmail/intelligence/store";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
 

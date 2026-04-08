@@ -2,8 +2,8 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emailIntelligence, emails } from "../../../db/schema";
-import { createEmailProvider } from "../../../lib/email";
-import { syncAllMailboxes } from "../../../lib/email/sync";
+import { createEmailProvider } from "../../../lib/gmail/resolver";
+import { catchUpAllMailboxes } from "../../../lib/gmail/sync/engine";
 import type { AppRouteEnv } from "../../types";
 import { emailDetailParamsSchema, emailDetailQuerySchema } from "./schemas";
 import {
@@ -28,7 +28,7 @@ export function registerGetEmail(api: Hono<AppRouteEnv>) {
       const { refreshLive } = c.req.valid("query");
 
       c.executionCtx.waitUntil(
-        syncAllMailboxes(db, c.env, user.id).catch((err) => {
+        catchUpAllMailboxes(db, c.env, user.id).catch((err) => {
           console.error("Background sync failed (email detail)", err);
         }),
       );

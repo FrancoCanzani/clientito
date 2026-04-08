@@ -1,27 +1,28 @@
-import { EmailDetailView } from "@/features/email/inbox/pages/email-detail-view";
+import { EmailList } from "@/features/email/inbox/components/email-list";
+import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
+import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
+import { useSetPageContext } from "@/hooks/use-page-context";
 import { getRouteApi } from "@tanstack/react-router";
+import { useMemo } from "react";
 
-const route = getRouteApi(
-  "/_dashboard/$mailboxId/inbox/labels/$label/email/$emailId",
-);
+const route = getRouteApi("/_dashboard/$mailboxId/inbox/labels/$label/");
 
 export default function LabelPage() {
-  const { mailboxId, label, emailId } = route.useParams();
-  const { email } = route.useLoaderData();
-  const navigate = route.useNavigate();
+  const { mailboxId, label } = route.useParams();
+  const { initialPage } = route.useLoaderData();
+  const emailData = useEmailData({ view: label, mailboxId, initialPage });
+  const { openEmail, executeEmailAction } = useEmailInboxActions({
+    view: label,
+    mailboxId,
+  });
+
+  useSetPageContext(useMemo(() => ({ route: "inbox" }), []));
 
   return (
-    <EmailDetailView
-      email={email}
-      mailboxId={mailboxId}
-      emailId={emailId}
-      view={label}
-      onNavigateToEmail={(nextEmailId) =>
-        navigate({
-          to: "/$mailboxId/inbox/labels/$label/email/$emailId",
-          params: { mailboxId, label, emailId: nextEmailId },
-          replace: true,
-        })}
+    <EmailList
+      emailData={emailData}
+      onOpen={openEmail}
+      onAction={executeEmailAction}
     />
   );
 }

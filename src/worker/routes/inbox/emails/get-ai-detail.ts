@@ -3,7 +3,7 @@ import type { Hono } from "hono";
 import {
   generateEmailOnDemand,
   getStoredEmailOnDemand,
-} from "../../../lib/email/intelligence/detail";
+} from "../../../lib/gmail/intelligence/detail";
 import type { AppRouteEnv } from "../../types";
 import { emailDetailParamsSchema } from "./schemas";
 

@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emails } from "../../../db/schema";
-import { createEmailProvider } from "../../../lib/email";
+import { createEmailProvider } from "../../../lib/gmail/resolver";
 import type { AppRouteEnv } from "../../types";
 import { normalizeFilename, normalizeMimeType } from "./utils";
 import { emailAttachmentQuerySchema } from "./schemas";

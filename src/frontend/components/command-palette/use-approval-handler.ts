@@ -3,7 +3,6 @@ import type { QueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
 function invalidateAll(queryClient: QueryClient) {
-  queryClient.invalidateQueries({ queryKey: ["tasks"] });
   queryClient.invalidateQueries({ queryKey: ["emails"] });
 }
 

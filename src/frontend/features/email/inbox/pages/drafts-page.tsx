@@ -11,7 +11,7 @@ import { useInboxCompose } from "@/features/email/inbox/components/inbox-compose
 import { TrashIcon } from "@phosphor-icons/react";
 import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
-import { deleteDraft, type DraftItem } from "../queries/drafts";
+import { deleteDraft, type DraftItem } from "../queries";
 import type { ComposeInitial } from "../types";
 import { htmlToPlainText } from "../utils/html-to-plain-text";
 

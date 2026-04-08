@@ -1,7 +1,7 @@
 import { and, eq, isNotNull, lt, or, isNull } from "drizzle-orm";
 import type { Database } from "../db/client";
 import { mailboxes } from "../db/schema";
-import { catchUpMailboxOnDemand } from "../lib/email/providers/google/sync";
+import { catchUpMailboxOnDemand } from "../lib/gmail/sync/engine";
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;
 

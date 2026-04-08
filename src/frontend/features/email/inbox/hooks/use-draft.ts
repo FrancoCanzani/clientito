@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DraftState } from "../types";
-import { getDraftsQueryKey } from "../queries/drafts";
+import { getDraftsQueryKey } from "../queries";
 
 const SAVE_DELAY_MS = 2000;
 

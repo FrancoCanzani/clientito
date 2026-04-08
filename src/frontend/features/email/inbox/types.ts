@@ -66,34 +66,6 @@ export type EmailIntelligenceCategory =
 
 export type EmailIntelligenceUrgency = "high" | "medium" | "low";
 
-export type EmailAction = {
-  id: string;
-  type: "reply" | "create_task";
-  label: string;
-  payload: Record<string, unknown>;
-  trustLevel: "approve";
-  status: "pending" | "executed" | "dismissed" | "failed";
-  error: string | null;
-  executedAt: number | null;
-  updatedAt: number;
-};
-
-export type CalendarSuggestion = {
-  id: number;
-  title: string;
-  proposedDate: string;
-  startAt: number;
-  endAt: number;
-  isAllDay: boolean;
-  confidence: "high" | "low";
-  sourceText: string;
-  status: "pending" | "approved" | "dismissed";
-  location: string | null;
-  attendees: string[] | null;
-  googleEventId: string | null;
-  updatedAt: number;
-};
-
 export type EmailSuspiciousFlag = {
   isSuspicious: boolean;
   kind: "phishing" | "impersonation" | "credential_harvest" | "payment_fraud" | null;
@@ -111,12 +83,6 @@ export type EmailDetailIntelligence = {
   summary: string | null;
   suspicious: EmailSuspiciousFlag;
   replyDraft: string | null;
-  taskSuggestion: {
-    title: string;
-    dueAt: number | null;
-    priority: "urgent" | "high" | "medium" | "low" | null;
-  } | null;
-  calendarSuggestion: CalendarSuggestion | null;
 };
 
 export type EmailListItem = {

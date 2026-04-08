@@ -7,12 +7,12 @@ import {
   getMailboxSyncPreferences,
   resolveMailbox,
   setMailboxSyncPreferences,
-} from "../../lib/email/mailbox-state";
+} from "../../lib/gmail/sync/state";
 import {
   normalizeSyncWindowMonths,
   requiresBackfillForCutoffChange,
   resolveSyncCutoffAt,
-} from "../../lib/email/sync-preferences";
+} from "../../lib/gmail/sync/preferences";
 import type { AppRouteEnv } from "../types";
 
 const syncSettingsBodySchema = z.object({

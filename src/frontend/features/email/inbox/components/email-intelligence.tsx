@@ -19,14 +19,7 @@ export function EmailIntelligence({
 
   const {
     handleReply,
-    handleCreateTask,
-    handleApproveCalendarSuggestion,
-    handleDismissCalendarSuggestion,
-    createTaskPending,
-    approveCalendarSuggestionPending,
-    dismissCalendarSuggestionPending,
   } = useEmailAiActions({
-    email,
     onReplyRequested,
   });
 
@@ -38,12 +31,6 @@ export function EmailIntelligence({
         <EmailAiPanel
           intelligence={intelligence}
           onReply={handleReply}
-          onCreateTask={handleCreateTask}
-          onApproveCalendarSuggestion={handleApproveCalendarSuggestion}
-          onDismissCalendarSuggestion={handleDismissCalendarSuggestion}
-          createTaskPending={createTaskPending}
-          approveCalendarSuggestionPending={approveCalendarSuggestionPending}
-          dismissCalendarSuggestionPending={dismissCalendarSuggestionPending}
         />
       )}
 

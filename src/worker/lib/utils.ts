@@ -51,10 +51,3 @@ export function truncate(value: string, maxLength: number) {
   if (value.length <= maxLength) return value;
   return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
 }
-
-export function getDayBoundsUtc(now: number = Date.now()): { start: number; end: number } {
-  const d = new Date(now);
-  const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-  const end = start + 86_400_000;
-  return { start, end };
-}

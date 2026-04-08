@@ -27,7 +27,7 @@ import {
 import { Link, getRouteApi, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-const mailboxRoute = getRouteApi("/_dashboard/$mailboxId/inbox");
+const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
 function formatDisplayName(
   name: string | null | undefined,
@@ -80,7 +80,7 @@ function SidebarNav() {
   const currentFolder = useRouterState({
     select: (state) =>
       state.matches.find(
-        (match) => match.routeId === "/_dashboard/$mailboxId/inbox/folders/$folder/",
+        (match) => match.routeId === "/_dashboard/$mailboxId/$folder/",
       )?.params.folder,
   });
   const currentLabel = useRouterState({
@@ -130,7 +130,7 @@ function SidebarNav() {
       <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "starred"}>
           <Link
-            to="/$mailboxId/inbox/folders/$folder"
+            to="/$mailboxId/$folder"
             params={{ mailboxId, folder: "starred" }}
           >
             <StarIcon />
@@ -142,7 +142,7 @@ function SidebarNav() {
       <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "sent"}>
           <Link
-            to="/$mailboxId/inbox/folders/$folder"
+            to="/$mailboxId/$folder"
             params={{ mailboxId, folder: "sent" }}
           >
             <PaperPlaneTiltIcon />
@@ -154,7 +154,7 @@ function SidebarNav() {
       <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "archived"}>
           <Link
-            to="/$mailboxId/inbox/folders/$folder"
+            to="/$mailboxId/$folder"
             params={{ mailboxId, folder: "archived" }}
           >
             <ArchiveIcon />
@@ -166,7 +166,7 @@ function SidebarNav() {
       <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "spam"}>
           <Link
-            to="/$mailboxId/inbox/folders/$folder"
+            to="/$mailboxId/$folder"
             params={{ mailboxId, folder: "spam" }}
           >
             <WarningCircleIcon />
@@ -178,7 +178,7 @@ function SidebarNav() {
       <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "trash"}>
           <Link
-            to="/$mailboxId/inbox/folders/$folder"
+            to="/$mailboxId/$folder"
             params={{ mailboxId, folder: "trash" }}
           >
             <TrashIcon />

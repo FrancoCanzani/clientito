@@ -1,1 +1,0 @@
-ALTER TABLE `email_intelligence` ADD `suspicious_json` text DEFAULT '{"isSuspicious":false,"kind":null,"reason":null,"confidence":null}' NOT NULL;

@@ -1,11 +1,12 @@
 import type { Hono } from "hono";
-import { hasUsableAccessToken } from "../../lib/email/providers/google/client";
+import { hasUsableAccessToken } from "../../lib/gmail/client";
 import {
   ensureMailbox,
   ensureGoogleMailboxesForUser,
   getMailboxSyncSnapshot,
-  getUserMailboxes,
-} from "../../lib/email/mailbox-state";
+} from "../../lib/gmail/sync/state";
+import { mailboxes } from "../../db/schema";
+import { eq } from "drizzle-orm";
 import type { AppRouteEnv } from "../types";
 import { resolveGmailEmail } from "./utils";
 
@@ -26,7 +27,10 @@ export function registerGetSettings(api: Hono<AppRouteEnv>) {
       }
     }
 
-    const userMailboxes = await getUserMailboxes(db, user.id);
+    const userMailboxes = await db
+      .select()
+      .from(mailboxes)
+      .where(eq(mailboxes.userId, user.id));
     const mailboxByAccountId = new Map(
       userMailboxes
         .filter((mb) => mb.accountId)

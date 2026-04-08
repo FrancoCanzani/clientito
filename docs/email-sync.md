@@ -22,56 +22,56 @@ There are three layers involved in sync:
 3. Google provider implementation
    Talks to Gmail, parses messages, updates D1, applies AI labels and user filters, and keeps mailbox history state in sync.
 
-The current production sync implementation is Google-only, but the code is now structured so the app-level entrypoints depend on `lib/email`, while the concrete sync engine lives under `lib/email/providers/google`.
+The current production sync implementation is Google-only, but the code is now structured so the app-level entrypoints depend on `lib/gmail`, while the concrete sync engine lives under `lib/gmail`.
 
 ## Current File Structure
 
 ### Provider-neutral email layer
 
-- `src/worker/lib/email/types.ts`
+- `src/worker/lib/gmail/types.ts`
   Defines `EmailProvider`, shared send/fetch types, and standard Gmail-compatible labels used by the app.
 
-- `src/worker/lib/email/resolver.ts`
+- `src/worker/lib/gmail/resolver.ts`
   Chooses the provider implementation for a mailbox.
   Today it only returns `GmailDriver`.
 
-- `src/worker/lib/email/sync.ts`
+- `src/worker/lib/gmail/sync/engine.ts`
   Provider-neutral entrypoint for "sync all mailboxes for this user".
 
-- `src/worker/lib/email/mailbox-state.ts`
+- `src/worker/lib/gmail/sync/state.ts`
   Owns mailbox resolution, sync locks, sync job state, last error state, and mailbox sync preferences.
 
-- `src/worker/lib/email/sync-preferences.ts`
+- `src/worker/lib/gmail/sync/preferences.ts`
   Sync window helpers like 6/12 month cutoff logic.
 
-- `src/worker/lib/email/ai-classifier.ts`
+- `src/worker/lib/gmail/ai-classifier.ts`
   AI labeling and filter matching.
 
-- `src/worker/lib/email/user-filters.ts`
+- `src/worker/lib/gmail/user-filters.ts`
   Loads enabled user-defined email filters.
 
-- `src/worker/lib/email/subscriptions.ts`
+- `src/worker/lib/gmail/subscriptions/service.ts`
   Tracks unsubscribe metadata and subscription state.
 
 ### Google provider implementation
 
-- `src/worker/lib/email/providers/google/driver.ts`
+- `src/worker/lib/gmail/driver.ts`
   Concrete `EmailProvider` implementation used by routes.
 
-- `src/worker/lib/email/providers/google/client.ts`
+- `src/worker/lib/gmail/client.ts`
   Low-level Gmail HTTP client, token resolution, retry/rate-limit handling, batch fetch support.
 
-- `src/worker/lib/email/providers/google/mailbox.ts`
+- `src/worker/lib/gmail/mailbox/read.ts`
   Gmail message parsing, attachment extraction/fetching, outgoing MIME composition, Gmail label mutation.
 
-- `src/worker/lib/email/providers/google/sync.ts`
+- `src/worker/lib/gmail/sync/engine.ts`
   The actual sync engine.
   This is the most important file for understanding sync behavior.
 
-- `src/worker/lib/email/providers/google/errors.ts`
+- `src/worker/lib/gmail/errors.ts`
   Error classification, including reconnect-required vs transient failures.
 
-- `src/worker/lib/email/providers/google/sync-preferences.ts`
+- `src/worker/lib/gmail/sync/preferences.ts`
   Google-specific query generation from the generic cutoff timestamp.
 
 ### Sync routes
@@ -202,7 +202,7 @@ Tracks newsletter/subscription senders and unsubscribe metadata discovered durin
 
 Routes should think in terms of `EmailProvider`, not Gmail-specific helpers.
 
-The provider interface in `src/worker/lib/email/types.ts` supports:
+The provider interface in `src/worker/lib/gmail/types.ts` supports:
 
 - fetch message bodies/attachments
 - send messages
@@ -211,7 +211,7 @@ The provider interface in `src/worker/lib/email/types.ts` supports:
 - sync a specific set of message ids
 - classify reconnect-required errors
 
-Provider selection happens in `src/worker/lib/email/resolver.ts`:
+Provider selection happens in `src/worker/lib/gmail/resolver.ts`:
 
 - look up mailbox by `mailboxId`
 - read `mailboxes.provider`
@@ -284,7 +284,7 @@ This is the "nuclear option" when history state is broken or the mailbox is stuc
 
 ## Full Sync Flow
 
-The full sync engine lives in `src/worker/lib/email/providers/google/sync.ts`, mainly in `startFullGmailSync(...)`.
+The full sync engine lives in `src/worker/lib/gmail/sync/engine.ts`, mainly in `startFullGmailSync(...)`.
 
 ### Step 1: Acquire lock
 
@@ -351,7 +351,7 @@ The caller marks the job succeeded or failed and releases the mailbox lock.
 
 ## Incremental Sync Flow
 
-Incremental sync also lives in `src/worker/lib/email/providers/google/sync.ts`.
+Incremental sync also lives in `src/worker/lib/gmail/sync/engine.ts`.
 
 Key functions:
 
@@ -507,7 +507,7 @@ That keeps the lock alive and avoids hammering Gmail.
 
 ## Gmail Client Layer
 
-The low-level Gmail client in `src/worker/lib/email/providers/google/client.ts` is responsible for:
+The low-level Gmail client in `src/worker/lib/gmail/client.ts` is responsible for:
 
 - token retrieval and refresh
 - generic Gmail HTTP requests
@@ -526,7 +526,7 @@ Important behavior:
 
 ## Mailbox Parsing / Sending Layer
 
-`src/worker/lib/email/providers/google/mailbox.ts` handles:
+`src/worker/lib/gmail/mailbox/read.ts` handles:
 
 - decoding Gmail body payloads
 - extracting `text/plain` and `text/html`
@@ -540,7 +540,7 @@ This file is where most Gmail-specific MIME/body/attachment logic lives.
 
 ## Mailbox State, Locks, and Jobs
 
-Shared mailbox/job state is managed in `src/worker/lib/email/mailbox-state.ts`.
+Shared mailbox/job state is managed in `src/worker/lib/gmail/sync/state.ts`.
 
 ### Locks
 
@@ -640,7 +640,7 @@ This is why unsubscribe features do not need to rediscover metadata later.
 Start with:
 
 - `src/worker/routes/settings/get.ts`
-- `src/worker/lib/email/mailbox-state.ts`
+- `src/worker/lib/gmail/sync/state.ts`
 
 Check:
 
@@ -652,9 +652,9 @@ Check:
 
 Start with:
 
-- `src/worker/lib/email/providers/google/errors.ts`
+- `src/worker/lib/gmail/errors.ts`
 - `src/worker/routes/inbox/sync/get.ts`
-- `src/worker/lib/email/mailbox-state.ts`
+- `src/worker/lib/gmail/sync/state.ts`
 
 Check:
 
@@ -667,7 +667,7 @@ Check:
 Start with:
 
 - `mailboxes.historyId`
-- `src/worker/lib/email/providers/google/sync.ts`
+- `src/worker/lib/gmail/sync/engine.ts`
 
 Check for:
 
@@ -680,7 +680,7 @@ Check for:
 Start with:
 
 - `src/worker/routes/inbox/emails/post.ts`
-- `src/worker/lib/email/providers/google/sync.ts`
+- `src/worker/lib/gmail/sync/engine.ts`
 
 Check:
 
@@ -692,8 +692,8 @@ Check:
 
 Start with:
 
-- `src/worker/lib/email/ai-classifier.ts`
-- `src/worker/lib/email/user-filters.ts`
+- `src/worker/lib/gmail/ai-classifier.ts`
+- `src/worker/lib/gmail/user-filters.ts`
 - `processMessageIds(...)` in Google sync
 
 Check:
@@ -706,7 +706,7 @@ Check:
 
 Start with:
 
-- `src/worker/lib/email/providers/google/mailbox.ts`
+- `src/worker/lib/gmail/mailbox/read.ts`
 - `src/worker/routes/inbox/emails/get.ts`
 - `src/worker/routes/inbox/emails/get-attachment.ts`
 
@@ -729,11 +729,11 @@ If you are onboarding, read in this order:
 
 1. `src/worker/routes/inbox/sync/get.ts`
 2. `src/worker/routes/inbox/sync/post.ts`
-3. `src/worker/lib/email/sync.ts`
-4. `src/worker/lib/email/mailbox-state.ts`
-5. `src/worker/lib/email/providers/google/sync.ts`
-6. `src/worker/lib/email/providers/google/client.ts`
-7. `src/worker/lib/email/providers/google/mailbox.ts`
+3. `src/worker/lib/gmail/sync/engine.ts`
+4. `src/worker/lib/gmail/sync/state.ts`
+5. `src/worker/lib/gmail/sync/engine.ts`
+6. `src/worker/lib/gmail/client.ts`
+7. `src/worker/lib/gmail/mailbox/read.ts`
 8. `src/worker/db/schema.ts`
 
 That sequence gives you:
@@ -747,10 +747,10 @@ That sequence gives you:
 
 Petit sync is currently:
 
-- provider-routed through `lib/email`
-- implemented for Gmail under `lib/email/providers/google`
+- provider-routed through `lib/gmail`
+- implemented for Gmail under `lib/gmail`
 - lock/job driven through `mailboxes` and `sync_jobs`
 - full-sync + history-based incremental sync
 - enriched during ingestion with AI labels, user filters, and unsubscribe metadata
 
-If you understand `mailbox-state.ts`, `routes/inbox/sync/*.ts`, and `providers/google/sync.ts`, you understand almost all of the live sync system.
+If you understand `sync/state.ts`, `routes/inbox/sync/*.ts`, and `sync/engine.ts`, you understand almost all of the live sync system.

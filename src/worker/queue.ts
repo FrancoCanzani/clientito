@@ -4,7 +4,7 @@ import { mailboxes } from "./db/schema";
 import {
   classifySyncError,
   isGmailReconnectRequiredError,
-} from "./lib/email/providers/google/errors";
+} from "./lib/gmail/errors";
 import {
   acquireMailboxSyncLock,
   createSyncJob,
@@ -13,15 +13,15 @@ import {
   releaseMailboxSyncLock,
   resolveMailbox,
   updateSyncJobProgress,
-} from "./lib/email/mailbox-state";
+} from "./lib/gmail/sync/state";
 import {
   recoverMailboxSync,
   startFullGmailSync,
-} from "./lib/email/providers/google/sync";
+} from "./lib/gmail/sync/engine";
 import {
   normalizeSyncWindowMonths,
   resolveSyncCutoffAt,
-} from "./lib/email/sync-preferences";
+} from "./lib/gmail/sync/preferences";
 
 export type SyncQueueMessage =
   | { type: "full-sync"; userId: string; mailboxId?: number; months?: number }

@@ -91,7 +91,7 @@ export function getMailboxStatusCopy(account: MailboxAccount, isBusy: boolean) {
     return {
       badge: "Reconnect Gmail",
       badgeTone: "bg-amber-500",
-      detail: "Google access expired. Reconnect this account to resume email and calendar sync.",
+      detail: "Google access expired. Reconnect this account to resume email sync.",
       sectionTitle: "Connection status",
       primaryLabel: "Reconnect Gmail",
       reimportHint: "Run a fresh full import after reconnecting if this mailbox still looks incomplete.",

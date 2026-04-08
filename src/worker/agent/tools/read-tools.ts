@@ -1,18 +1,13 @@
 import { tool } from "ai";
-import { and, asc, desc, eq, gt, isNotNull, isNull, like, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, isNull, like, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
-import { emailIntelligence, emails, tasks, type EmailAction } from "../../db/schema";
-import { listEvents } from "../../lib/calendar/google";
+import { emailIntelligence, emails, type EmailAction } from "../../db/schema";
 import {
   getStoredEmailClassification,
-} from "../../lib/email/intelligence/store";
-import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
-import { getUserMailboxes } from "../../lib/email/mailbox-state";
-import { syncAllMailboxes } from "../../lib/email/sync";
-import { STANDARD_LABELS } from "../../lib/email/types";
-import { getDayBoundsUtc } from "../../lib/utils";
-import { buildBriefingContext } from "../../routes/ai/get-briefing";
+} from "../../lib/gmail/intelligence/store";
+import { catchUpAllMailboxes } from "../../lib/gmail/sync/engine";
+import { STANDARD_LABELS } from "../../lib/gmail/types";
 import { hasEmailLabel } from "../../routes/inbox/emails/utils";
 
 type InboxView =
@@ -179,7 +174,7 @@ export function makeReadTools(
             and(eq(emails.userId, userId), lte(emails.snoozedUntil, now)),
           );
 
-        await syncAllMailboxes(db, env, userId);
+        await catchUpAllMailboxes(db, env, userId);
 
         const rows = await db
           .select({
@@ -288,145 +283,6 @@ export function makeReadTools(
         };
       },
     }),
-    getBriefing: tool({
-      description:
-        "Build a short briefing from the signed-in user's email and task state. Use this when the user asks for a briefing, summary of what needs attention, or an overview of their inbox.",
-      inputSchema: z.object({}),
-      execute: async () => {
-        const mailboxId = (await getUserMailboxes(db, userId))[0]?.id;
-        if (!mailboxId) {
-          return { tasks: [], events: [] };
-        }
-
-        return buildBriefingContext({
-          db,
-          env,
-          userId,
-          mailboxId,
-        });
-      },
-    }),
-    getAgenda: tool({
-      description:
-        "Get the user's calendar events and pending email-based calendar suggestions. Defaults to today. Use when the user asks about their agenda, schedule, calendar, meetings, or what they have coming up.",
-      inputSchema: z.object({
-        from: z.string().optional().describe("Start date as ISO string. Defaults to start of today."),
-        to: z.string().optional().describe("End date as ISO string. Defaults to end of today."),
-      }),
-      execute: async ({ from, to }) => {
-        const now = new Date();
-        const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const dayEnd = new Date(dayStart);
-        dayEnd.setDate(dayEnd.getDate() + 1);
-
-        const fromIso = from ?? dayStart.toISOString();
-        const toIso = to ?? dayEnd.toISOString();
-        const fromMs = new Date(fromIso).getTime();
-        const toMs = new Date(toIso).getTime();
-
-        const calendarEvents: { title: string; startAt: number; endAt: number; location?: string; isAllDay: boolean }[] = [];
-        const allMailboxes = await getUserMailboxes(db, userId);
-        for (const mb of allMailboxes) {
-          if (!mb.historyId || mb.authState !== "ok") continue;
-          try {
-            const token = await getGmailTokenForMailbox(db, mb.id, {
-              GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
-              GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
-            });
-            const events = await listEvents(token, fromIso, toIso);
-            for (const e of events) {
-              const isAllDay = !e.start.dateTime;
-              calendarEvents.push({
-                title: e.summary || "(No title)",
-                startAt: isAllDay ? new Date(e.start.date!).getTime() : new Date(e.start.dateTime!).getTime(),
-                endAt: isAllDay ? new Date(e.end.date!).getTime() : new Date(e.end.dateTime!).getTime(),
-                location: e.location,
-                isAllDay,
-              });
-            }
-          } catch {
-            // skip mailbox on error
-          }
-        }
-        calendarEvents.sort((a, b) => a.startAt - b.startAt);
-
-        const suggestionRows = await db
-          .select({
-            emailId: emailIntelligence.emailId,
-            calendarEventsJson: emailIntelligence.calendarEventsJson,
-          })
-          .from(emailIntelligence)
-          .where(eq(emailIntelligence.userId, userId));
-
-        const proposed = suggestionRows.flatMap((row) =>
-          (row.calendarEventsJson ?? [])
-            .filter(
-              (event) =>
-                event.status === "pending" &&
-                event.startAt >= fromMs &&
-                event.startAt <= toMs,
-            )
-            .map((event) => ({
-              id: event.id,
-              emailId: row.emailId,
-              title: event.title,
-              description: event.sourceText,
-              location: event.location,
-              startAt: event.startAt,
-              endAt: event.endAt,
-              status: event.status,
-            })),
-        );
-
-        return {
-          from: fromIso,
-          to: toIso,
-          events: calendarEvents,
-          suggestions: proposed,
-          count: calendarEvents.length + proposed.length,
-        };
-      },
-    }),
-    listTasks: tool({
-      description:
-        "List the signed-in user's CRM tasks. Use dueToday=true for tasks due today. By default only incomplete tasks are returned.",
-      inputSchema: z.object({
-        dueToday: z
-          .boolean()
-          .optional()
-          .describe("Set to true to return only tasks due today in the user's local day."),
-        includeCompleted: z
-          .boolean()
-          .optional()
-          .default(false)
-          .describe("Set to true to include completed tasks in the results."),
-      }),
-      execute: async ({ dueToday, includeCompleted }) => {
-        const conditions = [eq(tasks.userId, userId)];
-        if (!includeCompleted) conditions.push(ne(tasks.status, "done"));
-        if (dueToday) {
-          const { start, end } = getDayBoundsUtc(Date.now());
-          conditions.push(
-            sql`${tasks.dueAt} >= ${start} AND ${tasks.dueAt} < ${end}`,
-          );
-        }
-
-        const rows = await db
-          .select({
-            id: tasks.id,
-            title: tasks.title,
-            dueAt: tasks.dueAt,
-            status: tasks.status,
-            createdAt: tasks.createdAt,
-          })
-          .from(tasks)
-          .where(and(...conditions))
-          .orderBy(asc(tasks.dueAt))
-          .limit(20);
-        return { tasks: rows, count: rows.length };
-      },
-    }),
-
     searchEmailsByDate: tool({
       description:
         "Search emails within a date range. Use when user asks about emails from a specific time period like 'last week', 'yesterday', or 'in March'.",
@@ -454,7 +310,7 @@ export function makeReadTools(
             and(eq(emails.userId, userId), lte(emails.snoozedUntil, now)),
           );
 
-        await syncAllMailboxes(db, env, userId);
+        await catchUpAllMailboxes(db, env, userId);
 
         const conditions = [
           eq(emails.userId, userId),

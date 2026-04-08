@@ -2,18 +2,12 @@ import { tool } from "ai";
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
-import { emails, tasks } from "../../db/schema";
-import { createEvent } from "../../lib/calendar/google";
-import { createEmailProvider } from "../../lib/email";
-import {
-  findCalendarSuggestionById,
-  updateCalendarSuggestion,
-} from "../../lib/email/intelligence/store";
-import { getGmailTokenForMailbox } from "../../lib/email/providers/google/client";
-import { STANDARD_LABELS } from "../../lib/email/types";
+import { emails, mailboxes } from "../../db/schema";
+import { createEmailProvider } from "../../lib/gmail/resolver";
+import { STANDARD_LABELS } from "../../lib/gmail/types";
 import { chunkArray } from "../../lib/utils";
-import { resolveOutgoingMailbox, getUserMailboxes, ensureMailbox } from "../../lib/email/mailbox-state";
-import { markEmailSubscriptionStatus, normalizeUnsubscribeUrl, normalizeUnsubscribeEmail } from "../../lib/email/subscriptions";
+import { resolveOutgoingMailbox, ensureMailbox } from "../../lib/gmail/sync/state";
+import { markEmailSubscriptionStatus, normalizeUnsubscribeUrl, normalizeUnsubscribeEmail } from "../../lib/gmail/subscriptions/service";
 import { applyEmailPatch } from "../../routes/inbox/emails/internal/mutation";
 import { hasEmailLabel } from "../../routes/inbox/emails/utils";
 
@@ -346,77 +340,6 @@ export function makeWriteTools(
   }
 
   return {
-    createTask: tool({
-      description:
-        "Create a new task for the user.",
-      inputSchema: z.object({
-        title: z.string().describe("Task title."),
-        dueAt: z
-          .number()
-          .optional()
-          .describe("Due date as Unix timestamp in milliseconds."),
-      }),
-      execute: async ({ title, dueAt }) => {
-        const result = await db
-          .insert(tasks)
-          .values({ userId, title, dueAt: dueAt ?? null, status: "todo", createdAt: Date.now() })
-          .returning({ id: tasks.id });
-        return { created: true, taskId: result[0].id, title };
-      },
-    }),
-
-    updateTask: tool({
-      description:
-        "Update an existing task. Can change status, title, due date, or priority.",
-      inputSchema: z.object({
-        taskId: z.number().int().positive().describe("Task ID to update."),
-        status: z.enum(["backlog", "todo", "in_progress", "done"]).optional().describe("New status."),
-        title: z.string().optional().describe("New task title."),
-        dueAt: z.number().nullable().optional().describe("New due date (ms timestamp) or null to clear."),
-        priority: z
-          .enum(["urgent", "high", "medium", "low"])
-          .optional()
-          .describe("New priority level."),
-      }),
-      needsApproval: true,
-      execute: async ({ taskId, status, title, dueAt, priority }) => {
-        const existing = await db
-          .select({ id: tasks.id })
-          .from(tasks)
-          .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
-          .limit(1);
-        if (!existing[0]) return { error: "Task not found" };
-
-        const updates: Record<string, unknown> = {};
-        if (status !== undefined) updates.status = status;
-        if (title !== undefined) updates.title = title;
-        if (dueAt !== undefined) updates.dueAt = dueAt;
-        if (priority !== undefined) updates.priority = priority;
-
-        if (Object.keys(updates).length === 0) return { error: "Nothing to update" };
-
-        await db
-          .update(tasks)
-          .set(updates)
-          .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
-        return { updated: true, taskId };
-      },
-    }),
-
-    deleteTask: tool({
-      description: "Delete a task permanently.",
-      inputSchema: z.object({
-        taskId: z.number().int().positive().describe("Task ID to delete."),
-      }),
-      needsApproval: true,
-      execute: async ({ taskId }) => {
-        await db
-          .delete(tasks)
-          .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
-        return { deleted: true, taskId };
-      },
-    }),
-
     archiveEmail: tool({
       description: "Archive an email (remove from inbox).",
       inputSchema: z.object({
@@ -767,8 +690,11 @@ export function makeWriteTools(
         }
 
         if (unsubEmail) {
-          const mailboxes = await getUserMailboxes(db, userId);
-          const mailbox = mailboxes[0] ?? await ensureMailbox(db, userId, null);
+          const userMailboxes = await db
+            .select()
+            .from(mailboxes)
+            .where(eq(mailboxes.userId, userId));
+          const mailbox = userMailboxes[0] ?? await ensureMailbox(db, userId, null);
           if (!mailbox) return { error: "No mailbox configured" };
 
           const provider = await createEmailProvider(db, env, mailbox.id);
@@ -795,78 +721,6 @@ export function makeWriteTools(
           method: "manual",
         });
         return { unsubscribed: false, method: "manual", fromAddr: email.fromAddr, message: "Automatic unsubscribe failed. The user may need to unsubscribe manually." };
-      },
-    }),
-
-    approveProposedEvent: tool({
-      description: "Approve a pending calendar suggestion extracted from an email and add it to Google Calendar.",
-      inputSchema: z.object({
-        proposedId: z.number().int().positive().describe("Proposed event ID to approve."),
-      }),
-      execute: async ({ proposedId }) => {
-        const match = await findCalendarSuggestionById(db, userId, proposedId);
-        if (!match || match.suggestion.status !== "pending") {
-          return { error: "Calendar suggestion not found" };
-        }
-
-        const mailboxId = match.row.mailboxId;
-        let resolvedMailboxId = mailboxId;
-
-        if (!resolvedMailboxId) {
-          const mailboxes = await getUserMailboxes(db, userId);
-          const usable = mailboxes.find((mb) => mb.historyId && mb.authState === "ok");
-          if (!usable) return { error: "No connected account available" };
-          resolvedMailboxId = usable.id;
-        }
-
-        const token = await getGmailTokenForMailbox(db, resolvedMailboxId, {
-          GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
-          GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
-        });
-
-        const start = match.suggestion.isAllDay
-          ? { date: new Date(match.suggestion.startAt).toISOString().slice(0, 10) }
-          : { dateTime: new Date(match.suggestion.startAt).toISOString() };
-        const end = match.suggestion.isAllDay
-          ? { date: new Date(match.suggestion.endAt).toISOString().slice(0, 10) }
-          : { dateTime: new Date(match.suggestion.endAt).toISOString() };
-
-        const googleEvent = await createEvent(token, {
-          summary: match.suggestion.title,
-          description: match.suggestion.sourceText,
-          location: match.suggestion.location ?? undefined,
-          start,
-          end,
-          attendees: match.suggestion.attendees?.map((email) => ({ email })),
-        });
-
-        await updateCalendarSuggestion(db, match, {
-          status: "approved",
-          googleEventId: googleEvent.id,
-        });
-
-        return {
-          approved: true,
-          proposedId,
-          title: match.suggestion.title,
-          googleEventId: googleEvent.id,
-        };
-      },
-    }),
-
-    dismissProposedEvent: tool({
-      description: "Dismiss a pending calendar suggestion extracted from an email.",
-      inputSchema: z.object({
-        proposedId: z.number().int().positive().describe("Proposed event ID to dismiss."),
-      }),
-      execute: async ({ proposedId }) => {
-        const match = await findCalendarSuggestionById(db, userId, proposedId);
-        if (!match || match.suggestion.status !== "pending") {
-          return { error: "Calendar suggestion not found" };
-        }
-
-        await updateCalendarSuggestion(db, match, { status: "dismissed" });
-        return { dismissed: true, proposedId, title: match.suggestion.title };
       },
     }),
 

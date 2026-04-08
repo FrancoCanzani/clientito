@@ -1,4 +1,4 @@
-import { getGmailToken } from "../../lib/email/providers/google/client";
+import { getGmailToken } from "../../lib/gmail/client";
 
 export async function resolveGmailEmail(
   db: Parameters<typeof getGmailToken>[0],

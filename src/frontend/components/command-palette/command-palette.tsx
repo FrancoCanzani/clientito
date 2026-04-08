@@ -20,7 +20,6 @@ export function CommandPalette() {
   const {
     visibleNavigationCommands,
     accountCommands,
-    taskNavigationCommands,
     actionCommands,
     agentSuggestions,
   } = usePaletteCommands({ close: state.close });
@@ -71,13 +70,12 @@ export function CommandPalette() {
                     handleDiscard={handleDiscard}
                   />
                 ) : (
-                  <CommandListPanel
-                    visibleNavigationCommands={visibleNavigationCommands}
-                    accountCommands={accountCommands}
-                    taskNavigationCommands={taskNavigationCommands}
-                    actionCommands={actionCommands}
-                    enterAgentMode={state.enterAgentMode}
-                  />
+                    <CommandListPanel
+                      visibleNavigationCommands={visibleNavigationCommands}
+                      accountCommands={accountCommands}
+                      actionCommands={actionCommands}
+                      enterAgentMode={state.enterAgentMode}
+                    />
                 )}
               </m.div>
             )}

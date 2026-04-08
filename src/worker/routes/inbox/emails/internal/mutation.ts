@@ -1,5 +1,5 @@
 import { emails } from "../../../../db/schema";
-import { STANDARD_LABELS } from "../../../../lib/email/types";
+import { STANDARD_LABELS } from "../../../../lib/gmail/types";
 
 type EmailPatchMutation = {
   isRead?: boolean;
