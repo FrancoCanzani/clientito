@@ -3,7 +3,7 @@ import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../db/client";
 import { emails, mailboxes } from "../../db/schema";
-import { createEmailProvider } from "../../lib/gmail/resolver";
+import { GmailDriver } from "../../lib/gmail/driver";
 import { STANDARD_LABELS } from "../../lib/gmail/types";
 import { chunkArray } from "../../lib/utils";
 import { resolveOutgoingMailbox, ensureMailbox } from "../../lib/gmail/sync/state";
@@ -51,7 +51,7 @@ async function getEmailForForwarding(
   }
 
   try {
-    const provider = await createEmailProvider(db, env, email.mailboxId);
+    const provider = new GmailDriver(db, env, email.mailboxId);
     const rawMessage = await provider.fetchMessage(email.providerMessageId);
 
     return {
@@ -121,7 +121,7 @@ async function patchEmailLabels(
   }
 
   if (patch.addLabelIds.length > 0 || patch.removeLabelIds.length > 0) {
-    const provider = await createEmailProvider(db, env, email.mailboxId);
+    const provider = new GmailDriver(db, env, email.mailboxId);
     await provider.modifyLabels(
       [email.providerMessageId],
       patch.addLabelIds,
@@ -280,7 +280,7 @@ async function markAllEmailsReadInScope(
   }
 
   for (const [mailboxId, group] of providerGroups) {
-    const provider = await createEmailProvider(db, env, mailboxId);
+    const provider = new GmailDriver(db, env, mailboxId);
     await provider.modifyLabels(
       group.providerMessageIds,
       [],
@@ -497,7 +497,7 @@ export function makeWriteTools(
           const fromEmail = mailbox.email ?? userEmail;
           if (!fromEmail) return { error: "User email not available" };
 
-          const provider = await createEmailProvider(db, env, mailbox.id);
+          const provider = new GmailDriver(db, env, mailbox.id);
           const result = await provider.send(fromEmail, {
             to,
             subject: resolvedSubject,
@@ -697,7 +697,7 @@ export function makeWriteTools(
           const mailbox = userMailboxes[0] ?? await ensureMailbox(db, userId, null);
           if (!mailbox) return { error: "No mailbox configured" };
 
-          const provider = await createEmailProvider(db, env, mailbox.id);
+          const provider = new GmailDriver(db, env, mailbox.id);
           await provider.send(mailbox.email ?? userEmail ?? "", {
             to: unsubEmail,
             subject: "Unsubscribe",

@@ -17,9 +17,9 @@ import {
   listMessagesPage,
 } from "../client";
 import {
-  GmailHistoryExpiredError,
-  GmailSyncStateError,
   classifySyncError,
+  createGmailSyncStateError,
+  isGmailHistoryExpiredError,
   isGmailReconnectRequiredError,
 } from "../errors";
 import {
@@ -424,7 +424,7 @@ export async function startFullGmailSync(
   const hasLock =
     options?.skipLock === true ? true : await acquireMailboxSyncLock(db, mailboxId);
   if (!hasLock) {
-    throw new GmailSyncStateError("Sync already in progress.");
+    throw createGmailSyncStateError("Sync already in progress.");
   }
 
   try {
@@ -652,7 +652,7 @@ async function runIncrementalGmailSync(
   const hasLock =
     options?.skipLock === true ? true : await acquireMailboxSyncLock(db, mailboxId);
   if (!hasLock) {
-    throw new GmailSyncStateError("Sync already in progress.");
+    throw createGmailSyncStateError("Sync already in progress.");
   }
 
   try {
@@ -661,7 +661,7 @@ async function runIncrementalGmailSync(
     });
     const startHistoryId = startHistoryIdInput ?? mailbox?.historyId ?? null;
     if (!startHistoryId) {
-      throw new GmailSyncStateError("No sync state found. Run full sync first.");
+      throw createGmailSyncStateError("No sync state found. Run full sync first.");
     }
 
     const accessToken = await getGmailTokenForMailbox(db, mailboxId, {
@@ -802,7 +802,7 @@ export async function catchUpMailboxOnDemand(
         db, env, mailboxId, userId, mailbox.historyId, { skipLock: true },
       );
     } catch (error) {
-      if (error instanceof GmailHistoryExpiredError) {
+      if (isGmailHistoryExpiredError(error)) {
         console.warn("History expired, falling back to full sync", { userId, mailboxId });
         return startFullGmailSync(
           db, env, mailboxId, userId, undefined, { skipLock: true },

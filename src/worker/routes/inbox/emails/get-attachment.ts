@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emails } from "../../../db/schema";
-import { createEmailProvider } from "../../../lib/gmail/resolver";
+import { GmailDriver } from "../../../lib/gmail/driver";
 import type { AppRouteEnv } from "../../types";
 import { normalizeFilename, normalizeMimeType } from "./utils";
 import { emailAttachmentQuerySchema } from "./schemas";
@@ -31,7 +31,7 @@ export function registerGetAttachment(api: Hono<AppRouteEnv>) {
       let reconnectRequired = false;
 
       try {
-        const provider = await createEmailProvider(db, c.env, mailboxId);
+        const provider = new GmailDriver(db, c.env, mailboxId);
         const bytes = await provider.fetchAttachment(
           providerMessageId,
           attachmentId,
@@ -59,7 +59,7 @@ export function registerGetAttachment(api: Hono<AppRouteEnv>) {
         });
 
         try {
-          const provider = await createEmailProvider(db, c.env, mailboxId);
+          const provider = new GmailDriver(db, c.env, mailboxId);
           reconnectRequired = provider.isReconnectError(error);
         } catch {
           reconnectRequired = false;

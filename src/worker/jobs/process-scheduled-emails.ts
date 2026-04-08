@@ -1,7 +1,7 @@
 import { and, eq, lte } from "drizzle-orm";
 import type { Database } from "../db/client";
 import { mailboxes, scheduledEmails } from "../db/schema";
-import { createEmailProvider } from "../lib/gmail/resolver";
+import { GmailDriver } from "../lib/gmail/driver";
 import { resolveOutgoingMailbox } from "../lib/gmail/sync/state";
 import { appendSignature } from "../lib/gmail/mailbox/signature";
 
@@ -54,7 +54,7 @@ async function sendScheduledEmail(
     );
   }
 
-  const provider = await createEmailProvider(db, env, mailbox.id);
+  const provider = new GmailDriver(db, env, mailbox.id);
   await provider.send(mbRow[0]?.email ?? row.to, {
     to: row.to,
     cc: row.cc ?? undefined,

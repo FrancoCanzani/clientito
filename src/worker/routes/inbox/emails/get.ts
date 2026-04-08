@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emailIntelligence, emails } from "../../../db/schema";
-import { createEmailProvider } from "../../../lib/gmail/resolver";
+import { GmailDriver } from "../../../lib/gmail/driver";
 import { catchUpAllMailboxes } from "../../../lib/gmail/sync/engine";
 import type { AppRouteEnv } from "../../types";
 import { emailDetailParamsSchema, emailDetailQuerySchema } from "./schemas";
@@ -73,11 +73,7 @@ export function registerGetEmail(api: Hono<AppRouteEnv>) {
         let reconnectRequired = false;
 
         try {
-          const provider = await createEmailProvider(
-            db,
-            c.env,
-            first.mailboxId,
-          );
+          const provider = new GmailDriver(db, c.env, first.mailboxId);
           const rawMessage = await provider.fetchMessage(
             baseEmail.providerMessageId,
           );
@@ -127,11 +123,7 @@ export function registerGetEmail(api: Hono<AppRouteEnv>) {
           });
         } catch (error) {
           try {
-            const provider = await createEmailProvider(
-              db,
-              c.env,
-              first.mailboxId,
-            );
+            const provider = new GmailDriver(db, c.env, first.mailboxId);
             reconnectRequired = provider.isReconnectError(error);
           } catch {
             reconnectRequired = false;

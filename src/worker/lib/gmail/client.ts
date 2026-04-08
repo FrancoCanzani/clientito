@@ -4,9 +4,9 @@ import type { Database } from "../../db/client";
 import { mailboxes } from "../../db/schema";
 import { sleep } from "../utils";
 import {
+  createGmailHistoryExpiredError,
+  createGmailRateLimitError,
   GOOGLE_RECONNECT_REQUIRED_MESSAGE,
-  GmailHistoryExpiredError,
-  GmailRateLimitError,
   isGmailReconnectRequiredError,
 } from "./errors";
 import type {
@@ -128,7 +128,7 @@ async function gmailRequestRaw(
     }
 
     if (attempt === GMAIL_MAX_RATE_LIMIT_RETRIES) {
-      throw new GmailRateLimitError(
+      throw createGmailRateLimitError(
         `Gmail API rate limit reached for ${path} (status ${response.status}).`,
       );
     }
@@ -207,7 +207,7 @@ export async function listHistoryPage(
   });
 
   if (response.status === 404) {
-    throw new GmailHistoryExpiredError(
+    throw createGmailHistoryExpiredError(
       "Gmail history is too old. Run a full sync again.",
     );
   }

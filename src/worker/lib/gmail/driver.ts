@@ -13,13 +13,12 @@ import {
 import { isGmailReconnectRequiredError } from "./errors";
 import { catchUpAllMailboxes, syncGmailMessageIds } from "./sync/engine";
 import type {
-  EmailProvider,
   RawMessage,
   SendParams,
   SendResult,
 } from "./types";
 
-export class GmailDriver implements EmailProvider {
+export class GmailDriver {
   constructor(
     private db: Database,
     private env: Env,

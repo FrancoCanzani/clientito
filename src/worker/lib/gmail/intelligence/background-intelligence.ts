@@ -3,7 +3,7 @@ import type { Database } from "../../../db/client";
 import { emailIntelligence, emails, type FilterActions } from "../../../db/schema";
 import { applyEmailPatch } from "../../../routes/inbox/emails/internal/mutation";
 import { truncate } from "../../utils";
-import { createEmailProvider } from "../resolver";
+import { GmailDriver } from "../driver";
 import { getUserFilters } from "../user-filters";
 import {
   buildFilterPrompt,
@@ -89,7 +89,7 @@ async function applyFilterActions(
     email.mailboxId &&
     (patch.addLabelIds.length > 0 || patch.removeLabelIds.length > 0)
   ) {
-    const provider = await createEmailProvider(db, env, email.mailboxId);
+    const provider = new GmailDriver(db, env, email.mailboxId);
     await provider.modifyLabels(
       [email.providerMessageId],
       patch.addLabelIds,

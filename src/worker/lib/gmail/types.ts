@@ -152,21 +152,3 @@ export type SyncProgressFn = (
   current: number,
   total: number,
 ) => Promise<void>;
-
-export interface EmailProvider {
-  fetchMessage(messageId: string): Promise<RawMessage>;
-  fetchAttachment(messageId: string, attachmentId: string): Promise<Uint8Array>;
-  send(fromEmail: string, params: SendParams): Promise<SendResult>;
-  modifyLabels(
-    messageIds: string[],
-    addLabelIds: string[],
-    removeLabelIds: string[],
-  ): Promise<void>;
-  syncMessages(userId: string): Promise<void>;
-  syncMessageIds(
-    userId: string,
-    messageIds: string[],
-    forceFull?: boolean,
-  ): Promise<void>;
-  isReconnectError(error: unknown): boolean;
-}

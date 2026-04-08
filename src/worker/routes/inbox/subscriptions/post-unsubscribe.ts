@@ -4,7 +4,7 @@ import type { Hono } from "hono";
 import { z } from "zod";
 import { account } from "../../../db/auth-schema";
 import { mailboxes } from "../../../db/schema";
-import { createEmailProvider } from "../../../lib/gmail/resolver";
+import { GmailDriver } from "../../../lib/gmail/driver";
 import { ensureMailbox } from "../../../lib/gmail/sync/state";
 import {
   markEmailSubscriptionStatus,
@@ -93,7 +93,7 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
             return c.json({ error: "No mailbox configured" }, 400);
           }
 
-          const provider = await createEmailProvider(db, c.env, mailbox.id);
+          const provider = new GmailDriver(db, c.env, mailbox.id);
           await provider.send(mailbox.email ?? user.email, {
             to: unsubscribeEmail,
             subject: "Unsubscribe",

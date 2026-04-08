@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { emails } from "../../../db/schema";
-import { createEmailProvider } from "../../../lib/gmail/resolver";
+import { GmailDriver } from "../../../lib/gmail/driver";
 import type { AppRouteEnv } from "../../types";
 import { applyEmailPatch } from "./internal/mutation";
 import { patchEmailBodySchema, patchEmailParamsSchema } from "./schemas";
@@ -43,7 +43,7 @@ export function registerPatchEmail(api: Hono<AppRouteEnv>) {
         nextState.removeLabelIds.length > 0
       ) {
         try {
-          const provider = await createEmailProvider(db, c.env, email.mailboxId);
+          const provider = new GmailDriver(db, c.env, email.mailboxId);
           await provider.modifyLabels(
             [email.providerMessageId],
             nextState.addLabelIds,

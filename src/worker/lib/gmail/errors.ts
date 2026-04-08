@@ -1,11 +1,39 @@
 export const GOOGLE_RECONNECT_REQUIRED_MESSAGE =
   "Google connection expired. Please sign out and sign in with Google again.";
 
-export class GmailSyncStateError extends Error {}
+const GMAIL_SYNC_STATE_ERROR = "GmailSyncStateError";
+const GMAIL_HISTORY_EXPIRED_ERROR = "GmailHistoryExpiredError";
+const GMAIL_RATE_LIMIT_ERROR = "GmailRateLimitError";
 
-export class GmailHistoryExpiredError extends Error {}
+function taggedError(message: string, name: string): Error {
+  const error = new Error(message);
+  error.name = name;
+  return error;
+}
 
-export class GmailRateLimitError extends Error {}
+export function createGmailSyncStateError(message: string): Error {
+  return taggedError(message, GMAIL_SYNC_STATE_ERROR);
+}
+
+export function createGmailHistoryExpiredError(message: string): Error {
+  return taggedError(message, GMAIL_HISTORY_EXPIRED_ERROR);
+}
+
+export function createGmailRateLimitError(message: string): Error {
+  return taggedError(message, GMAIL_RATE_LIMIT_ERROR);
+}
+
+export function isGmailSyncStateError(error: unknown): boolean {
+  return error instanceof Error && error.name === GMAIL_SYNC_STATE_ERROR;
+}
+
+export function isGmailHistoryExpiredError(error: unknown): boolean {
+  return error instanceof Error && error.name === GMAIL_HISTORY_EXPIRED_ERROR;
+}
+
+export function isGmailRateLimitError(error: unknown): boolean {
+  return error instanceof Error && error.name === GMAIL_RATE_LIMIT_ERROR;
+}
 
 export function isGmailReconnectRequiredError(error: unknown): boolean {
   if (!(error instanceof Error)) {
@@ -26,16 +54,17 @@ export type SyncJobErrorClass =
 export function classifySyncError(error: unknown): SyncJobErrorClass {
   if (isGmailReconnectRequiredError(error)) return "reconnect_required";
 
-  if (
-    error instanceof Error &&
-    error.message.toLowerCase().includes("full sync again")
-  ) {
+  if (isGmailHistoryExpiredError(error)) {
     return "history_expired";
   }
 
-  if (error instanceof GmailRateLimitError) return "rate_limited";
+  if (error instanceof Error && error.message.toLowerCase().includes("full sync again")) {
+    return "history_expired";
+  }
 
-  if (error instanceof GmailSyncStateError) return "state_error";
+  if (isGmailRateLimitError(error)) return "rate_limited";
+
+  if (isGmailSyncStateError(error)) return "state_error";
 
   return "sync_failed";
 }

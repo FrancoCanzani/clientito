@@ -3,7 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { Hono } from "hono";
 import type { Database } from "../../../db/client";
 import { emails } from "../../../db/schema";
-import { createEmailProvider } from "../../../lib/gmail/resolver";
+import { GmailDriver } from "../../../lib/gmail/driver";
 import { chunkArray } from "../../../lib/utils";
 import type { AppRouteEnv } from "../../types";
 import { applyEmailPatch } from "./internal/mutation";
@@ -148,7 +148,7 @@ export function registerBatchPatchEmails(api: Hono<AppRouteEnv>) {
 
       for (const group of labelMutationGroups.values()) {
         try {
-          const provider = await createEmailProvider(db, c.env, group.mailboxId);
+          const provider = new GmailDriver(db, c.env, group.mailboxId);
           await provider.modifyLabels(
             group.providerMessageIds,
             group.addLabelIds,

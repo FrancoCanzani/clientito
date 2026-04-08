@@ -1,6 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Hono } from "hono";
-import { createEmailProvider } from "../../../lib/gmail/resolver";
+import { GmailDriver } from "../../../lib/gmail/driver";
 import { resolveOutgoingMailbox } from "../../../lib/gmail/sync/state";
 import { appendSignature } from "../../../lib/gmail/mailbox/signature";
 import { sleep } from "../../../lib/utils";
@@ -24,7 +24,7 @@ async function projectSentEmail(
   userId: string,
   providerMessageId: string,
 ): Promise<boolean> {
-  const provider = await createEmailProvider(db, env, mailboxId);
+  const provider = new GmailDriver(db, env, mailboxId);
 
   for (let attempt = 0; attempt < SENT_EMAIL_PROJECTION_RETRIES; attempt += 1) {
     try {
@@ -130,7 +130,7 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
         .limit(1);
       const bodyWithSignature = appendSignature(input.body, mbRow[0]?.signature);
 
-      const provider = await createEmailProvider(db, env, mailbox.id);
+      const provider = new GmailDriver(db, env, mailbox.id);
       const result = await provider.send(
         mailbox.email ?? user.email,
         {
