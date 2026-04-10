@@ -86,7 +86,8 @@ function SidebarNav() {
   const currentLabel = useRouterState({
     select: (state) =>
       state.matches.find(
-        (match) => match.routeId === "/_dashboard/$mailboxId/inbox/labels/$label/",
+        (match) =>
+          match.routeId === "/_dashboard/$mailboxId/inbox/labels/$label/",
       )?.params.label,
   });
   const activeView =
@@ -94,15 +95,15 @@ function SidebarNav() {
       ? "search"
       : currentRouteId === "/_dashboard/$mailboxId/inbox/subscriptions"
         ? "subscriptions"
-      : currentRouteId === "/_dashboard/$mailboxId/inbox/filters"
-        ? "filters"
+        : currentRouteId === "/_dashboard/$mailboxId/inbox/filters"
+          ? "filters"
           : currentRouteId === "/_dashboard/$mailboxId/inbox/drafts"
             ? "drafts"
-          : currentFolder
-            ? currentFolder
-            : currentLabel === "important"
-              ? "important"
-              : "inbox";
+            : currentFolder
+              ? currentFolder
+              : currentLabel === "important"
+                ? "important"
+                : "inbox";
 
   return (
     <SidebarMenu>
@@ -120,6 +121,7 @@ function SidebarNav() {
           <Link
             to="/$mailboxId/inbox/labels/$label"
             params={{ mailboxId, label: "important" }}
+            preload="intent"
           >
             <FlagIcon />
             <span>Important</span>
@@ -132,6 +134,7 @@ function SidebarNav() {
           <Link
             to="/$mailboxId/$folder"
             params={{ mailboxId, folder: "starred" }}
+            preload="intent"
           >
             <StarIcon />
             <span>Starred</span>
@@ -143,6 +146,7 @@ function SidebarNav() {
         <SidebarMenuButton asChild isActive={activeView === "sent"}>
           <Link
             to="/$mailboxId/$folder"
+            preload="intent"
             params={{ mailboxId, folder: "sent" }}
           >
             <PaperPlaneTiltIcon />
@@ -156,6 +160,7 @@ function SidebarNav() {
           <Link
             to="/$mailboxId/$folder"
             params={{ mailboxId, folder: "archived" }}
+            preload="intent"
           >
             <ArchiveIcon />
             <span>Archive</span>
@@ -167,6 +172,7 @@ function SidebarNav() {
         <SidebarMenuButton asChild isActive={activeView === "spam"}>
           <Link
             to="/$mailboxId/$folder"
+            preload="intent"
             params={{ mailboxId, folder: "spam" }}
           >
             <WarningCircleIcon />
@@ -180,6 +186,7 @@ function SidebarNav() {
           <Link
             to="/$mailboxId/$folder"
             params={{ mailboxId, folder: "trash" }}
+            preload="intent"
           >
             <TrashIcon />
             <span>Trash</span>
@@ -189,7 +196,11 @@ function SidebarNav() {
 
       <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "drafts"}>
-          <Link to="/$mailboxId/inbox/drafts" params={{ mailboxId }}>
+          <Link
+            to="/$mailboxId/inbox/drafts"
+            preload="intent"
+            params={{ mailboxId }}
+          >
             <FileDashedIcon />
             <span>Drafts</span>
           </Link>
@@ -198,7 +209,11 @@ function SidebarNav() {
 
       <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "search"}>
-          <Link to="/$mailboxId/inbox/search" params={{ mailboxId }}>
+          <Link
+            to="/$mailboxId/inbox/search"
+            preload="intent"
+            params={{ mailboxId }}
+          >
             <MagnifyingGlassIcon />
             <span>Search</span>
           </Link>
@@ -207,7 +222,11 @@ function SidebarNav() {
 
       <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "subscriptions"}>
-          <Link to="/$mailboxId/inbox/subscriptions" params={{ mailboxId }}>
+          <Link
+            to="/$mailboxId/inbox/subscriptions"
+            preload="intent"
+            params={{ mailboxId }}
+          >
             <NewspaperIcon />
             <span>Subscriptions</span>
           </Link>
@@ -216,7 +235,11 @@ function SidebarNav() {
 
       <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "filters"}>
-          <Link to="/$mailboxId/inbox/filters" params={{ mailboxId }}>
+          <Link
+            to="/$mailboxId/inbox/filters"
+            preload="intent"
+            params={{ mailboxId }}
+          >
             <FunnelIcon />
             <span>Filters</span>
           </Link>
@@ -231,7 +254,7 @@ export function InboxSidebarShell({ children }: { children: ReactNode }) {
   const { mailboxId } = mailboxRoute.useParams();
 
   return (
-    <SidebarProvider className="min-h-0">
+    <SidebarProvider className="min-h-0 flex-1">
       {isMobile && (
         <Sidebar>
           <SidebarHeader className="gap-3 px-3 pt-5 pb-3">
@@ -244,14 +267,14 @@ export function InboxSidebarShell({ children }: { children: ReactNode }) {
         </Sidebar>
       )}
 
-      <div className="mx-auto flex max-w-5xl min-w-0 flex-1 gap-8 px-4">
-        <aside className="sticky top-4 hidden w-56 shrink-0 self-start md:block">
+      <div className="mx-auto flex min-h-0 max-w-5xl min-w-0 flex-1 gap-8 px-4">
+        <aside className="hidden w-56 shrink-0 md:block">
           <div className="space-y-4 py-5">
             <InboxIdentity mailboxId={mailboxId} />
             <SidebarNav />
           </div>
         </aside>
-        <main className="min-w-0 flex-1">{children}</main>{" "}
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</main>
       </div>
     </SidebarProvider>
   );

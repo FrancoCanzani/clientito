@@ -1,6 +1,6 @@
 import { IconButton } from "@/components/ui/icon-button";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
-import { fetchEmailDetailAI } from "@/features/email/inbox/queries";
+import { fetchEmailDetail } from "@/features/email/inbox/queries";
 import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
 import { cn } from "@/lib/utils";
 import {
@@ -12,11 +12,12 @@ import {
   TrashIcon,
 } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
+import { memo, useRef, useState } from "react";
 import type { EmailListItem } from "../types";
 import { formatInboxRowDate } from "../utils/formatters";
 import type { ThreadGroup } from "../utils/group-emails-by-thread";
 
-export function EmailRow({
+export const EmailRow = memo(function EmailRow({
   group,
   view,
   onOpen,
@@ -28,6 +29,8 @@ export function EmailRow({
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
 }) {
   const queryClient = useQueryClient();
+  const prefetchedRef = useRef(false);
+  const [isHovered, setIsHovered] = useState(false);
   const email: EmailListItem = group.representative;
   const isStarred = email.labelIds.includes("STARRED");
   const isInInbox = email.labelIds.includes("INBOX");
@@ -41,19 +44,32 @@ export function EmailRow({
         : "To: (unknown recipient)"
       : email.fromName || email.fromAddr;
 
-  const prefetchAi = () => {
-    void queryClient.prefetchQuery({
-      queryKey: ["email-ai-detail", email.id],
-      queryFn: () => fetchEmailDetailAI(email.id),
-    });
+  const prefetchEmailData = () => {
+    if (prefetchedRef.current) return;
+    prefetchedRef.current = true;
+
+    const detailKey = ["email-detail", email.id] as const;
+    const detailState = queryClient.getQueryState(detailKey);
+    if (detailState?.status !== "success") {
+      void queryClient.prefetchQuery({
+        queryKey: detailKey,
+        queryFn: () => fetchEmailDetail(email.id),
+        staleTime: 45_000,
+        gcTime: 120_000,
+      });
+    }
   };
 
   return (
     <div
       role="button"
       tabIndex={0}
-      className="flex w-full group items-center gap-2 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40 cursor-default"
-      onMouseEnter={prefetchAi}
+      className="group flex h-10 w-full cursor-default items-center gap-2 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40"
+      onMouseEnter={() => {
+        prefetchEmailData();
+        setIsHovered(true);
+      }}
+      onMouseLeave={() => setIsHovered(false)}
       onClick={() => onOpen(email)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -71,7 +87,7 @@ export function EmailRow({
       />
 
       <div className="min-w-0 flex-1 items-center gap-2 overflow-hidden flex">
-        <span className="text-sm shrink-0 truncate tracking-[-0.6px] text-foreground font-medium">
+        <span className="text-sm shrink-0 truncate tracking-[-0.6px] text-foreground">
           {participantLabel}
         </span>
         <span className="text-foreground/50 text-sm truncate tracking-[-0.2px]">
@@ -100,63 +116,65 @@ export function EmailRow({
             </span>
           </div>
 
-          <div className="absolute inset-y-0 right-0 hidden items-center justify-end md:group-hover:flex">
-            <IconButton
-              label={archiveLabel}
-              variant="ghost"
-              size="icon-sm"
-              onClick={(event) => {
-                event.stopPropagation();
-                onAction(archiveAction, [email.id]);
-              }}
-            >
-              <ArchiveIcon className="size-3.5" />
-            </IconButton>
-            <IconButton
-              label={email.isRead ? "Mark as unread" : "Mark as read"}
-              variant="ghost"
-              size="icon-sm"
-              onClick={(event) => {
-                event.stopPropagation();
-                onAction(email.isRead ? "mark-unread" : "mark-read", [
-                  email.id,
-                ]);
-              }}
-            >
-              {email.isRead ? (
-                <EnvelopeSimpleIcon className="size-3.5" />
-              ) : (
-                <EnvelopeSimpleOpenIcon className="size-3.5" />
-              )}
-            </IconButton>
-            <IconButton
-              label={isStarred ? "Unstar" : "Star"}
-              variant="ghost"
-              size="icon-sm"
-              onClick={(event) => {
-                event.stopPropagation();
-                onAction(isStarred ? "unstar" : "star", [email.id]);
-              }}
-            >
-              <StarIcon
-                className={cn("size-3.5", isStarred && "text-yellow-400")}
-                weight={isStarred ? "fill" : "regular"}
-              />
-            </IconButton>
-            <IconButton
-              label="Delete"
-              variant="ghost"
-              size="icon-sm"
-              onClick={(event) => {
-                event.stopPropagation();
-                onAction("trash", [email.id]);
-              }}
-            >
-              <TrashIcon className="size-3.5" fill="red" />
-            </IconButton>
-          </div>
+          {isHovered && (
+            <div className="absolute inset-y-0 right-0 hidden items-center justify-end md:flex">
+              <IconButton
+                label={archiveLabel}
+                variant="ghost"
+                size="icon-sm"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAction(archiveAction, [email.id]);
+                }}
+              >
+                <ArchiveIcon className="size-3.5" />
+              </IconButton>
+              <IconButton
+                label={email.isRead ? "Mark as unread" : "Mark as read"}
+                variant="ghost"
+                size="icon-sm"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAction(email.isRead ? "mark-unread" : "mark-read", [
+                    email.id,
+                  ]);
+                }}
+              >
+                {email.isRead ? (
+                  <EnvelopeSimpleIcon className="size-3.5" />
+                ) : (
+                  <EnvelopeSimpleOpenIcon className="size-3.5" />
+                )}
+              </IconButton>
+              <IconButton
+                label={isStarred ? "Unstar" : "Star"}
+                variant="ghost"
+                size="icon-sm"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAction(isStarred ? "unstar" : "star", [email.id]);
+                }}
+              >
+                <StarIcon
+                  className={cn("size-3.5", isStarred && "text-yellow-400")}
+                  weight={isStarred ? "fill" : "regular"}
+                />
+              </IconButton>
+              <IconButton
+                label="Delete"
+                variant="ghost"
+                size="icon-sm"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAction("trash", [email.id]);
+                }}
+              >
+                <TrashIcon className="size-3.5" fill="red" />
+              </IconButton>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
-}
+});

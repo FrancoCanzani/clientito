@@ -79,6 +79,18 @@ export async function loadDraft(composeKey: string): Promise<DraftState | null> 
   }
 }
 
+export async function persistDraftNow(
+  composeKey: string,
+  draft: DraftState,
+): Promise<void> {
+  if (isDraftEmpty(draft)) {
+    await deleteDraftByKey(composeKey);
+    return;
+  }
+
+  await saveDraft(composeKey, draft);
+}
+
 export function useDraft(composeKey: string, draft: DraftState) {
   const queryClient = useQueryClient();
   const draftRef = useRef(draft);

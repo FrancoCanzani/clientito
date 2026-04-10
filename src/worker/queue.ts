@@ -11,9 +11,9 @@ import {
   markSyncJobFailed,
   markSyncJobSucceeded,
   releaseMailboxSyncLock,
-  resolveMailbox,
   updateSyncJobProgress,
 } from "./lib/gmail/sync/state";
+import { resolveMailbox } from "./lib/gmail/mailboxes";
 import {
   recoverMailboxSync,
   startFullGmailSync,

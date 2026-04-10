@@ -60,10 +60,6 @@
 		],
 	"r2_buckets": [
 		{
-			"binding": "NOTES_IMAGES",
-			"bucket_name": "petit-notes-images"
-		},
-		{
 			"binding": "ATTACHMENTS",
 			"bucket_name": "petit-attachments"
 		}

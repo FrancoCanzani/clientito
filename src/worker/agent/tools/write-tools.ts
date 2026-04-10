@@ -6,7 +6,7 @@ import { emails, mailboxes } from "../../db/schema";
 import { GmailDriver } from "../../lib/gmail/driver";
 import { STANDARD_LABELS } from "../../lib/gmail/types";
 import { chunkArray } from "../../lib/utils";
-import { resolveOutgoingMailbox, ensureMailbox } from "../../lib/gmail/sync/state";
+import { resolveOutgoingMailbox, ensureMailbox } from "../../lib/gmail/mailboxes";
 import { markEmailSubscriptionStatus, normalizeUnsubscribeUrl, normalizeUnsubscribeEmail } from "../../lib/gmail/subscriptions/service";
 import { applyEmailPatch } from "../../routes/inbox/emails/internal/mutation";
 import { hasEmailLabel } from "../../routes/inbox/emails/utils";

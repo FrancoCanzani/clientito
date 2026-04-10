@@ -10,6 +10,7 @@ type GrammarDiffViewProps = {
   onAccept: () => void;
   onDiscard: () => void;
   className?: string;
+  showActions?: boolean;
 };
 
 export function GrammarDiffView({
@@ -18,6 +19,7 @@ export function GrammarDiffView({
   onAccept,
   onDiscard,
   className,
+  showActions = true,
 }: GrammarDiffViewProps) {
   const parts = useMemo(
     () => diffWords(original, corrected),
@@ -51,16 +53,18 @@ export function GrammarDiffView({
           return <span key={i}>{part.value}</span>;
         })}
       </div>
-      <div className="flex items-center justify-end gap-1 border-t border-border/30 pt-2">
-        <Button variant="ghost" size="sm" onClick={onDiscard}>
-          <XIcon className="size-3.5" />
-          Discard
-        </Button>
-        <Button variant="secondary" size="sm" onClick={onAccept}>
-          <CheckIcon className="size-3.5" />
-          Accept
-        </Button>
-      </div>
+      {showActions && (
+        <div className="flex items-center justify-end gap-1 border-t border-border/30 pt-2">
+          <Button variant="ghost" size="sm" onClick={onDiscard}>
+            <XIcon className="size-3.5" />
+            Discard
+          </Button>
+          <Button variant="secondary" size="sm" onClick={onAccept}>
+            <CheckIcon className="size-3.5" />
+            Accept
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

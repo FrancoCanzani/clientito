@@ -1,11 +1,4 @@
-import type { ReactNode } from "react";
-
-export interface PaletteCommand {
-  id: string;
-  label: string;
-  icon: ReactNode;
-  shortcut?: string;
-  onSelect: () => void;
-}
+export type { Command, CommandContext, CommandServices } from "./registry/types";
+export type { InputMode } from "./modes/types";
 
 export type PaletteMode = "commands" | "agent";

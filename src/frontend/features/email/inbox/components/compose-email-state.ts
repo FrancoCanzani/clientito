@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAttachmentUpload } from "../hooks/use-attachment-upload";
-import { loadDraft, useDraft } from "../hooks/use-draft";
+import { loadDraft, persistDraftNow, useDraft } from "../hooks/use-draft";
 import { useUndoSend } from "../hooks/use-undo-send";
 import { sendEmail } from "../mutations";
 import { getDraftsQueryKey } from "../queries";
@@ -148,10 +148,13 @@ export function useComposeEmail(
   const queryClient = useQueryClient();
   const mailboxesQuery = useMailboxes();
   const composeKey = getComposePanelKey(initial);
-  const [draft, setDraft] = useState(() => createComposeDraft(initial));
+  const initialDraft = useMemo(() => createComposeDraft(initial), [composeKey]);
+  const [draft, setDraft] = useState(() => initialDraft);
   const [loadingDraft, setLoadingDraft] = useState(true);
   const attachments = useAttachmentUpload();
   const bodyRef = useRef(draft.body);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const [sendPending, setSendPending] = useState(false);
 
   const threadId = initial?.threadId;
@@ -159,6 +162,7 @@ export function useComposeEmail(
 
   useEffect(() => {
     let cancelled = false;
+    setLoadingDraft(true);
 
     loadDraft(composeKey).then((savedDraft) => {
       if (cancelled) return;
@@ -175,9 +179,8 @@ export function useComposeEmail(
         });
         bodyRef.current = savedDraft.body ?? "";
       } else {
-        const nextDraft = createComposeDraft(initial);
-        setDraft(nextDraft);
-        bodyRef.current = nextDraft.body;
+        setDraft(initialDraft);
+        bodyRef.current = initialDraft.body;
       }
 
       setLoadingDraft(false);
@@ -186,7 +189,7 @@ export function useComposeEmail(
     return () => {
       cancelled = true;
     };
-  }, [composeKey, initial]);
+  }, [composeKey, initialDraft]);
 
   const serverDraft = useDraft(composeKey, draft);
   const availableMailboxes = useMemo(
@@ -235,12 +238,23 @@ export function useComposeEmail(
 
   const clearDraft = useCallback(async () => {
     await serverDraft.clearDraft();
-    const nextDraft = createComposeDraft(initial);
-    bodyRef.current = nextDraft.body;
+    bodyRef.current = initialDraft.body;
     attachments.clear();
     setSendPending(false);
-    setDraft(nextDraft);
-  }, [attachments, initial, serverDraft]);
+    setDraft(initialDraft);
+  }, [attachments, initialDraft, serverDraft]);
+
+  const saveDraftNow = useCallback(async (targetComposeKey?: string) => {
+    const key = targetComposeKey ?? composeKey;
+    await persistDraftNow(key, {
+      ...draftRef.current,
+      body: bodyRef.current,
+    });
+    queryClient.invalidateQueries({
+      queryKey: getDraftsQueryKey(draftRef.current.mailboxId),
+    });
+    return key;
+  }, [composeKey, queryClient]);
 
   // Snapshot draft state at trigger time so the undo-send closure captures
   // the values that were current when the user pressed Send.
@@ -353,6 +367,8 @@ export function useComposeEmail(
     isPending: sendPending,
     attachments,
     clearDraft,
+    saveDraftNow,
+    composeKey,
     loadingDraft,
   };
 }

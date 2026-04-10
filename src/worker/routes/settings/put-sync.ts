@@ -3,11 +3,8 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq, lt } from "drizzle-orm";
 import { z } from "zod";
 import { emails } from "../../db/schema";
-import {
-  getMailboxSyncPreferences,
-  resolveMailbox,
-  setMailboxSyncPreferences,
-} from "../../lib/gmail/sync/state";
+import { getMailboxSyncPreferences, setMailboxSyncPreferences } from "../../lib/gmail/sync/state";
+import { resolveMailbox } from "../../lib/gmail/mailboxes";
 import {
   normalizeSyncWindowMonths,
   requiresBackfillForCutoffChange,

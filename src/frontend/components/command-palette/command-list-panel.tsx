@@ -1,76 +1,113 @@
-import { KeyReturnIcon } from "@phosphor-icons/react";
-import { Command } from "cmdk";
-import type { PaletteCommand } from "./types";
+import { Kbd } from "@/components/ui/kbd";
+import { Command as Cmdk } from "cmdk";
+import {
+  AtIcon,
+  CaretRightIcon,
+  HashIcon,
+  RobotIcon,
+} from "@phosphor-icons/react";
+import { resolveLabel } from "./registry/registry";
+import type { Command, CommandContext, CommandServices } from "./registry/types";
 
-function CommandGroup({
-  heading,
-  commands,
-}: {
-  heading: string;
-  commands: PaletteCommand[];
-}) {
-  if (commands.length === 0) return null;
-  return (
-    <Command.Group
-      heading={heading}
-      className="**:[[cmdk-group-heading]]:px-3 **:[[cmdk-group-heading]]:py-1 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:capitalize **:[[cmdk-group-heading]]:tracking-wider **:[[cmdk-group-heading]]:text-muted-foreground"
-    >
-      {commands.map((command) => (
-        <Command.Item
-          key={command.id}
-          value={command.label}
-          onSelect={command.onSelect}
-          className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
-        >
-          <span className="text-muted-foreground">{command.icon}</span>
-          <span>{command.label}</span>
-        </Command.Item>
-      ))}
-    </Command.Group>
-  );
+const GROUP_ORDER = ["accounts", "email", "composer", "navigation", "agent", "actions"];
+
+function groupCommands(commands: Command[]): Map<string, Command[]> {
+  const map = new Map<string, Command[]>();
+  for (const cmd of commands) {
+    const group = map.get(cmd.group) ?? [];
+    group.push(cmd);
+    map.set(cmd.group, group);
+  }
+  return map;
 }
 
+function sortedGroups(groups: Map<string, Command[]>): [string, Command[]][] {
+  return Array.from(groups.entries()).sort(([a], [b]) => {
+    const ai = GROUP_ORDER.indexOf(a);
+    const bi = GROUP_ORDER.indexOf(b);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+}
+
+const MODE_HINTS = [
+  { sigil: ">", label: "Commands", icon: CaretRightIcon },
+  { sigil: "@", label: "Contacts", icon: AtIcon },
+  { sigil: "#", label: "Search", icon: HashIcon },
+  { sigil: "/", label: "Agent", icon: RobotIcon },
+] as const;
+
 export function CommandListPanel({
-  visibleNavigationCommands,
-  accountCommands,
-  actionCommands,
+  commands,
+  ctx,
+  services,
   enterAgentMode,
+  hasQuery,
 }: {
-  visibleNavigationCommands: PaletteCommand[];
-  accountCommands: PaletteCommand[];
-  actionCommands: PaletteCommand[];
+  commands: Command[];
+  ctx: CommandContext;
+  services: CommandServices;
   enterAgentMode: (initialQuery?: string) => void;
+  hasQuery: boolean;
 }) {
+  const groups = groupCommands(commands);
+  const sorted = sortedGroups(groups);
+
   return (
-    <div className="max-h-72 overflow-y-auto py-2">
-      <Command.List>
-        <Command.Empty className="px-3 py-2 text-xs text-center text-muted-foreground">
-          No commands found.
-        </Command.Empty>
+    <Cmdk.List className="max-h-[min(56vh,24rem)] overflow-y-auto p-1">
+      <Cmdk.Empty className="py-6 text-center text-xs text-muted-foreground">
+        {hasQuery ? (
+          "No commands found."
+        ) : (
+          <div className="grid grid-cols-2 gap-1.5 px-3">
+            {MODE_HINTS.map(({ sigil, label, icon: Icon }) => (
+              <div
+                key={sigil}
+                className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-left"
+              >
+                <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="font-mono text-muted-foreground">{sigil}</span>
+                <span className="text-muted-foreground">{label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Cmdk.Empty>
 
-        <CommandGroup heading="Accounts" commands={accountCommands} />
-        <CommandGroup
-          heading="Navigation"
-          commands={visibleNavigationCommands}
-        />
+      {sorted.map(([group, cmds]) => (
+        <Cmdk.Group key={group}>
+          {cmds.map((cmd) => {
+            const label = resolveLabel(cmd, ctx);
+            return (
+              <Cmdk.Item
+                key={cmd.id}
+                value={`${group}: ${label}`}
+                keywords={cmd.keywords}
+                onSelect={() => cmd.perform(ctx, services)}
+                className="flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-xs transition-colors data-[selected=true]:bg-muted"
+              >
+                <span>
+                  <span className="font-medium text-blue-900 dark:text-blue-900">{group}:</span>{" "}
+                  {label}
+                </span>
+                {cmd.shortcut && (
+                  <Kbd className="ml-auto">{cmd.shortcut}</Kbd>
+                )}
+              </Cmdk.Item>
+            );
+          })}
+        </Cmdk.Group>
+      ))}
 
-        <Command.Group
-          heading="Agent"
-          className="**:[[cmdk-group-heading]]:px-3 **:[[cmdk-group-heading]]:py-1 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:capitalize **:[[cmdk-group-heading]]:tracking-wider **:[[cmdk-group-heading]]:text-muted-foreground"
+      <Cmdk.Group>
+        <Cmdk.Item
+          value="agent: ask agent"
+          keywords={["agent", "assistant", "ai", "chat"]}
+          onSelect={() => enterAgentMode()}
+          className="flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-xs transition-colors data-[selected=true]:bg-muted"
         >
-          <Command.Item
-            value="Ask agent"
-            keywords={["agent", "assistant", "ai", "chat"]}
-            onSelect={() => enterAgentMode()}
-            className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors data-[selected=true]:bg-muted"
-          >
-            <KeyReturnIcon className="size-4 text-muted-foreground" />
-            Ask agent
-          </Command.Item>
-        </Command.Group>
-
-        <CommandGroup heading="Actions" commands={actionCommands} />
-      </Command.List>
-    </div>
+          <span className="font-medium text-blue-900 dark:text-blue-900">agent:</span>{" "}ask agent
+        </Cmdk.Item>
+      </Cmdk.Group>
+    </Cmdk.List>
   );
 }

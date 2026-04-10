@@ -1,5 +1,11 @@
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -12,14 +18,22 @@ import {
   CheckIcon,
   ClockIcon,
   PaperclipIcon,
+  SparkleIcon,
   SpinnerGapIcon,
+  XIcon,
 } from "@phosphor-icons/react";
 import DOMPurify from "dompurify";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { htmlToPlainText } from "../utils/html-to-plain-text";
-import { useGrammarCheck } from "../hooks/use-grammar-check";
 import { AttachmentBar } from "./attachment-bar";
+import {
+  applyComposerAiReview,
+  COMPOSER_AI_ACTIONS,
+  getComposerAiLabel,
+  previewComposerAiAction,
+  type ComposerAiActionId,
+  type ComposerAiReview,
+} from "./compose-ai-actions";
 import { ComposeEditor } from "./compose-editor";
 import { useComposeEmail } from "./compose-email-state";
 import { GrammarDiffView } from "./grammar-diff-view";
@@ -69,14 +83,6 @@ function ForwardedMessagePreview({ html }: { html: string }) {
   );
 }
 
-
-function plainTextToHtml(text: string): string {
-  return text
-    .split("\n")
-    .map((line) => `<p>${line || "<br>"}</p>`)
-    .join("");
-}
-
 export function ComposeEmailFields({
   compose,
   bodyClassName,
@@ -109,26 +115,47 @@ export function ComposeEmailFields({
 
   const [showCc, setShowCc] = useState(cc.length > 0);
   const [showBcc, setShowBcc] = useState(bcc.length > 0);
-  const grammar = useGrammarCheck();
-  const isReviewing = grammar.state.status === "reviewing";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hasBody =
     body.trim().length > 0 && body !== "<p></p>" && body !== "<p><br></p>";
+  const [reviewState, setReviewState] = useState<
+    | { status: "idle" }
+    | { status: "loading"; action: ComposerAiActionId }
+    | { status: "reviewing"; review: ComposerAiReview }
+  >({ status: "idle" });
+  const isReviewing = reviewState.status === "reviewing";
+  const pendingAiAction =
+    reviewState.status === "loading" ? reviewState.action : null;
 
-  const handleGrammarCheck = async () => {
-    const plainText = htmlToPlainText(body);
-    if (!plainText.trim()) return;
-    const result = await grammar.check(plainText);
-    if (result === "no_changes") {
-      toast.info("No grammar issues found");
+  const handleComposerAiAction = async (action: ComposerAiActionId) => {
+    setReviewState({ status: "loading", action });
+    try {
+      const review = await previewComposerAiAction(action);
+      if (review === "no_changes") {
+        toast.info("No changes suggested");
+        setReviewState({ status: "idle" });
+        return;
+      }
+      if (!review) {
+        setReviewState({ status: "idle" });
+        return;
+      }
+      setReviewState({ status: "reviewing", review });
+    } catch {
+      setReviewState({ status: "idle" });
     }
   };
 
-  const handleAccept = () => {
-    const corrected = grammar.accept();
-    if (corrected) {
-      setBody(plainTextToHtml(corrected));
+  const handleAcceptReview = () => {
+    if (reviewState.status !== "reviewing") return;
+    const applied = applyComposerAiReview(reviewState.review);
+    if (applied) {
+      setReviewState({ status: "idle" });
     }
+  };
+
+  const handleDiscardReview = () => {
+    setReviewState({ status: "idle" });
   };
 
   return (
@@ -140,7 +167,7 @@ export function ComposeEmailFields({
         if (e.key === "Escape") {
           e.preventDefault();
           if (isReviewing) {
-            grammar.discard();
+            handleDiscardReview();
           } else {
             onEscape?.();
           }
@@ -172,7 +199,7 @@ export function ComposeEmailFields({
           </Select>
         )}
 
-        <div className="flex items-start gap-2 p-1">
+        <div className="flex items-start gap-2 px-2 py-1">
           <RecipientInput
             value={to}
             onChange={setTo}
@@ -241,96 +268,161 @@ export function ComposeEmailFields({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-1">
-        {grammar.state.status === "reviewing" ? (
+        {reviewState.status === "reviewing" && (
           <GrammarDiffView
-            original={grammar.state.original}
-            corrected={grammar.state.corrected}
-            onAccept={handleAccept}
-            onDiscard={grammar.discard}
+            original={reviewState.review.original}
+            corrected={reviewState.review.corrected}
+            onAccept={handleAcceptReview}
+            onDiscard={handleDiscardReview}
+            showActions={false}
             className={bodyClassName ?? "min-h-32 text-sm leading-relaxed"}
           />
-        ) : (
-          <>
-            <ComposeEditor
-              initialContent={body}
-              onChange={setBody}
-              onSend={() => {
-                if (canSend) send();
-              }}
-              className={bodyClassName ?? "min-h-32 text-sm leading-relaxed"}
-              autoFocus={editorAutoFocus}
-            />
-            {forwardedContent && (
-              <ForwardedMessagePreview html={forwardedContent} />
-            )}
-          </>
         )}
+        <div className={cn(reviewState.status === "reviewing" && "hidden")}>
+          <ComposeEditor
+            initialContent={body}
+            onChange={setBody}
+            onSend={() => {
+              if (canSend) send();
+            }}
+            className={bodyClassName ?? "min-h-32 text-sm leading-relaxed"}
+            autoFocus={editorAutoFocus}
+          />
+          {forwardedContent && (
+            <ForwardedMessagePreview html={forwardedContent} />
+          )}
+        </div>
       </div>
 
-      {!isReviewing && (
-        <div className="mt-auto px-3 py-2">
-          <AttachmentBar
-            files={attachments.files}
-            uploading={attachments.uploading}
-            onAddFiles={(files) => attachments.addFiles(files)}
-            onRemoveFile={attachments.removeFile}
-          />
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files && e.target.files.length > 0) {
-                attachments.addFiles(e.target.files);
-                e.target.value = "";
-              }
-            }}
-          />
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={attachments.uploading}
-                onClick={() => fileInputRef.current?.click()}
-                title="Attach files"
-              >
-                <PaperclipIcon className="size-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={grammar.state.status === "loading" || !hasBody}
-                onClick={handleGrammarCheck}
-                title="Grammar check"
-              >
-                {grammar.state.status === "loading" ? (
-                  <SpinnerGapIcon className="size-3.5 animate-spin" />
-                ) : (
-                  <CheckIcon className="size-3.5" />
-                )}
-              </Button>
-              <ScheduleSendPicker
-                onSchedule={(timestamp) => {
-                  scheduleSend(timestamp);
-                }}
-              >
-                <Button variant="ghost" size="icon" disabled={!canSend}>
-                  <ClockIcon className="size-3.5" />
-                </Button>
-              </ScheduleSendPicker>
-            </div>
+      <div className="mt-auto px-2 py-2">
+        <AttachmentBar
+          files={attachments.files}
+          uploading={attachments.uploading}
+          onAddFiles={(files) => attachments.addFiles(files)}
+          onRemoveFile={attachments.removeFile}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files && e.target.files.length > 0) {
+              attachments.addFiles(e.target.files);
+              e.target.value = "";
+            }
+          }}
+        />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
             <Button
-              variant="secondary"
-              onClick={() => send()}
-              disabled={!canSend || isPending}
+              variant="ghost"
+              size="icon"
+              disabled={attachments.uploading || isReviewing}
+              onClick={() => fileInputRef.current?.click()}
+              title="Attach files"
             >
-              {isPending ? "Sending..." : "Send"}
+              <PaperclipIcon className="size-3" />
             </Button>
+            {isReviewing ? (
+              <>
+                <Button
+                  variant="destructive"
+                  size="icon-xs"
+                  onClick={handleDiscardReview}
+                  title="Discard AI changes"
+                >
+                  <XIcon className="size-3" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon-xs"
+                  onClick={handleAcceptReview}
+                  title="Apply AI changes"
+                >
+                  <CheckIcon className="size-3" />
+                </Button>
+              </>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={pendingAiAction !== null || !hasBody}
+                    title="AI writing tools"
+                  >
+                    {pendingAiAction ? (
+                      <SpinnerGapIcon className="size-3 animate-spin" />
+                    ) : (
+                      <SparkleIcon className="size-3" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-40">
+                  {COMPOSER_AI_ACTIONS.map((action) => {
+                    const Icon = action.icon;
+                    const isPending = pendingAiAction === action.id;
+
+                    return (
+                      <DropdownMenuItem
+                        key={action.id}
+                        disabled={pendingAiAction !== null}
+                        onSelect={() => {
+                          void handleComposerAiAction(action.id);
+                        }}
+                      >
+                        {isPending ? (
+                          <SpinnerGapIcon className="size-3 animate-spin" />
+                        ) : (
+                          <Icon className="size-3" />
+                        )}
+                        {getComposerAiLabel(action.id)}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={pendingAiAction !== null || !hasBody || isReviewing}
+              onClick={() => {
+                void handleComposerAiAction("grammar");
+              }}
+              title="Grammar check"
+            >
+              {pendingAiAction === "grammar" ? (
+                <SpinnerGapIcon className="size-3 animate-spin" />
+              ) : (
+                <CheckIcon className="size-3" />
+              )}
+            </Button>
+            <ScheduleSendPicker
+              onSchedule={(timestamp) => {
+                scheduleSend(timestamp);
+              }}
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={!canSend || isReviewing}
+              >
+                <ClockIcon className="size-3" />
+              </Button>
+            </ScheduleSendPicker>
           </div>
+          <Button
+            variant="secondary"
+            onClick={() => send()}
+            disabled={!canSend || isPending || isReviewing}
+          >
+            {isPending ? "Sending..." : "Send"}
+          </Button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

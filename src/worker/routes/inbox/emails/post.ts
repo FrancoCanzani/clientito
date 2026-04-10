@@ -1,7 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Hono } from "hono";
 import { GmailDriver } from "../../../lib/gmail/driver";
-import { resolveOutgoingMailbox } from "../../../lib/gmail/sync/state";
+import { resolveOutgoingMailbox } from "../../../lib/gmail/mailboxes";
 import { appendSignature } from "../../../lib/gmail/mailbox/signature";
 import { sleep } from "../../../lib/utils";
 import { and, eq } from "drizzle-orm";

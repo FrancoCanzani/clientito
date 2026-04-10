@@ -21,11 +21,11 @@ import { Route as DashboardMailboxIdRouteRouteImport } from './routes/_dashboard
 import { Route as DashboardMailboxIdTasksRouteImport } from './routes/_dashboard/$mailboxId/tasks'
 import { Route as DashboardMailboxIdHomeRouteImport } from './routes/_dashboard/$mailboxId/home'
 import { Route as DashboardMailboxIdAgendaRouteImport } from './routes/_dashboard/$mailboxId/agenda'
-import { Route as DashboardMailboxIdInboxRouteRouteImport } from './routes/_dashboard/$mailboxId/inbox/route'
 import { Route as DashboardMailboxIdInboxIndexRouteImport } from './routes/_dashboard/$mailboxId/inbox/index'
 import { Route as DashboardMailboxIdFolderIndexRouteImport } from './routes/_dashboard/$mailboxId/$folder/index'
 import { Route as DashboardMailboxIdInboxSubscriptionsRouteImport } from './routes/_dashboard/$mailboxId/inbox/subscriptions'
 import { Route as DashboardMailboxIdInboxSearchRouteImport } from './routes/_dashboard/$mailboxId/inbox/search'
+import { Route as DashboardMailboxIdInboxNewRouteImport } from './routes/_dashboard/$mailboxId/inbox/new'
 import { Route as DashboardMailboxIdInboxFiltersRouteImport } from './routes/_dashboard/$mailboxId/inbox/filters'
 import { Route as DashboardMailboxIdInboxDraftsRouteImport } from './routes/_dashboard/$mailboxId/inbox/drafts'
 import { Route as DashboardMailboxIdInboxEmailEmailIdRouteImport } from './routes/_dashboard/$mailboxId/inbox/email/$emailId'
@@ -93,17 +93,11 @@ const DashboardMailboxIdAgendaRoute =
     path: '/agenda',
     getParentRoute: () => DashboardMailboxIdRouteRoute,
   } as any)
-const DashboardMailboxIdInboxRouteRoute =
-  DashboardMailboxIdInboxRouteRouteImport.update({
-    id: '/inbox',
-    path: '/inbox',
-    getParentRoute: () => DashboardMailboxIdRouteRoute,
-  } as any)
 const DashboardMailboxIdInboxIndexRoute =
   DashboardMailboxIdInboxIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => DashboardMailboxIdInboxRouteRoute,
+    id: '/inbox/',
+    path: '/inbox/',
+    getParentRoute: () => DashboardMailboxIdRouteRoute,
   } as any)
 const DashboardMailboxIdFolderIndexRoute =
   DashboardMailboxIdFolderIndexRouteImport.update({
@@ -113,33 +107,39 @@ const DashboardMailboxIdFolderIndexRoute =
   } as any)
 const DashboardMailboxIdInboxSubscriptionsRoute =
   DashboardMailboxIdInboxSubscriptionsRouteImport.update({
-    id: '/subscriptions',
-    path: '/subscriptions',
-    getParentRoute: () => DashboardMailboxIdInboxRouteRoute,
+    id: '/inbox/subscriptions',
+    path: '/inbox/subscriptions',
+    getParentRoute: () => DashboardMailboxIdRouteRoute,
   } as any)
 const DashboardMailboxIdInboxSearchRoute =
   DashboardMailboxIdInboxSearchRouteImport.update({
-    id: '/search',
-    path: '/search',
-    getParentRoute: () => DashboardMailboxIdInboxRouteRoute,
+    id: '/inbox/search',
+    path: '/inbox/search',
+    getParentRoute: () => DashboardMailboxIdRouteRoute,
+  } as any)
+const DashboardMailboxIdInboxNewRoute =
+  DashboardMailboxIdInboxNewRouteImport.update({
+    id: '/inbox/new',
+    path: '/inbox/new',
+    getParentRoute: () => DashboardMailboxIdRouteRoute,
   } as any)
 const DashboardMailboxIdInboxFiltersRoute =
   DashboardMailboxIdInboxFiltersRouteImport.update({
-    id: '/filters',
-    path: '/filters',
-    getParentRoute: () => DashboardMailboxIdInboxRouteRoute,
+    id: '/inbox/filters',
+    path: '/inbox/filters',
+    getParentRoute: () => DashboardMailboxIdRouteRoute,
   } as any)
 const DashboardMailboxIdInboxDraftsRoute =
   DashboardMailboxIdInboxDraftsRouteImport.update({
-    id: '/drafts',
-    path: '/drafts',
-    getParentRoute: () => DashboardMailboxIdInboxRouteRoute,
+    id: '/inbox/drafts',
+    path: '/inbox/drafts',
+    getParentRoute: () => DashboardMailboxIdRouteRoute,
   } as any)
 const DashboardMailboxIdInboxEmailEmailIdRoute =
   DashboardMailboxIdInboxEmailEmailIdRouteImport.update({
-    id: '/email/$emailId',
-    path: '/email/$emailId',
-    getParentRoute: () => DashboardMailboxIdInboxRouteRoute,
+    id: '/inbox/email/$emailId',
+    path: '/inbox/email/$emailId',
+    getParentRoute: () => DashboardMailboxIdRouteRoute,
   } as any)
 const DashboardMailboxIdFolderEmailEmailIdRoute =
   DashboardMailboxIdFolderEmailEmailIdRouteImport.update({
@@ -149,15 +149,15 @@ const DashboardMailboxIdFolderEmailEmailIdRoute =
   } as any)
 const DashboardMailboxIdInboxLabelsLabelIndexRoute =
   DashboardMailboxIdInboxLabelsLabelIndexRouteImport.update({
-    id: '/labels/$label/',
-    path: '/labels/$label/',
-    getParentRoute: () => DashboardMailboxIdInboxRouteRoute,
+    id: '/inbox/labels/$label/',
+    path: '/inbox/labels/$label/',
+    getParentRoute: () => DashboardMailboxIdRouteRoute,
   } as any)
 const DashboardMailboxIdInboxLabelsLabelEmailEmailIdRoute =
   DashboardMailboxIdInboxLabelsLabelEmailEmailIdRouteImport.update({
-    id: '/labels/$label/email/$emailId',
-    path: '/labels/$label/email/$emailId',
-    getParentRoute: () => DashboardMailboxIdInboxRouteRoute,
+    id: '/inbox/labels/$label/email/$emailId',
+    path: '/inbox/labels/$label/email/$emailId',
+    getParentRoute: () => DashboardMailboxIdRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -169,12 +169,12 @@ export interface FileRoutesByFullPath {
   '/settings': typeof DashboardSettingsRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
-  '/$mailboxId/inbox': typeof DashboardMailboxIdInboxRouteRouteWithChildren
   '/$mailboxId/agenda': typeof DashboardMailboxIdAgendaRoute
   '/$mailboxId/home': typeof DashboardMailboxIdHomeRoute
   '/$mailboxId/tasks': typeof DashboardMailboxIdTasksRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/$mailboxId/inbox/filters': typeof DashboardMailboxIdInboxFiltersRoute
+  '/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
   '/$mailboxId/inbox/subscriptions': typeof DashboardMailboxIdInboxSubscriptionsRoute
   '/$mailboxId/$folder/': typeof DashboardMailboxIdFolderIndexRoute
@@ -197,6 +197,7 @@ export interface FileRoutesByTo {
   '/$mailboxId/tasks': typeof DashboardMailboxIdTasksRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/$mailboxId/inbox/filters': typeof DashboardMailboxIdInboxFiltersRoute
+  '/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
   '/$mailboxId/inbox/subscriptions': typeof DashboardMailboxIdInboxSubscriptionsRoute
   '/$mailboxId/$folder': typeof DashboardMailboxIdFolderIndexRoute
@@ -217,12 +218,12 @@ export interface FileRoutesById {
   '/_dashboard/settings': typeof DashboardSettingsRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
-  '/_dashboard/$mailboxId/inbox': typeof DashboardMailboxIdInboxRouteRouteWithChildren
   '/_dashboard/$mailboxId/agenda': typeof DashboardMailboxIdAgendaRoute
   '/_dashboard/$mailboxId/home': typeof DashboardMailboxIdHomeRoute
   '/_dashboard/$mailboxId/tasks': typeof DashboardMailboxIdTasksRoute
   '/_dashboard/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/_dashboard/$mailboxId/inbox/filters': typeof DashboardMailboxIdInboxFiltersRoute
+  '/_dashboard/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/_dashboard/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
   '/_dashboard/$mailboxId/inbox/subscriptions': typeof DashboardMailboxIdInboxSubscriptionsRoute
   '/_dashboard/$mailboxId/$folder/': typeof DashboardMailboxIdFolderIndexRoute
@@ -243,12 +244,12 @@ export interface FileRouteTypes {
     | '/settings'
     | '/docs/$slug'
     | '/docs/'
-    | '/$mailboxId/inbox'
     | '/$mailboxId/agenda'
     | '/$mailboxId/home'
     | '/$mailboxId/tasks'
     | '/$mailboxId/inbox/drafts'
     | '/$mailboxId/inbox/filters'
+    | '/$mailboxId/inbox/new'
     | '/$mailboxId/inbox/search'
     | '/$mailboxId/inbox/subscriptions'
     | '/$mailboxId/$folder/'
@@ -271,6 +272,7 @@ export interface FileRouteTypes {
     | '/$mailboxId/tasks'
     | '/$mailboxId/inbox/drafts'
     | '/$mailboxId/inbox/filters'
+    | '/$mailboxId/inbox/new'
     | '/$mailboxId/inbox/search'
     | '/$mailboxId/inbox/subscriptions'
     | '/$mailboxId/$folder'
@@ -290,12 +292,12 @@ export interface FileRouteTypes {
     | '/_dashboard/settings'
     | '/docs/$slug'
     | '/docs/'
-    | '/_dashboard/$mailboxId/inbox'
     | '/_dashboard/$mailboxId/agenda'
     | '/_dashboard/$mailboxId/home'
     | '/_dashboard/$mailboxId/tasks'
     | '/_dashboard/$mailboxId/inbox/drafts'
     | '/_dashboard/$mailboxId/inbox/filters'
+    | '/_dashboard/$mailboxId/inbox/new'
     | '/_dashboard/$mailboxId/inbox/search'
     | '/_dashboard/$mailboxId/inbox/subscriptions'
     | '/_dashboard/$mailboxId/$folder/'
@@ -400,19 +402,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardMailboxIdAgendaRouteImport
       parentRoute: typeof DashboardMailboxIdRouteRoute
     }
-    '/_dashboard/$mailboxId/inbox': {
-      id: '/_dashboard/$mailboxId/inbox'
-      path: '/inbox'
-      fullPath: '/$mailboxId/inbox'
-      preLoaderRoute: typeof DashboardMailboxIdInboxRouteRouteImport
-      parentRoute: typeof DashboardMailboxIdRouteRoute
-    }
     '/_dashboard/$mailboxId/inbox/': {
       id: '/_dashboard/$mailboxId/inbox/'
-      path: '/'
+      path: '/inbox'
       fullPath: '/$mailboxId/inbox/'
       preLoaderRoute: typeof DashboardMailboxIdInboxIndexRouteImport
-      parentRoute: typeof DashboardMailboxIdInboxRouteRoute
+      parentRoute: typeof DashboardMailboxIdRouteRoute
     }
     '/_dashboard/$mailboxId/$folder/': {
       id: '/_dashboard/$mailboxId/$folder/'
@@ -423,38 +418,45 @@ declare module '@tanstack/react-router' {
     }
     '/_dashboard/$mailboxId/inbox/subscriptions': {
       id: '/_dashboard/$mailboxId/inbox/subscriptions'
-      path: '/subscriptions'
+      path: '/inbox/subscriptions'
       fullPath: '/$mailboxId/inbox/subscriptions'
       preLoaderRoute: typeof DashboardMailboxIdInboxSubscriptionsRouteImport
-      parentRoute: typeof DashboardMailboxIdInboxRouteRoute
+      parentRoute: typeof DashboardMailboxIdRouteRoute
     }
     '/_dashboard/$mailboxId/inbox/search': {
       id: '/_dashboard/$mailboxId/inbox/search'
-      path: '/search'
+      path: '/inbox/search'
       fullPath: '/$mailboxId/inbox/search'
       preLoaderRoute: typeof DashboardMailboxIdInboxSearchRouteImport
-      parentRoute: typeof DashboardMailboxIdInboxRouteRoute
+      parentRoute: typeof DashboardMailboxIdRouteRoute
+    }
+    '/_dashboard/$mailboxId/inbox/new': {
+      id: '/_dashboard/$mailboxId/inbox/new'
+      path: '/inbox/new'
+      fullPath: '/$mailboxId/inbox/new'
+      preLoaderRoute: typeof DashboardMailboxIdInboxNewRouteImport
+      parentRoute: typeof DashboardMailboxIdRouteRoute
     }
     '/_dashboard/$mailboxId/inbox/filters': {
       id: '/_dashboard/$mailboxId/inbox/filters'
-      path: '/filters'
+      path: '/inbox/filters'
       fullPath: '/$mailboxId/inbox/filters'
       preLoaderRoute: typeof DashboardMailboxIdInboxFiltersRouteImport
-      parentRoute: typeof DashboardMailboxIdInboxRouteRoute
+      parentRoute: typeof DashboardMailboxIdRouteRoute
     }
     '/_dashboard/$mailboxId/inbox/drafts': {
       id: '/_dashboard/$mailboxId/inbox/drafts'
-      path: '/drafts'
+      path: '/inbox/drafts'
       fullPath: '/$mailboxId/inbox/drafts'
       preLoaderRoute: typeof DashboardMailboxIdInboxDraftsRouteImport
-      parentRoute: typeof DashboardMailboxIdInboxRouteRoute
+      parentRoute: typeof DashboardMailboxIdRouteRoute
     }
     '/_dashboard/$mailboxId/inbox/email/$emailId': {
       id: '/_dashboard/$mailboxId/inbox/email/$emailId'
-      path: '/email/$emailId'
+      path: '/inbox/email/$emailId'
       fullPath: '/$mailboxId/inbox/email/$emailId'
       preLoaderRoute: typeof DashboardMailboxIdInboxEmailEmailIdRouteImport
-      parentRoute: typeof DashboardMailboxIdInboxRouteRoute
+      parentRoute: typeof DashboardMailboxIdRouteRoute
     }
     '/_dashboard/$mailboxId/$folder/email/$emailId': {
       id: '/_dashboard/$mailboxId/$folder/email/$emailId'
@@ -465,72 +467,59 @@ declare module '@tanstack/react-router' {
     }
     '/_dashboard/$mailboxId/inbox/labels/$label/': {
       id: '/_dashboard/$mailboxId/inbox/labels/$label/'
-      path: '/labels/$label'
+      path: '/inbox/labels/$label'
       fullPath: '/$mailboxId/inbox/labels/$label/'
       preLoaderRoute: typeof DashboardMailboxIdInboxLabelsLabelIndexRouteImport
-      parentRoute: typeof DashboardMailboxIdInboxRouteRoute
+      parentRoute: typeof DashboardMailboxIdRouteRoute
     }
     '/_dashboard/$mailboxId/inbox/labels/$label/email/$emailId': {
       id: '/_dashboard/$mailboxId/inbox/labels/$label/email/$emailId'
-      path: '/labels/$label/email/$emailId'
+      path: '/inbox/labels/$label/email/$emailId'
       fullPath: '/$mailboxId/inbox/labels/$label/email/$emailId'
       preLoaderRoute: typeof DashboardMailboxIdInboxLabelsLabelEmailEmailIdRouteImport
-      parentRoute: typeof DashboardMailboxIdInboxRouteRoute
+      parentRoute: typeof DashboardMailboxIdRouteRoute
     }
   }
 }
 
-interface DashboardMailboxIdInboxRouteRouteChildren {
+interface DashboardMailboxIdRouteRouteChildren {
+  DashboardMailboxIdAgendaRoute: typeof DashboardMailboxIdAgendaRoute
+  DashboardMailboxIdHomeRoute: typeof DashboardMailboxIdHomeRoute
+  DashboardMailboxIdTasksRoute: typeof DashboardMailboxIdTasksRoute
   DashboardMailboxIdInboxDraftsRoute: typeof DashboardMailboxIdInboxDraftsRoute
   DashboardMailboxIdInboxFiltersRoute: typeof DashboardMailboxIdInboxFiltersRoute
+  DashboardMailboxIdInboxNewRoute: typeof DashboardMailboxIdInboxNewRoute
   DashboardMailboxIdInboxSearchRoute: typeof DashboardMailboxIdInboxSearchRoute
   DashboardMailboxIdInboxSubscriptionsRoute: typeof DashboardMailboxIdInboxSubscriptionsRoute
+  DashboardMailboxIdFolderIndexRoute: typeof DashboardMailboxIdFolderIndexRoute
   DashboardMailboxIdInboxIndexRoute: typeof DashboardMailboxIdInboxIndexRoute
+  DashboardMailboxIdFolderEmailEmailIdRoute: typeof DashboardMailboxIdFolderEmailEmailIdRoute
   DashboardMailboxIdInboxEmailEmailIdRoute: typeof DashboardMailboxIdInboxEmailEmailIdRoute
   DashboardMailboxIdInboxLabelsLabelIndexRoute: typeof DashboardMailboxIdInboxLabelsLabelIndexRoute
   DashboardMailboxIdInboxLabelsLabelEmailEmailIdRoute: typeof DashboardMailboxIdInboxLabelsLabelEmailEmailIdRoute
 }
 
-const DashboardMailboxIdInboxRouteRouteChildren: DashboardMailboxIdInboxRouteRouteChildren =
+const DashboardMailboxIdRouteRouteChildren: DashboardMailboxIdRouteRouteChildren =
   {
+    DashboardMailboxIdAgendaRoute: DashboardMailboxIdAgendaRoute,
+    DashboardMailboxIdHomeRoute: DashboardMailboxIdHomeRoute,
+    DashboardMailboxIdTasksRoute: DashboardMailboxIdTasksRoute,
     DashboardMailboxIdInboxDraftsRoute: DashboardMailboxIdInboxDraftsRoute,
     DashboardMailboxIdInboxFiltersRoute: DashboardMailboxIdInboxFiltersRoute,
+    DashboardMailboxIdInboxNewRoute: DashboardMailboxIdInboxNewRoute,
     DashboardMailboxIdInboxSearchRoute: DashboardMailboxIdInboxSearchRoute,
     DashboardMailboxIdInboxSubscriptionsRoute:
       DashboardMailboxIdInboxSubscriptionsRoute,
+    DashboardMailboxIdFolderIndexRoute: DashboardMailboxIdFolderIndexRoute,
     DashboardMailboxIdInboxIndexRoute: DashboardMailboxIdInboxIndexRoute,
+    DashboardMailboxIdFolderEmailEmailIdRoute:
+      DashboardMailboxIdFolderEmailEmailIdRoute,
     DashboardMailboxIdInboxEmailEmailIdRoute:
       DashboardMailboxIdInboxEmailEmailIdRoute,
     DashboardMailboxIdInboxLabelsLabelIndexRoute:
       DashboardMailboxIdInboxLabelsLabelIndexRoute,
     DashboardMailboxIdInboxLabelsLabelEmailEmailIdRoute:
       DashboardMailboxIdInboxLabelsLabelEmailEmailIdRoute,
-  }
-
-const DashboardMailboxIdInboxRouteRouteWithChildren =
-  DashboardMailboxIdInboxRouteRoute._addFileChildren(
-    DashboardMailboxIdInboxRouteRouteChildren,
-  )
-
-interface DashboardMailboxIdRouteRouteChildren {
-  DashboardMailboxIdInboxRouteRoute: typeof DashboardMailboxIdInboxRouteRouteWithChildren
-  DashboardMailboxIdAgendaRoute: typeof DashboardMailboxIdAgendaRoute
-  DashboardMailboxIdHomeRoute: typeof DashboardMailboxIdHomeRoute
-  DashboardMailboxIdTasksRoute: typeof DashboardMailboxIdTasksRoute
-  DashboardMailboxIdFolderIndexRoute: typeof DashboardMailboxIdFolderIndexRoute
-  DashboardMailboxIdFolderEmailEmailIdRoute: typeof DashboardMailboxIdFolderEmailEmailIdRoute
-}
-
-const DashboardMailboxIdRouteRouteChildren: DashboardMailboxIdRouteRouteChildren =
-  {
-    DashboardMailboxIdInboxRouteRoute:
-      DashboardMailboxIdInboxRouteRouteWithChildren,
-    DashboardMailboxIdAgendaRoute: DashboardMailboxIdAgendaRoute,
-    DashboardMailboxIdHomeRoute: DashboardMailboxIdHomeRoute,
-    DashboardMailboxIdTasksRoute: DashboardMailboxIdTasksRoute,
-    DashboardMailboxIdFolderIndexRoute: DashboardMailboxIdFolderIndexRoute,
-    DashboardMailboxIdFolderEmailEmailIdRoute:
-      DashboardMailboxIdFolderEmailEmailIdRoute,
   }
 
 const DashboardMailboxIdRouteRouteWithChildren =

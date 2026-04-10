@@ -1,4 +1,5 @@
-import { fetchAccounts } from "@/hooks/use-mailboxes";
+import { InboxSidebarShell } from "@/features/email/inbox/components/inbox-sidebar-shell";
+import { accountsQueryOptions } from "@/hooks/use-mailboxes";
 import {
   createFileRoute,
   notFound,
@@ -12,8 +13,10 @@ export const Route = createFileRoute("/_dashboard/$mailboxId")({
     mailboxId: z.coerce.number().int().positive().parse(raw.mailboxId),
   }),
   stringifyParams: ({ mailboxId }) => ({ mailboxId: String(mailboxId) }),
-  loader: async ({ params }) => {
-    const accountsData = await fetchAccounts();
+  loader: async ({ context, params }) => {
+    const accountsData = await context.queryClient.ensureQueryData(
+      accountsQueryOptions,
+    );
     const accounts = accountsData.accounts.filter(
       (account): account is typeof account & { mailboxId: number } =>
         account.mailboxId != null,
@@ -27,5 +30,9 @@ export const Route = createFileRoute("/_dashboard/$mailboxId")({
       throw notFound();
     }
   },
-  component: () => <Outlet />,
+  component: () => (
+    <InboxSidebarShell>
+      <Outlet />
+    </InboxSidebarShell>
+  ),
 });

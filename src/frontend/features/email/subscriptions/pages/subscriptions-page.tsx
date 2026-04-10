@@ -26,7 +26,7 @@ export default function SubscriptionsPage() {
       <PageHeader
         title={
           <div className="flex items-center gap-2">
-            <SidebarTrigger className="h-10 w-10 md:hidden [&>svg]:size-5" />
+            <SidebarTrigger className="md:hidden" />
             <span>Subscriptions</span>
           </div>
         }

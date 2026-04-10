@@ -41,6 +41,13 @@ export function ComposeEditor({
   }, [editor]);
 
   useEffect(() => {
+    if (!editor) return;
+    const next = initialContent?.trim() ? initialContent : "<p></p>";
+    if (editor.getHTML() === next) return;
+    editor.commands.setContent(next, { emitUpdate: false });
+  }, [editor, initialContent]);
+
+  useEffect(() => {
     if (autoFocus && editor) {
       setTimeout(() => editor.commands.focus(), 0);
     }

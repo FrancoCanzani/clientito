@@ -1,10 +1,8 @@
 import { eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { mailboxes } from "../../../db/schema";
-import {
-  ensureGoogleMailboxesForUser,
-  getMailboxSyncSnapshot,
-} from "../../../lib/gmail/sync/state";
+import { getMailboxSyncSnapshot } from "../../../lib/gmail/sync/state";
+import { ensureGoogleMailboxesForUser } from "../../../lib/gmail/mailboxes";
 import { catchUpAllMailboxes } from "../../../lib/gmail/sync/engine";
 import type { AppRouteEnv } from "../../types";
 

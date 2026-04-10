@@ -1,6 +1,6 @@
 import { EmailDetailContent } from "@/features/email/inbox/components/email-detail-content";
 import { useInboxCompose } from "@/features/email/inbox/components/inbox-compose-provider";
-import { fetchEmailThread } from "@/features/email/inbox/queries";
+import { fetchEmailDetail, fetchEmailDetailAI, fetchEmailThread } from "@/features/email/inbox/queries";
 import type {
   ComposeInitial,
   EmailDetailItem,
@@ -16,7 +16,7 @@ import {
   type InfiniteData,
 } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 export function EmailDetailView({
   email,
@@ -98,6 +98,26 @@ export function EmailDetailView({
   const goBack = () => {
     router.history.back();
   };
+
+  useEffect(() => {
+    const previousId = currentIndex > 0 ? orderedIds[currentIndex - 1] : null;
+    const nextId =
+      currentIndex >= 0 && currentIndex < orderedIds.length - 1
+        ? orderedIds[currentIndex + 1]
+        : null;
+
+    for (const neighborId of [previousId, nextId]) {
+      if (!neighborId) continue;
+      void queryClient.prefetchQuery({
+        queryKey: ["email-detail", neighborId],
+        queryFn: () => fetchEmailDetail(neighborId),
+      });
+      void queryClient.prefetchQuery({
+        queryKey: ["email-ai-detail", neighborId],
+        queryFn: () => fetchEmailDetailAI(neighborId),
+      });
+    }
+  }, [currentIndex, orderedIds, queryClient]);
 
   const threadQuery = useQuery({
     queryKey: ["email-thread", email.threadId],

@@ -212,5 +212,5 @@ export async function deleteDraft(id: number): Promise<void> {
   if (!response.ok) throw new Error("Failed to delete draft");
 }
 
-export const EMAIL_LIST_PAGE_SIZE = 60;
+export const EMAIL_LIST_PAGE_SIZE = 100;
 export const INBOX_SEARCH_PAGE_SIZE = 30;

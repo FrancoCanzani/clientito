@@ -1,8 +1,8 @@
 import { markEmailRead } from "@/features/email/inbox/mutations";
-import { fetchEmailDetailAI } from "@/features/email/inbox/queries";
-import type { EmailListItem } from "@/features/email/inbox/types";
+import { fetchEmailDetail, fetchEmailDetailAI } from "@/features/email/inbox/queries";
+import type { EmailDetailItem, EmailListItem, EmailListResponse } from "@/features/email/inbox/types";
 import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
-import type { QueryClient } from "@tanstack/react-query";
+import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 
 type FolderView = Exclude<EmailView, "inbox" | "important">;
 
@@ -33,6 +33,11 @@ export function openEmail(
   options?: { replace?: boolean; context?: EmailView },
 ) {
   void queryClient.prefetchQuery({
+    queryKey: ["email-detail", email.id],
+    queryFn: () => fetchEmailDetail(email.id),
+  });
+
+  void queryClient.prefetchQuery({
     queryKey: ["email-ai-detail", email.id],
     queryFn: () => fetchEmailDetailAI(email.id),
   });
@@ -59,8 +64,34 @@ export function openEmail(
   }
 
   if (email.isRead) return;
+  queryClient.setQueriesData<InfiniteData<EmailListResponse>>(
+    { queryKey: ["emails"] },
+    (current) => {
+      if (!current) return current;
+      let changed = false;
+      const pages = current.pages.map((page) => {
+        let pageChanged = false;
+        const data = page.data.map((entry) => {
+          if (entry.id !== email.id || entry.isRead) return entry;
+          pageChanged = true;
+          changed = true;
+          return { ...entry, isRead: true };
+        });
+        return pageChanged ? { ...page, data } : page;
+      });
+      return changed ? { ...current, pages } : current;
+    },
+  );
 
-  void markEmailRead(email.id).finally(() => {
+  queryClient.setQueryData<EmailDetailItem | undefined>(
+    ["email-detail", email.id],
+    (current) => {
+      if (!current || current.isRead) return current;
+      return { ...current, isRead: true };
+    },
+  );
+
+  void markEmailRead(email.id).catch(() => {
     queryClient.invalidateQueries({ queryKey: ["emails"] });
     queryClient.invalidateQueries({ queryKey: ["email-detail", email.id] });
   });

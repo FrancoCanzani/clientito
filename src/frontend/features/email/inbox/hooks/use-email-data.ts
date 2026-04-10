@@ -38,8 +38,9 @@ export function useEmailData({
       lastPage?.pagination?.hasMore
         ? lastPage.pagination.offset + lastPage.pagination.limit
         : undefined,
-    refetchInterval: 15_000,
-    refetchIntervalInBackground: false,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   const displayEmails = useMemo(
@@ -56,16 +57,16 @@ export function useEmailData({
   );
   const hasEmails = threadGroups.length > 0;
 
-  const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } =
-    emailsQuery;
+  const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } = emailsQuery;
 
   const loadMoreRef = useIntersectionObserver<HTMLDivElement>({
     root: null,
     rootMargin: "200px 0px",
     threshold: 0.01,
     onChange: (isIntersecting) => {
-      if (!isIntersecting || !hasNextPage || isFetchingNextPage || isFetching)
+      if (!isIntersecting || !hasNextPage || isFetchingNextPage || isFetching) {
         return;
+      }
       fetchNextPage();
     },
   });

@@ -1,8 +1,11 @@
 import { useAppAgent } from "@/hooks/use-agent";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useRouter } from "@tanstack/react-router";
 import { isToolUIPart } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { discardPendingApprovalParts } from "./agent-approval-utils";
+import { resolveMode, MODE_PLACEHOLDERS } from "./modes/resolve-mode";
+import type { InputMode } from "./modes/types";
 import type { PaletteMode } from "./types";
 
 function focusDelayed(ref: React.RefObject<HTMLElement | null>) {
@@ -105,6 +108,30 @@ export function useCommandPaletteState() {
     setAgentInput("");
   }, [agentInput, submitAgentMessage]);
 
+  // Agent suggestions based on current route context
+  const router = useRouter();
+  const isEmailsRoute = router.state.matches.some(
+    (match) =>
+      match.routeId.startsWith("/_dashboard/$mailboxId/inbox") ||
+      match.routeId === "/_dashboard/$mailboxId/$folder/" ||
+      match.routeId === "/_dashboard/$mailboxId/$folder/email/$emailId",
+  );
+
+  const agentSuggestions = useMemo(() => {
+    if (isEmailsRoute) {
+      return [
+        "Summarize what I'm looking at",
+        "Draft a reply for the current email",
+        "What should I follow up on here?",
+      ];
+    }
+    return [
+      "What needs my attention in email today?",
+      "Find emails I should reply to",
+      "Draft a concise response for this sender",
+    ];
+  }, [isEmailsRoute]);
+
   // Cmd/Ctrl+K opens the palette and Escape exits/ closes it.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -114,7 +141,6 @@ export function useCommandPaletteState() {
       if (isCommandK) {
         event.preventDefault();
         setOpen(true);
-        focusDelayed(inputRef);
         return;
       }
 
@@ -136,20 +162,10 @@ export function useCommandPaletteState() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Outside click to close
   useEffect(() => {
     if (!open) return;
-    function onClick(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        close();
-      }
-    }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [close, open]);
+    focusDelayed(mode === "agent" ? agentInputRef : inputRef);
+  }, [mode, open]);
 
   // Auto-scroll agent messages
   useEffect(() => {
@@ -158,6 +174,22 @@ export function useCommandPaletteState() {
     if (!viewport) return;
     viewport.scrollTop = viewport.scrollHeight;
   }, [mode, messages, status]);
+
+  // Derive input mode from query prefix (only when not in agent mode)
+  const { mode: inputMode, query: modeQuery } = useMemo(
+    () =>
+      mode === "agent"
+        ? { mode: "agent" as InputMode, query: "" }
+        : resolveMode(query),
+    [mode, query],
+  );
+
+  const inputPlaceholder =
+    mode === "agent"
+      ? hasPendingApprovals
+        ? "Approve, discard, or revise..."
+        : "Ask the agent..."
+      : MODE_PLACEHOLDERS[inputMode];
 
   return {
     // Refs
@@ -176,12 +208,17 @@ export function useCommandPaletteState() {
     agentHasSubmitted,
     agentInput,
     setAgentInput,
+    // Input mode
+    inputMode,
+    modeQuery,
+    inputPlaceholder,
     // Agent
     messages,
     status,
     isConnected,
     hasPendingApprovals,
     addToolApprovalResponse,
+    agentSuggestions,
     // Callbacks
     close,
     submitAgentMessage,

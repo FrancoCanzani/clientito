@@ -38,7 +38,7 @@ import {
   type SyncJobKind,
   type SyncJobTrigger,
 } from "../sync/state";
-import { buildGmailQueryFromCutoff } from "./query";
+import { buildGmailQueryFromCutoff } from "./preferences";
 import {
   extractMessageAttachments,
   extractMessageBodyHtml,

@@ -94,7 +94,7 @@ function DocsLayout() {
             </Button>
           </header>
 
-          <div className="mx-auto w-full max-w-[1200px] px-5 pt-6 pb-16 md:pt-8">
+          <div className="mx-auto w-full max-w-300 px-5 pt-6 pb-16 md:pt-8">
             <Outlet />
           </div>
         </SidebarInset>

@@ -1,10 +1,7 @@
 import type { Hono } from "hono";
 import { hasUsableAccessToken } from "../../lib/gmail/client";
-import {
-  ensureMailbox,
-  ensureGoogleMailboxesForUser,
-  getMailboxSyncSnapshot,
-} from "../../lib/gmail/sync/state";
+import { getMailboxSyncSnapshot } from "../../lib/gmail/sync/state";
+import { ensureMailbox, ensureGoogleMailboxesForUser } from "../../lib/gmail/mailboxes";
 import { mailboxes } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import type { AppRouteEnv } from "../types";

@@ -7,10 +7,10 @@ import {
   useMemo,
   useState,
 } from "react";
-import { getRouteApi } from "@tanstack/react-router";
+import { useRouter } from "@tanstack/react-router";
 import type { ComposeInitial } from "../types";
 import { ComposePanel } from "./compose-panel";
-import { registerOpenComposeListener } from "./compose-events";
+import { openCompose as emitOpenCompose, registerOpenComposeListener } from "./compose-events";
 
 type InboxComposeContextValue = {
   openCompose: (initial?: ComposeInitial) => void;
@@ -20,22 +20,26 @@ type InboxComposeContextValue = {
 };
 
 const InboxComposeContext = createContext<InboxComposeContextValue | null>(null);
-const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
 export function InboxComposeProvider({ children }: { children: ReactNode }) {
-  const { mailboxId } = mailboxRoute.useParams();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [initial, setInitial] = useState<ComposeInitial | undefined>();
+  const mailboxIdParam = router.state.matches.find(
+    (match) => match.routeId === "/_dashboard/$mailboxId",
+  )?.params.mailboxId;
+  const activeMailboxId =
+    mailboxIdParam != null ? Number(mailboxIdParam) : undefined;
 
   const openCompose = useCallback(
     (nextInitial?: ComposeInitial) => {
       setInitial({
         ...nextInitial,
-        mailboxId: nextInitial?.mailboxId ?? mailboxId,
+        mailboxId: nextInitial?.mailboxId ?? activeMailboxId,
       });
       setIsOpen(true);
     },
-    [mailboxId],
+    [activeMailboxId],
   );
 
   const closeCompose = useCallback(() => {
@@ -73,7 +77,12 @@ export function InboxComposeProvider({ children }: { children: ReactNode }) {
 export function useInboxCompose() {
   const context = useContext(InboxComposeContext);
   if (!context) {
-    throw new Error("useInboxCompose must be used within InboxComposeProvider");
+    return {
+      openCompose: (initial?: ComposeInitial) => emitOpenCompose(initial),
+      closeCompose: () => {},
+      isOpen: false,
+      initial: undefined,
+    };
   }
   return context;
 }

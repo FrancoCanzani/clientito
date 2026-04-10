@@ -5,7 +5,7 @@ import { z } from "zod";
 import { account } from "../../../db/auth-schema";
 import { mailboxes } from "../../../db/schema";
 import { GmailDriver } from "../../../lib/gmail/driver";
-import { ensureMailbox } from "../../../lib/gmail/sync/state";
+import { ensureMailbox } from "../../../lib/gmail/mailboxes";
 import {
   markEmailSubscriptionStatus,
   normalizeUnsubscribeEmail,

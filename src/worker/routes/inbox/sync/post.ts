@@ -1,10 +1,8 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import type { Database } from "../../../db/client";
-import {
-  getMailboxSyncSnapshot,
-  resolveMailbox,
-} from "../../../lib/gmail/sync/state";
+import { getMailboxSyncSnapshot } from "../../../lib/gmail/sync/state";
+import { resolveMailbox } from "../../../lib/gmail/mailboxes";
 import { catchUpMailboxOnDemand } from "../../../lib/gmail/sync/engine";
 import type { AppRouteEnv } from "../../types";
 import { syncRequestSchema } from "./schemas";

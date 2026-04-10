@@ -121,11 +121,12 @@ function QuickReplyComposer({
 
   useEffect(() => {
     if (!pendingDraft) return;
+    if (compose.loadingDraft) return;
     if (appliedDraftIdRef.current === pendingDraft.id) return;
     compose.setBody(pendingDraft.text);
     appliedDraftIdRef.current = pendingDraft.id;
     onDraftApplied();
-  }, [compose, onDraftApplied, pendingDraft]);
+  }, [compose, compose.loadingDraft, onDraftApplied, pendingDraft]);
 
   const handleClose = () => {
     compose.clearDraft();

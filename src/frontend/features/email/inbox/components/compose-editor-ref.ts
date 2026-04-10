@@ -23,3 +23,14 @@ export function setComposerBody(html: string) {
 export function isComposerOpen(): boolean {
   return activeEditor !== null;
 }
+
+export function getComposerEditor(): Editor | null {
+  return activeEditor;
+}
+
+export function getComposerSelection(): string | null {
+  if (!activeEditor) return null;
+  const { from, to } = activeEditor.state.selection;
+  if (from === to) return null;
+  return activeEditor.state.doc.textBetween(from, to);
+}

@@ -2,7 +2,7 @@ import { and, eq, lte } from "drizzle-orm";
 import type { Database } from "../db/client";
 import { mailboxes, scheduledEmails } from "../db/schema";
 import { GmailDriver } from "../lib/gmail/driver";
-import { resolveOutgoingMailbox } from "../lib/gmail/sync/state";
+import { resolveOutgoingMailbox } from "../lib/gmail/mailboxes";
 import { appendSignature } from "../lib/gmail/mailbox/signature";
 
 async function sendScheduledEmail(

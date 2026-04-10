@@ -61,8 +61,7 @@ export function useComposeEditor({
     },
     editorProps: {
       attributes: {
-        class:
-          "min-h-[120px] text-[13px] outline-none prose prose-sm max-w-none",
+        class: "min-h-[120px] text-[13px] outline-none max-w-none",
       },
     },
   });

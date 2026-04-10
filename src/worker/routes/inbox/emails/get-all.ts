@@ -1,7 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { and, desc, eq, gt, isNull, like, lte, or, sql } from "drizzle-orm";
 import type { Hono } from "hono";
-import { emailIntelligence, emails } from "../../../db/schema";
+import { emailIntelligence, emails, mailboxes } from "../../../db/schema";
 import { catchUpAllMailboxes } from "../../../lib/gmail/sync/engine";
 import { STANDARD_LABELS } from "../../../lib/gmail/types";
 import type { AppRouteEnv } from "../../types";
@@ -19,7 +19,7 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
     const user = c.get("user")!;
 
     const {
-      limit = 50,
+      limit = 100,
       offset = 0,
       search,
       isRead,
@@ -39,12 +39,42 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
         ),
       );
 
-    if (offset === 0) {
-      c.executionCtx.waitUntil(
-        catchUpAllMailboxes(db, c.env, user.id).catch((err) => {
-          console.error("Background sync failed (email list)", err);
-        }),
-      );
+    const shouldAttemptBackgroundSync =
+      offset === 0 &&
+      view === "inbox" &&
+      !search &&
+      isRead === undefined;
+
+    if (shouldAttemptBackgroundSync) {
+      const mailboxSyncRows = mailboxId
+        ? await db
+            .select({
+              lastSuccessfulSyncAt: mailboxes.lastSuccessfulSyncAt,
+            })
+            .from(mailboxes)
+            .where(and(eq(mailboxes.userId, user.id), eq(mailboxes.id, mailboxId)))
+            .limit(1)
+        : await db
+            .select({
+              lastSuccessfulSyncAt: sql<number | null>`max(${mailboxes.lastSuccessfulSyncAt})`,
+            })
+            .from(mailboxes)
+            .where(eq(mailboxes.userId, user.id))
+            .limit(1);
+
+      const lastSuccessfulSyncAt = mailboxSyncRows[0]?.lastSuccessfulSyncAt ?? null;
+      const syncThrottleMs = 60_000;
+      const isSyncStale =
+        typeof lastSuccessfulSyncAt !== "number" ||
+        now - lastSuccessfulSyncAt > syncThrottleMs;
+
+      if (isSyncStale) {
+        c.executionCtx.waitUntil(
+          catchUpAllMailboxes(db, c.env, user.id).catch((err) => {
+            console.error("Background sync failed (email list)", err);
+          }),
+        );
+      }
     }
 
     const conditions = [eq(emails.userId, user.id)];

@@ -6,7 +6,7 @@ import type { EmailListItem } from "@/features/email/inbox/types";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
 import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
 import { useQueryClient } from "@tanstack/react-query";
-import { getRouteApi, useRouter } from "@tanstack/react-router";
+import { getRouteApi } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { toast } from "sonner";
 
@@ -51,7 +51,6 @@ export function useEmailInboxActions({
 }) {
   const navigate = mailboxRoute.useNavigate();
   const queryClient = useQueryClient();
-  const router = useRouter();
 
   const openEmail = useCallback(
     (email: EmailListItem) => {
@@ -81,13 +80,12 @@ export function useEmailInboxActions({
           void queryClient.invalidateQueries({ queryKey: ["email-detail", id] });
         }
         void queryClient.invalidateQueries({ queryKey: ["emails"] });
-        void router.invalidate();
       } catch (error) {
         void queryClient.invalidateQueries({ queryKey: ["emails"] });
         toast.error(error instanceof Error ? error.message : "Action failed");
       }
     },
-    [queryClient, router],
+    [queryClient],
   );
 
   return { openEmail, executeEmailAction };

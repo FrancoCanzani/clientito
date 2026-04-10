@@ -1,7 +1,7 @@
 import { fetchSyncStatus } from "@/features/onboarding/queries";
 import { authClient } from "@/lib/auth-client";
 
-const DASHBOARD_GATE_TTL_MS = 10_000;
+const DASHBOARD_GATE_TTL_MS = 60_000;
 
 export type DashboardGateResult = {
   hasUser: boolean;

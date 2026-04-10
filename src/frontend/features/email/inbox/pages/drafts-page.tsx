@@ -105,7 +105,6 @@ export default function DraftsPage() {
           ))}
         </div>
       )}
-
     </>
   );
 }

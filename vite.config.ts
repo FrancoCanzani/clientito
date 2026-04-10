@@ -13,7 +13,11 @@ export default defineConfig({
       routesDirectory: "./src/frontend/routes",
       generatedRouteTree: "./src/frontend/routeTree.gen.ts",
     }),
-    react(),
+    react({
+      babel: {
+        plugins: ["babel-plugin-react-compiler"],
+      },
+    }),
     tailwindcss(),
     cloudflare({
       persistState: {

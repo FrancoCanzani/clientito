@@ -1,10 +1,8 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import {
-  getMailboxSyncPreferences,
-  resolveMailbox,
-} from "../../lib/gmail/sync/state";
+import { getMailboxSyncPreferences } from "../../lib/gmail/sync/state";
+import { resolveMailbox } from "../../lib/gmail/mailboxes";
 import type { AppRouteEnv } from "../types";
 
 const syncSettingsQuerySchema = z.object({
