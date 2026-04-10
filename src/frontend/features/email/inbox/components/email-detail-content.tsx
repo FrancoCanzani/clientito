@@ -47,7 +47,7 @@ export const EmailDetailContent = forwardRef<
   }));
 
   return (
-    <div className="flex w-full min-h-0 min-w-0 flex-1 flex-col space-y-8 overflow-auto">
+    <div className="flex w-full min-w-0 flex-col space-y-8">
       <EmailDetailHeader
         email={email}
         onClose={onClose}

@@ -18,9 +18,6 @@ import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsSlugRouteImport } from './routes/docs/$slug'
 import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
 import { Route as DashboardMailboxIdRouteRouteImport } from './routes/_dashboard/$mailboxId/route'
-import { Route as DashboardMailboxIdTasksRouteImport } from './routes/_dashboard/$mailboxId/tasks'
-import { Route as DashboardMailboxIdHomeRouteImport } from './routes/_dashboard/$mailboxId/home'
-import { Route as DashboardMailboxIdAgendaRouteImport } from './routes/_dashboard/$mailboxId/agenda'
 import { Route as DashboardMailboxIdInboxIndexRouteImport } from './routes/_dashboard/$mailboxId/inbox/index'
 import { Route as DashboardMailboxIdFolderIndexRouteImport } from './routes/_dashboard/$mailboxId/$folder/index'
 import { Route as DashboardMailboxIdInboxSubscriptionsRouteImport } from './routes/_dashboard/$mailboxId/inbox/subscriptions'
@@ -77,22 +74,6 @@ const DashboardMailboxIdRouteRoute = DashboardMailboxIdRouteRouteImport.update({
   path: '/$mailboxId',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
-const DashboardMailboxIdTasksRoute = DashboardMailboxIdTasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
-  getParentRoute: () => DashboardMailboxIdRouteRoute,
-} as any)
-const DashboardMailboxIdHomeRoute = DashboardMailboxIdHomeRouteImport.update({
-  id: '/home',
-  path: '/home',
-  getParentRoute: () => DashboardMailboxIdRouteRoute,
-} as any)
-const DashboardMailboxIdAgendaRoute =
-  DashboardMailboxIdAgendaRouteImport.update({
-    id: '/agenda',
-    path: '/agenda',
-    getParentRoute: () => DashboardMailboxIdRouteRoute,
-  } as any)
 const DashboardMailboxIdInboxIndexRoute =
   DashboardMailboxIdInboxIndexRouteImport.update({
     id: '/inbox/',
@@ -169,9 +150,6 @@ export interface FileRoutesByFullPath {
   '/settings': typeof DashboardSettingsRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
-  '/$mailboxId/agenda': typeof DashboardMailboxIdAgendaRoute
-  '/$mailboxId/home': typeof DashboardMailboxIdHomeRoute
-  '/$mailboxId/tasks': typeof DashboardMailboxIdTasksRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/$mailboxId/inbox/filters': typeof DashboardMailboxIdInboxFiltersRoute
   '/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
@@ -192,9 +170,6 @@ export interface FileRoutesByTo {
   '/settings': typeof DashboardSettingsRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs': typeof DocsIndexRoute
-  '/$mailboxId/agenda': typeof DashboardMailboxIdAgendaRoute
-  '/$mailboxId/home': typeof DashboardMailboxIdHomeRoute
-  '/$mailboxId/tasks': typeof DashboardMailboxIdTasksRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/$mailboxId/inbox/filters': typeof DashboardMailboxIdInboxFiltersRoute
   '/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
@@ -218,9 +193,6 @@ export interface FileRoutesById {
   '/_dashboard/settings': typeof DashboardSettingsRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
-  '/_dashboard/$mailboxId/agenda': typeof DashboardMailboxIdAgendaRoute
-  '/_dashboard/$mailboxId/home': typeof DashboardMailboxIdHomeRoute
-  '/_dashboard/$mailboxId/tasks': typeof DashboardMailboxIdTasksRoute
   '/_dashboard/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/_dashboard/$mailboxId/inbox/filters': typeof DashboardMailboxIdInboxFiltersRoute
   '/_dashboard/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
@@ -244,9 +216,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/docs/$slug'
     | '/docs/'
-    | '/$mailboxId/agenda'
-    | '/$mailboxId/home'
-    | '/$mailboxId/tasks'
     | '/$mailboxId/inbox/drafts'
     | '/$mailboxId/inbox/filters'
     | '/$mailboxId/inbox/new'
@@ -267,9 +236,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/docs/$slug'
     | '/docs'
-    | '/$mailboxId/agenda'
-    | '/$mailboxId/home'
-    | '/$mailboxId/tasks'
     | '/$mailboxId/inbox/drafts'
     | '/$mailboxId/inbox/filters'
     | '/$mailboxId/inbox/new'
@@ -292,9 +258,6 @@ export interface FileRouteTypes {
     | '/_dashboard/settings'
     | '/docs/$slug'
     | '/docs/'
-    | '/_dashboard/$mailboxId/agenda'
-    | '/_dashboard/$mailboxId/home'
-    | '/_dashboard/$mailboxId/tasks'
     | '/_dashboard/$mailboxId/inbox/drafts'
     | '/_dashboard/$mailboxId/inbox/filters'
     | '/_dashboard/$mailboxId/inbox/new'
@@ -381,27 +344,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardMailboxIdRouteRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
-    '/_dashboard/$mailboxId/tasks': {
-      id: '/_dashboard/$mailboxId/tasks'
-      path: '/tasks'
-      fullPath: '/$mailboxId/tasks'
-      preLoaderRoute: typeof DashboardMailboxIdTasksRouteImport
-      parentRoute: typeof DashboardMailboxIdRouteRoute
-    }
-    '/_dashboard/$mailboxId/home': {
-      id: '/_dashboard/$mailboxId/home'
-      path: '/home'
-      fullPath: '/$mailboxId/home'
-      preLoaderRoute: typeof DashboardMailboxIdHomeRouteImport
-      parentRoute: typeof DashboardMailboxIdRouteRoute
-    }
-    '/_dashboard/$mailboxId/agenda': {
-      id: '/_dashboard/$mailboxId/agenda'
-      path: '/agenda'
-      fullPath: '/$mailboxId/agenda'
-      preLoaderRoute: typeof DashboardMailboxIdAgendaRouteImport
-      parentRoute: typeof DashboardMailboxIdRouteRoute
-    }
     '/_dashboard/$mailboxId/inbox/': {
       id: '/_dashboard/$mailboxId/inbox/'
       path: '/inbox'
@@ -483,9 +425,6 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardMailboxIdRouteRouteChildren {
-  DashboardMailboxIdAgendaRoute: typeof DashboardMailboxIdAgendaRoute
-  DashboardMailboxIdHomeRoute: typeof DashboardMailboxIdHomeRoute
-  DashboardMailboxIdTasksRoute: typeof DashboardMailboxIdTasksRoute
   DashboardMailboxIdInboxDraftsRoute: typeof DashboardMailboxIdInboxDraftsRoute
   DashboardMailboxIdInboxFiltersRoute: typeof DashboardMailboxIdInboxFiltersRoute
   DashboardMailboxIdInboxNewRoute: typeof DashboardMailboxIdInboxNewRoute
@@ -501,9 +440,6 @@ interface DashboardMailboxIdRouteRouteChildren {
 
 const DashboardMailboxIdRouteRouteChildren: DashboardMailboxIdRouteRouteChildren =
   {
-    DashboardMailboxIdAgendaRoute: DashboardMailboxIdAgendaRoute,
-    DashboardMailboxIdHomeRoute: DashboardMailboxIdHomeRoute,
-    DashboardMailboxIdTasksRoute: DashboardMailboxIdTasksRoute,
     DashboardMailboxIdInboxDraftsRoute: DashboardMailboxIdInboxDraftsRoute,
     DashboardMailboxIdInboxFiltersRoute: DashboardMailboxIdInboxFiltersRoute,
     DashboardMailboxIdInboxNewRoute: DashboardMailboxIdInboxNewRoute,

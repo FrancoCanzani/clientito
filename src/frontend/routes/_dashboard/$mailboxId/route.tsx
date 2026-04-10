@@ -14,9 +14,8 @@ export const Route = createFileRoute("/_dashboard/$mailboxId")({
   }),
   stringifyParams: ({ mailboxId }) => ({ mailboxId: String(mailboxId) }),
   loader: async ({ context, params }) => {
-    const accountsData = await context.queryClient.ensureQueryData(
-      accountsQueryOptions,
-    );
+    const accountsData =
+      await context.queryClient.ensureQueryData(accountsQueryOptions);
     const accounts = accountsData.accounts.filter(
       (account): account is typeof account & { mailboxId: number } =>
         account.mailboxId != null,

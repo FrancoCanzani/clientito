@@ -1,5 +1,5 @@
 import {
-  ArchiveIcon,
+  CheckIcon,
   FileDashedIcon,
   FlagIcon,
   FunnelIcon,
@@ -98,10 +98,10 @@ const navigationCommands: Command[] = [
     folder: "sent",
   }),
   makeNavCommand({
-    id: "nav:archive",
-    label: "Archive",
-    icon: paletteIcon(ArchiveIcon),
-    keywords: ["archive", "archived"],
+    id: "nav:done",
+    label: "Done",
+    icon: paletteIcon(CheckIcon),
+    keywords: ["done", "archive", "archived"],
     folder: "archived",
   }),
   makeNavCommand({

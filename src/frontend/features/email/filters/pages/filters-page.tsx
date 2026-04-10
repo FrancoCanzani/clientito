@@ -38,25 +38,25 @@ const filtersRoute = getRouteApi("/_dashboard/$mailboxId/inbox/filters");
 
 const NOISE_FILTER_TEMPLATES = [
   {
-    name: "Archive newsletters",
+    name: "Done: newsletters",
     description:
       "Newsletters, weekly roundups, digest emails, and editorial content from subscriptions",
     actions: { archive: true, markRead: true } as const,
   },
   {
-    name: "Archive marketing",
+    name: "Done: marketing",
     description:
       "Promotional emails, sales, discounts, flash deals, product offers, and company marketing campaigns",
     actions: { archive: true, markRead: true } as const,
   },
   {
-    name: "Archive notifications",
+    name: "Done: notifications",
     description:
       "Automated alerts, app notifications, product updates, social media summaries, and system-generated informational emails",
     actions: { archive: true, markRead: true } as const,
   },
   {
-    name: "Archive transactional",
+    name: "Done: transactional",
     description:
       "Receipts, order confirmations, shipping notifications, password resets, and verification codes",
     actions: { archive: true, markRead: true } as const,
@@ -64,7 +64,7 @@ const NOISE_FILTER_TEMPLATES = [
 ];
 
 const ACTION_LABELS: Record<string, string> = {
-  archive: "Archive",
+  archive: "Done",
   markRead: "Mark read",
   star: "Star",
   trash: "Trash",
@@ -214,7 +214,7 @@ export default function FiltersPage() {
         <Input
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder='Describe a filter... e.g. "Archive LinkedIn suggestions"'
+          placeholder='Describe a filter... e.g. "Mark LinkedIn suggestions as done"'
           className="pl-9 pr-20"
           disabled={generateMutation.isPending}
         />

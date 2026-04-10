@@ -13,12 +13,12 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "sticky top-0 z-20 flex items-center justify-between gap-3 bg-background pt-6 pb-2",
+        "sticky top-0 z-20 flex items-center justify-between gap-3 bg-background pt-6 pb-4",
         className,
       )}
     >
       <div className="min-w-0">
-        <h1 className="truncate text-xl font-medium tracking-[-0.6px] sm:tracking-[-0.8px] font-serif md:tracking-[-1px] text-foreground">
+        <h1 className="truncate text-xl tracking-[-0.6px] sm:tracking-[-0.8px] md:tracking-[-1px] text-foreground">
           {title}
         </h1>
       </div>

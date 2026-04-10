@@ -15,7 +15,7 @@ export const VIEW_LABELS: Record<EmailView, string> = {
   sent: "Sent",
   spam: "Spam",
   trash: "Trash",
-  archived: "Archive",
+  archived: "Done",
   starred: "Starred",
   important: "Important",
 };

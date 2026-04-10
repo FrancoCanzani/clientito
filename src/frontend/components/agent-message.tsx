@@ -17,8 +17,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 const toolLabels: Record<string, string> = {
-  archiveEmail: "Archive email",
-  batchArchive: "Archive emails",
+  archiveEmail: "Mark as done",
+  batchArchive: "Mark as done",
   trashEmail: "Trash email",
   batchTrash: "Trash emails",
   snoozeEmail: "Snooze email",

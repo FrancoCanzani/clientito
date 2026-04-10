@@ -1,14 +1,12 @@
-import { format, isToday, isYesterday } from "date-fns";
-
-export function formatInboxSectionDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  if (isToday(date)) return "Today";
-  if (isYesterday(date)) return "Yesterday";
-  return format(date, "EEE, MMM d");
-}
+import { format, isThisYear, isToday } from "date-fns";
 
 export function formatInboxRowDate(timestamp: number): string {
-  return format(new Date(timestamp), "p");
+  const date = new Date(timestamp);
+  if (isToday(date)) {
+    return format(date, "p");
+  }
+
+  return isThisYear(date) ? format(date, "MMM d") : format(date, "MMM d, yyyy");
 }
 
 export function formatEmailDetailDate(timestamp: number): string {

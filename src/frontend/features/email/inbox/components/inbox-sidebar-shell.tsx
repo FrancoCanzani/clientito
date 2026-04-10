@@ -6,23 +6,17 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
-  ArchiveIcon,
-  FileDashedIcon,
-  FlagIcon,
-  FunnelIcon,
+  CheckIcon,
   MagnifyingGlassIcon,
-  NewspaperIcon,
   PaperPlaneTiltIcon,
-  StarIcon,
-  TrashIcon,
   TrayIcon,
-  WarningCircleIcon,
 } from "@phosphor-icons/react";
 import { Link, getRouteApi, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -106,7 +100,7 @@ function SidebarNav() {
                 : "inbox";
 
   return (
-    <SidebarMenu>
+    <SidebarMenu className="space-y-0.5">
       <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "inbox"}>
           <Link to="/$mailboxId/inbox" params={{ mailboxId }}>
@@ -117,27 +111,14 @@ function SidebarNav() {
       </SidebarMenuItem>
 
       <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "important"}>
-          <Link
-            to="/$mailboxId/inbox/labels/$label"
-            params={{ mailboxId, label: "important" }}
-            preload="intent"
-          >
-            <FlagIcon />
-            <span>Important</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "starred"}>
+        <SidebarMenuButton asChild isActive={activeView === "archived"}>
           <Link
             to="/$mailboxId/$folder"
-            params={{ mailboxId, folder: "starred" }}
+            params={{ mailboxId, folder: "archived" }}
             preload="intent"
           >
-            <StarIcon />
-            <span>Starred</span>
+            <CheckIcon />
+            <span>Done</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -156,58 +137,6 @@ function SidebarNav() {
       </SidebarMenuItem>
 
       <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "archived"}>
-          <Link
-            to="/$mailboxId/$folder"
-            params={{ mailboxId, folder: "archived" }}
-            preload="intent"
-          >
-            <ArchiveIcon />
-            <span>Archive</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "spam"}>
-          <Link
-            to="/$mailboxId/$folder"
-            preload="intent"
-            params={{ mailboxId, folder: "spam" }}
-          >
-            <WarningCircleIcon />
-            <span>Spam</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "trash"}>
-          <Link
-            to="/$mailboxId/$folder"
-            params={{ mailboxId, folder: "trash" }}
-            preload="intent"
-          >
-            <TrashIcon />
-            <span>Trash</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "drafts"}>
-          <Link
-            to="/$mailboxId/inbox/drafts"
-            preload="intent"
-            params={{ mailboxId }}
-          >
-            <FileDashedIcon />
-            <span>Drafts</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-
-      <SidebarMenuItem>
         <SidebarMenuButton asChild isActive={activeView === "search"}>
           <Link
             to="/$mailboxId/inbox/search"
@@ -219,33 +148,31 @@ function SidebarNav() {
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
-
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "subscriptions"}>
-          <Link
-            to="/$mailboxId/inbox/subscriptions"
-            preload="intent"
-            params={{ mailboxId }}
-          >
-            <NewspaperIcon />
-            <span>Subscriptions</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "filters"}>
-          <Link
-            to="/$mailboxId/inbox/filters"
-            preload="intent"
-            params={{ mailboxId }}
-          >
-            <FunnelIcon />
-            <span>Filters</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
     </SidebarMenu>
+  );
+}
+
+function InboxShellContent({
+  children,
+  mailboxId,
+}: {
+  children: ReactNode;
+  mailboxId: number;
+}) {
+  const { open } = useSidebar();
+
+  return (
+    <div className="mx-auto flex max-w-5xl min-w-0 flex-1 gap-8 px-4">
+      {open && (
+        <aside className="sticky top-4 hidden w-56 shrink-0 self-start md:block">
+          <div className="space-y-4 py-5">
+            <InboxIdentity mailboxId={mailboxId} />
+            <SidebarNav />
+          </div>
+        </aside>
+      )}
+      <main className="min-w-0 flex-1">{children}</main>
+    </div>
   );
 }
 
@@ -267,15 +194,7 @@ export function InboxSidebarShell({ children }: { children: ReactNode }) {
         </Sidebar>
       )}
 
-      <div className="mx-auto flex min-h-0 max-w-5xl min-w-0 flex-1 gap-8 px-4">
-        <aside className="hidden w-56 shrink-0 md:block">
-          <div className="space-y-4 py-5">
-            <InboxIdentity mailboxId={mailboxId} />
-            <SidebarNav />
-          </div>
-        </aside>
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</main>
-      </div>
+      <InboxShellContent mailboxId={mailboxId}>{children}</InboxShellContent>
     </SidebarProvider>
   );
 }

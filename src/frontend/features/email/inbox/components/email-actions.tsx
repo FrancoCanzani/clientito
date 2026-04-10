@@ -11,11 +11,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMailboxes } from "@/hooks/use-mailboxes";
 import type { Icon } from "@phosphor-icons/react";
 import {
-  ArchiveIcon,
   ArrowBendDoubleUpLeftIcon,
   ArrowBendUpLeftIcon,
   ArrowBendUpRightIcon,
   BellSlashIcon,
+  CheckIcon,
   ClockIcon,
   DotsThreeIcon,
   EnvelopeSimpleIcon,
@@ -189,15 +189,15 @@ export function EmailActions({
 
   const menuActions: MenuAction[] = [
     {
-      icon: ArchiveIcon,
-      label: isInInbox ? "Archive" : "Move to inbox",
+      icon: CheckIcon,
+      label: isInInbox ? "Done" : "Move to inbox",
       action: () =>
         runEmailPatch(
           { archived: isInInbox },
           {
-            successMessage: isInInbox ? "Archived" : "Moved to inbox",
+            successMessage: isInInbox ? "Marked as done" : "Moved to inbox",
             errorMessage: isInInbox
-              ? "Failed to archive"
+              ? "Failed to mark as done"
               : "Failed to move to inbox",
             closeAfter: true,
           },
@@ -246,10 +246,14 @@ export function EmailActions({
     <div className="space-y-3">
       <div className="flex items-center justify-end gap-2">
         <div className="flex flex-wrap items-center gap-0.5">
-          <Button type="button" variant="ghost" onClick={() => onReply?.()}>
+          <IconButton
+            label="Reply"
+            shortcut="R"
+            variant="ghost"
+            onClick={() => onReply?.()}
+          >
             <ArrowBendUpLeftIcon className="size-3.5" />
-            Reply
-          </Button>
+          </IconButton>
           {showReplyAll && (
             <IconButton label="Reply all" onClick={handleReplyAll}>
               <ArrowBendDoubleUpLeftIcon className="size-3.5" />

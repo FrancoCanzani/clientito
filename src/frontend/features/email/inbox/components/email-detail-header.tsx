@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import type { EmailDetailItem } from "@/features/email/inbox/types";
@@ -36,12 +35,17 @@ export function EmailDetailHeader({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-0.5">
           <SidebarTrigger className="md:hidden" />
-          <Button type="button" variant="ghost" onClick={() => onBack?.()}>
+          <IconButton
+            label="Back"
+            shortcut="Esc"
+            variant="ghost"
+            onClick={() => onBack?.()}
+          >
             <ArrowLeftIcon className="size-3.5" />
-            Back
-          </Button>
+          </IconButton>
           <IconButton
             label="Previous"
+            shortcut="K"
             onClick={() => onPrev?.()}
             disabled={!hasPrev}
           >
@@ -49,6 +53,7 @@ export function EmailDetailHeader({
           </IconButton>
           <IconButton
             label="Next"
+            shortcut="J"
             onClick={() => onNext?.()}
             disabled={!hasNext}
           >

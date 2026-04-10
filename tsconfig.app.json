@@ -22,7 +22,8 @@
 		"noFallthroughCasesInSwitch": true,
 		"noUncheckedSideEffectImports": true,
 		"paths": {
-			"@/*": ["./src/frontend/*"]
+			"@/*": ["./src/frontend/*"],
+			"tinykeys": ["./node_modules/tinykeys/dist/tinykeys.d.ts"]
 		}
 	},
 	"include": ["src/frontend"]

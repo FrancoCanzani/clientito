@@ -1,4 +1,7 @@
-import { EmailDetailContent } from "@/features/email/inbox/components/email-detail-content";
+import {
+  EmailDetailContent,
+  type EmailDetailContentHandle,
+} from "@/features/email/inbox/components/email-detail-content";
 import { useInboxCompose } from "@/features/email/inbox/components/inbox-compose-provider";
 import { fetchEmailDetail, fetchEmailDetailAI, fetchEmailThread } from "@/features/email/inbox/queries";
 import type {
@@ -9,6 +12,7 @@ import type {
 import { buildForwardedEmailHtml } from "@/features/email/inbox/utils/build-forwarded-html";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
 import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
+import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useSetPageContext } from "@/hooks/use-page-context";
 import {
   useQuery,
@@ -16,7 +20,7 @@ import {
   type InfiniteData,
 } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 export function EmailDetailView({
   email,
@@ -35,6 +39,7 @@ export function EmailDetailView({
   const router = useRouter();
   const queryClient = useQueryClient();
   const { openCompose } = useInboxCompose();
+  const contentRef = useRef<EmailDetailContentHandle>(null);
 
   useSetPageContext(
     useMemo(() => {
@@ -74,26 +79,29 @@ export function EmailDetailView({
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex >= 0 && currentIndex < orderedIds.length - 1;
 
-  const goToEmail = (direction: "prev" | "next") => {
-    const nextIndex =
-      direction === "next" ? currentIndex + 1 : currentIndex - 1;
-    const nextId = orderedIds[nextIndex];
-    if (!nextId) return;
+  const goToEmail = useCallback(
+    (direction: "prev" | "next") => {
+      const nextIndex =
+        direction === "next" ? currentIndex + 1 : currentIndex - 1;
+      const nextId = orderedIds[nextIndex];
+      if (!nextId) return;
 
-    const nextEmail = orderedEmailById.get(nextId);
-    if (nextEmail) {
-      openInboxEmail(
-        queryClient,
-        navigate,
-        nextEmail.mailboxId ?? mailboxId,
-        nextEmail,
-        { context: view, replace: true },
-      );
-      return;
-    }
+      const nextEmail = orderedEmailById.get(nextId);
+      if (nextEmail) {
+        openInboxEmail(
+          queryClient,
+          navigate,
+          nextEmail.mailboxId ?? mailboxId,
+          nextEmail,
+          { context: view, replace: true },
+        );
+        return;
+      }
 
-    onNavigateToEmail(nextId);
-  };
+      onNavigateToEmail(nextId);
+    },
+    [currentIndex, orderedIds, orderedEmailById, queryClient, navigate, mailboxId, view, onNavigateToEmail],
+  );
 
   const goBack = () => {
     router.history.back();
@@ -148,10 +156,26 @@ export function EmailDetailView({
     [email, openCompose],
   );
 
+  useHotkeys({
+    j: {
+      enabled: hasNext,
+      onKeyDown: () => goToEmail("next"),
+    },
+    k: {
+      enabled: hasPrev,
+      onKeyDown: () => goToEmail("prev"),
+    },
+    r: () => contentRef.current?.triggerReply(),
+    c: () => openCompose(),
+    e: () => router.history.back(),
+    Escape: () => router.history.back(),
+  });
+
   return (
     <div className="w-full max-w-3xl">
       <div className="min-w-0">
         <EmailDetailContent
+          ref={contentRef}
           email={email}
           threadMessages={threadMessages}
           threadError={threadQuery.isError}

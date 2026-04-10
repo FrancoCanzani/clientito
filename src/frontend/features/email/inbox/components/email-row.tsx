@@ -4,7 +4,7 @@ import { fetchEmailDetail } from "@/features/email/inbox/queries";
 import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
 import { cn } from "@/lib/utils";
 import {
-  ArchiveIcon,
+  CheckIcon,
   EnvelopeSimpleIcon,
   EnvelopeSimpleOpenIcon,
   PaperclipIcon,
@@ -22,11 +22,13 @@ export const EmailRow = memo(function EmailRow({
   view,
   onOpen,
   onAction,
+  isFocused = false,
 }: {
   group: ThreadGroup;
   view: EmailView;
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
+  isFocused?: boolean;
 }) {
   const queryClient = useQueryClient();
   const prefetchedRef = useRef(false);
@@ -35,7 +37,7 @@ export const EmailRow = memo(function EmailRow({
   const isStarred = email.labelIds.includes("STARRED");
   const isInInbox = email.labelIds.includes("INBOX");
   const archiveAction = isInInbox ? "archive" : "move-to-inbox";
-  const archiveLabel = isInInbox ? "Archive" : "Move to inbox";
+  const archiveLabel = isInInbox ? "Done" : "Move to inbox";
   const threadCount = group.threadCount;
   const participantLabel =
     view === "sent"
@@ -64,7 +66,10 @@ export const EmailRow = memo(function EmailRow({
     <div
       role="button"
       tabIndex={0}
-      className="group flex h-10 w-full cursor-default items-center gap-2 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40"
+      className={cn(
+        "group flex h-10 w-full cursor-default items-center gap-2 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40",
+        isFocused && "bg-muted/40",
+      )}
       onMouseEnter={() => {
         prefetchEmailData();
         setIsHovered(true);
@@ -120,6 +125,7 @@ export const EmailRow = memo(function EmailRow({
             <div className="absolute inset-y-0 right-0 hidden items-center justify-end md:flex">
               <IconButton
                 label={archiveLabel}
+                shortcut="E"
                 variant="ghost"
                 size="icon-sm"
                 onClick={(event) => {
@@ -127,10 +133,11 @@ export const EmailRow = memo(function EmailRow({
                   onAction(archiveAction, [email.id]);
                 }}
               >
-                <ArchiveIcon className="size-3.5" />
+                <CheckIcon className="size-3.5" />
               </IconButton>
               <IconButton
                 label={email.isRead ? "Mark as unread" : "Mark as read"}
+                shortcut="U"
                 variant="ghost"
                 size="icon-sm"
                 onClick={(event) => {
@@ -148,6 +155,7 @@ export const EmailRow = memo(function EmailRow({
               </IconButton>
               <IconButton
                 label={isStarred ? "Unstar" : "Star"}
+                shortcut="S"
                 variant="ghost"
                 size="icon-sm"
                 onClick={(event) => {
@@ -162,6 +170,7 @@ export const EmailRow = memo(function EmailRow({
               </IconButton>
               <IconButton
                 label="Delete"
+                shortcut="#"
                 variant="ghost"
                 size="icon-sm"
                 onClick={(event) => {

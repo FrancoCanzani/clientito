@@ -10,6 +10,7 @@ const composeCommands: Command[] = [
     label: "Compose new email",
     icon: paletteIcon(PencilSimpleIcon),
     group: "email",
+    shortcut: "C",
     keywords: ["compose", "write", "new", "draft", "send"],
     when: (ctx) => ctx.defaultMailboxId != null && !ctx.composerOpen,
     perform: (ctx, services) => {

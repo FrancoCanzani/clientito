@@ -1,4 +1,5 @@
 import { useAppAgent } from "@/hooks/use-agent";
+import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useRouter } from "@tanstack/react-router";
 import { isToolUIPart } from "ai";
@@ -132,35 +133,27 @@ export function useCommandPaletteState() {
     ];
   }, [isEmailsRoute]);
 
-  // Cmd/Ctrl+K opens the palette and Escape exits/ closes it.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const isCommandK =
-        (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
-
-      if (isCommandK) {
-        event.preventDefault();
-        setOpen(true);
-        return;
-      }
-
-      if (event.key === "Escape") {
-        setMode((currentMode) => {
-          if (currentMode === "agent") {
-            focusDelayed(inputRef);
+  useHotkeys(
+    {
+      "$mod+k": () => setOpen(true),
+      Escape: {
+        enabled: open,
+        onKeyDown: () => {
+          setMode((currentMode) => {
+            if (currentMode === "agent") {
+              focusDelayed(inputRef);
+              return "commands";
+            }
+            setOpen(false);
+            setQuery("");
+            setAgentHasSubmitted(false);
             return "commands";
-          }
-          setOpen(false);
-          setQuery("");
-          setAgentHasSubmitted(false);
-          return "commands";
-        });
-      }
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, []);
+          });
+        },
+      },
+    },
+    { allowInEditable: true },
+  );
 
   useEffect(() => {
     if (!open) return;

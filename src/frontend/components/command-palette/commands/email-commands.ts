@@ -1,6 +1,6 @@
 import { patchEmail } from "@/features/email/inbox/mutations";
 import {
-  ArchiveIcon,
+  CheckIcon,
   ClockIcon,
   EnvelopeOpenIcon,
   EnvelopeSimpleIcon,
@@ -13,7 +13,11 @@ import { addHours, nextMonday, startOfTomorrow } from "date-fns";
 import { toast } from "sonner";
 import { paletteIcon } from "../registry/palette-icon";
 import { registerCommands } from "../registry/registry";
-import type { Command, CommandContext, CommandServices } from "../registry/types";
+import type {
+  Command,
+  CommandContext,
+  CommandServices,
+} from "../registry/types";
 
 async function performEmailAction(
   ctx: CommandContext,
@@ -41,11 +45,12 @@ const hasEmail = (ctx: CommandContext) => ctx.selectedEmailId !== null;
 
 const emailCommands: Command[] = [
   {
-    id: "email:archive",
-    label: "Archive email",
-    icon: paletteIcon(ArchiveIcon),
+    id: "email:done",
+    label: "Mark as done",
+    icon: paletteIcon(CheckIcon),
     group: "email",
-    keywords: ["archive", "remove", "done"],
+    shortcut: "E",
+    keywords: ["done", "archive", "remove"],
     when: (ctx) => hasEmail(ctx) && ctx.selectedEmailIsArchived !== true,
     perform: (ctx, services) =>
       performEmailAction(ctx, services, { archived: true }),
@@ -65,6 +70,7 @@ const emailCommands: Command[] = [
     label: "Move to trash",
     icon: paletteIcon(TrashIcon),
     group: "email",
+    shortcut: "#",
     keywords: ["trash", "delete", "remove"],
     when: hasEmail,
     perform: (ctx, services) =>
@@ -85,6 +91,7 @@ const emailCommands: Command[] = [
     label: "Mark as read",
     icon: paletteIcon(EnvelopeOpenIcon),
     group: "email",
+    shortcut: "U",
     keywords: ["read", "seen"],
     when: (ctx) => hasEmail(ctx) && ctx.selectedEmailIsRead !== true,
     perform: (ctx, services) =>
@@ -95,6 +102,7 @@ const emailCommands: Command[] = [
     label: "Mark as unread",
     icon: paletteIcon(EnvelopeSimpleIcon),
     group: "email",
+    shortcut: "U",
     keywords: ["unread", "unseen"],
     when: (ctx) => hasEmail(ctx) && ctx.selectedEmailIsRead !== false,
     perform: (ctx, services) =>
@@ -105,6 +113,7 @@ const emailCommands: Command[] = [
     label: "Star email",
     icon: paletteIcon(StarIcon),
     group: "email",
+    shortcut: "S",
     keywords: ["star", "favorite", "important"],
     when: hasEmail,
     perform: (ctx, services) =>

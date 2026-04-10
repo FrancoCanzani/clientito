@@ -6,7 +6,7 @@ import { CheckIcon, XIcon } from "@phosphor-icons/react";
 const ACTION_KEYS = ["archive", "markRead", "star", "trash"] as const;
 
 const ACTION_LABELS: Record<string, string> = {
-  archive: "Archive",
+  archive: "Done",
   markRead: "Mark read",
   star: "Star",
   trash: "Trash",

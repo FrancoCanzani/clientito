@@ -1,11 +1,12 @@
 import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/email/inbox/queries";
 import type { EmailListResponse } from "@/features/email/inbox/types";
-import { buildThreadSections } from "@/features/email/inbox/utils/build-thread-sections";
 import { groupEmailsByThread } from "@/features/email/inbox/utils/group-emails-by-thread";
 import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
+
+const LOAD_MORE_ROOT_MARGIN = "800px 0px";
 
 export function useEmailData({
   view,
@@ -51,17 +52,13 @@ export function useEmailData({
     () => groupEmailsByThread(displayEmails),
     [displayEmails],
   );
-  const sections = useMemo(
-    () => buildThreadSections(threadGroups),
-    [threadGroups],
-  );
   const hasEmails = threadGroups.length > 0;
 
   const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } = emailsQuery;
 
   const loadMoreRef = useIntersectionObserver<HTMLDivElement>({
     root: null,
-    rootMargin: "200px 0px",
+    rootMargin: LOAD_MORE_ROOT_MARGIN,
     threshold: 0.01,
     onChange: (isIntersecting) => {
       if (!isIntersecting || !hasNextPage || isFetchingNextPage || isFetching) {
@@ -75,7 +72,7 @@ export function useEmailData({
     view,
     mailboxId,
     hasEmails,
-    sections,
+    threadGroups,
     isError: emailsQuery.isError,
     hasNextPage: hasNextPage ?? false,
     isFetchingNextPage,

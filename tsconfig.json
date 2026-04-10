@@ -1,7 +1,8 @@
 {
 	"compilerOptions": {
 		"paths": {
-			"@/*": ["./src/frontend/*"]
+			"@/*": ["./src/frontend/*"],
+			"tinykeys": ["./node_modules/tinykeys/dist/tinykeys.d.ts"]
 		}
 	},
 	"files": [],

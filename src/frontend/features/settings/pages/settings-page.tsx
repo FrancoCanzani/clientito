@@ -111,7 +111,7 @@ export default function SettingsPage() {
   }, [accounts, accountsQuery.isPending, mailboxSyncMutation, queryClient]);
 
   return (
-    <div className="mx-auto w-full max-w-2xl flex-1 space-y-8 overflow-auto">
+    <div className="mx-auto w-full max-w-2xl space-y-8">
       <PageHeader title="Settings" />
 
       <section className="space-y-3">
