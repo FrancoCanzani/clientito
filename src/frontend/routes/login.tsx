@@ -34,7 +34,7 @@ function LoginRoute() {
   });
 
   return (
-    <main className="flex min-h-screen items-center justify-center antialiased">
+    <main className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-md text-center space-y-8">
         <div className="space-y-2">
           <h1 className="text-3xl font-medium tracking-tight">

@@ -77,7 +77,11 @@ export function EmailList({
         }
         actions={
           view === "inbox" && (
-            <IconButton label="New Email" shortcut="C">
+            <IconButton
+              label="New Email"
+              shortcut="C"
+              onClick={() => openCompose()}
+            >
               <NotePencilIcon className="size-3.5" />
             </IconButton>
           )

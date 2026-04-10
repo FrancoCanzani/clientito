@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Gelasio:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Silkscreen:wght@400;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Gelasio:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Silkscreen:wght@400;700&display=swap");
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 @import "tw-animate-css";
@@ -77,6 +77,7 @@
 
 @theme inline {
   --font-sans: "Colfax", "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
   --font-serif: "Gelasio", serif;
   --font-pixel: "Silkscreen", monospace;
   --color-sidebar-ring: var(--sidebar-ring);
@@ -130,7 +131,7 @@
     -moz-osx-font-smoothing: grayscale;
   }
   html {
-    @apply font-sans antialiased;
+    @apply font-mono antialiased;
   }
 }
 

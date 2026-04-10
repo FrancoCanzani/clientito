@@ -159,7 +159,7 @@ function InboxShellContent({
   children: ReactNode;
   mailboxId: number;
 }) {
-  const { open } = useSidebar();
+  const { open, isMobile } = useSidebar();
 
   return (
     <div className="mx-auto flex max-w-5xl min-w-0 flex-1 gap-8 px-4">
@@ -171,7 +171,14 @@ function InboxShellContent({
           </div>
         </aside>
       )}
-      <main className="min-w-0 flex-1">{children}</main>
+      <main
+        className={cn(
+          "min-w-0 flex-1",
+          !isMobile && !open && "flex justify-center",
+        )}
+      >
+        {children}
+      </main>
     </div>
   );
 }

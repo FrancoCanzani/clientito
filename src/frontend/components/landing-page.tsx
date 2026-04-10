@@ -1,7 +1,7 @@
-import { Link } from "@tanstack/react-router";
+import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
 import { useAuth } from "@/hooks/use-auth";
 import { useMailboxes } from "@/hooks/use-mailboxes";
-import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
+import { Link } from "@tanstack/react-router";
 import { Button } from "./ui/button";
 
 const FOOTER_LINKS = ["Privacy", "Terms", "Security"];
@@ -12,7 +12,7 @@ export default function LandingPage() {
   const preferredMailboxId = getPreferredMailboxId(accounts);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background text-foreground antialiased">
+    <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
       <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 sm:px-7 lg:px-8">
         <header className="flex justify-end pt-6">
           <div className="flex items-center gap-4">
