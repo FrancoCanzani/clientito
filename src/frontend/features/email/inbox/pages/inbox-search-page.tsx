@@ -71,7 +71,7 @@ export default function InboxSearchPage() {
       scope.mailboxId,
       "inbox",
       scope.includeJunk ?? false,
-    ] as const,
+    ],
     initialPageParam: 0,
     enabled: normalizeQuery(scope.q).length >= 2,
     initialData: initialResults
@@ -103,7 +103,7 @@ export default function InboxSearchPage() {
       scope.mailboxId,
       "inbox",
       scope.includeJunk ?? false,
-    ] as const,
+    ],
     queryFn: () =>
       fetchSearchSuggestions({
         ...scope,
@@ -164,12 +164,12 @@ export default function InboxSearchPage() {
   const canToggleJunk = hiddenJunkCount > 0 || search.includeJunk === true;
 
   return (
-    <div className="flex min-h-0 h-full w-full max-w-3xl min-w-0 flex-1 flex-col">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-5">
         <PageHeader
           title={
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="md:hidden" />
+              <SidebarTrigger />
               <span>Search</span>
             </div>
           }
@@ -187,7 +187,6 @@ export default function InboxSearchPage() {
                 }}
                 placeholder="Search"
                 spellCheck={false}
-                autoFocus
               />
             </div>
           }

@@ -3,7 +3,12 @@ import { Input } from "@/components/ui/input";
 import type { FilterActions } from "@/features/email/filters/types";
 import { CheckIcon, XIcon } from "@phosphor-icons/react";
 
-const ACTION_KEYS = ["archive", "markRead", "star", "trash"] as const;
+const ACTION_KEYS: ReadonlyArray<keyof FilterActions> = [
+  "archive",
+  "markRead",
+  "star",
+  "trash",
+];
 
 const ACTION_LABELS: Record<string, string> = {
   archive: "Done",

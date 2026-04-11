@@ -1,13 +1,19 @@
 import LabelEmailPage from "@/features/email/inbox/pages/label-email-page";
 import { fetchEmailDetail, fetchEmailDetailAI } from "@/features/email/inbox/queries";
 import { createFileRoute } from "@tanstack/react-router";
-import { labelEmailParamsSchema } from "@/features/email/inbox/routes/schemas";
+import {
+  parseEmailIdParam,
+  parseInboxLabelParam,
+} from "@/features/email/inbox/utils/inbox-filters";
 
 export const Route = createFileRoute(
   "/_dashboard/$mailboxId/inbox/labels/$label/email/$emailId",
 )({
   params: {
-    parse: (raw) => labelEmailParamsSchema.parse(raw),
+    parse: (raw) => ({
+      label: parseInboxLabelParam(raw.label),
+      emailId: parseEmailIdParam(raw.emailId),
+    }),
   },
   skipRouteOnParseError: { params: true },
   loader: async ({ context, params }) => {

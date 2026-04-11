@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
+import { ReadingSettings } from "@/features/settings/components/reading-settings";
 import { SignatureField } from "@/features/settings/components/signature-field";
 import { updateSyncPreference } from "@/features/settings/mutations";
 import { useSettingsMutations } from "@/features/settings/hooks/use-settings-mutations";
@@ -28,10 +29,27 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-const syncWindowOptions = [
-  { value: 6 as const, label: "6 months" },
-  { value: 12 as const, label: "1 year" },
+type SyncWindowOption = {
+  value: 6 | 12 | null;
+  label: string;
+};
+
+type ThemeOption = {
+  value: "light" | "dark" | "system";
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
+
+const syncWindowOptions: SyncWindowOption[] = [
+  { value: 6, label: "6 months" },
+  { value: 12, label: "1 year" },
   { value: null, label: "Everything" },
+];
+
+const themeOptions: ThemeOption[] = [
+  { value: "light", label: "Light", icon: SunIcon },
+  { value: "dark", label: "Dark", icon: MoonIcon },
+  { value: "system", label: "System", icon: MonitorIcon },
 ];
 
 export default function SettingsPage() {
@@ -111,7 +129,7 @@ export default function SettingsPage() {
   }, [accounts, accountsQuery.isPending, mailboxSyncMutation, queryClient]);
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-8">
+    <div className="mx-auto w-full max-w-3xl space-y-8">
       <PageHeader title="Settings" />
 
       <section className="space-y-3">
@@ -350,15 +368,7 @@ export default function SettingsPage() {
             </div>
             <div className="min-w-0 sm:max-w-[60%]">
               <ButtonGroup className="w-full sm:w-auto">
-                {[
-                  { value: "light" as const, label: "Light", icon: SunIcon },
-                  { value: "dark" as const, label: "Dark", icon: MoonIcon },
-                  {
-                    value: "system" as const,
-                    label: "System",
-                    icon: MonitorIcon,
-                  },
-                ].map((option) => (
+                {themeOptions.map((option) => (
                   <Button
                     key={option.value}
                     type="button"
@@ -375,6 +385,8 @@ export default function SettingsPage() {
           </div>
         </div>
       </section>
+
+      <ReadingSettings />
 
       <section className="space-y-3">
         <div className="space-y-1">

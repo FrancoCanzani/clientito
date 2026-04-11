@@ -3,15 +3,19 @@ import {
   type EmailDetailContentHandle,
 } from "@/features/email/inbox/components/email-detail-content";
 import { useInboxCompose } from "@/features/email/inbox/components/inbox-compose-provider";
-import { fetchEmailDetail, fetchEmailDetailAI, fetchEmailThread } from "@/features/email/inbox/queries";
+import {
+  fetchEmailDetail,
+  fetchEmailDetailAI,
+  fetchEmailThread,
+} from "@/features/email/inbox/queries";
 import type {
   ComposeInitial,
   EmailDetailItem,
   EmailListResponse,
 } from "@/features/email/inbox/types";
 import { buildForwardedEmailHtml } from "@/features/email/inbox/utils/build-forwarded-html";
-import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
 import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
+import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useSetPageContext } from "@/hooks/use-page-context";
 import {
@@ -73,7 +77,9 @@ export function EmailDetailView({
   }, [queryClient, mailboxId, view]);
 
   const orderedIds = orderedEmails.map((item) => item.id);
-  const orderedEmailById = new Map(orderedEmails.map((item) => [item.id, item]));
+  const orderedEmailById = new Map(
+    orderedEmails.map((item) => [item.id, item]),
+  );
 
   const currentIndex = orderedIds.indexOf(emailId);
   const hasPrev = currentIndex > 0;
@@ -100,7 +106,16 @@ export function EmailDetailView({
 
       onNavigateToEmail(nextId);
     },
-    [currentIndex, orderedIds, orderedEmailById, queryClient, navigate, mailboxId, view, onNavigateToEmail],
+    [
+      currentIndex,
+      orderedIds,
+      orderedEmailById,
+      queryClient,
+      navigate,
+      mailboxId,
+      view,
+      onNavigateToEmail,
+    ],
   );
 
   const goBack = () => {
@@ -172,7 +187,7 @@ export function EmailDetailView({
   });
 
   return (
-    <div className="w-full max-w-3xl">
+    <div className="mx-auto w-full max-w-3xl">
       <div className="min-w-0">
         <EmailDetailContent
           ref={contentRef}

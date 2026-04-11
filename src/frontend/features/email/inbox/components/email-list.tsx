@@ -56,7 +56,6 @@ export function EmailList({
     scrollMargin: listRef.current?.offsetTop ?? 0,
   });
 
-  // Scroll focused item into view
   useEffect(() => {
     if (focusedIndex < 0) return;
     if (focusedIndex < threadGroups.length) {
@@ -67,11 +66,11 @@ export function EmailList({
   const virtualItems = virtualizer.getVirtualItems();
 
   return (
-    <div className="flex w-full max-w-3xl min-w-0 flex-1 flex-col">
+    <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-1 flex-col">
       <PageHeader
         title={
           <div className="flex items-center gap-2">
-            <SidebarTrigger className="md:hidden" />
+            <SidebarTrigger />
             <span>{pageTitle}</span>
           </div>
         }

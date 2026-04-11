@@ -2,48 +2,67 @@ import { getAllDocs } from "@/features/docs/lib/docs";
 import { Link } from "@tanstack/react-router";
 
 const docs = getAllDocs();
+const coreFlow = [
+  "getting-started",
+  "connect-your-mailbox",
+  "inbox-and-search",
+  "sync-troubleshooting",
+  "security-and-privacy",
+];
+const coreDocs = coreFlow
+  .map((slug) => docs.find((doc) => doc.slug === slug))
+  .filter((doc) => doc != null);
 
 export default function DocsHomePage() {
   return (
-    <div className="mx-auto max-w-[47rem]">
-      <header className="mb-6 border-b border-[rgba(41,33,24,0.16)] pb-5">
-        <p className="text-[0.72rem] uppercase tracking-[0.18em] text-[#5d554c]">
-          Petit Documentation
-        </p>
-        <h1 className="mt-2 text-[clamp(1.95rem,4.8vw,2.9rem)] leading-[1.04] tracking-[-0.025em] text-[#171411]">
-          Reference Manual
-        </h1>
-        <p className="mt-4 max-w-[40rem] text-[1rem] leading-[1.65] text-[#5d554c]">
-          A quiet place for architecture notes, implementation details, and
-          operating knowledge.
+    <div className="mx-auto max-w-4xl space-y-8">
+      <header className="space-y-2">
+        <h1 className="text-2xl font-semibold">Petit docs</h1>
+        <p className="text-sm text-muted-foreground">
+          Open command palette and run <code>&gt; docs</code> anytime.
         </p>
       </header>
 
-      <section
-        className="border-t border-[rgba(41,33,24,0.16)]"
-        aria-label="Available documents"
-      >
-        {docs.map((doc) => (
-          <article
-            key={doc.slug}
-            className="border-b border-[rgba(41,33,24,0.16)] py-[1.1rem]"
-          >
-            <h2 className="text-[1.2rem] font-normal text-[#171411]">
-              <Link
-                to="/docs/$slug"
-                params={{ slug: doc.slug }}
-                className="text-[#1f4f8a] underline underline-offset-[0.14em]"
-              >
+      {coreDocs.length > 0 && (
+        <section className="space-y-2" aria-label="Core flow">
+          <h2 className="text-base font-semibold">
+            Start here
+          </h2>
+          <ul className="list-disc space-y-1 pl-5">
+            {coreDocs.map((doc) => (
+              <li key={doc.slug}>
+                <Link to="/docs/$slug" params={{ slug: doc.slug }}>
+                  {doc.title}
+                </Link>
+                {doc.description && (
+                  <p className="text-sm text-muted-foreground">
+                    {doc.description}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="space-y-2 pt-2" aria-label="All documents">
+        <h2 className="text-base font-semibold">
+          All documents
+        </h2>
+        <ul className="list-disc space-y-1 pl-5">
+          {docs.map((doc) => (
+            <li key={doc.slug}>
+              <Link to="/docs/$slug" params={{ slug: doc.slug }}>
                 {doc.title}
               </Link>
-            </h2>
-            {doc.description && (
-              <p className="mt-2 leading-[1.7] text-[#5d554c]">
-                {doc.description}
-              </p>
-            )}
-          </article>
-        ))}
+              {doc.description && (
+                <p className="text-sm text-muted-foreground">
+                  {doc.description}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
       </section>
     </div>
   );

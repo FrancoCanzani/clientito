@@ -50,7 +50,7 @@ export const EmailRow = memo(function EmailRow({
     if (prefetchedRef.current) return;
     prefetchedRef.current = true;
 
-    const detailKey = ["email-detail", email.id] as const;
+    const detailKey = ["email-detail", email.id];
     const detailState = queryClient.getQueryState(detailKey);
     if (detailState?.status !== "success") {
       void queryClient.prefetchQuery({
@@ -67,7 +67,7 @@ export const EmailRow = memo(function EmailRow({
       role="button"
       tabIndex={0}
       className={cn(
-        "group flex h-10 w-full cursor-default items-center gap-2 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40",
+        "group flex h-10 w-full cursor-default items-center gap-2 rounded-md px-2 text-left text-sm transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40",
         isFocused && "bg-muted/40",
       )}
       onMouseEnter={() => {
@@ -92,10 +92,10 @@ export const EmailRow = memo(function EmailRow({
       />
 
       <div className="min-w-0 flex-1 items-center gap-2 overflow-hidden flex">
-        <span className="text-sm shrink-0 truncate tracking-[-0.6px] text-foreground">
+        <span className="shrink-0 truncate tracking-[-0.6px] text-foreground">
           {participantLabel}
         </span>
-        <span className="text-foreground/50 text-sm truncate tracking-[-0.2px]">
+        <span className="text-foreground/50 truncate tracking-[-0.2px]">
           {email.subject ?? "(no subject)"}
         </span>
       </div>

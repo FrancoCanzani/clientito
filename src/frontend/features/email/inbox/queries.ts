@@ -1,33 +1,22 @@
-import type { EmailView } from "./utils/inbox-filters";
 import type {
   ContactSuggestion,
-  EmailThreadItem,
+  DraftItem,
   EmailDetailIntelligence,
   EmailDetailItem,
   EmailListResponse,
+  EmailThreadItem,
   InboxSearchScope,
   InboxSearchSuggestionsResponse,
 } from "./types";
+import type { EmailView } from "./utils/inbox-filters";
 
-type FetchEmailsParams = {
-  search?: string;
-  isRead?: "true" | "false";
-  view?: EmailView;
-  limit?: number;
-  offset?: number;
-  mailboxId?: number;
-};
-
-function appendEmailListParams(
+function appendScopeParams(
   query: URLSearchParams,
-  params?: FetchEmailsParams | InboxSearchScope,
+  params: InboxSearchScope,
 ) {
-  if (!params) return;
   if (params.mailboxId) query.set("mailboxId", String(params.mailboxId));
   if (params.view) query.set("view", params.view);
-  if ("includeJunk" in params && params.includeJunk) {
-    query.set("includeJunk", "true");
-  }
+  if (params.includeJunk) query.set("includeJunk", "true");
 }
 
 function normalizeSearchQuery(query: string) {
@@ -35,7 +24,14 @@ function normalizeSearchQuery(query: string) {
 }
 
 export async function fetchEmails(
-  params?: FetchEmailsParams,
+  params?: {
+    search?: string;
+    isRead?: "true" | "false";
+    view?: EmailView;
+    limit?: number;
+    offset?: number;
+    mailboxId?: number;
+  },
 ): Promise<EmailListResponse> {
   const query = new URLSearchParams();
   if (params?.search) query.set("search", params.search);
@@ -67,7 +63,7 @@ export async function fetchSearchEmails(
   query.set("q", normalizedQuery);
   if (params.limit) query.set("limit", String(params.limit));
   if (params.offset) query.set("offset", String(params.offset));
-  appendEmailListParams(query, params);
+  appendScopeParams(query, params);
 
   const response = await fetch(`/api/inbox/search/emails?${query}`);
   if (!response.ok) {
@@ -158,7 +154,7 @@ export async function fetchSearchSuggestions(
   const query = new URLSearchParams();
   const normalizedQuery = normalizeSearchQuery(params.q);
   if (normalizedQuery) query.set("q", normalizedQuery);
-  appendEmailListParams(query, params);
+  appendScopeParams(query, params);
 
   const response = await fetch(`/api/inbox/search/suggestions?${query}`);
   if (!response.ok) {
@@ -174,27 +170,15 @@ export async function fetchSearchSuggestions(
   return json;
 }
 
-export type DraftItem = {
-  id: number;
-  composeKey: string;
-  mailboxId: number | null;
-  toAddr: string;
-  ccAddr: string;
-  bccAddr: string;
-  subject: string;
-  body: string;
-  forwardedContent: string;
-  threadId: string | null;
-  attachmentKeys: Array<{ key: string; filename: string; mimeType: string }> | null;
-  updatedAt: number;
-  createdAt: number;
-};
-
-export function getDraftsQueryKey(mailboxId: number | null) {
-  return ["drafts", mailboxId ?? "none"] as const;
+export function getDraftsQueryKey(
+  mailboxId: number | null,
+): ["drafts", number | "none"] {
+  return ["drafts", mailboxId ?? "none"];
 }
 
-export async function fetchDrafts(mailboxId: number | null): Promise<DraftItem[]> {
+export async function fetchDrafts(
+  mailboxId: number | null,
+): Promise<DraftItem[]> {
   const search =
     mailboxId == null
       ? ""

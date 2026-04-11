@@ -171,7 +171,7 @@ export function CommandPalette() {
                     onKeyDown={(event) => {
                       if (event.key === "Tab") {
                         event.preventDefault();
-                        const sigils = [">", "@", "#", "/"] as const;
+                        const sigils = [">", "@", "#", "/"];
                         const current = sigils.find((s) => state.query === s);
                         const next = current
                           ? sigils[(sigils.indexOf(current) + 1) % sigils.length]

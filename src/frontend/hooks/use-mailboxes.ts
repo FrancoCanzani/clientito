@@ -48,7 +48,7 @@ export async function fetchAccounts(): Promise<{ accounts: MailboxAccount[] }> {
 }
 
 export const accountsQueryOptions = queryOptions({
-  queryKey: ["accounts"] as const,
+  queryKey: ["accounts"],
   queryFn: fetchAccounts,
   staleTime: 30_000,
   refetchOnWindowFocus: true,
@@ -72,7 +72,12 @@ export async function removeAccount(accountId: string): Promise<void> {
   if (!response.ok) {
     const json = await response.json().catch(() => ({}));
     throw new Error(
-      (json as { error?: string }).error ?? "Failed to remove account",
+      (typeof json === "object" &&
+      json !== null &&
+      "error" in json &&
+      typeof json.error === "string"
+        ? json.error
+        : "Failed to remove account"),
     );
   }
 }

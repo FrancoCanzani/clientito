@@ -11,8 +11,8 @@ import { useInboxCompose } from "@/features/email/inbox/components/inbox-compose
 import { TrashIcon } from "@phosphor-icons/react";
 import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
-import { deleteDraft, type DraftItem } from "../queries";
-import type { ComposeInitial } from "../types";
+import { deleteDraft } from "../queries";
+import type { ComposeInitial, DraftItem } from "../types";
 import { htmlToPlainText } from "../utils/html-to-plain-text";
 
 const route = getRouteApi("/_dashboard/$mailboxId/inbox/drafts");
@@ -46,7 +46,7 @@ export default function DraftsPage() {
   };
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-3xl">
       <PageHeader
         title={
           <div className="flex items-center gap-2">
@@ -105,6 +105,6 @@ export default function DraftsPage() {
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }

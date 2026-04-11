@@ -1,5 +1,5 @@
 import {
-  VIEW_VALUES,
+  isEmailView,
   type EmailView,
 } from "@/features/email/inbox/utils/inbox-filters";
 
@@ -10,17 +10,18 @@ export function resolveCurrentView(
   currentView: EmailView | undefined;
   currentLabel: string | undefined;
 } {
-  const currentFolder = matches.find(
+  const rawFolder = matches.find(
     (m) => m.routeId === "/_dashboard/$mailboxId/$folder/",
-  )?.params.folder as string | undefined;
-  const currentLabel = matches.find(
+  )?.params.folder;
+  const currentFolder = typeof rawFolder === "string" ? rawFolder : undefined;
+  const rawLabel = matches.find(
     (m) => m.routeId === "/_dashboard/$mailboxId/inbox/labels/$label/",
-  )?.params.label as string | undefined;
+  )?.params.label;
+  const currentLabel = typeof rawLabel === "string" ? rawLabel : undefined;
 
-  const folderView = VIEW_VALUES.includes(currentFolder as EmailView)
-    ? (currentFolder as EmailView)
-    : undefined;
-  const labelView = currentLabel === "important" ? ("important" as const) : undefined;
+  const folderView = isEmailView(currentFolder) ? currentFolder : undefined;
+  const labelView: EmailView | undefined =
+    currentLabel === "important" ? "important" : undefined;
   const isInboxRoot =
     currentRouteId === "/_dashboard/$mailboxId/inbox/" ||
     currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId";

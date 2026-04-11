@@ -36,30 +36,36 @@ import { toast } from "sonner";
 
 const filtersRoute = getRouteApi("/_dashboard/$mailboxId/inbox/filters");
 
-const NOISE_FILTER_TEMPLATES = [
+type FilterTemplate = {
+  name: string;
+  description: string;
+  actions: EditingFilter["actions"];
+};
+
+const NOISE_FILTER_TEMPLATES: FilterTemplate[] = [
   {
     name: "Done: newsletters",
     description:
       "Newsletters, weekly roundups, digest emails, and editorial content from subscriptions",
-    actions: { archive: true, markRead: true } as const,
+    actions: { archive: true, markRead: true },
   },
   {
     name: "Done: marketing",
     description:
       "Promotional emails, sales, discounts, flash deals, product offers, and company marketing campaigns",
-    actions: { archive: true, markRead: true } as const,
+    actions: { archive: true, markRead: true },
   },
   {
     name: "Done: notifications",
     description:
       "Automated alerts, app notifications, product updates, social media summaries, and system-generated informational emails",
-    actions: { archive: true, markRead: true } as const,
+    actions: { archive: true, markRead: true },
   },
   {
     name: "Done: transactional",
     description:
       "Receipts, order confirmations, shipping notifications, password resets, and verification codes",
-    actions: { archive: true, markRead: true } as const,
+    actions: { archive: true, markRead: true },
   },
 ];
 
@@ -70,7 +76,7 @@ const ACTION_LABELS: Record<string, string> = {
   trash: "Trash",
 };
 
-const FILTER_SKELETON_KEYS = ["filter-a", "filter-b", "filter-c"] as const;
+const FILTER_SKELETON_KEYS = ["filter-a", "filter-b", "filter-c"];
 
 function formatActions(actions: Record<string, unknown>) {
   const parts: string[] = [];

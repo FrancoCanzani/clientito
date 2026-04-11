@@ -13,6 +13,12 @@ export type UpdateSyncPreferenceInput = {
   months: 6 | 12 | null;
 };
 
+function getErrorMessage(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null) return null;
+  const error = Reflect.get(payload, "error");
+  return typeof error === "string" ? error : null;
+}
+
 export async function updateSyncPreference(
   input: UpdateSyncPreferenceInput,
 ): Promise<UpdateSyncPreferenceResult> {
@@ -24,9 +30,7 @@ export async function updateSyncPreference(
 
   if (!response.ok) {
     const json = await response.json().catch(() => ({}));
-    throw new Error(
-      (json as { error?: string }).error ?? "Failed to update import history",
-    );
+    throw new Error(getErrorMessage(json) ?? "Failed to update import history");
   }
 
   const json = await response.json();
@@ -45,9 +49,7 @@ export async function updateMailboxSignature(
 
   if (!response.ok) {
     const json = await response.json().catch(() => ({}));
-    throw new Error(
-      (json as { error?: string }).error ?? "Failed to update signature",
-    );
+    throw new Error(getErrorMessage(json) ?? "Failed to update signature");
   }
 }
 
@@ -58,8 +60,6 @@ export async function deleteAccount(): Promise<void> {
 
   if (!response.ok) {
     const json = await response.json().catch(() => ({}));
-    throw new Error(
-      (json as { error?: string }).error ?? "Failed to delete account",
-    );
+    throw new Error(getErrorMessage(json) ?? "Failed to delete account");
   }
 }

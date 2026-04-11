@@ -72,7 +72,7 @@ if (typeof window !== "undefined") {
 }
 
 export function useTheme() {
-  const theme = useSyncExternalStore(subscribe, getSnapshot, () => "system" as Theme);
+  const theme = useSyncExternalStore(subscribe, getSnapshot, getStoredTheme);
   const resolved = typeof window !== "undefined" ? getResolvedTheme(theme) : "light";
 
   const toggle = useCallback(() => {

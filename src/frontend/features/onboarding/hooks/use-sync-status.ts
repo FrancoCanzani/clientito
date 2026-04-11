@@ -5,7 +5,7 @@ const SYNC_ACTIVE_POLL_MS = 1_000;
 const SYNC_IDLE_POLL_MS = 60_000;
 
 const syncStatusQueryOptions = queryOptions({
-  queryKey: ["sync-status"] as const,
+  queryKey: ["sync-status"],
   queryFn: fetchSyncStatus,
   staleTime: 30_000,
   refetchOnWindowFocus: true,

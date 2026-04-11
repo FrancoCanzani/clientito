@@ -40,7 +40,7 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/search")({
         scope.mailboxId,
         "inbox",
         scope.includeJunk ?? false,
-      ] as const,
+      ],
       queryFn: () =>
         fetchSearchSuggestions({
           ...scope,
@@ -58,7 +58,7 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/search")({
                 scope.mailboxId,
                 "inbox",
                 scope.includeJunk ?? false,
-              ] as const,
+              ],
               queryFn: ({ pageParam }) =>
                 fetchSearchEmails({
                   ...scope,

@@ -1,3 +1,4 @@
+import { Kbd } from "@/components/ui/kbd";
 import {
   Sidebar,
   SidebarContent,
@@ -9,16 +10,26 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/use-auth";
+import { useHotkeys } from "@/hooks/use-hotkeys";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
+  BellSimpleIcon,
   CheckIcon,
+  FunnelSimpleIcon,
   MagnifyingGlassIcon,
+  PencilSimpleLineIcon,
   PaperPlaneTiltIcon,
+  StarIcon,
   TrayIcon,
 } from "@phosphor-icons/react";
-import { Link, getRouteApi, useRouterState } from "@tanstack/react-router";
+import {
+  Link,
+  getRouteApi,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
@@ -66,89 +77,183 @@ function InboxIdentity({
   );
 }
 
-function SidebarNav() {
+function SidebarNav({ mobile = false }: { mobile?: boolean }) {
   const { mailboxId } = mailboxRoute.useParams();
-  const currentRouteId = useRouterState({
-    select: (state) => state.matches[state.matches.length - 1]?.routeId,
-  });
-  const currentFolder = useRouterState({
-    select: (state) =>
-      state.matches.find(
-        (match) => match.routeId === "/_dashboard/$mailboxId/$folder/",
-      )?.params.folder,
-  });
-  const currentLabel = useRouterState({
-    select: (state) =>
-      state.matches.find(
+  const navigate = useNavigate();
+  const activeView = useRouterState({
+    select: (
+      state,
+    ):
+      | "search"
+      | "archived"
+      | "sent"
+      | "inbox"
+      | "important"
+      | "drafts"
+      | "filters"
+      | "subscriptions" => {
+      const matches = state.matches;
+      const leaf = matches[matches.length - 1]?.routeId;
+      if (leaf === "/_dashboard/$mailboxId/inbox/search") return "search";
+      if (leaf === "/_dashboard/$mailboxId/inbox/drafts") return "drafts";
+      if (leaf === "/_dashboard/$mailboxId/inbox/filters") return "filters";
+      if (leaf === "/_dashboard/$mailboxId/inbox/subscriptions") {
+        return "subscriptions";
+      }
+
+      const label = matches.find(
         (match) =>
           match.routeId === "/_dashboard/$mailboxId/inbox/labels/$label/",
-      )?.params.label,
+      )?.params.label;
+      if (label === "important") return "important";
+
+      const folder = matches.find(
+        (match) => match.routeId === "/_dashboard/$mailboxId/$folder/",
+      )?.params.folder;
+      if (folder === "archived" || folder === "sent") return folder;
+
+      return "inbox";
+    },
   });
-  const activeView =
-    currentRouteId === "/_dashboard/$mailboxId/inbox/search"
-      ? "search"
-      : currentRouteId === "/_dashboard/$mailboxId/inbox/subscriptions"
-        ? "subscriptions"
-        : currentRouteId === "/_dashboard/$mailboxId/inbox/filters"
-          ? "filters"
-          : currentRouteId === "/_dashboard/$mailboxId/inbox/drafts"
-            ? "drafts"
-            : currentFolder
-              ? currentFolder
-              : currentLabel === "important"
-                ? "important"
-                : "inbox";
+
+  useHotkeys({
+    "$mod+1": () =>
+      navigate({
+        to: "/$mailboxId/inbox",
+        params: { mailboxId },
+      }),
+    "$mod+2": () =>
+      navigate({
+        to: "/$mailboxId/$folder",
+        params: { mailboxId, folder: "archived" },
+      }),
+    "$mod+3": () =>
+      navigate({
+        to: "/$mailboxId/$folder",
+        params: { mailboxId, folder: "sent" },
+      }),
+    "$mod+4": () =>
+      navigate({
+        to: "/$mailboxId/inbox/search",
+        params: { mailboxId },
+      }),
+  });
 
   return (
-    <SidebarMenu className="space-y-0.5">
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "inbox"}>
-          <Link to="/$mailboxId/inbox" params={{ mailboxId }}>
-            <TrayIcon />
-            <span>Inbox</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
+    <>
+      <SidebarMenu className="space-y-0.5">
+        <SidebarMenuItem>
+          <SidebarMenuButton asChild isActive={activeView === "inbox"}>
+            <Link to="/$mailboxId/inbox" params={{ mailboxId }}>
+              <TrayIcon />
+              <span>Inbox</span>
+              <Kbd className="ml-auto shrink-0">⌘1</Kbd>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
 
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "archived"}>
-          <Link
-            to="/$mailboxId/$folder"
-            params={{ mailboxId, folder: "archived" }}
-            preload="intent"
-          >
-            <CheckIcon />
-            <span>Done</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
+        <SidebarMenuItem>
+          <SidebarMenuButton asChild isActive={activeView === "archived"}>
+            <Link
+              to="/$mailboxId/$folder"
+              params={{ mailboxId, folder: "archived" }}
+              preload="intent"
+            >
+              <CheckIcon />
+              <span>Done</span>
+              <Kbd className="ml-auto shrink-0">⌘2</Kbd>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
 
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "sent"}>
-          <Link
-            to="/$mailboxId/$folder"
-            preload="intent"
-            params={{ mailboxId, folder: "sent" }}
-          >
-            <PaperPlaneTiltIcon />
-            <span>Sent</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
+        <SidebarMenuItem>
+          <SidebarMenuButton asChild isActive={activeView === "sent"}>
+            <Link
+              to="/$mailboxId/$folder"
+              preload="intent"
+              params={{ mailboxId, folder: "sent" }}
+            >
+              <PaperPlaneTiltIcon />
+              <span>Sent</span>
+              <Kbd className="ml-auto shrink-0">⌘3</Kbd>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
 
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={activeView === "search"}>
-          <Link
-            to="/$mailboxId/inbox/search"
-            preload="intent"
-            params={{ mailboxId }}
-          >
-            <MagnifyingGlassIcon />
-            <span>Search</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    </SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton asChild isActive={activeView === "search"}>
+            <Link
+              to="/$mailboxId/inbox/search"
+              preload="intent"
+              params={{ mailboxId }}
+            >
+              <MagnifyingGlassIcon />
+              <span>Search</span>
+              <Kbd className="ml-auto shrink-0">⌘4</Kbd>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+
+        {mobile && (
+          <>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={activeView === "important"}>
+                <Link
+                  to="/$mailboxId/inbox/labels/$label"
+                  preload="intent"
+                  params={{ mailboxId, label: "important" }}
+                >
+                  <StarIcon />
+                  <span>Important</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={activeView === "drafts"}>
+                <Link
+                  to="/$mailboxId/inbox/drafts"
+                  preload="intent"
+                  params={{ mailboxId }}
+                >
+                  <PencilSimpleLineIcon />
+                  <span>Drafts</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={activeView === "filters"}>
+                <Link
+                  to="/$mailboxId/inbox/filters"
+                  preload="intent"
+                  params={{ mailboxId }}
+                >
+                  <FunnelSimpleIcon />
+                  <span>Filters</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={activeView === "subscriptions"}
+              >
+                <Link
+                  to="/$mailboxId/inbox/subscriptions"
+                  preload="intent"
+                  params={{ mailboxId }}
+                >
+                  <BellSimpleIcon />
+                  <span>Subscriptions</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </>
+        )}
+      </SidebarMenu>
+    </>
   );
 }
 
@@ -188,7 +293,7 @@ export function InboxSidebarShell({ children }: { children: ReactNode }) {
   const { mailboxId } = mailboxRoute.useParams();
 
   return (
-    <SidebarProvider className="min-h-0 flex-1">
+    <SidebarProvider className="min-h-0 flex-1" defaultOpen={false}>
       {isMobile && (
         <Sidebar>
           <SidebarHeader className="gap-3 px-3 pt-5 pb-3">
@@ -196,7 +301,7 @@ export function InboxSidebarShell({ children }: { children: ReactNode }) {
           </SidebarHeader>
 
           <SidebarContent className="px-2 pb-4">
-            <SidebarNav />
+            <SidebarNav mobile />
           </SidebarContent>
         </Sidebar>
       )}

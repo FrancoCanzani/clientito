@@ -13,7 +13,7 @@ export function discardPendingApprovalParts(
 
       return {
         ...part,
-        state: "output-denied" as const,
+        state: "output-denied",
         approval: {
           ...part.approval,
           approved: false,

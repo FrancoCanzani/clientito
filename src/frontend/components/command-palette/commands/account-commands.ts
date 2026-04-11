@@ -1,5 +1,5 @@
 import {
-  VIEW_VALUES,
+  isEmailView,
   type EmailView,
 } from "@/features/email/inbox/utils/inbox-filters";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
@@ -15,10 +15,19 @@ export function useAccountCommands(ctx: CommandContext): Command[] {
 
   const matches = router.state.matches;
   const currentRouteId = ctx.currentRouteId;
-  const routeSearch = router.state.location.search as {
-    q?: unknown;
-    includeJunk?: unknown;
-  };
+  const routeSearch = router.state.location.search;
+  const routeQuery =
+    typeof routeSearch === "object" &&
+    routeSearch !== null &&
+    "q" in routeSearch &&
+    typeof routeSearch.q === "string"
+      ? routeSearch.q
+      : undefined;
+  const includeJunk =
+    typeof routeSearch === "object" &&
+    routeSearch !== null &&
+    "includeJunk" in routeSearch &&
+    routeSearch.includeJunk === true;
   const currentFolder = matches.find(
     (match) => match.routeId === "/_dashboard/$mailboxId/$folder/",
   )?.params.folder;
@@ -26,10 +35,9 @@ export function useAccountCommands(ctx: CommandContext): Command[] {
     (match) =>
       match.routeId === "/_dashboard/$mailboxId/inbox/labels/$label/",
   )?.params.label;
-  const folderView = VIEW_VALUES.includes(currentFolder as EmailView)
-    ? (currentFolder as EmailView)
-    : undefined;
-  const labelView = currentLabel === "important" ? "important" : undefined;
+  const folderView = isEmailView(currentFolder) ? currentFolder : undefined;
+  const labelView: EmailView | undefined =
+    currentLabel === "important" ? "important" : undefined;
   const isInboxRootRoute =
     currentRouteId === "/_dashboard/$mailboxId/inbox/" ||
     currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId";
@@ -66,15 +74,8 @@ export function useAccountCommands(ctx: CommandContext): Command[] {
                 to: "/$mailboxId/inbox/search",
                 params: { mailboxId },
                 search: {
-                  q:
-                    typeof routeSearch.q === "string" &&
-                    routeSearch.q.trim()
-                      ? routeSearch.q
-                      : undefined,
-                  includeJunk:
-                    routeSearch.includeJunk === true
-                      ? true
-                      : undefined,
+                  q: routeQuery?.trim() ? routeQuery : undefined,
+                  includeJunk: includeJunk ? true : undefined,
                 },
               });
             } else if (
@@ -157,6 +158,7 @@ export function useAccountCommands(ctx: CommandContext): Command[] {
     currentRouteId,
     currentLabel,
     currentMailboxView,
-    routeSearch,
+    routeQuery,
+    includeJunk,
   ]);
 }

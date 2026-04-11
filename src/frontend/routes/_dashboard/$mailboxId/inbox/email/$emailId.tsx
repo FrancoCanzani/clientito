@@ -1,13 +1,16 @@
 import InboxEmailPage from "@/features/email/inbox/pages/inbox-email-page";
-import { fetchEmailDetail, fetchEmailDetailAI } from "@/features/email/inbox/queries";
-import { emailIdParamsSchema } from "@/features/email/inbox/routes/schemas";
+import {
+  fetchEmailDetail,
+  fetchEmailDetailAI,
+} from "@/features/email/inbox/queries";
+import { parseEmailIdParam } from "@/features/email/inbox/utils/inbox-filters";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute(
   "/_dashboard/$mailboxId/inbox/email/$emailId",
 )({
   params: {
-    parse: (raw) => emailIdParamsSchema.parse(raw),
+    parse: (raw) => ({ emailId: parseEmailIdParam(raw.emailId) }),
   },
   skipRouteOnParseError: { params: true },
   loader: async ({ context, params }) => {

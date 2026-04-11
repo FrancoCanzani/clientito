@@ -3,7 +3,17 @@ import { useHotkeys } from "@/hooks/use-hotkeys";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
 
-const SHORTCUT_GROUPS = [
+type ShortcutDefinition = {
+  key: string;
+  description: string;
+};
+
+type ShortcutGroup = {
+  label: string;
+  shortcuts: ShortcutDefinition[];
+};
+
+const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     label: "Navigation",
     shortcuts: [
@@ -32,7 +42,7 @@ const SHORTCUT_GROUPS = [
       { key: "?", description: "Keyboard shortcuts" },
     ],
   },
-] as const;
+];
 
 export function KeyboardShortcutsDialog() {
   const [open, setOpen] = useState(false);

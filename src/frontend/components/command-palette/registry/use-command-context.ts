@@ -1,6 +1,6 @@
 import { isComposerOpen } from "@/features/email/inbox/components/compose-editor-ref";
 import {
-  VIEW_VALUES,
+  isEmailView,
   type EmailView,
 } from "@/features/email/inbox/utils/inbox-filters";
 import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
@@ -35,10 +35,9 @@ export function useCommandContext(): CommandContext {
     (match) =>
       match.routeId === "/_dashboard/$mailboxId/inbox/labels/$label/",
   )?.params.label;
-  const folderView = VIEW_VALUES.includes(currentFolder as EmailView)
-    ? (currentFolder as EmailView)
-    : undefined;
-  const labelView = currentLabel === "important" ? "important" : undefined;
+  const folderView = isEmailView(currentFolder) ? currentFolder : undefined;
+  const labelView: EmailView | undefined =
+    currentLabel === "important" ? "important" : undefined;
   const isInboxRootRoute =
     currentRouteId === "/_dashboard/$mailboxId/inbox/" ||
     currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId";

@@ -39,11 +39,11 @@ export default function NewEmailPage() {
   );
 
   return (
-    <div className="flex h-full min-h-0 w-full max-w-3xl min-w-0 flex-col">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl min-w-0 flex-col">
       <PageHeader
         title={
           <div className="flex items-center gap-2">
-            <SidebarTrigger className="md:hidden" />
+            <SidebarTrigger />
             <span>New Email</span>
           </div>
         }

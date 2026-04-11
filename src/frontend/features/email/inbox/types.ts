@@ -150,6 +150,26 @@ export type EmailListResponse = {
   };
 };
 
+export type DraftItem = {
+  id: number;
+  composeKey: string;
+  mailboxId: number | null;
+  toAddr: string;
+  ccAddr: string;
+  bccAddr: string;
+  subject: string;
+  body: string;
+  forwardedContent: string;
+  threadId: string | null;
+  attachmentKeys: Array<{
+    key: string;
+    filename: string;
+    mimeType: string;
+  }> | null;
+  updatedAt: number;
+  createdAt: number;
+};
+
 export type ComposeInitial = {
   mailboxId?: number | null;
   to?: string;

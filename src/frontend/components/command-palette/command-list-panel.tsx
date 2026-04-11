@@ -10,6 +10,11 @@ import { resolveLabel } from "./registry/registry";
 import type { Command, CommandContext, CommandServices } from "./registry/types";
 
 const GROUP_ORDER = ["accounts", "email", "composer", "navigation", "agent", "actions"];
+type ModeHint = {
+  sigil: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
 
 function groupCommands(commands: Command[]): Map<string, Command[]> {
   const map = new Map<string, Command[]>();
@@ -29,12 +34,12 @@ function sortedGroups(groups: Map<string, Command[]>): [string, Command[]][] {
   });
 }
 
-const MODE_HINTS = [
+const MODE_HINTS: ModeHint[] = [
   { sigil: ">", label: "Commands", icon: CaretRightIcon },
   { sigil: "@", label: "Contacts", icon: AtIcon },
   { sigil: "#", label: "Search", icon: HashIcon },
   { sigil: "/", label: "Agent", icon: RobotIcon },
-] as const;
+];
 
 export function CommandListPanel({
   commands,

@@ -1,17 +1,17 @@
 import FolderPage from "@/features/email/inbox/pages/folder-page";
 import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/email/inbox/queries";
-import { folderParamsSchema } from "@/features/email/inbox/routes/schemas";
+import { parseEmailFolderParam } from "@/features/email/inbox/utils/inbox-filters";
 import type { EmailListResponse } from "@/features/email/inbox/types";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/$folder/")({
   params: {
-    parse: (raw) => folderParamsSchema.parse(raw),
+    parse: (raw) => ({ folder: parseEmailFolderParam(raw.folder) }),
   },
   skipRouteOnParseError: { params: true },
   loader: async ({ context, params }) => {
     const initialData = await context.queryClient.ensureInfiniteQueryData({
-      queryKey: ["emails", params.folder, params.mailboxId] as const,
+      queryKey: ["emails", params.folder, params.mailboxId],
       queryFn: ({ pageParam }) =>
         fetchEmails({
           view: params.folder,

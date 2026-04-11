@@ -12,11 +12,24 @@ export type Doc = {
   headings: Heading[];
 };
 
-const docsModules = import.meta.glob("/docs/*.md", {
+const docsModules: Record<string, string> = import.meta.glob("/docs/*.md", {
   query: "?raw",
   import: "default",
   eager: true,
-}) as Record<string, string>;
+});
+const DOC_ORDER = [
+  "getting-started",
+  "connect-your-mailbox",
+  "inbox-and-search",
+  "sync-troubleshooting",
+  "security-and-privacy",
+  "email-sync",
+] as const;
+
+function getOrderIndex(slug: string) {
+  const index = DOC_ORDER.indexOf(slug as (typeof DOC_ORDER)[number]);
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+}
 
 function slugify(value: string) {
   return value
@@ -70,10 +83,11 @@ function parseHeadings(content: string) {
 
   return matches.map(([_, hashes, rawText]) => {
     const text = rawText.trim();
+    const level: Heading["level"] = hashes === "##" ? 2 : 3;
 
     return {
       id: slugify(text),
-      level: hashes.length as 2 | 3,
+      level,
       text,
     };
   });
@@ -91,7 +105,11 @@ const docs = Object.entries(docsModules)
       headings: parseHeadings(content),
     } satisfies Doc;
   })
-  .sort((a, b) => a.title.localeCompare(b.title));
+  .sort((a, b) => {
+    const orderDiff = getOrderIndex(a.slug) - getOrderIndex(b.slug);
+    if (orderDiff !== 0) return orderDiff;
+    return a.title.localeCompare(b.title);
+  });
 
 export function getAllDocs() {
   return docs;

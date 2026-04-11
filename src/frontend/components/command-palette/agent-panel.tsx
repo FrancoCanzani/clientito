@@ -18,6 +18,18 @@ function getAgentStatusLabel(
   return null;
 }
 
+function getToolArgs(input: unknown): Record<string, unknown> | undefined {
+  if (typeof input !== "object" || input === null) return undefined;
+
+  return Object.entries(input).reduce<Record<string, unknown>>(
+    (args, [key, value]) => {
+      args[key] = value;
+      return args;
+    },
+    {},
+  );
+}
+
 export function AgentPanel({
   messages,
   status,
@@ -78,17 +90,18 @@ export function AgentPanel({
                     isToolUIPart(part) && part.state === "approval-requested",
                 )
                 .map((part) => {
+                  const args = getToolArgs(part.input) ?? {};
                   return (
                     <ToolApprovalCard
                       key={part.toolCallId}
                       toolCallId={part.approval.id}
                       toolName={getToolName(part)}
-                      args={part.input as Record<string, unknown>}
+                      args={args}
                       onApprove={(id) =>
                         handleApprove(
                           id,
                           getToolName(part),
-                          part.input as Record<string, unknown>,
+                          args,
                         )
                       }
                       onDiscard={handleDiscard}

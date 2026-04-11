@@ -54,7 +54,8 @@ export function ComposeBubbleMenu({ editor }: { editor: Editor }) {
   }, [editor, linkInput]);
 
   const openLinkInput = useCallback(() => {
-    const existing = editor.getAttributes("link").href as string | undefined;
+    const href = editor.getAttributes("link").href;
+    const existing = typeof href === "string" ? href : undefined;
     setLinkInput(existing ?? "");
     setShowLinkInput(true);
   }, [editor]);

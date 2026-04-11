@@ -2,7 +2,7 @@ import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-in
 import type { EmailListItem } from "@/features/email/inbox/types";
 import type { ThreadGroup } from "@/features/email/inbox/utils/group-emails-by-thread";
 import { useHotkeys } from "@/hooks/use-hotkeys";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type InboxHotkeysOptions = {
   groups: ThreadGroup[];
@@ -17,19 +17,36 @@ export function useInboxHotkeys({
   onAction,
   onCompose,
 }: InboxHotkeysOptions) {
-  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const lastIndexRef = useRef(-1);
+
+  let focusedIndex = focusedId
+    ? groups.findIndex((g) => g.representative.id === focusedId)
+    : -1;
+
+  // If the focused row vanished (archived/trashed), clamp to the previous slot
+  // so the next row takes focus instead of losing it entirely.
+  if (focusedId && focusedIndex === -1 && groups.length > 0) {
+    focusedIndex = Math.min(lastIndexRef.current, groups.length - 1);
+  }
+
+  lastIndexRef.current = focusedIndex;
   const focusedEmail = groups[focusedIndex]?.representative ?? null;
+
+  const moveFocus = (next: number) => {
+    const clamped = Math.max(0, Math.min(next, groups.length - 1));
+    const target = groups[clamped]?.representative.id ?? null;
+    setFocusedId(target);
+  };
 
   useHotkeys({
     j: {
       enabled: groups.length > 0,
-      onKeyDown: () =>
-        setFocusedIndex((index) => Math.min(index + 1, groups.length - 1)),
+      onKeyDown: () => moveFocus(focusedIndex < 0 ? 0 : focusedIndex + 1),
     },
     k: {
       enabled: groups.length > 0,
-      onKeyDown: () =>
-        setFocusedIndex((index) => Math.max(index - 1, 0)),
+      onKeyDown: () => moveFocus(focusedIndex < 0 ? 0 : focusedIndex - 1),
     },
     Enter: {
       enabled: Boolean(focusedEmail),
@@ -78,10 +95,10 @@ export function useInboxHotkeys({
     c: () => onCompose(),
   });
 
-  // Reset focus when the list changes
+  // Reset focus when the list is fully swapped out (e.g. view change → empty).
   useEffect(() => {
-    setFocusedIndex(-1);
-  }, [groups]);
+    if (groups.length === 0) setFocusedId(null);
+  }, [groups.length]);
 
-  return { focusedIndex, setFocusedIndex };
+  return { focusedIndex, setFocusedId };
 }

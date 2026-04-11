@@ -1,3 +1,5 @@
+import { usePreferences } from "@/features/settings/hooks/use-preferences";
+import { DetoxRenderer } from "./detox-renderer";
 import { useState } from "react";
 import type { EmailBodySource } from "../types";
 import { prepareEmailHtml } from "../utils/prepare-email-html";
@@ -81,11 +83,22 @@ function PlainTextEmailRenderer({ text }: { text: string }) {
 }
 
 export function MessageBody({ detail }: { detail?: EmailBodySource | null }) {
+  const { readingMode, fontSize, showImages, showQuoted } = usePreferences();
   const bodyHtml = detail?.resolvedBodyHtml ?? detail?.bodyHtml;
   const bodyText = detail?.resolvedBodyText ?? detail?.bodyText;
-  const preparedHtml = bodyHtml ? prepareEmailHtml(bodyHtml) : null;
 
-  if (preparedHtml) {
+  if (bodyHtml) {
+    if (readingMode === "detox") {
+      return (
+        <DetoxRenderer
+          html={bodyHtml}
+          fontSize={fontSize}
+          defaultShowImages={showImages === "always"}
+          defaultShowQuoted={showQuoted === "expanded"}
+        />
+      );
+    }
+    const preparedHtml = prepareEmailHtml(bodyHtml);
     return <EmailHtmlRenderer html={preparedHtml} />;
   }
 

@@ -1,6 +1,6 @@
 import LabelPage from "@/features/email/inbox/pages/label-page";
 import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/email/inbox/queries";
-import { labelParamsSchema } from "@/features/email/inbox/routes/schemas";
+import { parseInboxLabelParam } from "@/features/email/inbox/utils/inbox-filters";
 import type { EmailListResponse } from "@/features/email/inbox/types";
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -8,12 +8,12 @@ export const Route = createFileRoute(
   "/_dashboard/$mailboxId/inbox/labels/$label/",
 )({
   params: {
-    parse: (raw) => labelParamsSchema.parse(raw),
+    parse: (raw) => ({ label: parseInboxLabelParam(raw.label) }),
   },
   skipRouteOnParseError: { params: true },
   loader: async ({ context, params }) => {
     const initialData = await context.queryClient.ensureInfiniteQueryData({
-      queryKey: ["emails", params.label, params.mailboxId] as const,
+      queryKey: ["emails", params.label, params.mailboxId],
       queryFn: ({ pageParam }) =>
         fetchEmails({
           view: params.label,

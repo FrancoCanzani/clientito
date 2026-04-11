@@ -6,6 +6,10 @@ function invalidateAll(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: ["emails"] });
 }
 
+function getOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
 export function useApprovalHandler({
   addToolApprovalResponse,
   close,
@@ -26,9 +30,9 @@ export function useApprovalHandler({
 
       if (toolName === "composeEmail" && args) {
         openCompose({
-          to: args.to as string | undefined,
-          subject: args.subject as string | undefined,
-          bodyHtml: args.body as string | undefined,
+          to: getOptionalString(args.to),
+          subject: getOptionalString(args.subject),
+          bodyHtml: getOptionalString(args.body),
         });
         close();
       }

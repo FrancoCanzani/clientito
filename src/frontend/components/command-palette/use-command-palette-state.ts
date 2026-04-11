@@ -170,9 +170,9 @@ export function useCommandPaletteState() {
 
   // Derive input mode from query prefix (only when not in agent mode)
   const { mode: inputMode, query: modeQuery } = useMemo(
-    () =>
+    (): { mode: InputMode; query: string } =>
       mode === "agent"
-        ? { mode: "agent" as InputMode, query: "" }
+        ? { mode: "agent", query: "" }
         : resolveMode(query),
     [mode, query],
   );

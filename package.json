@@ -16,6 +16,7 @@
     "@ai-sdk/react": "^3.0.107",
     "@cloudflare/ai-chat": "^0.1.8",
     "@hono/zod-validator": "^0.7.6",
+    "@mozilla/readability": "^0.6.0",
     "@phosphor-icons/react": "^2.1.10",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-router": "^1.162.6",

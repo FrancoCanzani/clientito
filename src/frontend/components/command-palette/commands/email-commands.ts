@@ -22,11 +22,11 @@ import type {
 async function performEmailAction(
   ctx: CommandContext,
   services: CommandServices,
-  data: Record<string, unknown>,
+  data: Parameters<typeof patchEmail>[1],
 ) {
   if (!ctx.selectedEmailId) return;
   try {
-    await patchEmail(ctx.selectedEmailId, data as Record<string, boolean>);
+    await patchEmail(ctx.selectedEmailId, data);
     void services.queryClient.invalidateQueries({
       queryKey: ["email-detail", ctx.selectedEmailId],
     });

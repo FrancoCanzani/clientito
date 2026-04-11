@@ -1,10 +1,11 @@
 import { markEmailRead } from "@/features/email/inbox/mutations";
 import { fetchEmailDetail, fetchEmailDetailAI } from "@/features/email/inbox/queries";
 import type { EmailDetailItem, EmailListItem, EmailListResponse } from "@/features/email/inbox/types";
-import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
+import type {
+  EmailFolderView,
+  EmailView,
+} from "@/features/email/inbox/utils/inbox-filters";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
-
-type FolderView = Exclude<EmailView, "inbox" | "important">;
 
 type NavigateToEmail = (
   options:
@@ -15,7 +16,7 @@ type NavigateToEmail = (
       }
     | {
         to: "/$mailboxId/$folder/email/$emailId";
-        params: { mailboxId: number; folder: FolderView; emailId: string };
+        params: { mailboxId: number; folder: EmailFolderView; emailId: string };
         replace?: boolean;
       }
     | {
@@ -63,6 +64,13 @@ export function openEmail(
     });
   }
 
+  markEmailOpened(queryClient, email);
+}
+
+export function markEmailOpened(
+  queryClient: QueryClient,
+  email: Pick<EmailListItem, "id" | "isRead">,
+) {
   if (email.isRead) return;
   queryClient.setQueriesData<InfiniteData<EmailListResponse>>(
     { queryKey: ["emails"] },

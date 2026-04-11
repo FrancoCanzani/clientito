@@ -12,15 +12,19 @@ import { useEffect, useRef, useState } from "react";
 import type { EmailAttachment } from "../types";
 import { formatBytes } from "../utils/formatters";
 
+function getPayloadError(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null) return null;
+  const error = Reflect.get(payload, "error");
+  return typeof error === "string" ? error : null;
+}
+
 async function downloadAttachment(attachment: EmailAttachment) {
   const response = await fetch(attachment.downloadUrl);
   if (!response.ok) {
     const contentType = response.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
-      const payload = (await response.json().catch(() => ({}))) as {
-        error?: string;
-      };
-      throw new Error(payload.error ?? "Download failed");
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(getPayloadError(payload) ?? "Download failed");
     }
 
     throw new Error("Download failed");
