@@ -1,8 +1,8 @@
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { ComposeEmailFields } from "@/features/email/inbox/components/compose-email-fields";
-import { useComposeEmail } from "@/features/email/inbox/components/compose-email-state";
+import { ComposeEmailFields } from "@/features/email/inbox/components/compose/compose-email-fields";
+import { useComposeEmail } from "@/features/email/inbox/components/compose/compose-email-state";
 import { useSetPageContext } from "@/hooks/use-page-context";
 import { XIcon } from "@phosphor-icons/react";
 import { getRouteApi } from "@tanstack/react-router";

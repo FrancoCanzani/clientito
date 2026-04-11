@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../../db/client";
 import type { EmailAction, EmailSuspiciousFlag } from "../../../db/schema";
-import { emailIntelligence } from "../../../db/schema";
+import { emailIntelligence, mailboxes } from "../../../db/schema";
 import { truncate } from "../../utils";
 import {
   DEFAULT_SUSPICIOUS_FLAG,
@@ -14,10 +14,12 @@ import {
 import { loadEmailContext } from "./store";
 
 const ON_DEMAND_SYSTEM = [
-  "You are an email assistant. Analyze the email and its thread.",
+  "You are an email assistant analyzing an inbox on behalf of a specific user.",
+  "The prompt identifies the user's email address; any message from that address was written BY the user, and any message to that address was sent TO the user.",
+  "Write summaries from the user's perspective, never address the user in the third person, and never confuse the sender with the recipient.",
   "Return a JSON object with:",
-  "- summary: 1-2 sentences describing what the sender wants and what is at stake. Be specific — include names, amounts, and deadlines.",
-  "- replyDraft: a short plain-text reply body if a human personal response is clearly expected. null for newsletters, automated notifications, receipts, or any email not requiring a personal reply.",
+  "- summary: 1-2 sentences describing what is being asked of the user or what the user needs to know. Be specific — include names, amounts, and deadlines.",
+  "- replyDraft: a short plain-text reply the user could send, if a human personal response is clearly expected. null for newsletters, automated notifications, receipts, or any email not requiring a personal reply.",
 ].join(" ");
 
 const emailOnDemandOutputSchema = z.object({
@@ -142,7 +144,17 @@ export async function generateEmailOnDemand(
     if (hasOnDemandContent(cached)) return cached;
   }
 
-  const prompt = buildThreadPrompt(email, threadMessages);
+  let userEmail: string | null = null;
+  if (email.mailboxId != null) {
+    const mailboxRows = await db
+      .select({ email: mailboxes.email })
+      .from(mailboxes)
+      .where(eq(mailboxes.id, email.mailboxId))
+      .limit(1);
+    userEmail = mailboxRows[0]?.email ?? null;
+  }
+
+  const prompt = buildThreadPrompt(email, threadMessages, userEmail);
   const { object, model } = await generateStructuredEmailObject({
     env,
     prompt,

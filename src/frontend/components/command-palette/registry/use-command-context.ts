@@ -1,4 +1,4 @@
-import { isComposerOpen } from "@/features/email/inbox/components/compose-editor-ref";
+import { isComposerOpen } from "@/features/email/inbox/components/compose/compose-editor-ref";
 import {
   isEmailView,
   type EmailView,

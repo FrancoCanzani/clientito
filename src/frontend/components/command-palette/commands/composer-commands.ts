@@ -2,7 +2,7 @@ import {
   COMPOSER_AI_ACTIONS,
   getComposerAiLabel,
   runComposerAiAction,
-} from "@/features/email/inbox/components/compose-ai-actions";
+} from "@/features/email/inbox/components/compose/compose-ai-actions";
 import { paletteIcon } from "../registry/palette-icon";
 import { registerCommands } from "../registry/registry";
 import type { Command, CommandContext } from "../registry/types";

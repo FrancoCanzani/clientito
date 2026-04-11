@@ -12,11 +12,10 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
       <Toaster
-        position="bottom-right"
         toastOptions={{
           classNames: {
             toast:
-              "!rounded-md !border !border-border/60 !bg-background !text-foreground !shadow-sm !py-1.5 !px-2.5 !text-xs !gap-2 !min-h-0",
+              "!rounded-md !border !border-border/60 !bg-background !text-foreground !text-xs !gap-2 !min-h-0",
             title: "!text-xs !font-medium",
             description: "!text-[11px] !text-muted-foreground",
             icon: "!size-3",

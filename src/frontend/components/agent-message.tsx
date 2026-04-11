@@ -3,7 +3,7 @@ import {
   getComposerBody,
   isComposerOpen,
   setComposerBody,
-} from "@/features/email/inbox/components/compose-editor-ref";
+} from "@/features/email/inbox/components/compose/compose-editor-ref";
 import { fetchEmailDetail } from "@/features/email/inbox/queries";
 import type { EmailDetailItem } from "@/features/email/inbox/types";
 import { cn, normalizeAgentText } from "@/lib/utils";

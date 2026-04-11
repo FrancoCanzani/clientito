@@ -161,7 +161,11 @@ export async function buildSourceHash(email: EmailContextRow, threadMessages: Em
   return sha256(input);
 }
 
-export function buildThreadPrompt(email: EmailContextRow, threadMessages: EmailContextRow[]) {
+export function buildThreadPrompt(
+  email: EmailContextRow,
+  threadMessages: EmailContextRow[],
+  userEmail?: string | null,
+) {
   const threadBlock = threadMessages
     .map((message, index) => {
       const sender = message.fromName?.trim() || message.fromAddr;
@@ -176,8 +180,12 @@ export function buildThreadPrompt(email: EmailContextRow, threadMessages: EmailC
     })
     .join("\n\n");
 
-  return [
+  const lines = [
     `Today: ${new Date().toISOString().slice(0, 10)}`,
+    userEmail ? `User's email address: ${userEmail}` : null,
+    userEmail
+      ? `Always refer to ${userEmail} as "the user". Any message whose From equals ${userEmail} was sent BY the user, not to them. Any message whose To or Cc contains ${userEmail} was sent TO the user.`
+      : null,
     `Email ID: ${email.id}`,
     `Current message date: ${new Date(email.date).toISOString()}`,
     `From: ${email.fromName ? `${email.fromName} <${email.fromAddr}>` : email.fromAddr}`,
@@ -188,7 +196,9 @@ export function buildThreadPrompt(email: EmailContextRow, threadMessages: EmailC
     "",
     "Thread:",
     threadBlock,
-  ].join("\n");
+  ].filter((line): line is string => line !== null);
+
+  return lines.join("\n");
 }
 
 export function buildFilterPrompt(filters: ActiveEmailFilter[]) {

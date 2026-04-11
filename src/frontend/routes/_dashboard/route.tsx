@@ -1,8 +1,8 @@
 import { CommandPalette } from "@/components/command-palette/command-palette";
 import { Loading } from "@/components/loading";
 import { AppProviders } from "@/components/providers";
-import { InboxComposeProvider } from "@/features/email/inbox/components/inbox-compose-provider";
-import { KeyboardShortcutsDialog } from "@/features/email/inbox/components/keyboard-shortcuts-dialog";
+import { InboxComposeProvider } from "@/features/email/inbox/components/compose/inbox-compose-provider";
+import { KeyboardShortcutsDialog } from "@/features/email/inbox/components/shell/keyboard-shortcuts-dialog";
 import { getDashboardGate } from "@/features/onboarding/dashboard-gate";
 import {
   isEveningHour,

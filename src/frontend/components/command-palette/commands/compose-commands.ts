@@ -1,4 +1,4 @@
-import { openCompose } from "@/features/email/inbox/components/compose-events";
+import { openCompose } from "@/features/email/inbox/components/compose/compose-events";
 import { ArrowBendUpLeftIcon, PencilSimpleIcon } from "@phosphor-icons/react";
 import { paletteIcon } from "../registry/palette-icon";
 import { registerCommands } from "../registry/registry";

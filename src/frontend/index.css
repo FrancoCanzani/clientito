@@ -144,7 +144,7 @@
     --reading-font: var(--font-mono);
   }
   [data-warmth="on"] {
-    --background: oklch(0.985 0.005 85);
+    --background: oklch(98.8% 0.003 106.5);
     --muted: oklch(0.96 0.006 85);
   }
   .dark [data-warmth="on"],

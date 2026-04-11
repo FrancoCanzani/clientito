@@ -1,15 +1,26 @@
 import { Kbd } from "@/components/ui/kbd";
-import { Command as Cmdk } from "cmdk";
 import {
   AtIcon,
   CaretRightIcon,
   HashIcon,
   RobotIcon,
 } from "@phosphor-icons/react";
+import { Command as Cmdk } from "cmdk";
 import { resolveLabel } from "./registry/registry";
-import type { Command, CommandContext, CommandServices } from "./registry/types";
+import type {
+  Command,
+  CommandContext,
+  CommandServices,
+} from "./registry/types";
 
-const GROUP_ORDER = ["accounts", "email", "composer", "navigation", "agent", "actions"];
+const GROUP_ORDER = [
+  "accounts",
+  "email",
+  "composer",
+  "navigation",
+  "agent",
+  "actions",
+];
 type ModeHint = {
   sigil: string;
   label: string;
@@ -91,12 +102,12 @@ export function CommandListPanel({
                 className="flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-xs transition-colors data-[selected=true]:bg-muted"
               >
                 <span>
-                  <span className="font-medium text-blue-900 dark:text-blue-900">{group}:</span>{" "}
+                  <span className="font-medium text-blue-900 dark:text-blue-50">
+                    {group}:
+                  </span>{" "}
                   {label}
                 </span>
-                {cmd.shortcut && (
-                  <Kbd className="ml-auto">{cmd.shortcut}</Kbd>
-                )}
+                {cmd.shortcut && <Kbd className="ml-auto">{cmd.shortcut}</Kbd>}
               </Cmdk.Item>
             );
           })}
@@ -110,7 +121,10 @@ export function CommandListPanel({
           onSelect={() => enterAgentMode()}
           className="flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-xs transition-colors data-[selected=true]:bg-muted"
         >
-          <span className="font-medium text-blue-900 dark:text-blue-900">agent:</span>{" "}ask agent
+          <span className="font-medium text-blue-900 dark:text-blue-50">
+            agent:
+          </span>{" "}
+          ask agent
         </Cmdk.Item>
       </Cmdk.Group>
     </Cmdk.List>

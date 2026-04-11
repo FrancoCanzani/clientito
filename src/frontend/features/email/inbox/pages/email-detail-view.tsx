@@ -1,8 +1,8 @@
 import {
   EmailDetailContent,
   type EmailDetailContentHandle,
-} from "@/features/email/inbox/components/email-detail-content";
-import { useInboxCompose } from "@/features/email/inbox/components/inbox-compose-provider";
+} from "@/features/email/inbox/components/thread/email-detail-content";
+import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import {
   fetchEmailDetail,
   fetchEmailDetailAI,

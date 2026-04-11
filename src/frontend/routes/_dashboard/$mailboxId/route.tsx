@@ -1,4 +1,4 @@
-import { InboxSidebarShell } from "@/features/email/inbox/components/inbox-sidebar-shell";
+import { InboxSidebarShell } from "@/features/email/inbox/components/shell/inbox-sidebar-shell";
 import { accountsQueryOptions } from "@/hooks/use-mailboxes";
 import {
   createFileRoute,

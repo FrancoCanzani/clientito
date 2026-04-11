@@ -5,15 +5,6 @@ import { Link } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { Button } from "./ui/button";
 
-const FOOTER_LINKS = ["Roadmap", "Contact", "Legal"];
-
-const FEATURES = [
-  "You choose your sources",
-  "Chronological feed",
-  "Personal email digest",
-  "Search and filter",
-];
-
 const easeOut = [0.23, 1, 0.32, 1] as const;
 
 export default function LandingPage() {
@@ -22,57 +13,25 @@ export default function LandingPage() {
   const preferredMailboxId = getPreferredMailboxId(accounts);
 
   return (
-    <main className="min-h-screen bg-white text-neutral-900">
+    <main>
       <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 pb-8 sm:px-7 lg:px-8">
-        <header className="flex items-center justify-between pt-6">
-          <div className="flex items-center gap-2">
-            <span className="inline-block size-1.5 rounded-full bg-neutral-900" />
-            <span className="text-sm font-medium tracking-tight">Petit</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link
-              to="/docs"
-              className="text-sm text-neutral-500 transition-colors duration-150 hover:text-neutral-900"
-            >
-              Docs
-            </Link>
-            <Button asChild variant="default" size="default" className="h-8 px-3">
-              {isAuthenticated ? (
-                <Link
-                  to={preferredMailboxId ? "/$mailboxId/inbox" : "/get-started"}
-                  params={
-                    preferredMailboxId
-                      ? { mailboxId: String(preferredMailboxId) }
-                      : undefined
-                  }
-                >
-                  Go to inbox
-                </Link>
-              ) : (
-                <Link to="/login">Get started</Link>
-              )}
-            </Button>
-          </div>
-        </header>
-
         <section className="flex flex-1 flex-col justify-center py-16 sm:py-20">
-          <motion.p
-            className="text-center text-xs tracking-wide text-neutral-500"
+          <motion.span
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, ease: easeOut }}
+            className="text-center mb-10 tracking-wide text-xl"
           >
-            Available on Web and MacOS. iOS and Android soon.
-          </motion.p>
+            Petit
+          </motion.span>
 
           <motion.h1
-            className="mx-auto mt-4 max-w-3xl text-center font-serif text-[2.1rem] leading-[1.02] font-normal tracking-[-0.03em] text-balance sm:text-[3rem] lg:text-[3.6rem]"
+            className="mx-auto mt-4 max-w-3xl text-center font-serif text-3xl leading-[1.02] font-normal tracking-[-0.03em] text-balance sm:text-[3rem] lg:text-[3.6rem]"
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.05, ease: easeOut }}
           >
-            Your distraction-free reader for what matters.
+            Your distraction-free Email to get things done.
           </motion.h1>
 
           <motion.p
@@ -81,8 +40,7 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.1, ease: easeOut }}
           >
-            Pick your favorite sources, stay chronological, and get a digest on
-            your schedule. No ads, no tracking, no clutter.
+            Read less noise. Keep what matters. Delivered on your schedule.
           </motion.p>
 
           <motion.div
@@ -91,7 +49,7 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.15, ease: easeOut }}
           >
-            <Button asChild size="default" className="h-8 px-3">
+            <Button asChild className="h-9 text-lg">
               {isAuthenticated ? (
                 <Link
                   to={preferredMailboxId ? "/$mailboxId/inbox" : "/get-started"}
@@ -104,65 +62,94 @@ export default function LandingPage() {
                   Open Petit
                 </Link>
               ) : (
-                <Link to="/login">Start 7 day free trial</Link>
+                <Link to="/login">Get Started</Link>
               )}
-            </Button>
-            <Button asChild variant="outline" size="default" className="h-8 px-3">
-              <Link to="/docs">Read docs</Link>
             </Button>
           </motion.div>
         </section>
 
-        <section className="mb-10">
-          <div className="mx-auto w-full max-w-3xl">
-            <p className="text-xs tracking-[0.12em] text-neutral-500 uppercase">
-              Why Petit
-            </p>
-            <ul className="mt-3 divide-y divide-neutral-200/70">
-              {FEATURES.map((item, index) => (
-                <motion.li
-                  key={item}
-                  className="py-3 text-sm text-neutral-700 sm:text-[0.95rem]"
-                  initial={{ opacity: 0, x: -8 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true, amount: 0.6 }}
-                  transition={{
-                    duration: 0.22,
-                    delay: index * 0.04,
-                    ease: easeOut,
-                  }}
-                >
-                  {item}
-                </motion.li>
-              ))}
-            </ul>
-            <p className="mt-3 text-sm text-neutral-500">
-              Simple pricing: $5/month including VAT.
-            </p>
+        <section className="mx-auto w-full overflow-hidden rounded-md shadow-2xl">
+          <video
+            className="w-full h-auto object-cover"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            poster="/landing-video-poster.jpg"
+          >
+            <source src="/landing-video.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+        </section>
+
+        <section className="px-6 py-24 sm:px-8 lg:px-12">
+          <div className="mx-auto max-w-7xl">
+            <div className="grid grid-cols-1 gap-x-16 gap-y-20 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <h3 className="text-lg tracking-tight text-black dark:text-white">
+                  Bring every inbox together
+                </h3>
+                <p className="mt-3 max-w-sm text-sm leading-7 text-black/55 dark:text-white/55">
+                  Connect the accounts you use and manage personal, work, and
+                  side projects from one calm place.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-lg tracking-tight text-black dark:text-white">
+                  Stay beautifully organized
+                </h3>
+                <p className="mt-3 max-w-sm text-sm leading-7 text-black/55 dark:text-white/55">
+                  Keep conversations clean, sorted, and easy to find without the
+                  clutter of traditional inboxes.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-lg tracking-tight text-black dark:text-white">
+                  Focus on what matters
+                </h3>
+                <p className="mt-3 max-w-sm text-sm leading-7 text-black/55 dark:text-white/55">
+                  Important messages stay visible while distractions fade into
+                  the background.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-lg tracking-tight text-black dark:text-white">
+                  No ads. No tracking.
+                </h3>
+                <p className="mt-3 max-w-sm text-sm leading-7 text-black/55 dark:text-white/55">
+                  Your inbox belongs to you. Petit is private by design and free
+                  from surveillance business models.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-lg tracking-tight text-black dark:text-white">
+                  Search instantly
+                </h3>
+                <p className="mt-3 max-w-sm text-sm leading-7 text-black/55 dark:text-white/55">
+                  Find people, attachments, receipts, and old conversations in
+                  seconds.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-lg tracking-tight text-black dark:text-white">
+                  Built for speed
+                </h3>
+                <p className="mt-3 max-w-sm text-sm leading-7 text-black/55 dark:text-white/55">
+                  Fast, lightweight, and designed to help you clear email
+                  quickly and get back to your day.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
-        <footer className="mt-auto flex flex-col items-center justify-between gap-3 pt-8 text-xs text-neutral-400 sm:flex-row">
-          <p>Petit</p>
-          <div className="flex items-center gap-4">
-            {FOOTER_LINKS.map((label) => (
-              <Link
-                to="/"
-                key={label}
-                className="transition-colors duration-150 hover:text-neutral-700"
-                onClick={(event) => event.preventDefault()}
-              >
-                {label}
-              </Link>
-            ))}
-            <Link
-              to="/docs"
-              className="transition-colors duration-150 hover:text-neutral-700"
-            >
-              Docs
-            </Link>
-          </div>
-        </footer>
+        <footer className="mt-auto flex flex-col items-center justify-between gap-3 pt-8 text-xs text-neutral-400 sm:flex-row"></footer>
       </div>
     </main>
   );

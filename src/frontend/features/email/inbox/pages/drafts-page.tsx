@@ -7,7 +7,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useInboxCompose } from "@/features/email/inbox/components/inbox-compose-provider";
+import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import { TrashIcon } from "@phosphor-icons/react";
 import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
