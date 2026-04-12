@@ -1,9 +1,13 @@
+import { Error as RouteError } from "@/components/error";
 import FolderEmailPage from "@/features/email/inbox/pages/folder-email-page";
-import { fetchEmailDetail, fetchEmailDetailAI } from "@/features/email/inbox/queries";
 import {
   parseEmailFolderParam,
   parseEmailIdParam,
 } from "@/features/email/inbox/utils/inbox-filters";
+import {
+  createEmailDetailLoader,
+  emailDetailRouteOptions,
+} from "@/lib/email-detail-loader";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/$folder/email/$emailId")({
@@ -15,19 +19,10 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/$folder/email/$emai
   },
   skipRouteOnParseError: { params: true },
   loader: async ({ context, params }) => {
-    const email = await context.queryClient.ensureQueryData({
-      queryKey: ["email-detail", params.emailId],
-      queryFn: () => fetchEmailDetail(params.emailId),
-    });
-
-    void context.queryClient.prefetchQuery({
-      queryKey: ["email-ai-detail", params.emailId],
-      queryFn: () => fetchEmailDetailAI(params.emailId),
-    });
-
-    return { email };
+    const load = createEmailDetailLoader(params.folder);
+    return load({ context, params });
   },
-  staleTime: 60_000,
-  gcTime: 10 * 60_000,
+  ...emailDetailRouteOptions,
+  errorComponent: RouteError,
   component: FolderEmailPage,
 });

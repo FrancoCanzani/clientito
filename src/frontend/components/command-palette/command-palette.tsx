@@ -4,14 +4,11 @@ import { useNavigate } from "@tanstack/react-router";
 import { Command } from "cmdk";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useMemo } from "react";
-import { AgentPanel } from "./agent-panel";
 import { CommandListPanel } from "./command-list-panel";
 import { MODE_LABELS } from "./modes/resolve-mode";
 import type { CommandServices } from "./registry/types";
 import { useAllCommands } from "./registry/use-all-commands";
 import { SearchResultsPanel } from "./search-results-panel";
-import { useAgentInvalidation } from "./use-agent-invalidation";
-import { useApprovalHandler } from "./use-approval-handler";
 import { useCommandPaletteState } from "./use-command-palette-state";
 
 export function CommandPalette() {
@@ -29,37 +26,10 @@ export function CommandPalette() {
     [queryClient, navigate, state.close],
   );
 
-  useAgentInvalidation(state.status, queryClient);
-
-  const { handleApprove, handleDiscard } = useApprovalHandler({
-    addToolApprovalResponse: state.addToolApprovalResponse,
-    close: state.close,
-    queryClient,
-  });
-
   const normalizedQuery = state.query.trim();
-  const showModeIndicator =
-    state.inputMode !== "default" && state.mode !== "agent";
+  const showModeIndicator = state.inputMode !== "default";
 
   const renderPanel = () => {
-    if (state.mode === "agent") {
-      return (
-        <AgentPanel
-          messages={state.messages}
-          status={state.status}
-          isConnected={state.isConnected}
-          hasPendingApprovals={state.hasPendingApprovals}
-          agentHasSubmitted={state.agentHasSubmitted}
-          agentSuggestions={state.agentSuggestions}
-          messagesViewportRef={state.messagesViewportRef}
-          submitAgentMessage={state.submitAgentMessage}
-          startFreshChat={state.startFreshChat}
-          handleApprove={handleApprove}
-          handleDiscard={handleDiscard}
-        />
-      );
-    }
-
     if (state.inputMode === "people" || state.inputMode === "search") {
       return (
         <SearchResultsPanel
@@ -76,17 +46,13 @@ export function CommandPalette() {
         commands={commands}
         ctx={ctx}
         services={services}
-        enterAgentMode={state.enterAgentMode}
         hasQuery={normalizedQuery.length > 0}
       />
     );
   };
 
-  // Disable cmdk filtering for modes that handle their own search
   const shouldFilter =
-    state.mode !== "agent" &&
-    state.inputMode !== "people" &&
-    state.inputMode !== "search";
+    state.inputMode !== "people" && state.inputMode !== "search";
 
   return (
     <DialogPrimitive.Root
@@ -104,12 +70,6 @@ export function CommandPalette() {
         <DialogPrimitive.Content
           ref={state.containerRef}
           onOpenAutoFocus={(event) => event.preventDefault()}
-          onEscapeKeyDown={(event) => {
-            if (state.mode === "agent") {
-              event.preventDefault();
-              state.setMode("commands");
-            }
-          }}
           className={cn(
             "fixed left-1/2 top-4 z-50 w-[calc(100vw-1rem)] max-w-lg -translate-x-1/2 outline-none sm:top-[14vh]",
             "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-open:slide-in-from-top-2",
@@ -122,7 +82,7 @@ export function CommandPalette() {
             Command palette
           </DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
-            Search commands, people, emails, or ask the agent.
+            Search commands, people, or emails.
           </DialogPrimitive.Description>
 
           <Command
@@ -136,106 +96,26 @@ export function CommandPalette() {
                     {MODE_LABELS[state.inputMode]}
                   </span>
                 )}
-                {state.mode === "agent" ? (
-                  <>
-                    <input
-                      ref={state.agentInputRef}
-                      value={state.agentInput}
-                      onChange={(e) => state.setAgentInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          state.handleAgentSubmit();
-                        }
-                      }}
-                      placeholder={state.inputPlaceholder}
-                      className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-                    />
-                    {state.agentInput.trim() && (
-                      <button
-                        type="button"
-                        className="flex shrink-0 items-center rounded-sm px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={state.handleAgentSubmit}
-                      >
-                        Send
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <Command.Input
-                    ref={state.inputRef}
-                    value={state.query}
-                    onValueChange={state.setQuery}
-                    onFocus={() => state.setOpen(true)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Tab") {
-                        event.preventDefault();
-                        const sigils = [">", "@", "#", "/"];
-                        const current = sigils.find((s) => state.query === s);
-                        const next = current
-                          ? sigils[(sigils.indexOf(current) + 1) % sigils.length]
-                          : sigils[0];
-                        state.setQuery(next);
-                        return;
-                      }
-
-                      if (event.key !== "Enter" || event.nativeEvent.isComposing) {
-                        return;
-                      }
-
-                      const text = state.query.trim();
-                      if (!text) return;
-
-                      if (state.inputMode === "agent") {
-                        event.preventDefault();
-                        state.enterAgentMode(state.modeQuery);
-                        return;
-                      }
-
-                      if (
-                        state.inputMode === "people" ||
-                        state.inputMode === "search"
-                      ) {
-                        return;
-                      }
-
-                      const hasVisibleCommand = Boolean(
-                        state.containerRef.current?.querySelector(
-                          "[cmdk-item]:not([hidden])",
-                        ),
-                      );
-
-                      if (hasVisibleCommand) return;
-
+                <Command.Input
+                  ref={state.inputRef}
+                  value={state.query}
+                  onValueChange={state.setQuery}
+                  onFocus={() => state.setOpen(true)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Tab") {
                       event.preventDefault();
-                      state.enterAgentMode(text);
-                    }}
-                    placeholder={state.inputPlaceholder}
-                    className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-                  />
-                )}
-                {state.mode !== "agent" &&
-                  normalizedQuery &&
-                  state.inputMode !== "agent" && (
-                    <button
-                      type="button"
-                      className="hidden shrink-0 items-center rounded-sm px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex"
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => state.enterAgentMode(normalizedQuery)}
-                    >
-                      Ask agent
-                    </button>
-                  )}
+                      const sigils = [">", "@", "#"];
+                      const current = sigils.find((s) => state.query === s);
+                      const next = current
+                        ? sigils[(sigils.indexOf(current) + 1) % sigils.length]
+                        : sigils[0];
+                      state.setQuery(next);
+                    }
+                  }}
+                  placeholder={state.inputPlaceholder}
+                  className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+                />
               </div>
-              {state.mode !== "agent" && normalizedQuery && (
-                <div className="mt-1.5 px-0.5 text-[10px] text-muted-foreground">
-                  Use <span className="font-mono">&gt;</span> commands,{" "}
-                  <span className="font-mono">@</span> contacts,{" "}
-                  <span className="font-mono">#</span> emails,{" "}
-                  <span className="font-mono">/</span> agent
-                </div>
-              )}
             </div>
 
             <div className="min-h-0 flex-1 bg-card">
@@ -256,7 +136,6 @@ export function CommandPalette() {
                 <kbd className="font-mono">&gt;</kbd>
                 <kbd className="font-mono">@</kbd>
                 <kbd className="font-mono">#</kbd>
-                <kbd className="font-mono">/</kbd>
                 modes
               </span>
             </div>

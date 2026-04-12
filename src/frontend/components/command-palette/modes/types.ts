@@ -1,1 +1,1 @@
-export type InputMode = "default" | "commands" | "people" | "search" | "agent";
+export type InputMode = "default" | "commands" | "people" | "search";

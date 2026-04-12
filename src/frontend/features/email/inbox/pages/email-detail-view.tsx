@@ -16,15 +16,22 @@ import type {
 import { buildForwardedEmailHtml } from "@/features/email/inbox/utils/build-forwarded-html";
 import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
-import { useHotkeys } from "@/hooks/use-hotkeys";
-import { useSetPageContext } from "@/hooks/use-page-context";
 import {
+  setFocusedEmail,
+  clearFocusedEmail,
+} from "@/hooks/use-focused-email";
+import { useHotkeys } from "@/hooks/use-hotkeys";
+import { queryKeys } from "@/lib/query-keys";
+import { patchEmail } from "@/features/email/inbox/mutations";
+import {
+  useMutation,
   useQuery,
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { toast } from "sonner";
 
 export function EmailDetailView({
   email,
@@ -45,27 +52,17 @@ export function EmailDetailView({
   const { openCompose } = useInboxCompose();
   const contentRef = useRef<EmailDetailContentHandle>(null);
 
-  useSetPageContext(
-    useMemo(() => {
-      const bodyPreview = (email.resolvedBodyText ?? email.bodyText ?? "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 1500);
-      return {
-        route: "inbox",
-        entity: {
-          type: "email",
-          id: email.id,
-          subject: email.subject,
-          fromName: email.fromName,
-          fromAddr: email.fromAddr,
-          threadId: email.threadId,
-          mailboxId: email.mailboxId,
-          bodyPreview: bodyPreview || null,
-        },
-      };
-    }, [email]),
-  );
+  useEffect(() => {
+    setFocusedEmail({
+      id: email.id,
+      fromAddr: email.fromAddr,
+      fromName: email.fromName,
+      subject: email.subject,
+      threadId: email.threadId,
+      mailboxId: email.mailboxId,
+    });
+    return () => clearFocusedEmail();
+  }, [email.id, email.fromAddr, email.fromName, email.subject, email.threadId, email.mailboxId]);
 
   const orderedEmails = useMemo(() => {
     const cached = queryClient.getQueryData<InfiniteData<EmailListResponse>>([
@@ -132,22 +129,39 @@ export function EmailDetailView({
     for (const neighborId of [previousId, nextId]) {
       if (!neighborId) continue;
       void queryClient.prefetchQuery({
-        queryKey: ["email-detail", neighborId],
-        queryFn: () => fetchEmailDetail(neighborId),
+        queryKey: queryKeys.emails.detail(neighborId),
+        queryFn: () =>
+          fetchEmailDetail(neighborId, {
+            mailboxId,
+            view,
+          }),
       });
       void queryClient.prefetchQuery({
-        queryKey: ["email-ai-detail", neighborId],
+        queryKey: queryKeys.emails.aiDetail(neighborId),
         queryFn: () => fetchEmailDetailAI(neighborId),
       });
     }
-  }, [currentIndex, orderedIds, queryClient]);
+  }, [currentIndex, orderedIds, queryClient, mailboxId, view]);
 
   const threadQuery = useQuery({
-    queryKey: ["email-thread", email.threadId],
+    queryKey: queryKeys.emails.thread(email.threadId!),
     queryFn: () => fetchEmailThread(email.threadId!),
     enabled: Boolean(email.threadId),
     staleTime: 60_000,
   });
+
+  const emailPatchMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof patchEmail>[1]) =>
+      patchEmail(email.id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.emails.detail(email.id) });
+      void router.invalidate();
+    },
+  });
+
+  const isInInbox = email.labelIds.includes("INBOX");
+  const isStarred = email.labelIds.includes("STARRED");
 
   const threadMessages = useMemo(() => {
     if (!email.threadId) return [email];
@@ -182,12 +196,40 @@ export function EmailDetailView({
     },
     r: () => contentRef.current?.triggerReply(),
     c: () => openCompose(),
-    e: () => router.history.back(),
+    f: () => handleForward(),
+    e: () => {
+      emailPatchMutation.mutate(
+        { archived: isInInbox },
+        {
+          onSuccess: () => {
+            toast.success(isInInbox ? "Marked as done" : "Moved to inbox");
+            goBack();
+          },
+        },
+      );
+    },
+    "#": () => {
+      emailPatchMutation.mutate(
+        { trashed: true },
+        {
+          onSuccess: () => {
+            toast.success("Moved to trash");
+            goBack();
+          },
+        },
+      );
+    },
+    s: () => {
+      emailPatchMutation.mutate({ starred: !isStarred });
+    },
+    u: () => {
+      emailPatchMutation.mutate({ isRead: !email.isRead });
+    },
     Escape: () => router.history.back(),
   });
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="w-full">
       <div className="min-w-0">
         <EmailDetailContent
           ref={contentRef}

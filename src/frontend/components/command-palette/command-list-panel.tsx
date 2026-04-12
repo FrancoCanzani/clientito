@@ -3,7 +3,6 @@ import {
   AtIcon,
   CaretRightIcon,
   HashIcon,
-  RobotIcon,
 } from "@phosphor-icons/react";
 import { Command as Cmdk } from "cmdk";
 import { resolveLabel } from "./registry/registry";
@@ -18,7 +17,6 @@ const GROUP_ORDER = [
   "email",
   "composer",
   "navigation",
-  "agent",
   "actions",
 ];
 type ModeHint = {
@@ -49,20 +47,17 @@ const MODE_HINTS: ModeHint[] = [
   { sigil: ">", label: "Commands", icon: CaretRightIcon },
   { sigil: "@", label: "Contacts", icon: AtIcon },
   { sigil: "#", label: "Search", icon: HashIcon },
-  { sigil: "/", label: "Agent", icon: RobotIcon },
 ];
 
 export function CommandListPanel({
   commands,
   ctx,
   services,
-  enterAgentMode,
   hasQuery,
 }: {
   commands: Command[];
   ctx: CommandContext;
   services: CommandServices;
-  enterAgentMode: (initialQuery?: string) => void;
   hasQuery: boolean;
 }) {
   const groups = groupCommands(commands);
@@ -113,20 +108,6 @@ export function CommandListPanel({
           })}
         </Cmdk.Group>
       ))}
-
-      <Cmdk.Group>
-        <Cmdk.Item
-          value="agent: ask agent"
-          keywords={["agent", "assistant", "ai", "chat"]}
-          onSelect={() => enterAgentMode()}
-          className="flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-xs transition-colors data-[selected=true]:bg-muted"
-        >
-          <span className="font-medium text-blue-900 dark:text-blue-50">
-            agent:
-          </span>{" "}
-          ask agent
-        </Cmdk.Item>
-      </Cmdk.Group>
     </Cmdk.List>
   );
 }

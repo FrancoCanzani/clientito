@@ -1,5 +1,6 @@
 import {
   isEmailView,
+  isEmailFolderView,
   type EmailView,
 } from "@/features/email/inbox/utils/inbox-filters";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
@@ -127,7 +128,7 @@ export function useAccountCommands(ctx: CommandContext): Command[] {
                   to: "/$mailboxId/inbox",
                   params: { mailboxId },
                 });
-              } else if (currentMailboxView) {
+              } else if (currentMailboxView && isEmailFolderView(currentMailboxView)) {
                 services.navigate({
                   to: "/$mailboxId/$folder",
                   params: {

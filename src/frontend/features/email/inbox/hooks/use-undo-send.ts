@@ -65,5 +65,5 @@ export function useUndoSend({ onSend, onSuccess, onError }: UndoSendOptions) {
     }, UNDO_DELAY_MS);
   }, [onSend, onSuccess, onError, cancel]);
 
-  return { trigger, cancel, isPending: pendingRef };
+  return { trigger, cancel, isPending: pendingRef.current };
 }

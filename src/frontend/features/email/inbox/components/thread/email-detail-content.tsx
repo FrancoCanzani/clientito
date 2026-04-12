@@ -1,5 +1,5 @@
 import type { EmailDetailItem, EmailThreadItem } from "@/features/email/inbox/types";
-import { forwardRef, useImperativeHandle, useRef } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import type { ComposeInitial } from "../../types";
 import { EmailDetailHeader } from "./email-detail-header";
 import { EmailIntelligence } from "./email-intelligence";
@@ -40,6 +40,7 @@ export const EmailDetailContent = forwardRef<
   ref,
 ) {
   const quickReplyRef = useRef<QuickReplyHandle>(null);
+  const [readingMode, setReadingMode] = useState<"original" | "detox">("original");
 
   useImperativeHandle(ref, () => ({
     triggerReply: (draft?: string) =>
@@ -47,7 +48,7 @@ export const EmailDetailContent = forwardRef<
   }));
 
   return (
-    <div className="flex w-full min-w-0 flex-col space-y-8">
+    <div className="flex w-full min-w-0 flex-col">
       <EmailDetailHeader
         email={email}
         onClose={onClose}
@@ -58,9 +59,11 @@ export const EmailDetailContent = forwardRef<
         hasNext={hasNext}
         onForward={onForward}
         onReply={() => quickReplyRef.current?.scrollIntoViewAndFocus()}
+        readingMode={readingMode}
+        onReadingModeChange={setReadingMode}
       />
 
-      <div className="w-full space-y-8">
+      <div className="mx-auto w-full max-w-4xl space-y-8 pb-24">
         <EmailIntelligence
           email={email}
           onReplyRequested={(draft) =>
@@ -71,6 +74,7 @@ export const EmailDetailContent = forwardRef<
           email={email}
           threadMessages={threadMessages}
           threadError={threadError}
+          readingMode={readingMode}
         />
         <QuickReply ref={quickReplyRef} email={email} detail={email} />
       </div>

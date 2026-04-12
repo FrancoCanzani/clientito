@@ -46,7 +46,7 @@ export default function DraftsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="w-full">
       <PageHeader
         title={
           <div className="flex items-center gap-2">

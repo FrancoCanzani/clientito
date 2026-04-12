@@ -1,12 +1,14 @@
 import { z } from "zod";
 
 export const listEmailsQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
   offset: z.coerce.number().int().min(0).optional(),
   search: z.string().trim().max(500).optional(),
   isRead: z.enum(["true", "false"]).optional(),
-  view: z.enum(["inbox", "sent", "spam", "trash", "snoozed", "archived", "starred", "important"]).optional(),
+  view: z.enum(["inbox", "sent", "spam", "trash", "snoozed", "archived", "starred", "important", "to_respond", "to_follow_up", "fyi", "notification", "invoice", "marketing", "all"]).optional(),
   mailboxId: z.coerce.number().int().positive().optional(),
+  includeBody: z.coerce.boolean().optional(),
+  includeAi: z.coerce.boolean().optional(),
 });
 
 export const emailDetailParamsSchema = z.object({

@@ -44,12 +44,6 @@ type FilterTemplate = {
 
 const NOISE_FILTER_TEMPLATES: FilterTemplate[] = [
   {
-    name: "Done: newsletters",
-    description:
-      "Newsletters, weekly roundups, digest emails, and editorial content from subscriptions",
-    actions: { archive: true, markRead: true },
-  },
-  {
     name: "Done: marketing",
     description:
       "Promotional emails, sales, discounts, flash deals, product offers, and company marketing campaigns",
@@ -62,9 +56,9 @@ const NOISE_FILTER_TEMPLATES: FilterTemplate[] = [
     actions: { archive: true, markRead: true },
   },
   {
-    name: "Done: transactional",
+    name: "Done: invoices",
     description:
-      "Receipts, order confirmations, shipping notifications, password resets, and verification codes",
+      "Receipts, order confirmations, shipping notifications, payment confirmations, and verification codes",
     actions: { archive: true, markRead: true },
   },
 ];
@@ -205,7 +199,7 @@ export default function FiltersPage() {
   };
 
   return (
-    <div className="flex min-h-0 w-full max-w-2xl min-w-0 flex-1 flex-col gap-8">
+    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-8">
       <PageHeader
         title={
           <div className="flex items-center gap-2">

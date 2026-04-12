@@ -1,11 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../../../db/client";
-import type { EmailAction, EmailSuspiciousFlag } from "../../../db/schema";
+import type { EmailAction } from "../../../db/schema";
 import { emailIntelligence, mailboxes } from "../../../db/schema";
 import { truncate } from "../../utils";
 import {
-  DEFAULT_SUSPICIOUS_FLAG,
   EMAIL_INTELLIGENCE_SCHEMA_VERSION,
   buildSourceHash,
   buildThreadPrompt,
@@ -31,7 +30,7 @@ type EmailOnDemandOutput = z.infer<typeof emailOnDemandOutputSchema>;
 
 export type EmailOnDemandResult = {
   summary: string | null;
-  suspicious: EmailSuspiciousFlag;
+  isSuspicious: boolean;
   replyDraft: string | null;
 };
 
@@ -46,7 +45,7 @@ function whereByEmailId(emailId: number, userId?: string) {
 
 function toApiResult(row: {
   summary: string | null;
-  suspiciousJson: EmailSuspiciousFlag | null;
+  suspiciousJson: { isSuspicious: boolean } | null;
   actionsJson: EmailAction[] | null;
 }): EmailOnDemandResult {
   const replyAction = (row.actionsJson ?? []).find(
@@ -55,7 +54,7 @@ function toApiResult(row: {
 
   return {
     summary: row.summary,
-    suspicious: row.suspiciousJson ?? DEFAULT_SUSPICIOUS_FLAG,
+    isSuspicious: row.suspiciousJson?.isSuspicious ?? false,
     replyDraft:
       typeof replyAction?.payload.draft === "string"
         ? replyAction.payload.draft
@@ -64,7 +63,7 @@ function toApiResult(row: {
 }
 
 function hasOnDemandContent(result: EmailOnDemandResult): boolean {
-  return Boolean(result.summary || result.replyDraft || result.suspicious.isSuspicious);
+  return Boolean(result.summary || result.replyDraft || result.isSuspicious);
 }
 
 function normalizeOnDemandOutput(
@@ -163,7 +162,7 @@ export async function generateEmailOnDemand(
   });
 
   const normalized = normalizeOnDemandOutput(emailId, object, now);
-  const suspicious = existing?.suspiciousJson ?? DEFAULT_SUSPICIOUS_FLAG;
+  const isSuspicious = existing?.suspiciousJson?.isSuspicious ?? false;
 
   await db
     .insert(emailIntelligence)
@@ -173,7 +172,7 @@ export async function generateEmailOnDemand(
       mailboxId: email.mailboxId,
       status: existing?.status ?? "pending",
       summary: normalized.summary,
-      suspiciousJson: suspicious,
+      suspiciousJson: { isSuspicious },
       actionsJson: normalized.actions,
       sourceHash,
       model,
@@ -197,7 +196,7 @@ export async function generateEmailOnDemand(
 
   return {
     summary: normalized.summary,
-    suspicious,
+    isSuspicious,
     replyDraft: normalized.replyDraft,
   };
 }

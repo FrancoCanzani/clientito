@@ -1,11 +1,13 @@
+import { localDb } from "@/db/client";
+import { getCurrentUserId } from "@/db/user";
+import { queryKeys } from "@/lib/query-keys";
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DraftState } from "../types";
-import { getDraftsQueryKey } from "../queries";
 
 const SAVE_DELAY_MS = 2000;
 
-type ServerDraft = {
+type PersistedDraft = {
   id: number;
   composeKey: string;
   mailboxId: number | null;
@@ -15,6 +17,7 @@ type ServerDraft = {
   subject: string;
   body: string;
   forwardedContent: string;
+  threadId: string | null;
   updatedAt: number;
   createdAt: number;
 };
@@ -33,38 +36,46 @@ function isDraftEmpty(draft: DraftState): boolean {
 }
 
 async function saveDraft(composeKey: string, draft: DraftState): Promise<void> {
-  await fetch("/api/inbox/drafts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      composeKey,
-      mailboxId: draft.mailboxId,
-      toAddr: draft.to,
-      ccAddr: draft.cc,
-      bccAddr: draft.bcc,
-      subject: draft.subject,
-      body: draft.body,
-      forwardedContent: draft.forwardedContent ?? "",
-    }),
+  const userId = await getCurrentUserId();
+  if (!userId) return;
+
+  await localDb.upsertDraft({
+    userId,
+    composeKey,
+    mailboxId: draft.mailboxId,
+    toAddr: draft.to,
+    ccAddr: draft.cc,
+    bccAddr: draft.bcc,
+    subject: draft.subject,
+    body: draft.body,
+    forwardedContent: draft.forwardedContent ?? "",
+    threadId: null,
+    attachmentKeys: null,
   });
 }
 
 async function deleteDraftByKey(composeKey: string): Promise<void> {
-  await fetch(
-    `/api/inbox/drafts/by-key?composeKey=${encodeURIComponent(composeKey)}`,
-    { method: "DELETE" },
-  );
+  const userId = await getCurrentUserId();
+  if (!userId) return;
+
+  const existing = await localDb.getDraftByKey(userId, composeKey);
+  if (!existing) return;
+
+  await localDb.deleteDraft(existing.id, userId);
 }
 
 export async function loadDraft(composeKey: string): Promise<DraftState | null> {
-  try {
-    const response = await fetch(
-      `/api/inbox/drafts/by-key?composeKey=${encodeURIComponent(composeKey)}`,
-    );
-    if (!response.ok) return null;
+  const userId = await getCurrentUserId();
+  if (!userId) return null;
 
-    const nextDraft: ServerDraft | null = await response.json();
+  try {
+    const nextDraft: PersistedDraft | null = await localDb.getDraftByKey(
+      userId,
+      composeKey,
+    );
+
     if (!nextDraft) return null;
+
     return {
       mailboxId: nextDraft.mailboxId ?? null,
       to: nextDraft.toAddr,
@@ -113,7 +124,7 @@ export function useDraft(composeKey: string, draft: DraftState) {
     clearDraft: async () => {
       await deleteDraftByKey(composeKey);
       queryClient.invalidateQueries({
-        queryKey: getDraftsQueryKey(draftRef.current.mailboxId),
+        queryKey: queryKeys.drafts(draftRef.current.mailboxId),
       });
     },
   };

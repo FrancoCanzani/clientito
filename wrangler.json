@@ -10,44 +10,12 @@
 		"enabled": true
 	},
 	"upload_source_maps": true,
-	"durable_objects": {
-		"bindings": [
-			{
-				"name": "Agent",
-				"class_name": "AgentSQLite"
-			}
-		]
-	},
-	"migrations": [
-		{
-			"tag": "v1",
-			"new_sqlite_classes": [
-				"EmailAgent"
-			]
-		},
-		{
-			"tag": "v2",
-			"renamed_classes": [
-				{
-					"from": "EmailAgent",
-					"to": "Agent"
-				}
-			]
-		},
-		{
-			"tag": "v3",
-			"new_sqlite_classes": [
-				"AgentSQLite"
-			]
-		}
-	],
 	"assets": {
 		"directory": "./dist/client",
 		"not_found_handling": "single-page-application",
 		"run_worker_first": [
 			"/api/*",
-			"/sdk/*",
-			"/agents/*"
+			"/sdk/*"
 		]
 	},
 		"d1_databases": [

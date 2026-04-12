@@ -58,30 +58,21 @@ export type InboxSearchSuggestionsResponse = {
 };
 
 export type EmailIntelligenceCategory =
-  | "action_needed"
-  | "important"
-  | "newsletter"
-  | "transactional"
-  | "notification";
-
-export type EmailIntelligenceUrgency = "high" | "medium" | "low";
-
-export type EmailSuspiciousFlag = {
-  isSuspicious: boolean;
-  kind: "phishing" | "impersonation" | "credential_harvest" | "payment_fraud" | null;
-  reason: string | null;
-  confidence: "low" | "medium" | "high" | null;
-};
+  | "to_respond"
+  | "to_follow_up"
+  | "fyi"
+  | "notification"
+  | "invoice"
+  | "marketing";
 
 export type EmailIntelligence = {
   category: EmailIntelligenceCategory;
-  urgency: EmailIntelligenceUrgency;
-  suspicious: EmailSuspiciousFlag;
+  isSuspicious: boolean;
 };
 
 export type EmailDetailIntelligence = {
   summary: string | null;
-  suspicious: EmailSuspiciousFlag;
+  isSuspicious: boolean;
   replyDraft: string | null;
 };
 

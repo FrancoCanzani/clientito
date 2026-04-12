@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowsOutSimpleIcon, XIcon } from "@phosphor-icons/react";
+import { ArrowsOutSimpleIcon, TrashIcon, XIcon } from "@phosphor-icons/react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo } from "react";
@@ -53,7 +53,11 @@ function ComposePanelBody({
   });
   const hasInitialRecipient = (initial?.to?.trim().length ?? 0) > 0;
 
-  const handleClose = async () => {
+  const handleClose = () => {
+    onOpenChange(false);
+  };
+
+  const handleDiscard = async () => {
     await compose.clearDraft();
     onOpenChange(false);
   };
@@ -92,7 +96,7 @@ function ComposePanelBody({
         exit={{ opacity: 0 }}
         transition={{ duration: 0.15 }}
         onClick={() => {
-          void handleClose();
+          handleClose();
         }}
       />
       <motion.div
@@ -111,6 +115,18 @@ function ComposePanelBody({
                 variant="ghost"
                 size="icon"
                 onClick={() => {
+                  void handleDiscard();
+                }}
+                aria-label="Discard draft"
+                title="Discard draft"
+              >
+                <TrashIcon className="size-3" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => {
                   void handleOpenFullComposer();
                 }}
                 aria-label="Open full composer"
@@ -123,7 +139,7 @@ function ComposePanelBody({
                 variant="ghost"
                 size="icon"
                 onClick={() => {
-                  void handleClose();
+                  handleClose();
                 }}
                 aria-label="Close compose"
               >
@@ -136,7 +152,10 @@ function ComposePanelBody({
               compose={compose}
               bodyClassName="min-h-50 text-sm leading-relaxed"
               onEscape={() => {
-                void handleClose();
+                handleClose();
+              }}
+              onDiscard={() => {
+                void handleDiscard();
               }}
               recipientAutoFocus={!hasInitialRecipient}
               editorAutoFocus={hasInitialRecipient}

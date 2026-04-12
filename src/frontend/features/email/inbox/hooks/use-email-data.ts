@@ -2,7 +2,9 @@ import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/email/inbox/querie
 import type { EmailListResponse } from "@/features/email/inbox/types";
 import { groupEmailsByThread } from "@/features/email/inbox/utils/group-emails-by-thread";
 import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
+import { useSyncStatus } from "@/features/onboarding/hooks/use-sync-status";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
+import { queryKeys } from "@/lib/query-keys";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
@@ -17,8 +19,11 @@ export function useEmailData({
   mailboxId: number;
   initialPage?: EmailListResponse;
 }) {
+  const { data: syncStatus } = useSyncStatus();
+  const isSyncing = syncStatus?.state === "syncing";
+
   const emailsQuery = useInfiniteQuery({
-    queryKey: ["emails", view, mailboxId],
+    queryKey: queryKeys.emails.list(view, mailboxId),
     queryFn: ({ pageParam }) =>
       fetchEmails({
         view,
@@ -39,7 +44,7 @@ export function useEmailData({
       lastPage?.pagination?.hasMore
         ? lastPage.pagination.offset + lastPage.pagination.limit
         : undefined,
-    staleTime: 30_000,
+    staleTime: isSyncing ? 0 : 30_000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
   });
@@ -76,6 +81,7 @@ export function useEmailData({
     isError: emailsQuery.isError,
     hasNextPage: hasNextPage ?? false,
     isFetchingNextPage,
+    isSyncing,
     loadMoreRef,
   };
 }

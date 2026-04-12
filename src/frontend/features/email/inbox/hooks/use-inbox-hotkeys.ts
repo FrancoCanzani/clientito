@@ -1,6 +1,10 @@
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import type { EmailListItem } from "@/features/email/inbox/types";
 import type { ThreadGroup } from "@/features/email/inbox/utils/group-emails-by-thread";
+import {
+  setFocusedEmail,
+  clearFocusedEmail,
+} from "@/hooks/use-focused-email";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useEffect, useRef, useState } from "react";
 
@@ -9,6 +13,7 @@ type InboxHotkeysOptions = {
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
   onCompose: () => void;
+  onSearch: () => void;
 };
 
 export function useInboxHotkeys({
@@ -16,6 +21,7 @@ export function useInboxHotkeys({
   onOpen,
   onAction,
   onCompose,
+  onSearch,
 }: InboxHotkeysOptions) {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const lastIndexRef = useRef(-1);
@@ -93,7 +99,32 @@ export function useInboxHotkeys({
       },
     },
     c: () => onCompose(),
+    "/": (e) => {
+      e.preventDefault();
+      onSearch();
+    },
   });
+
+  // Sync focused email to the global store for the command palette.
+  useEffect(() => {
+    if (focusedEmail) {
+      setFocusedEmail({
+        id: focusedEmail.id,
+        fromAddr: focusedEmail.fromAddr,
+        fromName: focusedEmail.fromName ?? null,
+        subject: focusedEmail.subject ?? null,
+        threadId: focusedEmail.threadId ?? null,
+        mailboxId: focusedEmail.mailboxId ?? null,
+      });
+    } else {
+      clearFocusedEmail();
+    }
+  }, [focusedEmail]);
+
+  // Clear on unmount.
+  useEffect(() => {
+    return () => clearFocusedEmail();
+  }, []);
 
   // Reset focus when the list is fully swapped out (e.g. view change → empty).
   useEffect(() => {

@@ -1,11 +1,10 @@
 import { isComposerOpen } from "@/features/email/inbox/components/compose/compose-editor-ref";
 import {
   isEmailView,
-  type EmailView,
 } from "@/features/email/inbox/utils/inbox-filters";
 import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
+import { useFocusedEmail } from "@/hooks/use-focused-email";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { usePageContext } from "@/hooks/use-page-context";
 import { useMailboxes } from "@/hooks/use-mailboxes";
 import { useRouter } from "@tanstack/react-router";
 import { useMemo } from "react";
@@ -14,7 +13,7 @@ import type { CommandContext } from "./types";
 export function useCommandContext(): CommandContext {
   const router = useRouter();
   const isMobile = useIsMobile();
-  const pageContext = usePageContext();
+  const focused = useFocusedEmail();
   const accounts = useMailboxes().data?.accounts ?? [];
 
   const matches = router.state.matches;
@@ -36,26 +35,23 @@ export function useCommandContext(): CommandContext {
       match.routeId === "/_dashboard/$mailboxId/inbox/labels/$label/",
   )?.params.label;
   const folderView = isEmailView(currentFolder) ? currentFolder : undefined;
-  const labelView: EmailView | undefined =
-    currentLabel === "important" ? "important" : undefined;
+  const labelView: string | undefined = currentLabel != null
+    ? (currentLabel as string)
+    : undefined;
   const isInboxRootRoute =
     currentRouteId === "/_dashboard/$mailboxId/inbox/" ||
     currentRouteId === "/_dashboard/$mailboxId/inbox/email/$emailId";
   const currentView: string | undefined =
     labelView ?? folderView ?? (isInboxRootRoute ? "inbox" : undefined);
 
-  const emailEntity =
-    pageContext?.entity?.type === "email" ? pageContext.entity : null;
-  const selectedEmailId = emailEntity?.id ?? null;
-  const selectedEmailIsArchived = null;
-  const selectedEmailIsRead = null;
-  const selectedEmail = emailEntity
+  const selectedEmailId = focused?.id ?? null;
+  const selectedEmail = focused
     ? {
-        fromAddr: emailEntity.fromAddr,
-        fromName: emailEntity.fromName ?? null,
-        subject: emailEntity.subject ?? null,
-        threadId: emailEntity.threadId ?? null,
-        mailboxId: emailEntity.mailboxId ?? null,
+        fromAddr: focused.fromAddr,
+        fromName: focused.fromName,
+        subject: focused.subject,
+        threadId: focused.threadId,
+        mailboxId: focused.mailboxId,
       }
     : null;
 
@@ -66,8 +62,6 @@ export function useCommandContext(): CommandContext {
       activeMailboxId,
       defaultMailboxId,
       selectedEmailId,
-      selectedEmailIsArchived,
-      selectedEmailIsRead,
       selectedEmail,
       composerOpen: isComposerOpen(),
       isMobile,

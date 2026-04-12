@@ -1,4 +1,5 @@
 import type { ComposeInitial } from "../types";
+import { escapeHtml } from "../utils/escape-html";
 
 function decodeMailtoPart(value: string | null): string | undefined {
   if (!value) return undefined;
@@ -8,13 +9,6 @@ function decodeMailtoPart(value: string | null): string | undefined {
   } catch {
     return value.trim().length > 0 ? value.trim() : undefined;
   }
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 function plainTextToHtml(text: string): string {

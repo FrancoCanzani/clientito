@@ -1,14 +1,17 @@
+import { Error as RouteError } from "@/components/error";
 import DraftsPage from "@/features/email/inbox/pages/drafts-page";
-import { fetchDrafts, getDraftsQueryKey } from "@/features/email/inbox/queries";
+import { fetchDrafts } from "@/features/email/inbox/queries";
+import { queryKeys } from "@/lib/query-keys";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/drafts")({
   loader: async ({ context, params }) => {
     const drafts = await context.queryClient.ensureQueryData({
-      queryKey: getDraftsQueryKey(params.mailboxId),
+      queryKey: queryKeys.drafts(params.mailboxId),
       queryFn: () => fetchDrafts(params.mailboxId),
     });
     return { drafts };
   },
+  errorComponent: RouteError,
   component: DraftsPage,
 });

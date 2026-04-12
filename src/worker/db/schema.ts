@@ -8,13 +8,12 @@ import {
 import { account, user } from "./auth-schema";
 
 export type EmailIntelligenceCategory =
-  | "important"
-  | "action_needed"
-  | "newsletter"
+  | "to_respond"
+  | "to_follow_up"
+  | "fyi"
   | "notification"
-  | "transactional";
-
-export type EmailIntelligenceUrgency = "high" | "medium" | "low";
+  | "invoice"
+  | "marketing";
 
 export type EmailActionType = "reply";
 
@@ -25,14 +24,6 @@ export type EmailActionStatus =
   | "executed"
   | "dismissed"
   | "failed";
-
-export type EmailSuspiciousKind =
-  | "phishing"
-  | "impersonation"
-  | "credential_harvest"
-  | "payment_fraud";
-
-export type EmailSuspiciousConfidence = "low" | "medium" | "high";
 
 export type EmailAction = {
   id: string;
@@ -48,39 +39,10 @@ export type EmailAction = {
 
 export type EmailSuspiciousFlag = {
   isSuspicious: boolean;
-  kind: EmailSuspiciousKind | null;
-  reason: string | null;
-  confidence: EmailSuspiciousConfidence | null;
 };
 
 export type EmailIntelligenceStatus = "pending" | "ready" | "error";
 
-export type PersistedEmailIntelligence = {
-  category: EmailIntelligenceCategory;
-  urgency: EmailIntelligenceUrgency;
-  summary: string;
-  suspicious: EmailSuspiciousFlag;
-  actions: EmailAction[];
-  autoExecute: string[];
-  requiresApproval: string[];
-};
-
-
-export const notes = sqliteTable(
-  "notes",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    title: text("title").notNull().default("Untitled note"),
-    content: text("content").notNull(),
-    isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
-    createdAt: integer("created_at").notNull(),
-    updatedAt: integer("updated_at").notNull().default(0),
-  },
-  (table) => [index("notes_user_updated_idx").on(table.userId, table.updatedAt)],
-);
 
 export const emails = sqliteTable(
   "emails",
@@ -183,16 +145,12 @@ export const emailIntelligence = sqliteTable(
       onDelete: "cascade",
     }),
     category: text("category").$type<EmailIntelligenceCategory>(),
-    urgency: text("urgency").$type<EmailIntelligenceUrgency>(),
     summary: text("summary"),
     suspiciousJson: text("suspicious_json", { mode: "json" })
       .$type<EmailSuspiciousFlag>()
       .notNull()
       .default({
         isSuspicious: false,
-        kind: null,
-        reason: null,
-        confidence: null,
       }),
     actionsJson: text("actions_json", { mode: "json" })
       .$type<EmailAction[]>()
@@ -254,11 +212,12 @@ export type FilterActions = {
   markRead?: boolean;
   star?: boolean;
   applyCategory?:
-    | "action_needed"
-    | "important"
-    | "newsletter"
-    | "transactional"
-    | "notification";
+    | "to_respond"
+    | "to_follow_up"
+    | "fyi"
+    | "notification"
+    | "invoice"
+    | "marketing";
   trash?: boolean;
 };
 

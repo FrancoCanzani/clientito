@@ -22,7 +22,7 @@ export const Route = createFileRoute("/_dashboard/$mailboxId")({
     );
 
     if (accounts.length === 0) {
-      throw redirect({ to: "/get-started" });
+      throw redirect({ to: "/inbox-redirect" });
     }
 
     if (!accounts.some((account) => account.mailboxId === params.mailboxId)) {

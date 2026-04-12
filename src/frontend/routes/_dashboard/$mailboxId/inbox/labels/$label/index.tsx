@@ -1,7 +1,9 @@
+import { Error as RouteError } from "@/components/error";
 import LabelPage from "@/features/email/inbox/pages/label-page";
 import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/email/inbox/queries";
 import { parseInboxLabelParam } from "@/features/email/inbox/utils/inbox-filters";
 import type { EmailListResponse } from "@/features/email/inbox/types";
+import { queryKeys } from "@/lib/query-keys";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute(
@@ -13,7 +15,7 @@ export const Route = createFileRoute(
   skipRouteOnParseError: { params: true },
   loader: async ({ context, params }) => {
     const initialData = await context.queryClient.ensureInfiniteQueryData({
-      queryKey: ["emails", params.label, params.mailboxId],
+      queryKey: queryKeys.emails.list(params.label, params.mailboxId),
       queryFn: ({ pageParam }) =>
         fetchEmails({
           view: params.label,
@@ -32,5 +34,6 @@ export const Route = createFileRoute(
       initialPage: initialData.pages[0],
     };
   },
+  errorComponent: RouteError,
   component: LabelPage,
 });

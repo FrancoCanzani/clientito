@@ -6,7 +6,7 @@ import { useAttachmentUpload } from "../../hooks/use-attachment-upload";
 import { loadDraft, persistDraftNow, useDraft } from "../../hooks/use-draft";
 import { useUndoSend } from "../../hooks/use-undo-send";
 import { sendEmail } from "../../mutations";
-import { getDraftsQueryKey } from "../../queries";
+import { queryKeys } from "@/lib/query-keys";
 import type { ComposeInitial, DraftState } from "../../types";
 import { buildPlainForwardedHtml } from "../../utils/build-forwarded-html";
 
@@ -251,7 +251,7 @@ export function useComposeEmail(
       body: bodyRef.current,
     });
     queryClient.invalidateQueries({
-      queryKey: getDraftsQueryKey(draftRef.current.mailboxId),
+      queryKey: queryKeys.drafts(draftRef.current.mailboxId),
     });
     return key;
   }, [composeKey, queryClient]);
@@ -277,12 +277,12 @@ export function useComposeEmail(
     onSuccess: () => {
       clearDraft();
       toast.success("Email sent");
-      queryClient.invalidateQueries({ queryKey: ["emails"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
       queryClient.invalidateQueries({
-        queryKey: getDraftsQueryKey(draftSnapshotRef.current.mailboxId),
+        queryKey: queryKeys.drafts(draftSnapshotRef.current.mailboxId),
       });
       if (threadId) {
-        queryClient.invalidateQueries({ queryKey: ["email-thread", threadId] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.emails.thread(threadId) });
       }
       options?.onSent?.();
     },
@@ -323,9 +323,9 @@ export function useComposeEmail(
           minute: "2-digit",
         }).format(new Date(scheduledFor));
         clearDraft();
-        queryClient.invalidateQueries({ queryKey: ["scheduled-emails"] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scheduledEmails() });
         queryClient.invalidateQueries({
-          queryKey: getDraftsQueryKey(draft.mailboxId),
+          queryKey: queryKeys.drafts(draft.mailboxId),
         });
         toast.success(`Email scheduled for ${timeStr}`);
         options?.onSent?.();

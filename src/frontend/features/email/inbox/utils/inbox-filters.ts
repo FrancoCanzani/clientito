@@ -3,32 +3,55 @@ export type EmailView =
   | "sent"
   | "spam"
   | "trash"
+  | "snoozed"
   | "archived"
   | "starred"
-  | "important";
+  | "important"
+  | "to_respond"
+  | "to_follow_up"
+  | "fyi"
+  | "notification"
+  | "invoice"
+  | "marketing";
 
-export type EmailFolderView = Exclude<EmailView, "inbox" | "important">;
-export type InboxLabelView = Extract<EmailView, "important">;
+export type EmailFolderView = Exclude<EmailView, "inbox" | "to_respond" | "to_follow_up" | "fyi" | "notification" | "invoice" | "marketing">;
+export type InboxLabelView = Extract<EmailView, "important" | "to_respond" | "to_follow_up" | "fyi" | "notification" | "invoice" | "marketing">;
 
 export const VIEW_VALUES: ReadonlyArray<EmailView> = [
   "inbox",
   "sent",
   "spam",
   "trash",
+  "snoozed",
   "archived",
   "starred",
   "important",
+  "to_respond",
+  "to_follow_up",
+  "fyi",
+  "notification",
+  "invoice",
+  "marketing",
 ];
 
 export const FOLDER_VIEW_VALUES: ReadonlyArray<EmailFolderView> = [
   "sent",
   "spam",
   "trash",
+  "snoozed",
   "archived",
   "starred",
 ];
 
-export const INBOX_LABEL_VALUES: ReadonlyArray<InboxLabelView> = ["important"];
+export const INBOX_LABEL_VALUES: ReadonlyArray<InboxLabelView> = [
+  "important",
+  "to_respond",
+  "to_follow_up",
+  "fyi",
+  "notification",
+  "invoice",
+  "marketing",
+];
 
 const VIEW_VALUE_SET = new Set<string>(VIEW_VALUES);
 const FOLDER_VIEW_SET = new Set<string>(FOLDER_VIEW_VALUES);
@@ -76,7 +99,15 @@ export const VIEW_LABELS: Record<EmailView, string> = {
   sent: "Sent",
   spam: "Spam",
   trash: "Trash",
+  snoozed: "Snoozed",
   archived: "Done",
   starred: "Starred",
   important: "Important",
+
+  to_respond: "To respond",
+  to_follow_up: "To follow up",
+  fyi: "FYI",
+  notification: "Notification",
+  invoice: "Invoice",
+  marketing: "Marketing",
 };

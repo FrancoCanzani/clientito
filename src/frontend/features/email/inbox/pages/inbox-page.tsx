@@ -1,9 +1,7 @@
 import { EmailList } from "@/features/email/inbox/components/list/email-list";
 import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
 import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
-import { useSetPageContext } from "@/hooks/use-page-context";
 import { getRouteApi } from "@tanstack/react-router";
-import { useMemo } from "react";
 
 const route = getRouteApi("/_dashboard/$mailboxId/inbox/");
 
@@ -15,8 +13,6 @@ export default function InboxPage() {
     view: "inbox",
     mailboxId,
   });
-
-  useSetPageContext(useMemo(() => ({ route: "inbox" }), []));
 
   return (
     <EmailList

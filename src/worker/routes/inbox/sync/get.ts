@@ -85,6 +85,23 @@ export function registerGetSync(api: Hono<AppRouteEnv>) {
       }),
     );
 
+    // Auto-trigger 6-month sync for new mailboxes that have never synced
+    if (workflowState === "ready_to_sync" && firstMailbox) {
+      c.executionCtx.waitUntil(
+        c.env.SYNC_QUEUE.send({
+          type: "full-sync" as const,
+          userId: user.id,
+          mailboxId: firstMailbox.id,
+          months: 6,
+        }).catch((err: unknown) => {
+          console.error("Auto-trigger sync failed", {
+            userId: user.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }),
+      );
+    }
+
     return c.json(
       {
         state: workflowState,

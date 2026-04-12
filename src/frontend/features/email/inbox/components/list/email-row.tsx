@@ -13,9 +13,18 @@ import {
 } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { memo, useRef, useState } from "react";
-import type { EmailListItem } from "../../types";
+import type { EmailIntelligenceCategory, EmailListItem } from "../../types";
 import { formatInboxRowDate } from "../../utils/formatters";
 import type { ThreadGroup } from "../../utils/group-emails-by-thread";
+
+const CATEGORY_LABELS: Record<EmailIntelligenceCategory, string> = {
+  to_respond: "respond",
+  to_follow_up: "follow up",
+  fyi: "fyi",
+  notification: "notification",
+  invoice: "invoice",
+  marketing: "marketing",
+};
 
 export const EmailRow = memo(function EmailRow({
   group,
@@ -55,7 +64,11 @@ export const EmailRow = memo(function EmailRow({
     if (detailState?.status !== "success") {
       void queryClient.prefetchQuery({
         queryKey: detailKey,
-        queryFn: () => fetchEmailDetail(email.id),
+        queryFn: () =>
+          fetchEmailDetail(email.id, {
+            mailboxId: email.mailboxId ?? undefined,
+            view,
+          }),
         staleTime: 45_000,
         gcTime: 120_000,
       });
@@ -95,14 +108,24 @@ export const EmailRow = memo(function EmailRow({
         <span className="shrink-0 truncate tracking-[-0.6px] text-foreground">
           {participantLabel}
         </span>
-        <span className="text-foreground/50 truncate tracking-[-0.2px]">
+        <span className="min-w-0 overflow-hidden whitespace-nowrap tracking-[-0.2px] text-foreground/50">
           {email.subject ?? "(no subject)"}
+          {email.snippet && (
+            <span className="text-foreground/30"> {email.snippet}</span>
+          )}
         </span>
       </div>
 
       <div className="shrink-0">
         <div className="relative flex md:min-w-24 justify-end text-xs text-muted-foreground">
           <div className="flex items-center gap-2 md:group-hover:invisible">
+            {email.intelligence?.category && (
+              <span
+                className="text-[10px] text-muted-foreground"
+              >
+                {CATEGORY_LABELS[email.intelligence.category]}
+              </span>
+            )}
             {isStarred && (
               <StarIcon
                 className="size-3.5 text-yellow-400"

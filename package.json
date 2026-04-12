@@ -13,17 +13,16 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.41",
-    "@ai-sdk/react": "^3.0.107",
-    "@cloudflare/ai-chat": "^0.1.8",
+    "@electric-sql/pglite": "^0.4.4",
     "@hono/zod-validator": "^0.7.6",
     "@phosphor-icons/react": "^2.1.10",
+    "@radix-ui/react-collapsible": "^1.1.12",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-router": "^1.162.6",
     "@tanstack/react-virtual": "^3.13.23",
     "@tiptap/core": "^3.20.0",
     "@tiptap/pm": "^3.20.0",
     "@tiptap/react": "^3.20.0",
-    "agents": "^0.7.5",
     "ai": "^6.0.100",
     "better-auth": "^1.4.19",
     "class-variance-authority": "^0.7.1",
@@ -91,7 +90,9 @@
     "db:migrate:dev": "bunx wrangler d1 migrations apply petit-db --local",
     "db:migrate:prod": "bunx wrangler d1 migrations apply petit-db --remote",
     "db:reset:dev": "rm -rf .wrangler/state && bun run db:migrate:dev",
-    "knip": "knip"
+    "knip": "knip",
+    "scheduled": "wrangler dev --test-scheduled --port 8787",
+    "scheduled:trigger": "curl -s \"http://localhost:8787/__scheduled?cron=*/1+*+*+*+*\""
   },
   "type": "module"
 }

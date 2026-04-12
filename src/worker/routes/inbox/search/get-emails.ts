@@ -17,6 +17,7 @@ import { STANDARD_LABELS } from "../../../lib/gmail/types";
 import type { AppRouteEnv } from "../../types";
 import {
   HAS_ATTACHMENT_LABEL,
+  CATEGORY_VIEWS,
   emailIntelligenceSelection,
   emailSummarySelection,
   hasEmailLabel,
@@ -66,6 +67,16 @@ export function registerEmailSearch(api: Hono<AppRouteEnv>) {
         conditions.push(hasEmailLabel(HAS_ATTACHMENT_LABEL));
       }
 
+      if (parsedQuery.before !== undefined) {
+        conditions.push(lte(emails.date, parsedQuery.before));
+      }
+
+      if (parsedQuery.after !== undefined) {
+        conditions.push(
+          sql`${emails.date} >= ${parsedQuery.after}`,
+        );
+      }
+
       for (const value of parsedQuery.from) {
         const pattern = `%${escapeLikePattern(value.toLowerCase())}%`;
         conditions.push(
@@ -112,45 +123,51 @@ export function registerEmailSearch(api: Hono<AppRouteEnv>) {
 
       const baseConditions = [...conditions];
 
-      switch (effectiveView) {
-        case "inbox":
-          conditions.push(hasEmailLabel(STANDARD_LABELS.INBOX));
-          conditions.push(
-            or(isNull(emails.snoozedUntil), lte(emails.snoozedUntil, now))!,
-          );
-          break;
-        case "sent":
-          conditions.push(hasEmailLabel(STANDARD_LABELS.SENT));
-          break;
-        case "spam":
-          conditions.push(hasEmailLabel(STANDARD_LABELS.SPAM));
-          break;
-        case "trash":
-          conditions.push(hasEmailLabel(STANDARD_LABELS.TRASH));
-          break;
-        case "snoozed":
-          conditions.push(gt(emails.snoozedUntil, now));
-          break;
-        case "archived":
-          conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.INBOX)}`);
-          conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SENT)}`);
-          conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.TRASH)}`);
-          conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SPAM)}`);
-          break;
-        case "starred":
-          conditions.push(hasEmailLabel(STANDARD_LABELS.STARRED));
-          break;
-        case "important":
-          conditions.push(
-            sql<boolean>`${emailIntelligence.category} in ('important', 'action_needed')`,
-          );
-          break;
-        default:
-          if (!includeJunk) {
-            conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SPAM)}`);
+      if (effectiveView && CATEGORY_VIEWS.has(effectiveView)) {
+        conditions.push(
+          sql<boolean>`${emailIntelligence.category} = ${effectiveView}`,
+        );
+      } else {
+        switch (effectiveView) {
+          case "inbox":
+            conditions.push(hasEmailLabel(STANDARD_LABELS.INBOX));
+            conditions.push(
+              or(isNull(emails.snoozedUntil), lte(emails.snoozedUntil, now))!,
+            );
+            break;
+          case "sent":
+            conditions.push(hasEmailLabel(STANDARD_LABELS.SENT));
+            break;
+          case "spam":
+            conditions.push(hasEmailLabel(STANDARD_LABELS.SPAM));
+            break;
+          case "trash":
+            conditions.push(hasEmailLabel(STANDARD_LABELS.TRASH));
+            break;
+          case "snoozed":
+            conditions.push(gt(emails.snoozedUntil, now));
+            break;
+          case "archived":
+            conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.INBOX)}`);
+            conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SENT)}`);
             conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.TRASH)}`);
-          }
-          break;
+            conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SPAM)}`);
+            break;
+          case "starred":
+            conditions.push(hasEmailLabel(STANDARD_LABELS.STARRED));
+            break;
+          case "important":
+            conditions.push(
+              sql<boolean>`${emailIntelligence.category} in ('to_respond', 'to_follow_up')`,
+            );
+            break;
+          default:
+            if (!includeJunk) {
+              conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SPAM)}`);
+              conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.TRASH)}`);
+            }
+            break;
+        }
       }
 
       const normalizedPlainText = parsedQuery.plainText.toLowerCase();

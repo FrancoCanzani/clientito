@@ -12,7 +12,7 @@ import {
 import type { EmailListItem } from "@/features/email/inbox/types";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
-import { useSetPageContext } from "@/hooks/use-page-context";
+import { queryKeys } from "@/lib/query-keys";
 import {
   useInfiniteQuery,
   useQuery,
@@ -61,17 +61,13 @@ export default function InboxSearchPage() {
     [routeQuery, search.includeJunk, mailboxId],
   );
 
-  useSetPageContext(useMemo(() => ({ route: "inbox-search" }), []));
-
   const resultsQuery = useInfiniteQuery({
-    queryKey: [
-      "emails",
-      "search",
+    queryKey: queryKeys.emails.search.results(
       normalizeQuery(scope.q),
       scope.mailboxId,
       "inbox",
       scope.includeJunk ?? false,
-    ],
+    ),
     initialPageParam: 0,
     enabled: normalizeQuery(scope.q).length >= 2,
     initialData: initialResults
@@ -95,15 +91,12 @@ export default function InboxSearchPage() {
   });
 
   const suggestionsQuery = useQuery({
-    queryKey: [
-      "emails",
-      "search",
-      "suggestions",
+    queryKey: queryKeys.emails.search.suggestions(
       normalizeQuery(scope.q),
       scope.mailboxId,
       "inbox",
       scope.includeJunk ?? false,
-    ],
+    ),
     queryFn: () =>
       fetchSearchSuggestions({
         ...scope,
@@ -164,12 +157,12 @@ export default function InboxSearchPage() {
   const canToggleJunk = hiddenJunkCount > 0 || search.includeJunk === true;
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-5">
         <PageHeader
           title={
             <div className="flex items-center gap-2">
-              <SidebarTrigger />
+              <SidebarTrigger className="md:hidden" />
               <span>Search</span>
             </div>
           }

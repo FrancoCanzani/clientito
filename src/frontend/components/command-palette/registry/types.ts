@@ -8,8 +8,6 @@ export type CommandContext = {
   activeMailboxId: number | null;
   defaultMailboxId: number | null;
   selectedEmailId: string | null;
-  selectedEmailIsArchived: boolean | null;
-  selectedEmailIsRead: boolean | null;
   selectedEmail: {
     fromAddr: string;
     fromName: string | null;

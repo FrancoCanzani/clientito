@@ -4,8 +4,8 @@ import { fetchEmailDetailAI } from "@/features/email/inbox/queries";
 import type {
   EmailDetailIntelligence,
   EmailDetailItem,
-  EmailSuspiciousFlag,
 } from "@/features/email/inbox/types";
+import { queryKeys } from "@/lib/query-keys";
 import { WarningIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -23,7 +23,7 @@ export function EmailIntelligence({
     email.labelIds.includes("SPAM");
 
   const detailAIQuery = useQuery({
-    queryKey: ["email-ai-detail", email.id],
+    queryKey: queryKeys.emails.aiDetail(email.id),
     queryFn: () => fetchEmailDetailAI(email.id),
     enabled: !skipAi,
   });
@@ -55,9 +55,7 @@ function AiPanel({
 }) {
   return (
     <section className="space-y-4 rounded-md border border-border/40 p-3">
-      {intelligence.suspicious.isSuspicious && (
-        <SuspiciousWarning suspicious={intelligence.suspicious} />
-      )}
+      {intelligence.isSuspicious && <SuspiciousWarning />}
 
       {intelligence.summary && (
         <div className="space-y-1.5">
@@ -102,11 +100,7 @@ function AiPanelLoading() {
   );
 }
 
-function SuspiciousWarning({
-  suspicious,
-}: {
-  suspicious: EmailSuspiciousFlag;
-}) {
+function SuspiciousWarning() {
   return (
     <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-3">
       <div className="flex min-w-0 gap-2.5">
@@ -116,14 +110,8 @@ function SuspiciousWarning({
             Suspicious email
           </p>
           <p className="text-sm text-foreground">
-            {suspicious.reason ??
-              "This message shows signs of phishing or impersonation."}
+            This message shows signs of phishing or impersonation.
           </p>
-          {suspicious.confidence && (
-            <p className="text-xs text-amber-900/80">
-              Confidence: {suspicious.confidence}
-            </p>
-          )}
         </div>
       </div>
     </div>

@@ -13,10 +13,13 @@ import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-in
 import { useInboxHotkeys } from "@/features/email/inbox/hooks/use-inbox-hotkeys";
 import type { EmailListItem } from "@/features/email/inbox/types";
 import { VIEW_LABELS } from "@/features/email/inbox/utils/inbox-filters";
-import { NotePencilIcon } from "@phosphor-icons/react";
+import { MagnifyingGlassIcon, NotePencilIcon } from "@phosphor-icons/react";
+import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
 import { EmailRow } from "./email-row";
+
+const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
 const ROW_HEIGHT = 40;
 
@@ -35,16 +38,23 @@ export function EmailList({
     threadGroups,
     hasNextPage,
     isFetchingNextPage,
+    isSyncing,
     loadMoreRef,
   } = emailData;
   const { openCompose } = useInboxCompose();
+  const { mailboxId } = mailboxRoute.useParams();
+  const navigate = useNavigate();
   const pageTitle = VIEW_LABELS[view];
+
+  const goToSearch = () =>
+    navigate({ to: "/$mailboxId/inbox/search", params: { mailboxId } });
 
   const { focusedIndex } = useInboxHotkeys({
     groups: threadGroups,
     onOpen,
     onAction,
     onCompose: openCompose,
+    onSearch: goToSearch,
   });
 
   const listRef = useRef<HTMLDivElement>(null);
@@ -66,16 +76,34 @@ export function EmailList({
   const virtualItems = virtualizer.getVirtualItems();
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-1 flex-col">
+    <div className="flex w-full min-w-0 flex-1 flex-col">
       <PageHeader
         title={
           <div className="flex items-center gap-2">
-            <SidebarTrigger />
+            <SidebarTrigger className="md:hidden" />
             <span>{pageTitle}</span>
+            {isSyncing && (
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-foreground/40" />
+                <span className="relative inline-flex size-2 rounded-full bg-foreground/60" />
+              </span>
+            )}
           </div>
         }
         actions={
-          view === "inbox" && (
+          <>
+            <IconButton
+              label="Search"
+              shortcut="/"
+              onClick={() =>
+                navigate({
+                  to: "/$mailboxId/inbox/search",
+                  params: { mailboxId },
+                })
+              }
+            >
+              <MagnifyingGlassIcon className="size-3.5" />
+            </IconButton>
             <IconButton
               label="New Email"
               shortcut="C"
@@ -83,7 +111,7 @@ export function EmailList({
             >
               <NotePencilIcon className="size-3.5" />
             </IconButton>
-          )
+          </>
         }
       />
 

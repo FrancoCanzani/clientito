@@ -82,8 +82,14 @@ function PlainTextEmailRenderer({ text }: { text: string }) {
   );
 }
 
-export function MessageBody({ detail }: { detail?: EmailBodySource | null }) {
-  const { readingMode, fontSize, showImages, showQuoted } = usePreferences();
+export function MessageBody({
+  detail,
+  readingMode = "original",
+}: {
+  detail?: EmailBodySource | null;
+  readingMode?: "detox" | "original";
+}) {
+  const { fontSize, showImages, showQuoted } = usePreferences();
   const bodyHtml = detail?.resolvedBodyHtml ?? detail?.bodyHtml;
   const bodyText = detail?.resolvedBodyText ?? detail?.bodyText;
 

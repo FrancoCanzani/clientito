@@ -21,6 +21,7 @@ import {
   PaperclipIcon,
   SparkleIcon,
   SpinnerGapIcon,
+  TrashIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import DOMPurify from "dompurify";
@@ -45,6 +46,7 @@ type ComposeEmailFieldsProps = {
   compose: ReturnType<typeof useComposeEmail>;
   bodyClassName?: string;
   onEscape?: () => void;
+  onDiscard?: () => void;
   recipientAutoFocus?: boolean;
   editorAutoFocus?: boolean;
   showMailboxSelector?: boolean;
@@ -102,6 +104,7 @@ export function ComposeEmailFields({
   compose,
   bodyClassName,
   onEscape,
+  onDiscard,
   recipientAutoFocus = false,
   editorAutoFocus = false,
   showMailboxSelector = true,
@@ -508,21 +511,6 @@ export function ComposeEmailFields({
               </DropdownMenu>
             )}
 
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={pendingAiAction !== null || !hasBody || isReviewing}
-              onClick={() => {
-                void handleComposerAiAction("grammar");
-              }}
-              title="Grammar check"
-            >
-              {pendingAiAction === "grammar" ? (
-                <SpinnerGapIcon className="size-3 animate-spin" />
-              ) : (
-                <CheckIcon className="size-3" />
-              )}
-            </Button>
             <ScheduleSendPicker
               onSchedule={(timestamp) => {
                 scheduleSend(timestamp);
@@ -536,6 +524,16 @@ export function ComposeEmailFields({
                 <ClockIcon className="size-3" />
               </Button>
             </ScheduleSendPicker>
+            {onDiscard && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onDiscard}
+                title="Discard draft"
+              >
+                <TrashIcon className="size-3" />
+              </Button>
+            )}
           </div>
           <Button
             variant="secondary"

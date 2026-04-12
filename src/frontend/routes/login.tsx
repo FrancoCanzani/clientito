@@ -18,7 +18,7 @@ function LoginRoute() {
     mutationFn: async () => {
       const result = await signIn.social({
         provider: "google",
-        callbackURL: "/get-started",
+        callbackURL: "/inbox-redirect",
       });
 
       if (result?.error) {
@@ -26,7 +26,7 @@ function LoginRoute() {
       }
     },
     onSuccess: () => {
-      navigate({ to: "/get-started" });
+      navigate({ to: "/inbox-redirect" });
     },
     onError: (error) => {
       toast.error(error.message);

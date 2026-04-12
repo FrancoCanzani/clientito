@@ -1,4 +1,3 @@
-import { routeAgentRequest } from "agents";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
@@ -7,11 +6,6 @@ import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { auth } from "../../auth";
 import { authMiddleware } from "./middleware/auth";
-import {
-  authLimiter,
-  standardLimiter,
-  strictLimiter,
-} from "./middleware/rate-limit";
 import aiRoutes from "./routes/ai/router";
 import healthRoutes from "./routes/health/router";
 import inboxRoutes from "./routes/inbox/router";
@@ -20,8 +14,6 @@ import draftsRoutes from "./routes/inbox/drafts/router";
 import type { AppRouteEnv } from "./routes/types";
 import { handleScheduled } from "./scheduled";
 import { handleSyncQueue, type SyncQueueMessage } from "./queue";
-
-export { Agent, AgentSQLite } from "./agent/agent";
 
 const app = new Hono<AppRouteEnv>();
 
@@ -48,13 +40,6 @@ app.onError((err, c) => {
 
 app.use("*", authMiddleware);
 
-app.use("/api/auth/*", authLimiter);
-app.use("/api/inbox/sync/start", strictLimiter);
-app.use("/api/inbox/sync/recover", strictLimiter);
-app.use("/api/inbox/emails/send", strictLimiter);
-app.use("/api/ai/*", strictLimiter);
-app.use("/api/*", standardLimiter);
-
 app.all("/api/auth/*", async (c) => {
   const authInstance = auth(c.env);
   return authInstance.handler(c.req.raw);
@@ -69,8 +54,6 @@ app.route("/api/settings", settingsRoutes);
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
-    const agentResponse = await routeAgentRequest(request, env);
-    if (agentResponse) return agentResponse;
     return app.fetch(request, env, ctx);
   },
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {

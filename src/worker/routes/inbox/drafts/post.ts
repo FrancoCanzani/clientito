@@ -21,7 +21,7 @@ export function registerPostDrafts(api: Hono<AppRouteEnv>) {
       .limit(1);
 
     if (existing[0]) {
-      await db
+      const [updated] = await db
         .update(drafts)
         .set({
           mailboxId: body.mailboxId ?? null,
@@ -35,19 +35,14 @@ export function registerPostDrafts(api: Hono<AppRouteEnv>) {
           attachmentKeys: body.attachmentKeys ?? null,
           updatedAt: now,
         })
-        .where(eq(drafts.id, existing[0].id));
-
-      const rows = await db
-        .select()
-        .from(drafts)
         .where(eq(drafts.id, existing[0].id))
-        .limit(1);
+        .returning();
 
-      const { userId: _userId, ...row } = rows[0]!;
+      const { userId: _userId, ...row } = updated!;
       return c.json(row, 200);
     }
 
-    const inserted = await db
+    const [inserted] = await db
       .insert(drafts)
       .values({
         userId: user.id,
@@ -64,15 +59,9 @@ export function registerPostDrafts(api: Hono<AppRouteEnv>) {
         updatedAt: now,
         createdAt: now,
       })
-      .returning({ id: drafts.id });
+      .returning();
 
-    const rows = await db
-      .select()
-      .from(drafts)
-      .where(eq(drafts.id, inserted[0]!.id))
-      .limit(1);
-
-    const { userId: _userId, ...row } = rows[0]!;
+    const { userId: _userId, ...row } = inserted!;
     return c.json(row, 201);
   });
 }

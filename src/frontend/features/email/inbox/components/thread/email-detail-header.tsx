@@ -19,6 +19,8 @@ export function EmailDetailHeader({
   hasNext = false,
   onForward,
   onReply,
+  readingMode,
+  onReadingModeChange,
 }: {
   email: EmailDetailItem;
   onClose?: () => void;
@@ -29,12 +31,14 @@ export function EmailDetailHeader({
   hasNext?: boolean;
   onForward: (initial: ComposeInitial) => void;
   onReply: () => void;
+  readingMode: "original" | "detox";
+  onReadingModeChange: (mode: "original" | "detox") => void;
 }) {
   return (
-    <div className="sticky top-0 z-20 w-full bg-background pt-6 pb-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="sticky top-0 z-20 flex min-h-14 w-full shrink-0 items-center bg-background">
+      <div className="flex w-full items-center justify-between gap-2">
         <div className="flex items-center gap-0.5">
-          <SidebarTrigger />
+          <SidebarTrigger className="md:hidden" />
           <IconButton
             label="Back"
             shortcut="Esc"
@@ -61,12 +65,38 @@ export function EmailDetailHeader({
           </IconButton>
         </div>
 
-        <EmailActions
-          email={email}
-          onClose={onClose}
-          onForward={onForward}
-          onReply={onReply}
-        />
+        <div className="flex items-center gap-1">
+          <div className="flex items-center rounded-md border border-border/60 bg-muted/50 p-0.5 text-xs">
+            <button
+              type="button"
+              className={`rounded-sm px-2 py-0.5 font-medium transition-colors ${
+                readingMode === "original"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => onReadingModeChange("original")}
+            >
+              Original
+            </button>
+            <button
+              type="button"
+              className={`rounded-sm px-2 py-0.5 font-medium transition-colors ${
+                readingMode === "detox"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => onReadingModeChange("detox")}
+            >
+              Simplified
+            </button>
+          </div>
+          <EmailActions
+            email={email}
+            onClose={onClose}
+            onForward={onForward}
+            onReply={onReply}
+          />
+        </div>
       </div>
     </div>
   );

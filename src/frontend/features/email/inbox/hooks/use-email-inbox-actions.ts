@@ -8,6 +8,7 @@ import type {
 } from "@/features/email/inbox/types";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
 import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
+import { queryKeys } from "@/lib/query-keys";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback } from "react";
@@ -145,10 +146,10 @@ export function useEmailInboxActions({
       const data = actionPayloads[action];
       const idSet = new Set(ids);
 
-      await queryClient.cancelQueries({ queryKey: ["emails"] });
+      await queryClient.cancelQueries({ queryKey: queryKeys.emails.all() });
       const snapshots = queryClient.getQueriesData<
         InfiniteData<EmailListResponse>
-      >({ queryKey: ["emails"] });
+      >({ queryKey: queryKeys.emails.all() });
 
       for (const [key] of snapshots) {
         const queryView = key[1] as EmailView | undefined;
@@ -167,11 +168,11 @@ export function useEmailInboxActions({
 
         for (const id of ids) {
           void queryClient.invalidateQueries({
-            queryKey: ["email-detail", id],
+            queryKey: queryKeys.emails.detail(id),
           });
         }
         void queryClient.invalidateQueries({
-          queryKey: ["emails"],
+          queryKey: queryKeys.emails.all(),
           refetchType: "none",
         });
       } catch (error) {

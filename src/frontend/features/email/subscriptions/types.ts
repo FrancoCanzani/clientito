@@ -13,4 +13,26 @@ export type UnsubscribeResult = {
   fromAddr: string;
   success: boolean;
   url?: string;
+  trashedCount?: number;
+};
+
+export type BulkUnsubscribeResult = {
+  results: UnsubscribeResult[];
+  trashedCount: number;
+};
+
+export type SubscriptionSuggestions = {
+  topSenders: Subscription[];
+  domainGroups: {
+    domain: string;
+    totalEmailCount: number;
+    senderCount: number;
+    senders: {
+      fromAddr: string;
+      fromName: string | null;
+      emailCount: number;
+      unsubscribeUrl: string | null;
+      unsubscribeEmail: string | null;
+    }[];
+  }[];
 };

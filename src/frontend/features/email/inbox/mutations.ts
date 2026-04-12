@@ -1,3 +1,7 @@
+import { localDb } from "@/db/client";
+import { isSynced } from "@/db/sync";
+import { getCurrentUserId } from "@/db/user";
+
 function getErrorMessage(payload: unknown): string | null {
   if (typeof payload !== "object" || payload === null) return null;
   const error = Reflect.get(payload, "error");
@@ -8,16 +12,47 @@ function throwApiError(payload: unknown, fallback: string): never {
   throw new Error(getErrorMessage(payload) ?? fallback);
 }
 
+type EmailPatchPayload = {
+  isRead?: boolean;
+  archived?: boolean;
+  trashed?: boolean;
+  spam?: boolean;
+  starred?: boolean;
+  snoozedUntil?: number | null;
+};
+
+async function syncLocalPatch(emailIds: string[], patch: EmailPatchPayload) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const userId = await getCurrentUserId();
+  if (!userId || !(await isSynced(userId))) {
+    return;
+  }
+
+  const numericIds = emailIds
+    .map((id) => Number(id))
+    .filter((value) => Number.isFinite(value));
+
+  if (numericIds.length === 0) {
+    return;
+  }
+
+  try {
+    if (numericIds.length === 1) {
+      await localDb.updateEmail(userId, numericIds[0]!, patch);
+    } else {
+      await localDb.updateEmails(userId, numericIds, patch);
+    }
+  } catch (error) {
+    console.warn("Failed to sync local email patch", error);
+  }
+}
+
 export async function patchEmail(
   emailId: string,
-  data: {
-    isRead?: boolean;
-    archived?: boolean;
-    trashed?: boolean;
-    spam?: boolean;
-    starred?: boolean;
-    snoozedUntil?: number | null;
-  },
+  data: EmailPatchPayload,
 ): Promise<void> {
   const response = await fetch(`/api/inbox/emails/${emailId}`, {
     method: "PATCH",
@@ -29,18 +64,13 @@ export async function patchEmail(
     const json = await response.json().catch(() => null);
     throwApiError(json, "Failed to update email");
   }
+
+  await syncLocalPatch([emailId], data);
 }
 
 export async function batchPatchEmails(
   emailIds: string[],
-  data: {
-    isRead?: boolean;
-    archived?: boolean;
-    trashed?: boolean;
-    spam?: boolean;
-    starred?: boolean;
-    snoozedUntil?: number | null;
-  },
+  data: EmailPatchPayload,
 ): Promise<void> {
   const response = await fetch("/api/inbox/emails/batch", {
     method: "POST",
@@ -55,6 +85,8 @@ export async function batchPatchEmails(
     const json = await response.json().catch(() => null);
     throwApiError(json, "Failed to update emails");
   }
+
+  await syncLocalPatch(emailIds, data);
 }
 
 export async function markEmailRead(emailId: string): Promise<void> {

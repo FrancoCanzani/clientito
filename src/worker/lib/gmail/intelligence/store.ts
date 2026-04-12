@@ -3,11 +3,9 @@ import type { Database } from "../../../db/client";
 import {
   emailIntelligence,
   emails,
-  type EmailSuspiciousFlag,
 } from "../../../db/schema";
 import { STANDARD_LABELS } from "../types";
 import {
-  DEFAULT_SUSPICIOUS_FLAG,
   ELIGIBILITY_WINDOW_MS,
   MAX_THREAD_MESSAGES,
   type EmailContextRow,
@@ -19,7 +17,6 @@ type StoredClassificationRow =
       typeof emailIntelligence.$inferSelect,
       | "status"
       | "category"
-      | "urgency"
       | "suspiciousJson"
     >
   | null
@@ -34,14 +31,13 @@ export function getIntelligenceStatus(
 export function getStoredEmailClassification(
   row: StoredClassificationRow,
 ): StoredEmailClassification | null {
-  if (!row || row.status !== "ready" || !row.category || !row.urgency) {
+  if (!row || row.status !== "ready" || !row.category) {
     return null;
   }
 
   return {
     category: row.category,
-    urgency: row.urgency,
-    suspicious: row.suspiciousJson ?? DEFAULT_SUSPICIOUS_FLAG satisfies EmailSuspiciousFlag,
+    isSuspicious: row.suspiciousJson?.isSuspicious ?? false,
   };
 }
 

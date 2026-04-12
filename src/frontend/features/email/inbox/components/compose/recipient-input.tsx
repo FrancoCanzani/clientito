@@ -1,4 +1,5 @@
 import { fetchContactSuggestions } from "@/features/email/inbox/queries";
+import { queryKeys } from "@/lib/query-keys";
 import { XIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -120,7 +121,7 @@ export function RecipientInput({
   const debouncedQuery = debouncedInput.length >= 2 ? debouncedInput : "";
 
   const { data } = useQuery({
-    queryKey: ["contact-suggestions", debouncedQuery],
+    queryKey: queryKeys.contactSuggestions(debouncedQuery),
     queryFn: () => fetchContactSuggestions(debouncedQuery),
     enabled: debouncedQuery.length >= 2,
     staleTime: 30_000,

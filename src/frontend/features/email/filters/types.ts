@@ -3,11 +3,12 @@ export type FilterActions = {
   markRead?: boolean;
   star?: boolean;
   applyCategory?:
-    | "action_needed"
-    | "important"
-    | "newsletter"
-    | "transactional"
-    | "notification";
+    | "to_respond"
+    | "to_follow_up"
+    | "fyi"
+    | "notification"
+    | "invoice"
+    | "marketing";
   trash?: boolean;
 };
 

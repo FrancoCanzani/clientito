@@ -10,6 +10,7 @@ import {
   emailSummarySelection,
   hasEmailLabel,
   toEmailListResponse,
+  CATEGORY_VIEWS,
 } from "./utils";
 import { listEmailsQuerySchema } from "./schemas";
 
@@ -25,6 +26,7 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
       isRead,
       view = "inbox",
       mailboxId,
+      includeBody = false,
     } = c.req.valid("query");
 
     const now = Date.now();
@@ -100,39 +102,42 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
     if (isRead === "true") conditions.push(eq(emails.isRead, true));
     else if (isRead === "false") conditions.push(eq(emails.isRead, false));
 
-    switch (view) {
-      case "inbox":
-        conditions.push(hasEmailLabel(STANDARD_LABELS.INBOX));
-        conditions.push(
-          or(isNull(emails.snoozedUntil), lte(emails.snoozedUntil, now))!,
-        );
-        break;
-      case "sent":
-        conditions.push(hasEmailLabel(STANDARD_LABELS.SENT));
-        break;
-      case "spam":
-        conditions.push(hasEmailLabel(STANDARD_LABELS.SPAM));
-        break;
-      case "trash":
-        conditions.push(hasEmailLabel(STANDARD_LABELS.TRASH));
-        break;
-      case "snoozed":
-        conditions.push(gt(emails.snoozedUntil, now));
-        break;
-      case "archived":
-        conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.INBOX)}`);
-        conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SENT)}`);
-        conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.TRASH)}`);
-        conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SPAM)}`);
-        break;
-      case "starred":
-        conditions.push(hasEmailLabel(STANDARD_LABELS.STARRED));
-        break;
-      case "important":
-        conditions.push(
-          sql<boolean>`${emailIntelligence.category} in ('important', 'action_needed')`,
-        );
-        break;
+    if (view && CATEGORY_VIEWS.has(view)) {
+      conditions.push(
+        sql<boolean>`${emailIntelligence.category} = ${view}`,
+      );
+    } else {
+      switch (view) {
+        case "all":
+          break;
+        case "inbox":
+          conditions.push(hasEmailLabel(STANDARD_LABELS.INBOX));
+          conditions.push(
+            or(isNull(emails.snoozedUntil), lte(emails.snoozedUntil, now))!,
+          );
+          break;
+        case "sent":
+          conditions.push(hasEmailLabel(STANDARD_LABELS.SENT));
+          break;
+        case "spam":
+          conditions.push(hasEmailLabel(STANDARD_LABELS.SPAM));
+          break;
+        case "trash":
+          conditions.push(hasEmailLabel(STANDARD_LABELS.TRASH));
+          break;
+        case "snoozed":
+          conditions.push(gt(emails.snoozedUntil, now));
+          break;
+        case "archived":
+          conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.INBOX)}`);
+          conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SENT)}`);
+          conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.TRASH)}`);
+          conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SPAM)}`);
+          break;
+        case "starred":
+          conditions.push(hasEmailLabel(STANDARD_LABELS.STARRED));
+          break;
+      }
     }
 
     const whereClause = and(...conditions);
@@ -141,6 +146,8 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
       .select({
         ...emailSummarySelection,
         ...emailIntelligenceSelection,
+        bodyText: emails.bodyText,
+        bodyHtml: emails.bodyHtml,
       })
       .from(emails)
       .leftJoin(emailIntelligence, eq(emailIntelligence.emailId, emails.id))
@@ -153,7 +160,18 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
 
     return c.json(
       {
-        data: rows.map(toEmailListResponse),
+        data: rows.map((row) => {
+          const item = toEmailListResponse(row);
+          if (!includeBody) {
+            return item;
+          }
+
+          return {
+            ...item,
+            bodyText: row.bodyText ?? null,
+            bodyHtml: row.bodyHtml ?? null,
+          };
+        }),
         pagination: {
           limit,
           offset,

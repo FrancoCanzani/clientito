@@ -1,4 +1,4 @@
-import type { Subscription, UnsubscribeResult } from "./types";
+import type { BulkUnsubscribeResult, Subscription, SubscriptionSuggestions, UnsubscribeResult } from "./types";
 
 function getErrorMessage(payload: unknown): string | null {
   if (typeof payload !== "object" || payload === null) return null;
@@ -17,10 +17,22 @@ export async function fetchSubscriptions(): Promise<Subscription[]> {
   return json;
 }
 
+export async function fetchSuggestions(): Promise<SubscriptionSuggestions> {
+  const response = await fetch("/api/inbox/subscriptions/suggestions");
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(getErrorMessage(payload) ?? "Failed to fetch suggestions");
+  }
+
+  const json: SubscriptionSuggestions = await response.json();
+  return json;
+}
+
 export async function unsubscribe(input: {
   fromAddr: string;
   unsubscribeUrl?: string;
   unsubscribeEmail?: string;
+  trashExisting?: boolean;
 }): Promise<UnsubscribeResult> {
   const response = await fetch("/api/inbox/subscriptions/unsubscribe", {
     method: "POST",
@@ -34,5 +46,24 @@ export async function unsubscribe(input: {
   }
 
   const json: UnsubscribeResult = await response.json();
+  return json;
+}
+
+export async function bulkUnsubscribe(input: {
+  items: { fromAddr: string; unsubscribeUrl?: string; unsubscribeEmail?: string }[];
+  trashExisting?: boolean;
+}): Promise<BulkUnsubscribeResult> {
+  const response = await fetch("/api/inbox/subscriptions/bulk-unsubscribe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(getErrorMessage(payload) ?? "Failed to bulk unsubscribe");
+  }
+
+  const json: BulkUnsubscribeResult = await response.json();
   return json;
 }

@@ -1,3 +1,5 @@
+import { clearLocalData } from "@/db/sync";
+import { resetCurrentUserCache } from "@/db/user";
 import { signOut, useSession } from "@/lib/auth-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -25,9 +27,10 @@ export function useLogout() {
       return result;
     },
     onSuccess: () => {
+      resetCurrentUserCache();
+      void clearLocalData();
       queryClient.clear();
       window.location.href = "/login";
     },
   });
 }
-

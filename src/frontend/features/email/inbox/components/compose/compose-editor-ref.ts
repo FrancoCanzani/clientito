@@ -1,4 +1,5 @@
 import type { Editor } from "@tiptap/core";
+import { escapeHtml } from "../../utils/escape-html";
 
 let activeEditor: Editor | null = null;
 
@@ -21,13 +22,6 @@ export function unregisterComposeEditor(editor?: Editor) {
 export function getComposerBody(): string | null {
   if (!activeEditor) return null;
   return activeEditor.getText();
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 export function plainTextToHtml(text: string): string {

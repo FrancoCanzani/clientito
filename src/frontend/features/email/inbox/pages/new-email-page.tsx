@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ComposeEmailFields } from "@/features/email/inbox/components/compose/compose-email-fields";
 import { useComposeEmail } from "@/features/email/inbox/components/compose/compose-email-state";
-import { useSetPageContext } from "@/hooks/use-page-context";
 import { XIcon } from "@phosphor-icons/react";
 import { getRouteApi } from "@tanstack/react-router";
 import { useMemo } from "react";
@@ -14,8 +13,6 @@ export default function NewEmailPage() {
   const { mailboxId } = route.useParams();
   const { composeKey } = route.useSearch();
   const navigate = route.useNavigate();
-
-  useSetPageContext(useMemo(() => ({ route: "inbox" }), []));
 
   const initialCompose = useMemo(
     () => ({
@@ -38,12 +35,23 @@ export default function NewEmailPage() {
     }
   );
 
+  const navigateBack = () =>
+    navigate({
+      to: "/$mailboxId/inbox",
+      params: { mailboxId },
+    });
+
+  const handleDiscard = async () => {
+    await compose.clearDraft();
+    navigateBack();
+  };
+
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl min-w-0 flex-col">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
       <PageHeader
         title={
           <div className="flex items-center gap-2">
-            <SidebarTrigger />
+            <SidebarTrigger className="md:hidden" />
             <span>New Email</span>
           </div>
         }
@@ -52,12 +60,7 @@ export default function NewEmailPage() {
             type="button"
             variant="ghost"
             size="icon"
-            onClick={() =>
-              navigate({
-                to: "/$mailboxId/inbox",
-                params: { mailboxId },
-              })
-            }
+            onClick={navigateBack}
             aria-label="Close full composer"
           >
             <XIcon className="size-3.5" />
@@ -65,16 +68,14 @@ export default function NewEmailPage() {
         }
       />
 
-      <div className="flex  min-h-0 flex-1 flex-col">
+      <div className="mx-auto w-full max-w-4xl min-h-0 flex-1 flex-col flex">
         <ComposeEmailFields
           compose={compose}
           bodyClassName="flex-1 text-sm leading-relaxed"
-          onEscape={() =>
-            navigate({
-              to: "/$mailboxId/inbox",
-              params: { mailboxId },
-            })
-          }
+          onEscape={navigateBack}
+          onDiscard={() => {
+            void handleDiscard();
+          }}
           recipientAutoFocus={compose.to.trim().length === 0}
           editorAutoFocus={compose.to.trim().length > 0}
         />

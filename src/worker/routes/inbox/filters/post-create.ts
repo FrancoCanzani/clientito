@@ -10,11 +10,12 @@ const actionsSchema = z.object({
   star: z.boolean().optional(),
   applyCategory: z
     .enum([
-      "action_needed",
-      "important",
-      "newsletter",
-      "transactional",
+      "to_respond",
+      "to_follow_up",
+      "fyi",
       "notification",
+      "invoice",
+      "marketing",
     ])
     .optional(),
   trash: z.boolean().optional(),

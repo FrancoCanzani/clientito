@@ -7,6 +7,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { IconButton } from "@/components/ui/icon-button";
+import { Kbd } from "@/components/ui/kbd";
 import { useAuth } from "@/hooks/use-auth";
 import { useMailboxes } from "@/hooks/use-mailboxes";
 import type { Icon } from "@phosphor-icons/react";
@@ -27,6 +28,7 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { queryKeys } from "@/lib/query-keys";
 import { unsubscribe } from "../../../subscriptions/queries";
 import { patchEmail } from "../../mutations";
 import type { ComposeInitial, EmailDetailItem } from "../../types";
@@ -75,8 +77,8 @@ export function EmailActions({
   );
 
   const invalidateEmails = () => {
-    queryClient.invalidateQueries({ queryKey: ["emails"] });
-    queryClient.invalidateQueries({ queryKey: ["email-detail", email.id] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.emails.detail(email.id) });
     void router.invalidate();
   };
 
@@ -180,41 +182,49 @@ export function EmailActions({
     snoozeMutation.isPending ||
     unsubscribeMutation.isPending;
 
+  const handleDone = () =>
+    runEmailPatch(
+      { archived: isInInbox },
+      {
+        successMessage: isInInbox ? "Marked as done" : "Moved to inbox",
+        errorMessage: isInInbox
+          ? "Failed to mark as done"
+          : "Failed to move to inbox",
+        closeAfter: true,
+      },
+    );
+
+  const handleTrash = () =>
+    runEmailPatch(
+      { trashed: true },
+      {
+        successMessage: "Moved to trash",
+        errorMessage: "Failed to delete",
+        closeAfter: true,
+      },
+    );
+
   type MenuAction = {
     icon: Icon;
     iconWeight?: "fill" | "regular";
     label: string;
+    shortcut?: string;
     action: () => void;
   };
 
-  const menuActions: MenuAction[] = [
+  const overflowActions: MenuAction[] = [
     {
-      icon: CheckIcon,
-      label: isInInbox ? "Done" : "Move to inbox",
-      action: () =>
-        runEmailPatch(
-          { archived: isInInbox },
-          {
-            successMessage: isInInbox ? "Marked as done" : "Moved to inbox",
-            errorMessage: isInInbox
-              ? "Failed to mark as done"
-              : "Failed to move to inbox",
-            closeAfter: true,
-          },
-        ),
+      icon: StarIcon,
+      iconWeight: isStarred ? "fill" : "regular",
+      label: isStarred ? "Unstar" : "Star",
+      shortcut: "S",
+      action: () => runEmailPatch({ starred: !isStarred }),
     },
     {
-      icon: TrashIcon,
-      label: "Move to trash",
-      action: () =>
-        runEmailPatch(
-          { trashed: true },
-          {
-            successMessage: "Moved to trash",
-            errorMessage: "Failed to delete",
-            closeAfter: true,
-          },
-        ),
+      icon: email.isRead ? EnvelopeSimpleIcon : EnvelopeSimpleOpenIcon,
+      label: email.isRead ? "Mark as unread" : "Mark as read",
+      shortcut: "U",
+      action: () => runEmailPatch({ isRead: !email.isRead }),
     },
     {
       icon: WarningIcon,
@@ -229,108 +239,139 @@ export function EmailActions({
           },
         ),
     },
-    {
-      icon: StarIcon,
-      iconWeight: isStarred ? "fill" : "regular",
-      label: isStarred ? "Unstar" : "Star",
-      action: () => runEmailPatch({ starred: !isStarred }),
-    },
-    {
-      icon: email.isRead ? EnvelopeSimpleIcon : EnvelopeSimpleOpenIcon,
-      label: email.isRead ? "Mark as unread" : "Mark as read",
-      action: () => runEmailPatch({ isRead: !email.isRead }),
-    },
   ];
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-end gap-2">
-        <div className="flex flex-wrap items-center gap-0.5">
-          <IconButton
-            label="Reply"
-            shortcut="R"
-            variant="ghost"
-            onClick={() => onReply?.()}
-          >
-            <ArrowBendUpLeftIcon className="size-3.5" />
-          </IconButton>
-          {showReplyAll && (
-            <IconButton label="Reply all" onClick={handleReplyAll}>
-              <ArrowBendDoubleUpLeftIcon className="size-3.5" />
-            </IconButton>
-          )}
-          <IconButton label="Forward" onClick={handleForward}>
-            <ArrowBendUpRightIcon className="size-3.5" />
-          </IconButton>
-        </div>
+    <div className="flex items-center gap-0.5">
+      {/* Done & Delete — always visible */}
+      <IconButton
+        label={isInInbox ? "Done" : "Move to inbox"}
+        shortcut="E"
+        variant="ghost"
+        disabled={actionsPending}
+        onClick={handleDone}
+      >
+        <CheckIcon className="size-3.5" />
+      </IconButton>
+      <IconButton
+        label="Delete"
+        shortcut="#"
+        variant="ghost"
+        disabled={actionsPending}
+        onClick={handleTrash}
+      >
+        <TrashIcon className="size-3.5" />
+      </IconButton>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-lg"
-              disabled={actionsPending}
-              aria-label="More actions"
-            >
-              <DotsThreeIcon className="size-3.5" weight="bold" />
-            </Button>
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent>
-            {menuActions.map((item) => {
-              const IconComponent = item.icon;
-              return (
-                <DropdownMenuItem
-                  key={item.label}
-                  disabled={actionsPending}
-                  onSelect={item.action}
-                >
-                  <IconComponent
-                    className="size-3.5"
-                    weight={item.iconWeight}
-                  />
-                  <span className="flex-1">{item.label}</span>
-                </DropdownMenuItem>
-              );
-            })}
-            <DropdownMenuSeparator />
-            {isSnoozed ? (
-              <DropdownMenuItem
-                disabled={actionsPending}
-                onSelect={() => snoozeMutation.mutate(null)}
-              >
-                <ClockIcon className="size-3.5" weight="fill" />
-                <span className="flex-1">Unsnooze</span>
-              </DropdownMenuItem>
-            ) : (
-              <SnoozePicker
-                onSnooze={(timestamp) => snoozeMutation.mutate(timestamp)}
-              >
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={actionsPending}
-                  className="h-auto w-full justify-start px-2 py-1 text-xs/relaxed"
-                >
-                  <ClockIcon className="size-3.5" />
-                  Snooze
-                </Button>
-              </SnoozePicker>
-            )}
-            {hasUnsubscribe && (
-              <DropdownMenuItem
-                disabled={actionsPending}
-                onSelect={() => unsubscribeMutation.mutate()}
-              >
-                <BellSlashIcon className="size-3.5" />
-                <span className="flex-1">Unsubscribe</span>
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+      {/* Reply, Reply All, Forward — visible on desktop */}
+      <div className="hidden items-center gap-0.5 sm:flex">
+        <IconButton
+          label="Reply"
+          shortcut="R"
+          variant="ghost"
+          onClick={() => onReply?.()}
+        >
+          <ArrowBendUpLeftIcon className="size-3.5" />
+        </IconButton>
+        {showReplyAll && (
+          <IconButton label="Reply all" variant="ghost" onClick={handleReplyAll}>
+            <ArrowBendDoubleUpLeftIcon className="size-3.5" />
+          </IconButton>
+        )}
+        <IconButton label="Forward" shortcut="F" variant="ghost" onClick={handleForward}>
+          <ArrowBendUpRightIcon className="size-3.5" />
+        </IconButton>
       </div>
+
+      {/* Overflow menu */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-lg"
+            disabled={actionsPending}
+            aria-label="More actions"
+          >
+            <DotsThreeIcon className="size-3.5" weight="bold" />
+          </Button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent align="end">
+          {/* Reply/Forward — mobile only */}
+          <div className="sm:hidden">
+            <DropdownMenuItem onSelect={() => onReply?.()}>
+              <ArrowBendUpLeftIcon className="size-3.5" />
+              <span className="flex-1">Reply</span>
+              <Kbd>R</Kbd>
+            </DropdownMenuItem>
+            {showReplyAll && (
+              <DropdownMenuItem onSelect={handleReplyAll}>
+                <ArrowBendDoubleUpLeftIcon className="size-3.5" />
+                <span className="flex-1">Reply all</span>
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={handleForward}>
+              <ArrowBendUpRightIcon className="size-3.5" />
+              <span className="flex-1">Forward</span>
+              <Kbd>F</Kbd>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </div>
+
+          {overflowActions.map((item) => {
+            const IconComponent = item.icon;
+            return (
+              <DropdownMenuItem
+                key={item.label}
+                disabled={actionsPending}
+                onSelect={item.action}
+              >
+                <IconComponent
+                  className="size-3.5"
+                  weight={item.iconWeight}
+                />
+                <span className="flex-1">{item.label}</span>
+                {item.shortcut && <Kbd>{item.shortcut}</Kbd>}
+              </DropdownMenuItem>
+            );
+          })}
+          <DropdownMenuSeparator />
+          {isSnoozed ? (
+            <DropdownMenuItem
+              disabled={actionsPending}
+              onSelect={() => snoozeMutation.mutate(null)}
+            >
+              <ClockIcon className="size-3.5" weight="fill" />
+              <span className="flex-1">Unsnooze</span>
+            </DropdownMenuItem>
+          ) : (
+            <SnoozePicker
+              onSnooze={(timestamp) => snoozeMutation.mutate(timestamp)}
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={actionsPending}
+                className="h-auto w-full justify-start px-2 py-1 text-xs/relaxed"
+              >
+                <ClockIcon className="size-3.5" />
+                Snooze
+              </Button>
+            </SnoozePicker>
+          )}
+          {hasUnsubscribe && (
+            <DropdownMenuItem
+              disabled={actionsPending}
+              onSelect={() => unsubscribeMutation.mutate()}
+            >
+              <BellSlashIcon className="size-3.5" />
+              <span className="flex-1">Unsubscribe</span>
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

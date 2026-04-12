@@ -1,4 +1,6 @@
 import { patchEmail } from "@/features/email/inbox/mutations";
+import type { EmailListResponse } from "@/features/email/inbox/types";
+import { queryKeys } from "@/lib/query-keys";
 import {
   CheckIcon,
   ClockIcon,
@@ -9,6 +11,7 @@ import {
   TrayIcon,
   WarningIcon,
 } from "@phosphor-icons/react";
+import type { InfiniteData } from "@tanstack/react-query";
 import { addHours, nextMonday, startOfTomorrow } from "date-fns";
 import { toast } from "sonner";
 import { paletteIcon } from "../registry/palette-icon";
@@ -19,26 +22,60 @@ import type {
   CommandServices,
 } from "../registry/types";
 
+type PatchData = Parameters<typeof patchEmail>[1];
+
+// Actions that remove the email from the current list view.
+function removesFromList(data: PatchData): boolean {
+  return Boolean(data.archived || data.trashed || data.spam || data.snoozedUntil);
+}
+
+function optimisticRemove(
+  old: InfiniteData<EmailListResponse> | undefined,
+  emailId: string,
+): InfiniteData<EmailListResponse> | undefined {
+  if (!old) return old;
+  return {
+    ...old,
+    pages: old.pages.map((page) => ({
+      ...page,
+      data: page.data.filter((e) => e.id !== emailId),
+    })),
+  };
+}
+
 async function performEmailAction(
   ctx: CommandContext,
   services: CommandServices,
-  data: Parameters<typeof patchEmail>[1],
+  data: PatchData,
+  label?: string,
 ) {
   if (!ctx.selectedEmailId) return;
+  services.close();
+
+  const emailId = ctx.selectedEmailId;
+
+  // Optimistically remove from all list caches if this action hides the email.
+  if (removesFromList(data)) {
+    services.queryClient.setQueriesData<InfiniteData<EmailListResponse>>(
+      { queryKey: queryKeys.emails.all() },
+      (old) => optimisticRemove(old, emailId),
+    );
+  }
+
   try {
-    await patchEmail(ctx.selectedEmailId, data);
-    void services.queryClient.invalidateQueries({
-      queryKey: ["email-detail", ctx.selectedEmailId],
-    });
-    void services.queryClient.invalidateQueries({
-      queryKey: ["emails"],
-    });
+    await patchEmail(emailId, data);
   } catch (error) {
-    void services.queryClient.invalidateQueries({
-      queryKey: ["emails"],
-    });
     toast.error(error instanceof Error ? error.message : "Action failed");
   }
+
+  void services.queryClient.invalidateQueries({
+    queryKey: queryKeys.emails.all(),
+  });
+  void services.queryClient.invalidateQueries({
+    queryKey: queryKeys.emails.detail(emailId),
+  });
+
+  if (label) toast(label);
 }
 
 const hasEmail = (ctx: CommandContext) => ctx.selectedEmailId !== null;
@@ -51,7 +88,7 @@ const emailCommands: Command[] = [
     group: "email",
     shortcut: "E",
     keywords: ["done", "archive", "remove"],
-    when: (ctx) => hasEmail(ctx) && ctx.selectedEmailIsArchived !== true,
+    when: hasEmail,
     perform: (ctx, services) =>
       performEmailAction(ctx, services, { archived: true }),
   },
@@ -61,7 +98,7 @@ const emailCommands: Command[] = [
     icon: paletteIcon(TrayIcon),
     group: "email",
     keywords: ["unarchive", "inbox", "move"],
-    when: (ctx) => hasEmail(ctx) && ctx.selectedEmailIsArchived === true,
+    when: hasEmail,
     perform: (ctx, services) =>
       performEmailAction(ctx, services, { archived: false }),
   },
@@ -74,7 +111,7 @@ const emailCommands: Command[] = [
     keywords: ["trash", "delete", "remove"],
     when: hasEmail,
     perform: (ctx, services) =>
-      performEmailAction(ctx, services, { trashed: true }),
+      performEmailAction(ctx, services, { trashed: true }, "Moved to trash"),
   },
   {
     id: "email:spam",
@@ -84,7 +121,7 @@ const emailCommands: Command[] = [
     keywords: ["spam", "junk"],
     when: hasEmail,
     perform: (ctx, services) =>
-      performEmailAction(ctx, services, { spam: true }),
+      performEmailAction(ctx, services, { spam: true }, "Marked as spam"),
   },
   {
     id: "email:mark-read",
@@ -93,7 +130,7 @@ const emailCommands: Command[] = [
     group: "email",
     shortcut: "U",
     keywords: ["read", "seen"],
-    when: (ctx) => hasEmail(ctx) && ctx.selectedEmailIsRead !== true,
+    when: hasEmail,
     perform: (ctx, services) =>
       performEmailAction(ctx, services, { isRead: true }),
   },
@@ -104,7 +141,7 @@ const emailCommands: Command[] = [
     group: "email",
     shortcut: "U",
     keywords: ["unread", "unseen"],
-    when: (ctx) => hasEmail(ctx) && ctx.selectedEmailIsRead !== false,
+    when: hasEmail,
     perform: (ctx, services) =>
       performEmailAction(ctx, services, { isRead: false }),
   },
@@ -136,12 +173,13 @@ const emailCommands: Command[] = [
     group: "email",
     keywords: ["snooze", "remind", "later"],
     when: hasEmail,
-    perform: (ctx, services) => {
-      performEmailAction(ctx, services, {
-        snoozedUntil: addHours(new Date(), 1).getTime(),
-      });
-      services.close();
-    },
+    perform: (ctx, services) =>
+      performEmailAction(
+        ctx,
+        services,
+        { snoozedUntil: addHours(new Date(), 1).getTime() },
+        "Snoozed for 1 hour",
+      ),
   },
   {
     id: "email:snooze-tomorrow",
@@ -150,12 +188,13 @@ const emailCommands: Command[] = [
     group: "email",
     keywords: ["snooze", "remind", "tomorrow"],
     when: hasEmail,
-    perform: (ctx, services) => {
-      performEmailAction(ctx, services, {
-        snoozedUntil: startOfTomorrow().getTime(),
-      });
-      services.close();
-    },
+    perform: (ctx, services) =>
+      performEmailAction(
+        ctx,
+        services,
+        { snoozedUntil: startOfTomorrow().getTime() },
+        "Snoozed until tomorrow",
+      ),
   },
   {
     id: "email:snooze-next-week",
@@ -164,12 +203,13 @@ const emailCommands: Command[] = [
     group: "email",
     keywords: ["snooze", "remind", "next week"],
     when: hasEmail,
-    perform: (ctx, services) => {
-      performEmailAction(ctx, services, {
-        snoozedUntil: nextMonday(new Date()).getTime(),
-      });
-      services.close();
-    },
+    perform: (ctx, services) =>
+      performEmailAction(
+        ctx,
+        services,
+        { snoozedUntil: nextMonday(new Date()).getTime() },
+        "Snoozed until next week",
+      ),
   },
 ];
 

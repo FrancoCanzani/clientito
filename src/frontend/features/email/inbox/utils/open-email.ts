@@ -4,7 +4,10 @@ import type { EmailDetailItem, EmailListItem, EmailListResponse } from "@/featur
 import type {
   EmailFolderView,
   EmailView,
+  InboxLabelView,
 } from "@/features/email/inbox/utils/inbox-filters";
+import { INBOX_LABEL_VALUES } from "@/features/email/inbox/utils/inbox-filters";
+import { queryKeys } from "@/lib/query-keys";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 
 type NavigateToEmail = (
@@ -21,10 +24,12 @@ type NavigateToEmail = (
       }
     | {
         to: "/$mailboxId/inbox/labels/$label/email/$emailId";
-        params: { mailboxId: number; label: "important"; emailId: string };
+        params: { mailboxId: number; label: InboxLabelView; emailId: string };
         replace?: boolean;
       },
 ) => void;
+
+const LABEL_VIEW_SET = new Set<string>(INBOX_LABEL_VALUES);
 
 export function openEmail(
   queryClient: QueryClient,
@@ -34,26 +39,30 @@ export function openEmail(
   options?: { replace?: boolean; context?: EmailView },
 ) {
   void queryClient.prefetchQuery({
-    queryKey: ["email-detail", email.id],
-    queryFn: () => fetchEmailDetail(email.id),
+    queryKey: queryKeys.emails.detail(email.id),
+    queryFn: () =>
+      fetchEmailDetail(email.id, {
+        mailboxId: routeMailboxId,
+        view: options?.context,
+      }),
   });
 
   void queryClient.prefetchQuery({
-    queryKey: ["email-ai-detail", email.id],
+    queryKey: queryKeys.emails.aiDetail(email.id),
     queryFn: () => fetchEmailDetailAI(email.id),
   });
 
   const context = options?.context ?? "inbox";
-  if (context === "important") {
+  if (LABEL_VIEW_SET.has(context)) {
     navigate({
       to: "/$mailboxId/inbox/labels/$label/email/$emailId",
-      params: { mailboxId: routeMailboxId, label: "important", emailId: email.id },
+      params: { mailboxId: routeMailboxId, label: context as InboxLabelView, emailId: email.id },
       replace: options?.replace,
     });
   } else if (context !== "inbox") {
     navigate({
       to: "/$mailboxId/$folder/email/$emailId",
-      params: { mailboxId: routeMailboxId, folder: context, emailId: email.id },
+      params: { mailboxId: routeMailboxId, folder: context as EmailFolderView, emailId: email.id },
       replace: options?.replace,
     });
   } else {
@@ -73,7 +82,7 @@ export function markEmailOpened(
 ) {
   if (email.isRead) return;
   queryClient.setQueriesData<InfiniteData<EmailListResponse>>(
-    { queryKey: ["emails"] },
+    { queryKey: queryKeys.emails.all() },
     (current) => {
       if (!current) return current;
       let changed = false;
@@ -92,7 +101,7 @@ export function markEmailOpened(
   );
 
   queryClient.setQueryData<EmailDetailItem | undefined>(
-    ["email-detail", email.id],
+    queryKeys.emails.detail(email.id),
     (current) => {
       if (!current || current.isRead) return current;
       return { ...current, isRead: true };
@@ -100,7 +109,7 @@ export function markEmailOpened(
   );
 
   void markEmailRead(email.id).catch(() => {
-    queryClient.invalidateQueries({ queryKey: ["emails"] });
-    queryClient.invalidateQueries({ queryKey: ["email-detail", email.id] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.emails.detail(email.id) });
   });
 }

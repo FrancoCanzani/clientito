@@ -8,6 +8,15 @@ import {
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
 
+const CATEGORY_VIEWS = new Set([
+  "to_respond",
+  "to_follow_up",
+  "fyi",
+  "notification",
+  "invoice",
+  "marketing",
+]);
+
 export const emailSummarySelection = {
   id: emails.id,
   mailboxId: emails.mailboxId,
@@ -32,7 +41,6 @@ export const emailSummarySelection = {
 export const emailIntelligenceSelection = {
   intelligenceStatus: emailIntelligence.status,
   intelligenceCategory: emailIntelligence.category,
-  intelligenceUrgency: emailIntelligence.urgency,
   intelligenceSuspiciousJson: emailIntelligence.suspiciousJson,
 } as const;
 
@@ -65,7 +73,6 @@ export function toEmailListResponse(row: {
   snoozedUntil: number | null;
   intelligenceStatus: "pending" | "ready" | "error" | null;
   intelligenceCategory: import("../../../db/schema").EmailIntelligenceCategory | null;
-  intelligenceUrgency: import("../../../db/schema").EmailIntelligenceUrgency | null;
   intelligenceSuspiciousJson: import("../../../db/schema").EmailSuspiciousFlag | null;
 }) {
   const labelIds = row.labelIds ?? [];
@@ -97,12 +104,8 @@ export function toEmailListResponse(row: {
         ? {
             status: row.intelligenceStatus,
             category: row.intelligenceCategory,
-            urgency: row.intelligenceUrgency,
             suspiciousJson: row.intelligenceSuspiciousJson ?? {
               isSuspicious: false,
-              kind: null,
-              reason: null,
-              confidence: null,
             },
           }
         : null,
@@ -172,4 +175,4 @@ export function resolveInlineCidImages(
   );
 }
 
-export { HAS_ATTACHMENT_LABEL };
+export { HAS_ATTACHMENT_LABEL, CATEGORY_VIEWS };

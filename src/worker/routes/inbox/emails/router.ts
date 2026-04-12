@@ -11,6 +11,7 @@ import { registerPatchEmail } from "./patch";
 import { registerBatchPatchEmails } from "./patch-batch";
 import { registerPostEmail } from "./post";
 import { registerUploadAttachments } from "./post-attachments";
+import { registerGetIntelligenceUpdates } from "./get-intelligence-updates";
 
 const emailsRoutes = new Hono<AppRouteEnv>();
 
@@ -22,6 +23,7 @@ registerGetAttachment(emailsRoutes);
 registerUploadAttachments(emailsRoutes);
 registerGetScheduledEmails(emailsRoutes);
 registerGetEmailAIDetail(emailsRoutes);
+registerGetIntelligenceUpdates(emailsRoutes);
 registerGetEmail(emailsRoutes);
 registerPatchEmail(emailsRoutes);
 registerPostEmail(emailsRoutes);

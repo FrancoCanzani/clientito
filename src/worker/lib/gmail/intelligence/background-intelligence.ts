@@ -1,23 +1,16 @@
 import { eq, inArray, or, sql } from "drizzle-orm";
 import type { Database } from "../../../db/client";
-import { emailIntelligence, emails, type FilterActions } from "../../../db/schema";
-import { applyEmailPatch } from "../../../routes/inbox/emails/internal/mutation";
+import { emailIntelligence, emails } from "../../../db/schema";
 import { truncate } from "../../utils";
-import { GmailDriver } from "../driver";
-import { getUserFilters } from "../user-filters";
 import {
-  buildFilterPrompt,
   buildSourceHash,
   buildThreadPrompt,
   EMAIL_INTELLIGENCE_SCHEMA_VERSION,
   emailClassificationOutputSchema,
   generateStructuredEmailObject,
   normalizeEmailClassificationOutput,
-  normalizeMatchedFilterIds,
   INLINE_PROCESS_LIMIT,
   MAX_RETRY_ATTEMPTS,
-  type ActiveEmailFilter,
-  type EmailContextRow,
 } from "./common";
 import {
   getStoredEmailClassification,
@@ -32,73 +25,17 @@ const CLASSIFICATION_SYSTEM = [
   "",
   "## Classification",
   "- category:",
-  "  - action_needed: the user must do something — pay, reply, sign, approve, renew, or meet a deadline. Government, tax, legal, and financial deadlines are always action_needed.",
-  "  - important: high-value updates the user should know about but that don't require a response.",
-  "  - notification: automated alerts, status updates, policy changes, product announcements.",
-  "  - newsletter: recurring content digests, blog roundups, marketing.",
-  "  - transactional: receipts, order confirmations, password resets.",
-  "- urgency: high for items with a deadline within 7 days, medium for this week, low for informational.",
+  "  - to_respond: the user must reply — a question was asked, a meeting proposed, approval requested, or a personal message expects an answer.",
+  "  - to_follow_up: the user must act but not reply — pay a bill, sign a document, meet a deadline, renew a subscription. Government, tax, legal, and financial deadlines are always to_follow_up.",
+  "  - fyi: informational updates the user should know about — status changes, announcements, newsletters, digests, blog roundups.",
+  "  - notification: automated alerts, app notifications, social media summaries, security alerts, product updates.",
+  "  - invoice: receipts, order confirmations, payment confirmations, bills, invoices, refunds, shipping notifications.",
+  "  - marketing: promotional emails, sales, discounts, flash deals, product offers, company marketing campaigns.",
   "",
   "## Safety",
-  "- Set suspicious.isSuspicious=true only when there are concrete scam or impersonation signals.",
-  "- Use suspicious.kind for phishing, impersonation, credential_harvest, or payment_fraud.",
-  "- Use suspicious.reason to explain the strongest signal in one short sentence.",
-  "- If the email appears normal or you are unsure, set isSuspicious=false and other suspicious fields to null.",
-  "",
-  "## Filter Matching",
-  "- matchedFilterIds: include only the provided filter IDs that clearly match this email.",
-  "- If no provided filters clearly match, return an empty array.",
+  "- Set isSuspicious=true only when there are concrete scam or impersonation signals (phishing links, credential harvesting, payment fraud, sender impersonation).",
+  "- If the email appears normal or you are unsure, set isSuspicious=false.",
 ].join("\n");
-
-async function applyFilterActions(
-  db: Database,
-  env: Env,
-  email: EmailContextRow,
-  filters: ActiveEmailFilter[],
-) {
-  const matchedFilters = filters.filter(
-    (filter) => Boolean(filter.actions) && Object.keys(filter.actions).length > 0,
-  );
-  if (matchedFilters.length === 0) {
-    return { categoryOverride: null as FilterActions["applyCategory"] | null };
-  }
-
-  let categoryOverride: FilterActions["applyCategory"] | null = null;
-  const mutation: Parameters<typeof applyEmailPatch>[1] = {};
-
-  for (const filter of matchedFilters) {
-    if (filter.actions.markRead) mutation.isRead = true;
-    if (filter.actions.archive) mutation.archived = true;
-    if (filter.actions.trash) mutation.trashed = true;
-    if (filter.actions.star) mutation.starred = true;
-    if (filter.actions.applyCategory) {
-      categoryOverride = filter.actions.applyCategory;
-    }
-  }
-
-  if (Object.keys(mutation).length === 0) {
-    return { categoryOverride };
-  }
-
-  const patch = applyEmailPatch(email, mutation);
-  if (Object.keys(patch.dbUpdates).length > 0) {
-    await db.update(emails).set(patch.dbUpdates).where(eq(emails.id, email.id));
-  }
-
-  if (
-    email.mailboxId &&
-    (patch.addLabelIds.length > 0 || patch.removeLabelIds.length > 0)
-  ) {
-    const provider = new GmailDriver(db, env, email.mailboxId);
-    await provider.modifyLabels(
-      [email.providerMessageId],
-      patch.addLabelIds,
-      patch.removeLabelIds,
-    );
-  }
-
-  return { categoryOverride };
-}
 
 export async function enqueueEmailIntelligence(
   db: Database,
@@ -203,8 +140,7 @@ async function processEmailIntelligence(
   if (
     existing?.status === "ready" &&
     existing.sourceHash === nextSourceHash &&
-    existing.category &&
-    existing.urgency
+    existing.category
   ) {
     return getStoredEmailClassification(existing);
   }
@@ -233,10 +169,7 @@ async function processEmailIntelligence(
     });
 
   try {
-    const activeFilters = await getUserFilters(db, email.userId);
-    const prompt = [buildThreadPrompt(email, threadMessages), buildFilterPrompt(activeFilters)]
-      .filter(Boolean)
-      .join("\n");
+    const prompt = buildThreadPrompt(email, threadMessages);
 
     const result = await generateStructuredEmailObject({
       env,
@@ -244,29 +177,16 @@ async function processEmailIntelligence(
       system: CLASSIFICATION_SYSTEM,
       schema: emailClassificationOutputSchema,
     });
-    const matchedFilterIds = normalizeMatchedFilterIds(
-      result.object.matchedFilterIds,
-      activeFilters,
-    );
     const classification = normalizeEmailClassificationOutput(result.object);
 
-    const { categoryOverride } = await applyFilterActions(
-      db,
-      env,
-      email,
-      activeFilters.filter((filter) => matchedFilterIds.includes(filter.id)),
-    );
-
-    const category = categoryOverride ?? classification.category;
     const contentChanged = existing?.sourceHash !== nextSourceHash;
 
     await db
       .update(emailIntelligence)
       .set({
         mailboxId: email.mailboxId,
-        category,
-        urgency: classification.urgency,
-        suspiciousJson: classification.suspicious,
+        category: classification.category,
+        suspiciousJson: { isSuspicious: classification.isSuspicious },
         // Clear stale on-demand data only when email content changed
         ...(contentChanged ? { summary: null, actionsJson: [] } : {}),
         status: "ready",

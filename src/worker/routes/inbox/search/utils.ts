@@ -7,6 +7,12 @@ export const SEARCH_VIEW_VALUES = [
   "archived",
   "starred",
   "important",
+  "to_respond",
+  "to_follow_up",
+  "fyi",
+  "notification",
+  "invoice",
+  "marketing",
 ] as const;
 
 export type SearchView = (typeof SEARCH_VIEW_VALUES)[number];
@@ -19,10 +25,48 @@ export type ParsedSearchQuery = {
   isRead?: boolean;
   hasAttachment?: boolean;
   view?: SearchView;
+  before?: number;
+  after?: number;
 };
 
 export function escapeLikePattern(input: string) {
   return input.replace(/[\\%_]/g, "\\$&");
+}
+
+const RELATIVE_DATE_RE = /^(\d+)([dwmy])$/;
+
+/**
+ * Parses a date value into a Unix timestamp (ms).
+ * Accepts ISO dates (2024-01-15) or relative shorthand (7d, 2w, 3m, 1y).
+ */
+function parseDateValue(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const relMatch = trimmed.match(RELATIVE_DATE_RE);
+  if (relMatch) {
+    const amount = Number(relMatch[1]);
+    const unit = relMatch[2];
+    const now = new Date();
+    switch (unit) {
+      case "d":
+        now.setDate(now.getDate() - amount);
+        break;
+      case "w":
+        now.setDate(now.getDate() - amount * 7);
+        break;
+      case "m":
+        now.setMonth(now.getMonth() - amount);
+        break;
+      case "y":
+        now.setFullYear(now.getFullYear() - amount);
+        break;
+    }
+    return now.getTime();
+  }
+
+  const ts = new Date(trimmed).getTime();
+  return Number.isNaN(ts) ? null : ts;
 }
 
 export function parseSearchQuery(input: string): ParsedSearchQuery {
@@ -79,6 +123,18 @@ export function parseSearchQuery(input: string): ParsedSearchQuery {
         parsed.view = view;
         continue;
       }
+    }
+
+    if (lowerToken.startsWith("before:")) {
+      const ts = parseDateValue(token.slice(7));
+      if (ts !== null) parsed.before = ts;
+      continue;
+    }
+
+    if (lowerToken.startsWith("after:")) {
+      const ts = parseDateValue(token.slice(6));
+      if (ts !== null) parsed.after = ts;
+      continue;
     }
 
     plainTerms.push(stripQuotes(token));

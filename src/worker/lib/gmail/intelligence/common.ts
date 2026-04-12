@@ -1,11 +1,7 @@
 import { Output, generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
-import {
-  type EmailSuspiciousFlag,
-  type FilterActions,
-} from "../../../db/schema";
-import { truncate, withRetry } from "../../utils";
+import { withRetry } from "../../utils";
 
 const EMAIL_INTELLIGENCE_MODEL = "gpt-5.4-mini";
 export const EMAIL_INTELLIGENCE_SCHEMA_VERSION = 1;
@@ -13,51 +9,25 @@ export const MAX_THREAD_MESSAGES = 6;
 export const INLINE_PROCESS_LIMIT = 5;
 export const MAX_RETRY_ATTEMPTS = 3;
 export const ELIGIBILITY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
-export const DEFAULT_SUSPICIOUS_FLAG: EmailSuspiciousFlag = {
-  isSuspicious: false,
-  kind: null,
-  reason: null,
-  confidence: null,
-};
-
-const suspiciousFlagOutputSchema = z.object({
-  isSuspicious: z.boolean(),
-  kind: z.enum([
-    "phishing",
-    "impersonation",
-    "credential_harvest",
-    "payment_fraud",
-  ]).nullable(),
-  reason: z.string().trim().max(280).nullable(),
-  confidence: z.enum(["low", "medium", "high"]).nullable(),
-});
 
 /** Background email classification only */
 export const emailClassificationOutputSchema = z.object({
   category: z.enum([
-    "important",
-    "action_needed",
-    "newsletter",
+    "to_respond",
+    "to_follow_up",
+    "fyi",
     "notification",
-    "transactional",
+    "invoice",
+    "marketing",
   ]),
-  urgency: z.enum(["high", "medium", "low"]),
-  suspicious: suspiciousFlagOutputSchema,
-  matchedFilterIds: z.array(z.number().int().positive()),
+  isSuspicious: z.boolean(),
 });
 
 export type EmailClassificationOutput = z.infer<typeof emailClassificationOutputSchema>;
 
-export type ActiveEmailFilter = {
-  id: number;
-  description: string;
-  actions: FilterActions;
-};
-
 export type StoredEmailClassification = {
-  category: "important" | "action_needed" | "newsletter" | "notification" | "transactional";
-  urgency: "high" | "medium" | "low";
-  suspicious: EmailSuspiciousFlag;
+  category: "to_respond" | "to_follow_up" | "fyi" | "notification" | "invoice" | "marketing";
+  isSuspicious: boolean;
 };
 
 export type EmailContextRow = {
@@ -98,42 +68,13 @@ async function sha256(input: string): Promise<string> {
   return toHex(digest);
 }
 
-function normalizeSuspiciousFlag(
-  suspicious: EmailClassificationOutput["suspicious"],
-): EmailSuspiciousFlag {
-  if (!suspicious?.isSuspicious) {
-    return DEFAULT_SUSPICIOUS_FLAG;
-  }
-
-  const reason = typeof suspicious.reason === "string"
-    ? truncate(suspicious.reason.replace(/\s+/g, " ").trim(), 280)
-    : "";
-
-  return {
-    isSuspicious: true,
-    kind: suspicious.kind ?? null,
-    reason: reason || null,
-    confidence: suspicious.confidence ?? null,
-  };
-}
-
 export function normalizeEmailClassificationOutput(
   output: EmailClassificationOutput,
 ): StoredEmailClassification {
   return {
     category: output.category,
-    urgency: output.urgency,
-    suspicious: normalizeSuspiciousFlag(output.suspicious),
+    isSuspicious: Boolean(output.isSuspicious),
   };
-}
-
-export function normalizeMatchedFilterIds(
-  matchedFilterIds: number[],
-  filters: ActiveEmailFilter[],
-) {
-  if (filters.length === 0 || matchedFilterIds.length === 0) return [];
-  const filterIds = new Set(filters.map((filter) => filter.id));
-  return [...new Set(matchedFilterIds)].filter((id) => filterIds.has(id));
 }
 
 export async function buildSourceHash(email: EmailContextRow, threadMessages: EmailContextRow[]) {
@@ -199,16 +140,6 @@ export function buildThreadPrompt(
   ].filter((line): line is string => line !== null);
 
   return lines.join("\n");
-}
-
-export function buildFilterPrompt(filters: ActiveEmailFilter[]) {
-  if (filters.length === 0) return null;
-
-  return [
-    "",
-    "Active filters:",
-    ...filters.map((filter) => `Filter ${filter.id}: ${filter.description}`),
-  ].join("\n");
 }
 
 export async function generateStructuredEmailObject<T extends z.ZodTypeAny>(input: {

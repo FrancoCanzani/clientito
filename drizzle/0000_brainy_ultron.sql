@@ -196,18 +196,6 @@ CREATE INDEX `mailboxes_user_idx` ON `mailboxes` (`user_id`);--> statement-break
 CREATE UNIQUE INDEX `mailboxes_account_idx` ON `mailboxes` (`account_id`);--> statement-breakpoint
 CREATE INDEX `mailboxes_auth_state_idx` ON `mailboxes` (`auth_state`);--> statement-breakpoint
 CREATE INDEX `mailboxes_last_success_idx` ON `mailboxes` (`last_successful_sync_at`);--> statement-breakpoint
-CREATE TABLE `notes` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`user_id` text NOT NULL,
-	`title` text DEFAULT 'Untitled note' NOT NULL,
-	`content` text NOT NULL,
-	`is_pinned` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL,
-	`updated_at` integer DEFAULT 0 NOT NULL,
-	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `notes_user_updated_idx` ON `notes` (`user_id`,`updated_at`);--> statement-breakpoint
 CREATE TABLE `scheduled_emails` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` text NOT NULL,

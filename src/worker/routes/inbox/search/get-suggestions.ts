@@ -15,7 +15,7 @@ import { z } from "zod";
 import { emailIntelligence, emails } from "../../../db/schema";
 import { isAutomatedSender } from "../../../lib/domains";
 import type { AppRouteEnv } from "../../types";
-import { HAS_ATTACHMENT_LABEL, hasEmailLabel } from "../emails/utils";
+import { HAS_ATTACHMENT_LABEL, CATEGORY_VIEWS, hasEmailLabel } from "../emails/utils";
 import { escapeLikePattern, parseSearchQuery, SEARCH_VIEW_VALUES } from "./utils";
 
 const searchSuggestionsQuerySchema = z.object({
@@ -58,6 +58,20 @@ function buildFilterSuggestions(query: string) {
         query: "in:important",
         description: "Focus on priority mail",
       },
+      {
+        kind: "filter" as const,
+        id: "filter-past-week",
+        label: "Past week",
+        query: "after:7d",
+        description: "Messages from the last 7 days",
+      },
+      {
+        kind: "filter" as const,
+        id: "filter-past-month",
+        label: "Past month",
+        query: "after:30d",
+        description: "Messages from the last 30 days",
+      },
     ];
   }
 
@@ -90,6 +104,13 @@ function buildFilterSuggestions(query: string) {
       query: `has:attachment ${query}`,
       description: "Messages with files attached",
     },
+    {
+      kind: "filter" as const,
+      id: `filter-past-week-${query}`,
+      label: `"${query}" from past week`,
+      query: `after:7d ${query}`,
+      description: "Recent results only",
+    },
   ];
 }
 
@@ -97,6 +118,10 @@ function buildViewConditions(
   view: (typeof SEARCH_VIEW_VALUES)[number] | undefined,
   now: number,
 ) {
+  if (view && CATEGORY_VIEWS.has(view)) {
+    return [sql<boolean>`${emailIntelligence.category} = ${view}`];
+  }
+
   switch (view) {
     case "inbox":
       return [
@@ -122,7 +147,7 @@ function buildViewConditions(
       return [hasEmailLabel("STARRED")];
     case "important":
       return [
-        sql<boolean>`${emailIntelligence.category} in ('important', 'action_needed')`,
+        sql<boolean>`${emailIntelligence.category} in ('to_respond', 'to_follow_up')`,
       ];
     default:
       return [];

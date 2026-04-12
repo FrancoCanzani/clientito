@@ -9,6 +9,7 @@ import {
   updateSyncPreference,
 } from "@/features/settings/mutations";
 import { removeAccount } from "@/hooks/use-mailboxes";
+import { queryKeys } from "@/lib/query-keys";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -37,8 +38,8 @@ export function useSettingsMutations({
     },
     onSuccess: async () => {
       toast.success("Account removed");
-      await queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      await queryClient.invalidateQueries({ queryKey: ["sync-status"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.syncStatus() });
     },
     onError: (error) => toast.error(error.message),
     onSettled: () => setRemovingAccountId(null),
@@ -77,8 +78,8 @@ export function useSettingsMutations({
               ? "Account connected. Import started."
               : "Import started",
       );
-      await queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      await queryClient.invalidateQueries({ queryKey: ["sync-status"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.syncStatus() });
     },
     onError: (_error, variables) => {
       toast.error(
@@ -107,8 +108,8 @@ export function useSettingsMutations({
     },
     onSuccess: async (result, variables) => {
       const { mailboxId, months } = variables;
-      await queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      await queryClient.invalidateQueries({ queryKey: ["sync-status"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.syncStatus() });
 
       if (result.requiresBackfill) {
         try {
@@ -118,8 +119,8 @@ export function useSettingsMutations({
               ? "Import history updated. Full mailbox backfill started."
               : "Import history updated. Backfill started.",
           );
-          await queryClient.invalidateQueries({ queryKey: ["accounts"] });
-          await queryClient.invalidateQueries({ queryKey: ["sync-status"] });
+          await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+          await queryClient.invalidateQueries({ queryKey: queryKeys.syncStatus() });
           return;
         } catch {
           toast.success("Import history updated");
@@ -147,7 +148,7 @@ export function useSettingsMutations({
     }) => updateMailboxSignature(mailboxId, signature),
     onSuccess: async () => {
       toast.success("Signature saved");
-      await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
     },
     onError: () => toast.error("Failed to save signature"),
   });

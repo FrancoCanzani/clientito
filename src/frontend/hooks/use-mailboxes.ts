@@ -1,3 +1,4 @@
+import { queryKeys } from "@/lib/query-keys";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 
 const ACTIVE_SYNC_POLL_MS = 1_000;
@@ -48,7 +49,7 @@ export async function fetchAccounts(): Promise<{ accounts: MailboxAccount[] }> {
 }
 
 export const accountsQueryOptions = queryOptions({
-  queryKey: ["accounts"],
+  queryKey: queryKeys.accounts(),
   queryFn: fetchAccounts,
   staleTime: 30_000,
   refetchOnWindowFocus: true,

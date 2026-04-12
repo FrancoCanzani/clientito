@@ -49,10 +49,12 @@ export function EmailThread({
   email,
   threadMessages,
   threadError,
+  readingMode = "original",
 }: {
   email: EmailDetailItem;
   threadMessages: EmailThreadItem[];
   threadError: boolean;
+  readingMode?: "detox" | "original";
 }) {
   const [expansionOverrides, setExpansionOverrides] = useState<
     Map<string, boolean>
@@ -127,6 +129,7 @@ export function EmailThread({
                 expanded={isExpanded(threadEmail.id)}
                 onToggle={() => toggleMessage(threadEmail.id)}
                 attachments={isSelected ? email.attachments : []}
+                readingMode={readingMode}
               />
             );
           })}
@@ -134,7 +137,7 @@ export function EmailThread({
       ) : (
         <div>
           <div className="min-w-0">
-            <MessageBody detail={email} />
+            <MessageBody detail={email} readingMode={readingMode} />
           </div>
 
           {hasAttachments && (
@@ -165,12 +168,14 @@ function ThreadMessage({
   expanded,
   onToggle,
   attachments,
+  readingMode = "original",
 }: {
   email: EmailThreadItem;
   body?: EmailBodySource | null;
   expanded: boolean;
   onToggle: () => void;
   attachments: EmailAttachment[];
+  readingMode?: "detox" | "original";
 }) {
   const formattedDate = formatEmailThreadDate(email.date);
   const collapsedPreview = getCollapsedPreview(email, body ?? email);
@@ -206,7 +211,7 @@ function ThreadMessage({
 
         <div className="min-w-0 pb-4">
           {expanded ? (
-            <MessageBody detail={body ?? email} />
+            <MessageBody detail={body ?? email} readingMode={readingMode} />
           ) : (
             <p className="line-clamp-3 text-xs text-muted-foreground">
               {collapsedPreview}

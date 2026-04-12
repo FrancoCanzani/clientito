@@ -8,8 +8,11 @@ export function registerDeleteAccount(api: Hono<AppRouteEnv>) {
     const db = c.get("db");
     const currentUser = c.get("user")!;
 
-    await db.delete(user).where(eq(user.id, currentUser.id));
-
-    return c.json({ data: { deleted: true } }, 200);
+    try {
+      await db.delete(user).where(eq(user.id, currentUser.id));
+      return c.json({ data: { deleted: true } }, 200);
+    } catch {
+      return c.json({ error: "Failed to delete account" }, 500);
+    }
   });
 }

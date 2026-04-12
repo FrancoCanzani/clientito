@@ -1,3 +1,4 @@
+import { queryKeys } from "@/lib/query-keys";
 import { fetchSyncStatus } from "@/features/onboarding/queries";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 
@@ -5,7 +6,7 @@ const SYNC_ACTIVE_POLL_MS = 1_000;
 const SYNC_IDLE_POLL_MS = 60_000;
 
 const syncStatusQueryOptions = queryOptions({
-  queryKey: ["sync-status"],
+  queryKey: queryKeys.syncStatus(),
   queryFn: fetchSyncStatus,
   staleTime: 30_000,
   refetchOnWindowFocus: true,

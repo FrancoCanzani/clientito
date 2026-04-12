@@ -27,11 +27,6 @@ const fontSizeOptions: Option<"fontSize">[] = [
   { value: "xl", label: "XL" },
 ];
 
-const readingModeOptions: Option<"readingMode">[] = [
-  { value: "detox", label: "Detox" },
-  { value: "original", label: "Original" },
-];
-
 const warmthOptions: Option<"warmth">[] = [
   { value: "off", label: "Off" },
   { value: "auto", label: "Auto" },
@@ -159,13 +154,6 @@ export function ReadingSettings() {
           description="Applies to email bodies."
           settingKey="fontSize"
           options={fontSizeOptions}
-        />
-        <div className="border-t border-border/60" />
-        <Row
-          title="Reading mode"
-          description="Detox strips styling. Original preserves sender design."
-          settingKey="readingMode"
-          options={readingModeOptions}
         />
         <div className="border-t border-border/60" />
         <Row

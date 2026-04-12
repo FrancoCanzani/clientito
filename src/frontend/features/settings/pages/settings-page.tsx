@@ -1,3 +1,4 @@
+import { clearLocalData } from "@/db/sync";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -24,6 +25,7 @@ import {
   SunIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
+import { queryKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -114,7 +116,7 @@ export default function SettingsPage() {
             mailboxId,
             months: 6,
           });
-          await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+          await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
         } catch {
           toast.error("Failed to set import history for the new account");
           return;
@@ -129,7 +131,7 @@ export default function SettingsPage() {
   }, [accounts, accountsQuery.isPending, mailboxSyncMutation, queryClient]);
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-8">
+    <div className="mx-auto w-full max-w-3xl space-y-8 px-4">
       <PageHeader title="Settings" />
 
       <section className="space-y-3">
@@ -387,6 +389,44 @@ export default function SettingsPage() {
       </section>
 
       <ReadingSettings />
+
+      <section className="space-y-3">
+        <div className="space-y-1">
+          <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            Local data
+          </h2>
+          <p className="max-w-lg text-sm text-muted-foreground">
+            Petit keeps a local copy of your emails for fast offline access.
+            Resetting clears the cache — your emails will re-sync from the
+            server on next load.
+          </p>
+        </div>
+        <div className="border-t border-border/60">
+          <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium">Reset local data</p>
+              <p className="text-xs text-muted-foreground">
+                Clears the browser cache. No emails are deleted from your
+                account.
+              </p>
+            </div>
+            <div className="min-w-0 sm:max-w-[60%]">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  await clearLocalData();
+                  queryClient.clear();
+                  toast.success("Local data cleared — reloading…");
+                  setTimeout(() => window.location.reload(), 600);
+                }}
+              >
+                Reset local data
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section className="space-y-3">
         <div className="space-y-1">

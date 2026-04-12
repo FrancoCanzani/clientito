@@ -1,9 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { Hono } from "hono";
 import { z } from "zod";
 import { account } from "../../../db/auth-schema";
-import { mailboxes } from "../../../db/schema";
+import type { Database } from "../../../db/client";
+import { emails, mailboxes } from "../../../db/schema";
 import { GmailDriver } from "../../../lib/gmail/driver";
 import { ensureMailbox } from "../../../lib/gmail/mailboxes";
 import {
@@ -17,7 +18,40 @@ const unsubscribeSchema = z.object({
   unsubscribeUrl: z.string().optional(),
   unsubscribeEmail: z.string().optional(),
   fromAddr: z.string(),
+  trashExisting: z.boolean().optional(),
 });
+
+export async function trashEmailsFromSender(
+  db: Database,
+  userId: string,
+  fromAddr: string,
+): Promise<number> {
+  const senderLower = fromAddr.trim().toLowerCase();
+
+  const rows = await db
+    .select({ id: emails.id, labelIds: emails.labelIds })
+    .from(emails)
+    .where(
+      and(
+        eq(emails.userId, userId),
+        sql`lower(${emails.fromAddr}) = ${senderLower}`,
+      ),
+    );
+
+  let count = 0;
+  for (const row of rows) {
+    const current: string[] = Array.isArray(row.labelIds) ? row.labelIds : [];
+    if (current.includes("TRASH")) continue;
+    const updated = current.filter((l) => l !== "INBOX");
+    updated.push("TRASH");
+    await db
+      .update(emails)
+      .set({ labelIds: updated })
+      .where(eq(emails.id, row.id));
+    count++;
+  }
+  return count;
+}
 
 export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
   api.post(
@@ -26,7 +60,7 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
     async (c) => {
       const db = c.get("db");
       const user = c.get("user")!;
-      const { unsubscribeUrl: rawUnsubscribeUrl, unsubscribeEmail: rawUnsubscribeEmail, fromAddr } =
+      const { unsubscribeUrl: rawUnsubscribeUrl, unsubscribeEmail: rawUnsubscribeEmail, fromAddr, trashExisting } =
         c.req.valid("json");
       const unsubscribeUrl = normalizeUnsubscribeUrl(rawUnsubscribeUrl);
       const unsubscribeEmail = normalizeUnsubscribeEmail(rawUnsubscribeEmail);
@@ -47,7 +81,11 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
               status: "unsubscribed",
               method: "one-click",
             });
-            return c.json({ method: "one-click", fromAddr, success: true }, 200);
+            let trashedCount = 0;
+            if (trashExisting) {
+              trashedCount = await trashEmailsFromSender(db, user.id, fromAddr);
+            }
+            return c.json({ method: "one-click", fromAddr, success: true, trashedCount }, 200);
           }
         } catch (error) {
           console.warn("One-click unsubscribe failed, falling back", {
@@ -77,7 +115,6 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
 
       if (unsubscribeEmail) {
         try {
-          // Resolve mailbox for sending
           const userMailboxes = await db
             .select()
             .from(mailboxes)
@@ -107,7 +144,11 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
             status: "unsubscribed",
             method: "mailto",
           });
-          return c.json({ method: "mailto", fromAddr, success: true }, 200);
+          let trashedCount = 0;
+          if (trashExisting) {
+            trashedCount = await trashEmailsFromSender(db, user.id, fromAddr);
+          }
+          return c.json({ method: "mailto", fromAddr, success: true, trashedCount }, 200);
         } catch (error) {
           return c.json(
             {
