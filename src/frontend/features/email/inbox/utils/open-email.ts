@@ -1,9 +1,8 @@
 import { markEmailRead } from "@/features/email/inbox/mutations";
-import { fetchEmailDetail, fetchEmailDetailAI } from "@/features/email/inbox/queries";
+import { fetchEmailDetail } from "@/features/email/inbox/queries";
 import type { EmailDetailItem, EmailListItem, EmailListResponse } from "@/features/email/inbox/types";
 import type {
   EmailFolderView,
-  EmailView,
   InboxLabelView,
 } from "@/features/email/inbox/utils/inbox-filters";
 import { INBOX_LABEL_VALUES } from "@/features/email/inbox/utils/inbox-filters";
@@ -36,7 +35,7 @@ export function openEmail(
   navigate: NavigateToEmail,
   routeMailboxId: number,
   email: Pick<EmailListItem, "id" | "isRead">,
-  options?: { replace?: boolean; context?: EmailView },
+  options?: { replace?: boolean; context?: string },
 ) {
   void queryClient.prefetchQuery({
     queryKey: queryKeys.emails.detail(email.id),
@@ -45,11 +44,6 @@ export function openEmail(
         mailboxId: routeMailboxId,
         view: options?.context,
       }),
-  });
-
-  void queryClient.prefetchQuery({
-    queryKey: queryKeys.emails.aiDetail(email.id),
-    queryFn: () => fetchEmailDetailAI(email.id),
   });
 
   const context = options?.context ?? "inbox";

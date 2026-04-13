@@ -6,16 +6,10 @@ export type EmailView =
   | "snoozed"
   | "archived"
   | "starred"
-  | "important"
-  | "to_respond"
-  | "to_follow_up"
-  | "fyi"
-  | "notification"
-  | "invoice"
-  | "marketing";
+  | "important";
 
-export type EmailFolderView = Exclude<EmailView, "inbox" | "to_respond" | "to_follow_up" | "fyi" | "notification" | "invoice" | "marketing">;
-export type InboxLabelView = Extract<EmailView, "important" | "to_respond" | "to_follow_up" | "fyi" | "notification" | "invoice" | "marketing">;
+export type EmailFolderView = Exclude<EmailView, "inbox">;
+export type InboxLabelView = "important" | (string & {});
 
 export const VIEW_VALUES: ReadonlyArray<EmailView> = [
   "inbox",
@@ -26,12 +20,6 @@ export const VIEW_VALUES: ReadonlyArray<EmailView> = [
   "archived",
   "starred",
   "important",
-  "to_respond",
-  "to_follow_up",
-  "fyi",
-  "notification",
-  "invoice",
-  "marketing",
 ];
 
 export const FOLDER_VIEW_VALUES: ReadonlyArray<EmailFolderView> = [
@@ -45,12 +33,6 @@ export const FOLDER_VIEW_VALUES: ReadonlyArray<EmailFolderView> = [
 
 export const INBOX_LABEL_VALUES: ReadonlyArray<InboxLabelView> = [
   "important",
-  "to_respond",
-  "to_follow_up",
-  "fyi",
-  "notification",
-  "invoice",
-  "marketing",
 ];
 
 const VIEW_VALUE_SET = new Set<string>(VIEW_VALUES);
@@ -67,7 +49,7 @@ export function isEmailFolderView(value: unknown): value is EmailFolderView {
 }
 
 export function isInboxLabelView(value: unknown): value is InboxLabelView {
-  return typeof value === "string" && INBOX_LABEL_SET.has(value);
+  return typeof value === "string" && (INBOX_LABEL_SET.has(value) || value.startsWith("Label_"));
 }
 
 export function parseEmailFolderParam(value: string): EmailFolderView {
@@ -103,11 +85,4 @@ export const VIEW_LABELS: Record<EmailView, string> = {
   archived: "Done",
   starred: "Starred",
   important: "Important",
-
-  to_respond: "To respond",
-  to_follow_up: "To follow up",
-  fyi: "FYI",
-  notification: "Notification",
-  invoice: "Invoice",
-  marketing: "Marketing",
 };

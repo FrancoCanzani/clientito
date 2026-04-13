@@ -1,7 +1,6 @@
 import { IconButton } from "@/components/ui/icon-button";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import { fetchEmailDetail } from "@/features/email/inbox/queries";
-import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
 import { cn } from "@/lib/utils";
 import {
   CheckIcon,
@@ -13,18 +12,9 @@ import {
 } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { memo, useRef, useState } from "react";
-import type { EmailIntelligenceCategory, EmailListItem } from "../../types";
+import type { EmailListItem } from "../../types";
 import { formatInboxRowDate } from "../../utils/formatters";
 import type { ThreadGroup } from "../../utils/group-emails-by-thread";
-
-const CATEGORY_LABELS: Record<EmailIntelligenceCategory, string> = {
-  to_respond: "respond",
-  to_follow_up: "follow up",
-  fyi: "fyi",
-  notification: "notification",
-  invoice: "invoice",
-  marketing: "marketing",
-};
 
 export const EmailRow = memo(function EmailRow({
   group,
@@ -34,7 +24,7 @@ export const EmailRow = memo(function EmailRow({
   isFocused = false,
 }: {
   group: ThreadGroup;
-  view: EmailView;
+  view: string;
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
   isFocused?: boolean;
@@ -119,13 +109,6 @@ export const EmailRow = memo(function EmailRow({
       <div className="shrink-0">
         <div className="relative flex md:min-w-24 justify-end text-xs text-muted-foreground">
           <div className="flex items-center gap-2 md:group-hover:invisible">
-            {email.intelligence?.category && (
-              <span
-                className="text-[10px] text-muted-foreground"
-              >
-                {CATEGORY_LABELS[email.intelligence.category]}
-              </span>
-            )}
             {isStarred && (
               <StarIcon
                 className="size-3.5 text-yellow-400"

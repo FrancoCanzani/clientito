@@ -9,14 +9,12 @@ import {
   ELIGIBILITY_WINDOW_MS,
   MAX_THREAD_MESSAGES,
   type EmailContextRow,
-  type StoredEmailClassification,
 } from "./common";
 
 type StoredClassificationRow =
   | Pick<
       typeof emailIntelligence.$inferSelect,
       | "status"
-      | "category"
       | "suspiciousJson"
     >
   | null
@@ -30,13 +28,12 @@ export function getIntelligenceStatus(
 
 export function getStoredEmailClassification(
   row: StoredClassificationRow,
-): StoredEmailClassification | null {
-  if (!row || row.status !== "ready" || !row.category) {
+): { isSuspicious: boolean } | null {
+  if (!row || row.status !== "ready") {
     return null;
   }
 
   return {
-    category: row.category,
     isSuspicious: row.suspiciousJson?.isSuspicious ?? false,
   };
 }

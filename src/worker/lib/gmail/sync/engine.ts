@@ -56,6 +56,7 @@ import {
   processInlineEmailIntelligence,
 } from "../intelligence/background-intelligence";
 import { STANDARD_LABELS } from "../types";
+import { syncGmailLabels } from "./labels";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
 const ON_DEMAND_SYNC_MIN_INTERVAL_MS = 60_000;
@@ -497,6 +498,12 @@ export async function startFullGmailSync(
 
     await persistMailboxHistoryState(db, mailboxId, latestHistoryId);
     console.log(`[full-sync] mailbox=${mailboxId} done: inserted=${result.inserted} skipped=${result.skipped}`);
+
+    await syncGmailLabels(db, mailboxId, userId, {
+      GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
+    }).catch((err) => console.error("[full-sync] label sync failed", err));
+
     return result;
   } catch (error) {
     console.error(`[full-sync] mailbox=${mailboxId} failed`, error instanceof Error ? error.message : error);

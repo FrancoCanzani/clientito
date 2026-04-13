@@ -57,19 +57,6 @@ export type InboxSearchSuggestionsResponse = {
   subjects: InboxSearchSubjectSuggestion[];
 };
 
-export type EmailIntelligenceCategory =
-  | "to_respond"
-  | "to_follow_up"
-  | "fyi"
-  | "notification"
-  | "invoice"
-  | "marketing";
-
-export type EmailIntelligence = {
-  category: EmailIntelligenceCategory;
-  isSuspicious: boolean;
-};
-
 export type EmailDetailIntelligence = {
   summary: string | null;
   isSuspicious: boolean;
@@ -96,8 +83,6 @@ export type EmailListItem = {
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
   snoozedUntil: number | null;
-  intelligenceStatus: "pending" | "ready" | "error" | null;
-  intelligence: EmailIntelligence | null;
 };
 
 export type EmailBodySource = {

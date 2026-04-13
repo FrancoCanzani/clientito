@@ -1,10 +1,11 @@
 import { PGlite } from "@electric-sql/pglite";
 import { type SQL, and, asc, desc, eq, gt, isNull, like, lte, or, sql } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core/dialect";
 import { drizzle } from "drizzle-orm/pglite";
 import type {
   EmailDetailIntelligence,
-  EmailIntelligenceCategory,
 } from "@/features/email/inbox/types";
+import migrations from "./migrations/export.json";
 import * as schema from "./schema";
 
 type LocalEmailPatch = {
@@ -28,21 +29,12 @@ type ViewFilter =
   | "archived"
   | "starred"
   | "important"
-
-  | EmailIntelligenceCategory;
-
-const CATEGORY_VIEWS = new Set<string>([
-  "to_respond",
-  "to_follow_up",
-  "fyi",
-  "notification",
-  "invoice",
-  "marketing",
-]);
+  | (string & {});
 
 type EmailInsert = typeof schema.emails.$inferInsert;
 type IntelligenceInsert = typeof schema.emailIntelligence.$inferInsert;
 type SubscriptionInsert = typeof schema.emailSubscriptions.$inferInsert;
+type LabelInsert = typeof schema.labels.$inferInsert;
 
 type EmailQueryRow = {
   id: number;
@@ -63,9 +55,6 @@ type EmailQueryRow = {
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
   snoozedUntil: number | null;
-  intelligenceStatus: "pending" | "ready" | "error" | null;
-  intelligenceCategory: EmailIntelligenceCategory | null;
-  intelligenceSuspiciousJson: { isSuspicious: boolean } | null;
 };
 
 let pg: PGlite | null = null;
@@ -81,10 +70,22 @@ async function destroyIdb() {
   }
 }
 
+const DB_NAME = "petit";
+
 async function initPglite() {
-  pg = new PGlite("idb://petit");
+  pg = new PGlite(`idb://${DB_NAME}`);
   db = drizzle(pg, { schema });
-  await bootstrapSchema();
+
+  const start = performance.now();
+  try {
+    // @ts-expect-error db._.session typing mismatch with migrate's Session param
+    await new PgDialect().migrate(migrations, db._.session, DB_NAME);
+    console.info(`✅ Local database ready in ${performance.now() - start}ms`);
+  } catch (cause) {
+    console.error("❌ Local database schema migration failed", cause);
+    throw cause;
+  }
+
   navigator.storage.persist().catch(() => {});
 }
 
@@ -106,139 +107,6 @@ async function ensureDb() {
 
   await initPromise;
   return db!;
-}
-
-async function bootstrapSchema() {
-  const SCHEMA_VERSION = 4;
-
-  await pg!.exec(`
-    CREATE TABLE IF NOT EXISTS _meta (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-  `);
-
-  const versionResult = await pg!.query<{ value: string }>(
-    "SELECT value FROM _meta WHERE key = 'schema_version'"
-  );
-  const currentVersion = versionResult.rows.length > 0
-    ? parseInt(versionResult.rows[0].value, 10)
-    : 0;
-
-  if (currentVersion < SCHEMA_VERSION) {
-    await pg!.exec(`
-      DROP TABLE IF EXISTS emails CASCADE;
-      DROP TABLE IF EXISTS email_intelligence CASCADE;
-      DROP TABLE IF EXISTS email_subscriptions CASCADE;
-      DROP TABLE IF EXISTS drafts CASCADE;
-      DELETE FROM _meta WHERE key != 'schema_version';
-    `);
-  }
-
-  await pg!.exec(`
-    CREATE TABLE IF NOT EXISTS emails (
-      id SERIAL PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      mailbox_id INTEGER,
-      provider_message_id TEXT NOT NULL UNIQUE,
-      thread_id TEXT,
-      from_addr TEXT NOT NULL,
-      from_name TEXT,
-      to_addr TEXT,
-      cc_addr TEXT,
-      subject TEXT,
-      snippet TEXT,
-      body_text TEXT,
-      body_html TEXT,
-      date BIGINT NOT NULL,
-      direction TEXT,
-      is_read BOOLEAN NOT NULL DEFAULT false,
-      label_ids JSONB,
-      unsubscribe_url TEXT,
-      unsubscribe_email TEXT,
-      snoozed_until BIGINT,
-      created_at BIGINT NOT NULL,
-      search_vector tsvector GENERATED ALWAYS AS (
-        setweight(to_tsvector('english', coalesce(subject, '')), 'A') ||
-        setweight(to_tsvector('english', coalesce(from_name, '')), 'B') ||
-        setweight(to_tsvector('english', coalesce(from_addr, '')), 'B') ||
-        setweight(to_tsvector('english', coalesce(snippet, '')), 'C') ||
-        setweight(to_tsvector('english', coalesce(body_text, '')), 'D')
-      ) STORED
-    );
-    CREATE INDEX IF NOT EXISTS emails_date_idx ON emails(date);
-    CREATE INDEX IF NOT EXISTS emails_thread_idx ON emails(thread_id);
-    CREATE INDEX IF NOT EXISTS emails_snoozed_idx ON emails(snoozed_until);
-    CREATE INDEX IF NOT EXISTS emails_mailbox_date_idx ON emails(mailbox_id, date);
-    CREATE INDEX IF NOT EXISTS emails_search_idx ON emails USING gin(search_vector);
-
-    CREATE TABLE IF NOT EXISTS email_intelligence (
-      id SERIAL PRIMARY KEY,
-      email_id INTEGER NOT NULL,
-      user_id TEXT NOT NULL,
-      mailbox_id INTEGER,
-      category TEXT,
-      summary TEXT,
-      suspicious_json JSONB NOT NULL DEFAULT '{"isSuspicious":false}',
-      actions_json JSONB NOT NULL DEFAULT '[]',
-      status TEXT NOT NULL DEFAULT 'pending',
-      source_hash TEXT,
-      model TEXT,
-      schema_version INTEGER NOT NULL DEFAULT 1,
-      attempt_count INTEGER NOT NULL DEFAULT 0,
-      error TEXT,
-      last_processed_at BIGINT,
-      created_at BIGINT NOT NULL,
-      updated_at BIGINT NOT NULL
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS email_intelligence_email_idx ON email_intelligence(email_id);
-    CREATE INDEX IF NOT EXISTS email_intelligence_status_idx ON email_intelligence(status);
-
-    CREATE TABLE IF NOT EXISTS email_subscriptions (
-      id SERIAL PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      mailbox_id INTEGER,
-      sender_key TEXT NOT NULL,
-      from_addr TEXT NOT NULL,
-      from_name TEXT,
-      unsubscribe_url TEXT,
-      unsubscribe_email TEXT,
-      status TEXT NOT NULL DEFAULT 'active',
-      email_count INTEGER NOT NULL DEFAULT 0,
-      last_received_at BIGINT,
-      unsubscribe_method TEXT,
-      unsubscribe_requested_at BIGINT,
-      unsubscribed_at BIGINT,
-      created_at BIGINT NOT NULL,
-      updated_at BIGINT NOT NULL,
-      UNIQUE(mailbox_id, sender_key)
-    );
-    CREATE INDEX IF NOT EXISTS email_subscriptions_status_idx ON email_subscriptions(status);
-
-    CREATE TABLE IF NOT EXISTS drafts (
-      id SERIAL PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      compose_key TEXT NOT NULL,
-      mailbox_id INTEGER,
-      to_addr TEXT NOT NULL DEFAULT '',
-      cc_addr TEXT NOT NULL DEFAULT '',
-      bcc_addr TEXT NOT NULL DEFAULT '',
-      subject TEXT NOT NULL DEFAULT '',
-      body TEXT NOT NULL DEFAULT '',
-      forwarded_content TEXT NOT NULL DEFAULT '',
-      thread_id TEXT,
-      attachment_keys JSONB,
-      updated_at BIGINT NOT NULL,
-      created_at BIGINT NOT NULL,
-      UNIQUE(user_id, compose_key)
-    );
-    CREATE INDEX IF NOT EXISTS drafts_updated_idx ON drafts(updated_at);
-  `);
-
-  await pg!.exec(
-    `INSERT INTO _meta (key, value) VALUES ('schema_version', '${SCHEMA_VERSION}')
-     ON CONFLICT (key) DO UPDATE SET value = '${SCHEMA_VERSION}'`
-  );
 }
 
 function hasLabel(label: string) {
@@ -336,10 +204,6 @@ function applyEmailPatch(
 }
 
 function buildViewConditions(view: ViewFilter, now: number): SQL[] {
-  if (CATEGORY_VIEWS.has(view)) {
-    return [sql<boolean>`${schema.emailIntelligence.category} = ${view}`];
-  }
-
   switch (view) {
     case "inbox": {
       const snoozeCondition = or(isNull(schema.emails.snoozedUntil), lte(schema.emails.snoozedUntil, now));
@@ -364,7 +228,12 @@ function buildViewConditions(view: ViewFilter, now: number): SQL[] {
       ];
     case "starred":
       return [hasLabel("STARRED")];
+    case "important":
+      return [hasLabel("IMPORTANT")];
     default:
+      if (view.startsWith("Label_")) {
+        return [hasLabel(view)];
+      }
       return [];
   }
 }
@@ -392,12 +261,6 @@ const emailSummaryColumns = {
   snoozedUntil: schema.emails.snoozedUntil,
 } as const;
 
-const intelligenceColumns = {
-  intelligenceStatus: schema.emailIntelligence.status,
-  intelligenceCategory: schema.emailIntelligence.category,
-  intelligenceSuspiciousJson: schema.emailIntelligence.suspiciousJson,
-} as const;
-
 function toEmailListItem(row: EmailQueryRow) {
   const labelIds = row.labelIds ?? [];
 
@@ -421,14 +284,6 @@ function toEmailListItem(row: EmailQueryRow) {
     unsubscribeUrl: row.unsubscribeUrl,
     unsubscribeEmail: row.unsubscribeEmail,
     snoozedUntil: row.snoozedUntil,
-    intelligenceStatus: row.intelligenceStatus,
-    intelligence:
-      row.intelligenceStatus === "ready" && row.intelligenceCategory
-        ? {
-            category: row.intelligenceCategory,
-            isSuspicious: row.intelligenceSuspiciousJson?.isSuspicious ?? false,
-          }
-        : null,
   };
 }
 
@@ -465,9 +320,8 @@ export const localDb = {
     conditions.push(...buildViewConditions(view, now));
 
     const rowsWithExtra = await d
-      .select({ ...emailSummaryColumns, ...intelligenceColumns })
+      .select({ ...emailSummaryColumns })
       .from(schema.emails)
-      .leftJoin(schema.emailIntelligence, eq(schema.emailIntelligence.emailId, schema.emails.id))
       .where(and(...(conditions as [])))
       .orderBy(desc(schema.emails.date))
       .limit(limit + 1)
@@ -488,12 +342,10 @@ export const localDb = {
     const rows = await d
       .select({
         ...emailSummaryColumns,
-        ...intelligenceColumns,
         bodyText: schema.emails.bodyText,
         bodyHtml: schema.emails.bodyHtml,
       })
       .from(schema.emails)
-      .leftJoin(schema.emailIntelligence, eq(schema.emailIntelligence.emailId, schema.emails.id))
       .where(and(eq(schema.emails.userId, userId), eq(schema.emails.id, emailId)))
       .limit(1);
 
@@ -595,12 +447,10 @@ export const localDb = {
     const rows = await d
       .select({
         ...emailSummaryColumns,
-        ...intelligenceColumns,
         bodyText: schema.emails.bodyText,
         bodyHtml: schema.emails.bodyHtml,
       })
       .from(schema.emails)
-      .leftJoin(schema.emailIntelligence, eq(schema.emailIntelligence.emailId, schema.emails.id))
       .where(and(eq(schema.emails.userId, userId), eq(schema.emails.threadId, threadId)))
       .orderBy(asc(schema.emails.date));
 
@@ -877,9 +727,8 @@ export const localDb = {
     const tsRank = sql`ts_rank(search_vector, plainto_tsquery('english', ${query}))`;
 
     const rowsWithExtra = await d
-      .select({ ...emailSummaryColumns, ...intelligenceColumns })
+      .select({ ...emailSummaryColumns })
       .from(schema.emails)
-      .leftJoin(schema.emailIntelligence, eq(schema.emailIntelligence.emailId, schema.emails.id))
       .where(and(...(conditions as [])))
       .orderBy(desc(tsRank))
       .limit(limit + 1)
@@ -996,6 +845,79 @@ export const localDb = {
     };
   },
 
+  async getLabels(userId: string, mailboxId: number) {
+    const d = await ensureDb();
+    return d
+      .select({
+        gmailId: schema.labels.gmailId,
+        name: schema.labels.name,
+        type: schema.labels.type,
+        textColor: schema.labels.textColor,
+        backgroundColor: schema.labels.backgroundColor,
+        messagesTotal: schema.labels.messagesTotal,
+        messagesUnread: schema.labels.messagesUnread,
+      })
+      .from(schema.labels)
+      .where(
+        and(
+          eq(schema.labels.userId, userId),
+          eq(schema.labels.mailboxId, mailboxId),
+        ),
+      )
+      .orderBy(asc(schema.labels.name));
+  },
+
+  async upsertLabels(
+    userId: string,
+    mailboxId: number,
+    labels: Array<{
+      gmailId: string;
+      name: string;
+      type?: "system" | "user";
+      textColor?: string | null;
+      backgroundColor?: string | null;
+      messagesTotal?: number;
+      messagesUnread?: number;
+    }>,
+  ): Promise<void> {
+    if (labels.length === 0) return;
+    const d = await ensureDb();
+    const now = Date.now();
+    const rows: LabelInsert[] = labels.map((l) => ({
+      gmailId: l.gmailId,
+      userId,
+      mailboxId,
+      name: l.name,
+      type: l.type ?? "user",
+      textColor: l.textColor ?? null,
+      backgroundColor: l.backgroundColor ?? null,
+      messagesTotal: l.messagesTotal ?? 0,
+      messagesUnread: l.messagesUnread ?? 0,
+      syncedAt: now,
+    }));
+
+    await d
+      .insert(schema.labels)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: schema.labels.gmailId,
+        set: {
+          name: sql`excluded.name`,
+          type: sql`excluded.type`,
+          textColor: sql`excluded.text_color`,
+          backgroundColor: sql`excluded.background_color`,
+          messagesTotal: sql`excluded.messages_total`,
+          messagesUnread: sql`excluded.messages_unread`,
+          syncedAt: sql`excluded.synced_at`,
+        },
+      });
+  },
+
+  async deleteLabel(gmailId: string): Promise<void> {
+    const d = await ensureDb();
+    await d.delete(schema.labels).where(eq(schema.labels.gmailId, gmailId));
+  },
+
   async setMeta(key: string, value: string): Promise<void> {
     const d = await ensureDb();
     await d.execute(
@@ -1016,27 +938,10 @@ export const localDb = {
     const d = await ensureDb();
     await d.delete(schema.emailIntelligence);
     await d.delete(schema.emailSubscriptions);
+    await d.delete(schema.labels);
     await d.delete(schema.drafts);
     await d.delete(schema.emails);
     await d.execute(sql`DELETE FROM _meta`);
   },
 
-  async countEmailsMissingIntelligence(userId: string, mailboxId: number): Promise<number> {
-    const d = await ensureDb();
-    const result = await d
-      .select({ count: sql<number>`count(*)` })
-      .from(schema.emails)
-      .leftJoin(schema.emailIntelligence, eq(schema.emailIntelligence.emailId, schema.emails.id))
-      .where(
-        and(
-          eq(schema.emails.userId, userId),
-          eq(schema.emails.mailboxId, mailboxId),
-          or(
-            isNull(schema.emailIntelligence.emailId),
-            sql<boolean>`${schema.emailIntelligence.status} != 'ready'`,
-          ),
-        ),
-      );
-    return Number(result[0]?.count ?? 0);
-  },
 };

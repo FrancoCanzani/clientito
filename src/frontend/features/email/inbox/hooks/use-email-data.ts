@@ -1,7 +1,6 @@
 import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/email/inbox/queries";
 import type { EmailListResponse } from "@/features/email/inbox/types";
 import { groupEmailsByThread } from "@/features/email/inbox/utils/group-emails-by-thread";
-import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
 import { useSyncStatus } from "@/features/onboarding/hooks/use-sync-status";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { queryKeys } from "@/lib/query-keys";
@@ -15,7 +14,7 @@ export function useEmailData({
   mailboxId,
   initialPage,
 }: {
-  view: EmailView;
+  view: string;
   mailboxId: number;
   initialPage?: EmailListResponse;
 }) {

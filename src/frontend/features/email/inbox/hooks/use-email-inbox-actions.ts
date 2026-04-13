@@ -7,7 +7,6 @@ import type {
   EmailListResponse,
 } from "@/features/email/inbox/types";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
-import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
 import { queryKeys } from "@/lib/query-keys";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
@@ -80,7 +79,7 @@ function patchItem(
   }
 }
 
-function removesFromView(action: EmailInboxAction, view: EmailView): boolean {
+function removesFromView(action: EmailInboxAction, view: string): boolean {
   switch (action) {
     case "archive":
       return view === "inbox";
@@ -99,7 +98,7 @@ function removesFromView(action: EmailInboxAction, view: EmailView): boolean {
 
 function applyOptimistic(
   cache: EmailsCache,
-  view: EmailView,
+  view: string,
   action: EmailInboxAction,
   idSet: Set<string>,
 ): EmailsCache {
@@ -122,7 +121,7 @@ export function useEmailInboxActions({
   view,
   mailboxId,
 }: {
-  view: EmailView;
+  view: string;
   mailboxId: number;
 }) {
   const navigate = mailboxRoute.useNavigate();
@@ -152,7 +151,7 @@ export function useEmailInboxActions({
       >({ queryKey: queryKeys.emails.all() });
 
       for (const [key] of snapshots) {
-        const queryView = key[1] as EmailView | undefined;
+        const queryView = key[1] as string | undefined;
         if (!queryView) continue;
         queryClient.setQueryData<InfiniteData<EmailListResponse>>(key, (old) =>
           applyOptimistic(old, queryView, action, idSet),

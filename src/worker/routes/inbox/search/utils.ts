@@ -7,12 +7,6 @@ export const SEARCH_VIEW_VALUES = [
   "archived",
   "starred",
   "important",
-  "to_respond",
-  "to_follow_up",
-  "fyi",
-  "notification",
-  "invoice",
-  "marketing",
 ] as const;
 
 export type SearchView = (typeof SEARCH_VIEW_VALUES)[number];

@@ -4,7 +4,8 @@ type StandardLabel =
   | "TRASH"
   | "SPAM"
   | "STARRED"
-  | "UNREAD";
+  | "UNREAD"
+  | "IMPORTANT";
 
 export const STANDARD_LABELS: Record<StandardLabel, string> = {
   INBOX: "INBOX",
@@ -13,6 +14,7 @@ export const STANDARD_LABELS: Record<StandardLabel, string> = {
   SPAM: "SPAM",
   STARRED: "STARRED",
   UNREAD: "UNREAD",
+  IMPORTANT: "IMPORTANT",
 };
 
 export type AttachmentMeta = {
@@ -146,6 +148,28 @@ export type GmailSyncResult = {
 };
 
 export type GmailAttachmentMeta = AttachmentMeta;
+
+export type GmailLabelColor = {
+  textColor: string;
+  backgroundColor: string;
+};
+
+export type GmailLabel = {
+  id: string;
+  name: string;
+  type: "system" | "user";
+  messageListVisibility?: "show" | "hide";
+  labelListVisibility?: "labelShow" | "labelShowIfUnread" | "labelHide";
+  messagesTotal?: number;
+  messagesUnread?: number;
+  threadsTotal?: number;
+  threadsUnread?: number;
+  color?: GmailLabelColor;
+};
+
+export type GmailLabelsListResponse = {
+  labels: GmailLabel[];
+};
 
 export type SyncProgressFn = (
   phase: string,

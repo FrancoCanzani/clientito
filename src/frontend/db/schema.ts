@@ -1,6 +1,8 @@
+import { type SQL, sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -9,6 +11,12 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+
+const tsVector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector";
+  },
+});
 
 export const emails = pgTable(
   "emails",
@@ -34,12 +42,21 @@ export const emails = pgTable(
     unsubscribeEmail: text("unsubscribe_email"),
     snoozedUntil: bigint("snoozed_until", { mode: "number" }),
     createdAt: bigint("created_at", { mode: "number" }).notNull(),
+    searchVector: tsVector("search_vector").generatedAlwaysAs(
+      (): SQL =>
+        sql`setweight(to_tsvector('english', coalesce(${emails.subject}, '')), 'A') ||
+            setweight(to_tsvector('english', coalesce(${emails.fromName}, '')), 'B') ||
+            setweight(to_tsvector('english', coalesce(${emails.fromAddr}, '')), 'B') ||
+            setweight(to_tsvector('english', coalesce(${emails.snippet}, '')), 'C') ||
+            setweight(to_tsvector('english', coalesce(${emails.bodyText}, '')), 'D')`,
+    ),
   },
   (table) => [
     index("emails_date_idx").on(table.date),
     index("emails_thread_idx").on(table.threadId),
     index("emails_snoozed_idx").on(table.snoozedUntil),
     index("emails_mailbox_date_idx").on(table.mailboxId, table.date),
+    index("emails_search_idx").using("gin", table.searchVector),
   ],
 );
 
@@ -111,6 +128,25 @@ export const emailSubscriptions = pgTable(
       table.senderKey,
     ),
     index("email_subscriptions_status_idx").on(table.status),
+  ],
+);
+
+export const labels = pgTable(
+  "labels",
+  {
+    gmailId: text("gmail_id").notNull().primaryKey(),
+    userId: text("user_id").notNull(),
+    mailboxId: integer("mailbox_id").notNull(),
+    name: text("name").notNull(),
+    type: text("type").$type<"system" | "user">().notNull().default("user"),
+    textColor: text("text_color"),
+    backgroundColor: text("background_color"),
+    messagesTotal: integer("messages_total").notNull().default(0),
+    messagesUnread: integer("messages_unread").notNull().default(0),
+    syncedAt: bigint("synced_at", { mode: "number" }).notNull(),
+  },
+  (table) => [
+    index("labels_user_mailbox_idx").on(table.userId, table.mailboxId),
   ],
 );
 

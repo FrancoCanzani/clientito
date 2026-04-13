@@ -7,14 +7,6 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { account, user } from "./auth-schema";
 
-export type EmailIntelligenceCategory =
-  | "to_respond"
-  | "to_follow_up"
-  | "fyi"
-  | "notification"
-  | "invoice"
-  | "marketing";
-
 export type EmailActionType = "reply";
 
 export type EmailActionTrustLevel = "auto" | "approve";
@@ -144,7 +136,7 @@ export const emailIntelligence = sqliteTable(
     mailboxId: integer("mailbox_id").references(() => mailboxes.id, {
       onDelete: "cascade",
     }),
-    category: text("category").$type<EmailIntelligenceCategory>(),
+    category: text("category").$type<"to_respond" | "to_follow_up" | "fyi" | "notification" | "invoice" | "marketing">(),
     summary: text("summary"),
     suspiciousJson: text("suspicious_json", { mode: "json" })
       .$type<EmailSuspiciousFlag>()
@@ -202,8 +194,8 @@ export const emailFilters = sqliteTable(
 );
 
 export type FilterCondition = {
-  field: "from" | "to" | "subject" | "category";
-  operator: "contains" | "equals" | "startsWith" | "endsWith";
+  field: "from" | "to" | "subject" | "body";
+  operator: "contains" | "equals" | "startsWith" | "endsWith" | "notContains";
   value: string;
 };
 
@@ -211,13 +203,7 @@ export type FilterActions = {
   archive?: boolean;
   markRead?: boolean;
   star?: boolean;
-  applyCategory?:
-    | "to_respond"
-    | "to_follow_up"
-    | "fyi"
-    | "notification"
-    | "invoice"
-    | "marketing";
+  applyLabel?: string;
   trash?: boolean;
 };
 
@@ -347,5 +333,32 @@ export const drafts = sqliteTable(
   (table) => [
     uniqueIndex("drafts_user_compose_key_idx").on(table.userId, table.composeKey),
     index("drafts_user_updated_idx").on(table.userId, table.updatedAt),
+  ],
+);
+
+export type GmailLabelType = "system" | "user";
+
+export const labels = sqliteTable(
+  "labels",
+  {
+    gmailId: text("gmail_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mailboxId: integer("mailbox_id")
+      .notNull()
+      .references(() => mailboxes.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    type: text("type").$type<GmailLabelType>().notNull().default("user"),
+    textColor: text("text_color"),
+    backgroundColor: text("background_color"),
+    messagesTotal: integer("messages_total").notNull().default(0),
+    messagesUnread: integer("messages_unread").notNull().default(0),
+    syncedAt: integer("synced_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("labels_mailbox_gmail_idx").on(table.mailboxId, table.gmailId),
+    index("labels_user_idx").on(table.userId),
+    index("labels_mailbox_idx").on(table.mailboxId),
   ],
 );

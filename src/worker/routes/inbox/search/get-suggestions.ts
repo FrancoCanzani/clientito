@@ -12,10 +12,10 @@ import {
 } from "drizzle-orm";
 import type { Hono } from "hono";
 import { z } from "zod";
-import { emailIntelligence, emails } from "../../../db/schema";
+import { emails } from "../../../db/schema";
 import { isAutomatedSender } from "../../../lib/domains";
 import type { AppRouteEnv } from "../../types";
-import { HAS_ATTACHMENT_LABEL, CATEGORY_VIEWS, hasEmailLabel } from "../emails/utils";
+import { HAS_ATTACHMENT_LABEL, hasEmailLabel } from "../emails/utils";
 import { escapeLikePattern, parseSearchQuery, SEARCH_VIEW_VALUES } from "./utils";
 
 const searchSuggestionsQuerySchema = z.object({
@@ -118,10 +118,6 @@ function buildViewConditions(
   view: (typeof SEARCH_VIEW_VALUES)[number] | undefined,
   now: number,
 ) {
-  if (view && CATEGORY_VIEWS.has(view)) {
-    return [sql<boolean>`${emailIntelligence.category} = ${view}`];
-  }
-
   switch (view) {
     case "inbox":
       return [
@@ -146,9 +142,7 @@ function buildViewConditions(
     case "starred":
       return [hasEmailLabel("STARRED")];
     case "important":
-      return [
-        sql<boolean>`${emailIntelligence.category} in ('to_respond', 'to_follow_up')`,
-      ];
+      return [hasEmailLabel("IMPORTANT")];
     default:
       return [];
   }
@@ -215,7 +209,6 @@ export function registerSearchSuggestions(api: Hono<AppRouteEnv>) {
           ),
         })
         .from(emails)
-        .leftJoin(emailIntelligence, eq(emailIntelligence.emailId, emails.id))
         .where(
           and(
             ...emailScopeConditions,
@@ -313,7 +306,6 @@ export function registerSearchSuggestions(api: Hono<AppRouteEnv>) {
           lastUsedAt: sql<number | null>`max(${emails.date})`.as("last_used_at"),
         })
         .from(emails)
-        .leftJoin(emailIntelligence, eq(emailIntelligence.emailId, emails.id))
         .where(and(...subjectConditions))
         .groupBy(emails.subject)
         .orderBy(desc(sql`max(${emails.date})`))

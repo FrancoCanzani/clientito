@@ -1,11 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
 import { and, asc, eq } from "drizzle-orm";
 import type { Hono } from "hono";
-import { emailIntelligence, emails } from "../../../db/schema";
+import { emails } from "../../../db/schema";
 import { catchUpAllMailboxes } from "../../../lib/gmail/sync/engine";
 import type { AppRouteEnv } from "../../types";
 import {
-  emailIntelligenceSelection,
   emailSummarySelection,
   toEmailListResponse,
 } from "./utils";
@@ -31,10 +30,8 @@ export function registerGetEmailThread(api: Hono<AppRouteEnv>) {
           ...emailSummarySelection,
           bodyText: emails.bodyText,
           bodyHtml: emails.bodyHtml,
-          ...emailIntelligenceSelection,
         })
         .from(emails)
-        .leftJoin(emailIntelligence, eq(emailIntelligence.emailId, emails.id))
         .where(and(eq(emails.threadId, threadId), eq(emails.userId, user.id)))
         .orderBy(asc(emails.date));
 

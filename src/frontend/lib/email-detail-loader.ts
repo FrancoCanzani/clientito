@@ -1,12 +1,10 @@
 import {
   fetchEmailDetail,
-  fetchEmailDetailAI,
 } from "@/features/email/inbox/queries";
-import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
 import { queryKeys } from "@/lib/query-keys";
 import type { QueryClient } from "@tanstack/react-query";
 
-export function createEmailDetailLoader(view: EmailView) {
+export function createEmailDetailLoader(view: string) {
   return async ({
     context,
     params,
@@ -21,11 +19,6 @@ export function createEmailDetailLoader(view: EmailView) {
           mailboxId: params.mailboxId,
           view,
         }),
-    });
-
-    void context.queryClient.prefetchQuery({
-      queryKey: queryKeys.emails.aiDetail(params.emailId),
-      queryFn: () => fetchEmailDetailAI(params.emailId),
     });
 
     return { email };

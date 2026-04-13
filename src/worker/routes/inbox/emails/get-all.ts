@@ -1,16 +1,14 @@
 import { zValidator } from "@hono/zod-validator";
 import { and, desc, eq, gt, isNull, like, lte, or, sql } from "drizzle-orm";
 import type { Hono } from "hono";
-import { emailIntelligence, emails, mailboxes } from "../../../db/schema";
+import { emails, mailboxes } from "../../../db/schema";
 import { catchUpAllMailboxes } from "../../../lib/gmail/sync/engine";
 import { STANDARD_LABELS } from "../../../lib/gmail/types";
 import type { AppRouteEnv } from "../../types";
 import {
-  emailIntelligenceSelection,
   emailSummarySelection,
   hasEmailLabel,
   toEmailListResponse,
-  CATEGORY_VIEWS,
 } from "./utils";
 import { listEmailsQuerySchema } from "./schemas";
 
@@ -102,11 +100,7 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
     if (isRead === "true") conditions.push(eq(emails.isRead, true));
     else if (isRead === "false") conditions.push(eq(emails.isRead, false));
 
-    if (view && CATEGORY_VIEWS.has(view)) {
-      conditions.push(
-        sql<boolean>`${emailIntelligence.category} = ${view}`,
-      );
-    } else {
+    if (view) {
       switch (view) {
         case "all":
           break;
@@ -137,6 +131,14 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
         case "starred":
           conditions.push(hasEmailLabel(STANDARD_LABELS.STARRED));
           break;
+        case "important":
+          conditions.push(hasEmailLabel(STANDARD_LABELS.IMPORTANT));
+          break;
+        default:
+          if (view.startsWith("Label_")) {
+            conditions.push(hasEmailLabel(view));
+          }
+          break;
       }
     }
 
@@ -145,12 +147,10 @@ export function registerGetAllEmails(api: Hono<AppRouteEnv>) {
     const rowsWithExtra = await db
       .select({
         ...emailSummarySelection,
-        ...emailIntelligenceSelection,
         bodyText: emails.bodyText,
         bodyHtml: emails.bodyHtml,
       })
       .from(emails)
-      .leftJoin(emailIntelligence, eq(emailIntelligence.emailId, emails.id))
       .where(whereClause)
       .orderBy(desc(emails.date))
       .limit(limit + 1)

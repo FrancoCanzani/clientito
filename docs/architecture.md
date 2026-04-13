@@ -407,7 +407,8 @@ A "Reset local data" button in settings lets users manually trigger this.
 |---|---|
 | `wrangler.json` | Worker config — D1, R2, Queues, Durable Objects, cron triggers, asset routing |
 | `vite.config.ts` | Build config — TanStack Router plugin, React Compiler, Tailwind CSS 4, Cloudflare integration |
-| `drizzle.config.ts` | Migration config — SQLite dialect, schema sources, output directory |
+| `drizzle.worker.config.ts` | Worker DB migration config — SQLite dialect, schema sources, output directory |
+| `drizzle.client.config.ts` | Client DB migration config — PostgreSQL dialect for PGlite/IndexedDB |
 | `auth.ts` | better-auth config — Google OAuth, scopes, session settings |
 | `tsconfig.worker.json` | Worker TypeScript config (Node.js compat) |
 | `tsconfig.app.json` | Frontend TypeScript config (ES2020, DOM) |

@@ -20,7 +20,6 @@ export function registerGetIntelligenceUpdates(app: Hono<AppRouteEnv>) {
     const rows = await db
       .select({
         emailId: emailIntelligence.emailId,
-        category: emailIntelligence.category,
         suspiciousJson: emailIntelligence.suspiciousJson,
         updatedAt: emailIntelligence.updatedAt,
       })
@@ -37,7 +36,6 @@ export function registerGetIntelligenceUpdates(app: Hono<AppRouteEnv>) {
 
     const data = rows.map((r) => ({
       emailId: r.emailId,
-      category: r.category,
       isSuspicious: r.suspiciousJson?.isSuspicious ?? false,
       updatedAt: r.updatedAt,
     }));

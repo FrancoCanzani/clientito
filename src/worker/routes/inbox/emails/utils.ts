@@ -1,21 +1,8 @@
 import { sql } from "drizzle-orm";
-import { emailIntelligence, emails } from "../../../db/schema";
+import { emails } from "../../../db/schema";
 import type { AttachmentMeta } from "../../../lib/gmail/types";
-import {
-  getIntelligenceStatus,
-  getStoredEmailClassification,
-} from "../../../lib/gmail/intelligence/store";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
-
-const CATEGORY_VIEWS = new Set([
-  "to_respond",
-  "to_follow_up",
-  "fyi",
-  "notification",
-  "invoice",
-  "marketing",
-]);
 
 export const emailSummarySelection = {
   id: emails.id,
@@ -36,12 +23,6 @@ export const emailSummarySelection = {
   unsubscribeUrl: emails.unsubscribeUrl,
   unsubscribeEmail: emails.unsubscribeEmail,
   snoozedUntil: emails.snoozedUntil,
-} as const;
-
-export const emailIntelligenceSelection = {
-  intelligenceStatus: emailIntelligence.status,
-  intelligenceCategory: emailIntelligence.category,
-  intelligenceSuspiciousJson: emailIntelligence.suspiciousJson,
 } as const;
 
 export function hasEmailLabel(label: string) {
@@ -71,9 +52,6 @@ export function toEmailListResponse(row: {
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
   snoozedUntil: number | null;
-  intelligenceStatus: "pending" | "ready" | "error" | null;
-  intelligenceCategory: import("../../../db/schema").EmailIntelligenceCategory | null;
-  intelligenceSuspiciousJson: import("../../../db/schema").EmailSuspiciousFlag | null;
 }) {
   const labelIds = row.labelIds ?? [];
   return {
@@ -96,20 +74,6 @@ export function toEmailListResponse(row: {
     unsubscribeUrl: row.unsubscribeUrl,
     unsubscribeEmail: row.unsubscribeEmail,
     snoozedUntil: row.snoozedUntil,
-    intelligenceStatus: getIntelligenceStatus(
-      row.intelligenceStatus ? { status: row.intelligenceStatus } : null,
-    ),
-    intelligence: getStoredEmailClassification(
-      row.intelligenceStatus
-        ? {
-            status: row.intelligenceStatus,
-            category: row.intelligenceCategory,
-            suspiciousJson: row.intelligenceSuspiciousJson ?? {
-              isSuspicious: false,
-            },
-          }
-        : null,
-    ),
   };
 }
 
@@ -175,4 +139,4 @@ export function resolveInlineCidImages(
   );
 }
 
-export { HAS_ATTACHMENT_LABEL, CATEGORY_VIEWS };
+export { HAS_ATTACHMENT_LABEL };

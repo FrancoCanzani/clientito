@@ -5,10 +5,12 @@ export const listEmailsQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional(),
   search: z.string().trim().max(500).optional(),
   isRead: z.enum(["true", "false"]).optional(),
-  view: z.enum(["inbox", "sent", "spam", "trash", "snoozed", "archived", "starred", "important", "to_respond", "to_follow_up", "fyi", "notification", "invoice", "marketing", "all"]).optional(),
+  view: z.string().optional().refine(
+    (v) => !v || ["inbox", "sent", "spam", "trash", "snoozed", "archived", "starred", "important", "all"].includes(v) || v.startsWith("Label_"),
+    { message: "Invalid view" },
+  ),
   mailboxId: z.coerce.number().int().positive().optional(),
   includeBody: z.coerce.boolean().optional(),
-  includeAi: z.coerce.boolean().optional(),
 });
 
 export const emailDetailParamsSchema = z.object({

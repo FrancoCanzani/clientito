@@ -5,7 +5,6 @@ import {
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import {
   fetchEmailDetail,
-  fetchEmailDetailAI,
   fetchEmailThread,
 } from "@/features/email/inbox/queries";
 import type {
@@ -14,7 +13,6 @@ import type {
   EmailListResponse,
 } from "@/features/email/inbox/types";
 import { buildForwardedEmailHtml } from "@/features/email/inbox/utils/build-forwarded-html";
-import type { EmailView } from "@/features/email/inbox/utils/inbox-filters";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
 import {
   setFocusedEmail,
@@ -43,7 +41,7 @@ export function EmailDetailView({
   email: EmailDetailItem;
   mailboxId: number;
   emailId: string;
-  view: EmailView;
+  view: string;
   onNavigateToEmail: (nextEmailId: string) => void;
 }) {
   const navigate = useNavigate();
@@ -135,10 +133,6 @@ export function EmailDetailView({
             mailboxId,
             view,
           }),
-      });
-      void queryClient.prefetchQuery({
-        queryKey: queryKeys.emails.aiDetail(neighborId),
-        queryFn: () => fetchEmailDetailAI(neighborId),
       });
     }
   }, [currentIndex, orderedIds, queryClient, mailboxId, view]);

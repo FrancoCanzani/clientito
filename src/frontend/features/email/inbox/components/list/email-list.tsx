@@ -44,7 +44,7 @@ export function EmailList({
   const { openCompose } = useInboxCompose();
   const { mailboxId } = mailboxRoute.useParams();
   const navigate = useNavigate();
-  const pageTitle = VIEW_LABELS[view];
+  const pageTitle = (VIEW_LABELS as Record<string, string>)[view] ?? view;
 
   const goToSearch = () =>
     navigate({ to: "/$mailboxId/inbox/search", params: { mailboxId } });

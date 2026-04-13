@@ -11,7 +11,6 @@ import type {
   InboxSearchScope,
   InboxSearchSuggestionsResponse,
 } from "./types";
-import type { EmailView } from "./utils/inbox-filters";
 
 function normalizeSearchQuery(query: string) {
   return query.trim().replace(/\s+/g, " ");
@@ -36,7 +35,7 @@ export async function fetchEmails(
   params?: {
     search?: string;
     isRead?: "true" | "false";
-    view?: EmailView;
+    view?: string;
     limit?: number;
     offset?: number;
     mailboxId?: number;
@@ -97,7 +96,7 @@ export async function fetchSearchEmails(
 
 export async function fetchEmailDetail(
   emailId: string,
-  options?: { refreshLive?: boolean; mailboxId?: number; view?: EmailView },
+  options?: { refreshLive?: boolean; mailboxId?: number; view?: string },
 ): Promise<EmailDetailItem> {
   const userId = await getCurrentUserId();
   if (!userId) {

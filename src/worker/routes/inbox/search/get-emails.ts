@@ -12,13 +12,11 @@ import {
 } from "drizzle-orm";
 import type { Hono } from "hono";
 import { z } from "zod";
-import { emailIntelligence, emails } from "../../../db/schema";
+import { emails } from "../../../db/schema";
 import { STANDARD_LABELS } from "../../../lib/gmail/types";
 import type { AppRouteEnv } from "../../types";
 import {
   HAS_ATTACHMENT_LABEL,
-  CATEGORY_VIEWS,
-  emailIntelligenceSelection,
   emailSummarySelection,
   hasEmailLabel,
   toEmailListResponse,
@@ -123,11 +121,7 @@ export function registerEmailSearch(api: Hono<AppRouteEnv>) {
 
       const baseConditions = [...conditions];
 
-      if (effectiveView && CATEGORY_VIEWS.has(effectiveView)) {
-        conditions.push(
-          sql<boolean>`${emailIntelligence.category} = ${effectiveView}`,
-        );
-      } else {
+      if (effectiveView) {
         switch (effectiveView) {
           case "inbox":
             conditions.push(hasEmailLabel(STANDARD_LABELS.INBOX));
@@ -157,16 +151,13 @@ export function registerEmailSearch(api: Hono<AppRouteEnv>) {
             conditions.push(hasEmailLabel(STANDARD_LABELS.STARRED));
             break;
           case "important":
-            conditions.push(
-              sql<boolean>`${emailIntelligence.category} in ('to_respond', 'to_follow_up')`,
-            );
+            conditions.push(hasEmailLabel(STANDARD_LABELS.IMPORTANT));
             break;
-          default:
-            if (!includeJunk) {
-              conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SPAM)}`);
-              conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.TRASH)}`);
-            }
-            break;
+        }
+      } else {
+        if (!includeJunk) {
+          conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.SPAM)}`);
+          conditions.push(sql<boolean>`not ${hasEmailLabel(STANDARD_LABELS.TRASH)}`);
         }
       }
 
@@ -189,11 +180,9 @@ export function registerEmailSearch(api: Hono<AppRouteEnv>) {
       const rowsWithExtra = await db
         .select({
           ...emailSummarySelection,
-          ...emailIntelligenceSelection,
           relevance,
         })
         .from(emails)
-        .leftJoin(emailIntelligence, eq(emailIntelligence.emailId, emails.id))
         .where(and(...conditions))
         .orderBy(
           ...(normalizedPlainText ? [relevance] : []),
@@ -211,7 +200,6 @@ export function registerEmailSearch(api: Hono<AppRouteEnv>) {
         const hiddenJunkRows = await db
           .select({ count: sql<number>`count(*)` })
           .from(emails)
-          .leftJoin(emailIntelligence, eq(emailIntelligence.emailId, emails.id))
           .where(
             and(
               ...baseConditions,

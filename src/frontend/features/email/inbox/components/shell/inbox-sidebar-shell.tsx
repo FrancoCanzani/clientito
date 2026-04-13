@@ -1,23 +1,8 @@
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -32,17 +17,11 @@ import {
   useMailboxes,
 } from "@/hooks/use-mailboxes";
 import {
-  ArrowBendUpLeftIcon,
   BellSimpleIcon,
-  CaretRightIcon,
   CaretUpDownIcon,
   CheckIcon,
-  ClockCounterClockwiseIcon,
   ClockIcon,
-  CurrencyDollarIcon,
   FunnelSimpleIcon,
-  InfoIcon,
-  MegaphoneIcon,
   PaperPlaneTiltIcon,
   PencilSimpleLineIcon,
   StarIcon,
@@ -56,9 +35,19 @@ import {
   useNavigate,
   useRouterState,
 } from "@tanstack/react-router";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useMemo } from "react";
 import { Kbd } from "@/components/ui/kbd";
 import { useHotkeys } from "@/hooks/use-hotkeys";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { LabelSidebarSection } from "@/features/email/labels/components/label-sidebar-section";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
@@ -180,22 +169,7 @@ type NavView =
   | "important"
   | "drafts"
   | "filters"
-  | "subscriptions"
-  | "to_respond"
-  | "to_follow_up"
-  | "fyi"
-  | "notification"
-  | "invoice"
-  | "marketing";
-
-const CATEGORY_LABELS = new Set([
-  "to_respond",
-  "to_follow_up",
-  "fyi",
-  "notification",
-  "invoice",
-  "marketing",
-]);
+  | "subscriptions";
 
 function useActiveView(): NavView {
   return useRouterState({
@@ -214,7 +188,7 @@ function useActiveView(): NavView {
           match.routeId === "/_dashboard/$mailboxId/inbox/labels/$label/",
       )?.params.label;
 
-      if (label && CATEGORY_LABELS.has(label)) return label as NavView;
+      if (label === "important") return "important";
 
       const folder = matches.find(
         (match) => match.routeId === "/_dashboard/$mailboxId/$folder/",
@@ -252,12 +226,6 @@ function getNavTo(
     case "search":
       return { to: "/$mailboxId/inbox/search", params: { mailboxId } };
     case "important":
-    case "to_respond":
-    case "to_follow_up":
-    case "fyi":
-    case "notification":
-    case "invoice":
-    case "marketing":
       return {
         to: "/$mailboxId/inbox/labels/$label",
         params: { mailboxId, label: view },
@@ -286,23 +254,9 @@ const NAV_ITEMS = [
   { view: "subscriptions", icon: BellSimpleIcon, label: "Subscriptions" },
 ] as const;
 
-const LABEL_ITEMS = [
-  { view: "to_respond", icon: ArrowBendUpLeftIcon, label: "To respond" },
-  {
-    view: "to_follow_up",
-    icon: ClockCounterClockwiseIcon,
-    label: "To follow up",
-  },
-  { view: "fyi", icon: InfoIcon, label: "FYI" },
-  { view: "notification", icon: BellSimpleIcon, label: "Notification" },
-  { view: "invoice", icon: CurrencyDollarIcon, label: "Invoice" },
-  { view: "marketing", icon: MegaphoneIcon, label: "Marketing" },
-] as const;
-
 function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   const activeView = useActiveView();
   const navigate = useNavigate();
-  const [labelsOpen, setLabelsOpen] = useState(true);
 
   const hotkeyBindings = useMemo(() => {
     const bindings: Record<string, () => void> = {};
@@ -310,14 +264,6 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
       const nav = getNavTo(item.view, mailboxId);
       bindings[`$mod+${i + 1}`] = () =>
         navigate({ to: nav.to as string, params: nav.params });
-    });
-    const shiftKeys = ["!", "@", "#", "$", "%", "^"];
-    LABEL_ITEMS.forEach((item, i) => {
-      const nav = getNavTo(item.view, mailboxId);
-      if (i < shiftKeys.length) {
-        bindings[shiftKeys[i]] = () =>
-          navigate({ to: nav.to as string, params: nav.params });
-      }
     });
     return bindings;
   }, [mailboxId, navigate]);
@@ -367,52 +313,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <Collapsible open={labelsOpen} onOpenChange={setLabelsOpen}>
-          <SidebarGroup>
-            <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="flex w-full items-center justify-between">
-                Labels
-                <CaretRightIcon
-                  className="size-3! transition-transform duration-200"
-                  style={{
-                    transform: labelsOpen ? "rotate(90deg)" : undefined,
-                  }}
-                />
-              </CollapsibleTrigger>
-            </SidebarGroupLabel>
-            <CollapsibleContent>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {LABEL_ITEMS.map((item, i) => {
-                    const Icon = item.icon;
-                    const nav = getNavTo(item.view, mailboxId);
-                    return (
-                      <SidebarMenuItem key={item.view} className="group/nav">
-                        <SidebarMenuButton
-                          asChild
-                          isActive={activeView === item.view}
-                          tooltip={item.label}
-                        >
-                          <Link
-                            to={nav.to as string}
-                            params={nav.params}
-                            preload="intent"
-                          >
-                            <Icon className="hidden group-data-[collapsible=icon]:block" />
-                            <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                            <Kbd className="ml-auto opacity-0 transition-opacity group-hover/nav:opacity-100 group-data-[collapsible=icon]:hidden">
-                              ⇧{i + 1}
-                            </Kbd>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </CollapsibleContent>
-          </SidebarGroup>
-        </Collapsible>
+        <LabelSidebarSection mailboxId={mailboxId} />
       </SidebarContent>
 
       <SidebarRail />
