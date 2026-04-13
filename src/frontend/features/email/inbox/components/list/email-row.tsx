@@ -22,12 +22,14 @@ export const EmailRow = memo(function EmailRow({
   onOpen,
   onAction,
   isFocused = false,
+  isSelected = false,
 }: {
   group: ThreadGroup;
   view: string;
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
   isFocused?: boolean;
+  isSelected?: boolean;
 }) {
   const queryClient = useQueryClient();
   const prefetchedRef = useRef(false);
@@ -72,6 +74,7 @@ export const EmailRow = memo(function EmailRow({
       className={cn(
         "group flex h-10 w-full first:rounded-tl-md first:rounded-tr-md border-dashed border-b cursor-default items-center gap-2 px-2 text-left text-sm transition-all duration-200 ease-out hover:bg-muted/40",
         isFocused && "bg-blue-50 dark:bg-blue-950",
+        isSelected && "bg-muted",
       )}
       onMouseEnter={() => {
         prefetchEmailData();

@@ -27,10 +27,12 @@ export function EmailList({
   emailData,
   onOpen,
   onAction,
+  selectedEmailId,
 }: {
   emailData: ReturnType<typeof useEmailData>;
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
+  selectedEmailId?: string | null;
 }) {
   const {
     view,
@@ -140,6 +142,7 @@ export function EmailList({
                       onOpen={onOpen}
                       onAction={onAction}
                       isFocused={virtualItem.index === focusedIndex}
+                      isSelected={group.representative.id === selectedEmailId}
                     />
                   </div>
                 );
