@@ -3,7 +3,6 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
-import { ReadingSettings } from "@/features/settings/components/reading-settings";
 import { SignatureField } from "@/features/settings/components/signature-field";
 import { updateSyncPreference } from "@/features/settings/mutations";
 import { useSettingsMutations } from "@/features/settings/hooks/use-settings-mutations";
@@ -131,7 +130,7 @@ export default function SettingsPage() {
   }, [accounts, accountsQuery.isPending, mailboxSyncMutation, queryClient]);
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-8 px-4">
+    <div className="mx-auto w-full max-w-3xl space-y-8 px-4 pb-12">
       <PageHeader title="Settings" />
 
       <section className="space-y-3">
@@ -387,8 +386,6 @@ export default function SettingsPage() {
           </div>
         </div>
       </section>
-
-      <ReadingSettings />
 
       <section className="space-y-3">
         <div className="space-y-1">

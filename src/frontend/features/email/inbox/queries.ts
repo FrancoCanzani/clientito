@@ -4,7 +4,6 @@ import { getCurrentUserId } from "@/db/user";
 import type {
   ContactSuggestion,
   DraftItem,
-  EmailDetailIntelligence,
   EmailDetailItem,
   EmailListResponse,
   EmailThreadItem,
@@ -16,7 +15,7 @@ function normalizeSearchQuery(query: string) {
   return query.trim().replace(/\s+/g, " ");
 }
 
-export const EMAIL_LIST_PAGE_SIZE = 100;
+export const EMAIL_LIST_PAGE_SIZE = 50;
 export const INBOX_SEARCH_PAGE_SIZE = 30;
 
 function emptyListResponse(
@@ -38,6 +37,7 @@ export async function fetchEmails(
     view?: string;
     limit?: number;
     offset?: number;
+    cursor?: number;
     mailboxId?: number;
   },
 ): Promise<EmailListResponse> {
@@ -47,8 +47,9 @@ export async function fetchEmails(
     return emptyListResponse(params?.limit ?? EMAIL_LIST_PAGE_SIZE, params?.offset ?? 0);
   }
 
-  if (!(await isSynced(userId, mailboxId))) {
-    ensureLocalSync(userId, mailboxId);
+  const offset = params?.offset ?? 0;
+  if (offset === 0 && !params?.cursor && !(await isSynced(userId, mailboxId))) {
+    await ensureLocalSync(userId, mailboxId);
   }
 
   return localDb.getEmails({
@@ -57,6 +58,7 @@ export async function fetchEmails(
     mailboxId,
     limit: params?.limit,
     offset: params?.offset,
+    cursor: params?.cursor,
     search: params?.search,
     isRead: params?.isRead,
   });
@@ -80,7 +82,7 @@ export async function fetchSearchEmails(
     params.mailboxId != null &&
     !(await isSynced(userId, params.mailboxId))
   ) {
-    ensureLocalSync(userId, params.mailboxId);
+    await ensureLocalSync(userId, params.mailboxId);
   }
 
   return localDb.searchEmails({
@@ -107,43 +109,14 @@ export async function fetchEmailDetail(
     options?.mailboxId != null &&
     !(await isSynced(userId, options.mailboxId))
   ) {
-    ensureLocalSync(userId, options.mailboxId);
-  }
-
-  let local = await localDb.getEmailDetail(userId, Number(emailId));
-  if (local) {
-    return local;
-  }
-
-  if (options?.mailboxId != null) {
     await ensureLocalSync(userId, options.mailboxId);
-    local = await localDb.getEmailDetail(userId, Number(emailId));
-    if (local) return local;
   }
 
-  throw new Error("Email not found in local database");
-}
-
-export async function fetchEmailDetailAI(
-  emailId: string,
-): Promise<EmailDetailIntelligence | null> {
-  const userId = await getCurrentUserId();
-  if (!userId) return null;
-
-  const local = await localDb.getEmailDetailAI(userId, Number(emailId));
-  if (local?.summary) return local;
-
-  try {
-    const response = await fetch(`/api/inbox/emails/${emailId}/ai`);
-    if (!response.ok) return local;
-    const result: EmailDetailIntelligence | null = await response.json();
-    if (!result) return local;
-
-    await localDb.cacheEmailDetailAI(userId, Number(emailId), result);
-    return result;
-  } catch {
-    return local;
+  const local = await localDb.getEmailDetail(userId, Number(emailId));
+  if (!local) {
+    throw new Error("Email not found in local database");
   }
+  return local;
 }
 
 export async function fetchEmailThread(
@@ -177,7 +150,7 @@ export async function fetchSearchSuggestions(
     params.mailboxId != null &&
     !(await isSynced(userId, params.mailboxId))
   ) {
-    ensureLocalSync(userId, params.mailboxId);
+    await ensureLocalSync(userId, params.mailboxId);
   }
 
   return localDb.getSearchSuggestions({

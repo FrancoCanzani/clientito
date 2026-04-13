@@ -22,6 +22,7 @@ import {
   EnvelopeSimpleIcon,
   EnvelopeSimpleOpenIcon,
   StarIcon,
+  TagIcon,
   TrashIcon,
   WarningIcon,
 } from "@phosphor-icons/react";
@@ -29,6 +30,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
+import { LabelPicker } from "@/features/email/labels/components/label-picker";
 import { unsubscribe } from "../../../subscriptions/queries";
 import { patchEmail } from "../../mutations";
 import type { ComposeInitial, EmailDetailItem } from "../../types";
@@ -262,6 +264,20 @@ export function EmailActions({
       >
         <TrashIcon className="size-3.5" />
       </IconButton>
+
+      {email.mailboxId != null && (
+        <LabelPicker
+          mailboxId={email.mailboxId}
+          emailIds={[email.id]}
+          appliedLabelIds={email.labelIds}
+          onDone={invalidateEmails}
+          trigger={
+            <IconButton label="Label" shortcut="L" variant="ghost">
+              <TagIcon className="size-3.5" />
+            </IconButton>
+          }
+        />
+      )}
 
       {/* Reply, Reply All, Forward — visible on desktop */}
       <div className="hidden items-center gap-0.5 sm:flex">

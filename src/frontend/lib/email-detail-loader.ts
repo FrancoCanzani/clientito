@@ -19,8 +19,8 @@ export function createEmailDetailLoader(view: string) {
           mailboxId: params.mailboxId,
           view,
         }),
+      staleTime: 60_000,
     });
-
     return { email };
   };
 }

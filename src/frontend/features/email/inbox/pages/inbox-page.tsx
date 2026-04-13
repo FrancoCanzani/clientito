@@ -13,8 +13,7 @@ const route = getRouteApi("/_dashboard/$mailboxId/inbox/");
 
 export default function InboxPage() {
   const { mailboxId } = route.useParams();
-  const { initialPage } = route.useLoaderData();
-  const emailData = useEmailData({ view: "inbox", mailboxId, initialPage });
+  const emailData = useEmailData({ view: "inbox", mailboxId });
   const isMobile = useIsMobile();
   const splitView = useSplitView();
   const { openEmail, executeEmailAction } = useEmailInboxActions({
@@ -26,12 +25,17 @@ export default function InboxPage() {
     ? openEmail
     : (email: Parameters<typeof openEmail>[0]) => splitView.select(email.id);
 
+  const handleFocusChange = splitView.enabled
+    ? (emailId: string | null) => splitView.select(emailId)
+    : undefined;
+
   const list = (
     <EmailList
       emailData={emailData}
       onOpen={handleOpen}
       onAction={executeEmailAction}
       selectedEmailId={splitView.enabled ? splitView.selectedEmailId : null}
+      onFocusChange={handleFocusChange}
     />
   );
 

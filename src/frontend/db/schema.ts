@@ -1,27 +1,15 @@
-import { type SQL, sql } from "drizzle-orm";
 import {
-  bigint,
-  boolean,
-  customType,
   index,
   integer,
-  jsonb,
-  pgTable,
-  serial,
+  sqliteTable,
   text,
   uniqueIndex,
-} from "drizzle-orm/pg-core";
+} from "drizzle-orm/sqlite-core";
 
-const tsVector = customType<{ data: string }>({
-  dataType() {
-    return "tsvector";
-  },
-});
-
-export const emails = pgTable(
+export const emails = sqliteTable(
   "emails",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id").notNull(),
     mailboxId: integer("mailbox_id"),
     providerMessageId: text("provider_message_id").notNull().unique(),
@@ -34,75 +22,31 @@ export const emails = pgTable(
     snippet: text("snippet"),
     bodyText: text("body_text"),
     bodyHtml: text("body_html"),
-    date: bigint("date", { mode: "number" }).notNull(),
+    date: integer("date").notNull(),
     direction: text("direction").$type<"sent" | "received">(),
-    isRead: boolean("is_read").notNull().default(false),
-    labelIds: jsonb("label_ids").$type<string[] | null>(),
+    isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
+    labelIds: text("label_ids"),
+    hasInbox: integer("has_inbox", { mode: "boolean" }).notNull().default(false),
+    hasSent: integer("has_sent", { mode: "boolean" }).notNull().default(false),
+    hasTrash: integer("has_trash", { mode: "boolean" }).notNull().default(false),
+    hasSpam: integer("has_spam", { mode: "boolean" }).notNull().default(false),
+    hasStarred: integer("has_starred", { mode: "boolean" }).notNull().default(false),
     unsubscribeUrl: text("unsubscribe_url"),
     unsubscribeEmail: text("unsubscribe_email"),
-    snoozedUntil: bigint("snoozed_until", { mode: "number" }),
-    createdAt: bigint("created_at", { mode: "number" }).notNull(),
-    searchVector: tsVector("search_vector").generatedAlwaysAs(
-      (): SQL =>
-        sql`setweight(to_tsvector('english', coalesce(${emails.subject}, '')), 'A') ||
-            setweight(to_tsvector('english', coalesce(${emails.fromName}, '')), 'B') ||
-            setweight(to_tsvector('english', coalesce(${emails.fromAddr}, '')), 'B') ||
-            setweight(to_tsvector('english', coalesce(${emails.snippet}, '')), 'C') ||
-            setweight(to_tsvector('english', coalesce(${emails.bodyText}, '')), 'D')`,
-    ),
+    snoozedUntil: integer("snoozed_until"),
+    createdAt: integer("created_at").notNull(),
   },
   (table) => [
-    index("emails_date_idx").on(table.date),
+    index("emails_user_mailbox_date_idx").on(table.userId, table.mailboxId, table.date),
     index("emails_thread_idx").on(table.threadId),
     index("emails_snoozed_idx").on(table.snoozedUntil),
-    index("emails_mailbox_date_idx").on(table.mailboxId, table.date),
-    index("emails_search_idx").using("gin", table.searchVector),
   ],
 );
 
-export const emailIntelligence = pgTable(
-  "email_intelligence",
-  {
-    id: serial("id").primaryKey(),
-    emailId: integer("email_id").notNull(),
-    userId: text("user_id").notNull(),
-    mailboxId: integer("mailbox_id"),
-    category: text("category").$type<
-      "to_respond" | "to_follow_up" | "fyi" | "notification" | "invoice" | "marketing"
-    >(),
-    summary: text("summary"),
-    suspiciousJson: jsonb("suspicious_json")
-      .$type<{
-        isSuspicious: boolean;
-      }>()
-      .notNull()
-      .default({
-        isSuspicious: false,
-      }),
-    actionsJson: jsonb("actions_json").$type<unknown[]>().notNull().default([]),
-    status: text("status")
-      .$type<"pending" | "ready" | "error">()
-      .notNull()
-      .default("pending"),
-    sourceHash: text("source_hash"),
-    model: text("model"),
-    schemaVersion: integer("schema_version").notNull().default(1),
-    attemptCount: integer("attempt_count").notNull().default(0),
-    error: text("error"),
-    lastProcessedAt: bigint("last_processed_at", { mode: "number" }),
-    createdAt: bigint("created_at", { mode: "number" }).notNull(),
-    updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
-  },
-  (table) => [
-    uniqueIndex("email_intelligence_email_idx").on(table.emailId),
-    index("email_intelligence_status_idx").on(table.status),
-  ],
-);
-
-export const emailSubscriptions = pgTable(
+export const emailSubscriptions = sqliteTable(
   "email_subscriptions",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id").notNull(),
     mailboxId: integer("mailbox_id"),
     senderKey: text("sender_key").notNull(),
@@ -115,12 +59,12 @@ export const emailSubscriptions = pgTable(
       .notNull()
       .default("active"),
     emailCount: integer("email_count").notNull().default(0),
-    lastReceivedAt: bigint("last_received_at", { mode: "number" }),
+    lastReceivedAt: integer("last_received_at"),
     unsubscribeMethod: text("unsubscribe_method").$type<"one-click" | "mailto" | "manual" | null>(),
-    unsubscribeRequestedAt: bigint("unsubscribe_requested_at", { mode: "number" }),
-    unsubscribedAt: bigint("unsubscribed_at", { mode: "number" }),
-    createdAt: bigint("created_at", { mode: "number" }).notNull(),
-    updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+    unsubscribeRequestedAt: integer("unsubscribe_requested_at"),
+    unsubscribedAt: integer("unsubscribed_at"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
     uniqueIndex("email_subscriptions_mailbox_sender_idx").on(
@@ -131,7 +75,7 @@ export const emailSubscriptions = pgTable(
   ],
 );
 
-export const labels = pgTable(
+export const labels = sqliteTable(
   "labels",
   {
     gmailId: text("gmail_id").notNull().primaryKey(),
@@ -143,17 +87,17 @@ export const labels = pgTable(
     backgroundColor: text("background_color"),
     messagesTotal: integer("messages_total").notNull().default(0),
     messagesUnread: integer("messages_unread").notNull().default(0),
-    syncedAt: bigint("synced_at", { mode: "number" }).notNull(),
+    syncedAt: integer("synced_at").notNull(),
   },
   (table) => [
     index("labels_user_mailbox_idx").on(table.userId, table.mailboxId),
   ],
 );
 
-export const drafts = pgTable(
+export const drafts = sqliteTable(
   "drafts",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id").notNull(),
     composeKey: text("compose_key").notNull(),
     mailboxId: integer("mailbox_id"),
@@ -164,11 +108,9 @@ export const drafts = pgTable(
     body: text("body").notNull().default(""),
     forwardedContent: text("forwarded_content").notNull().default(""),
     threadId: text("thread_id"),
-    attachmentKeys: jsonb("attachment_keys").$type<
-      Array<{ key: string; filename: string; mimeType: string }> | null
-    >(),
-    updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
-    createdAt: bigint("created_at", { mode: "number" }).notNull(),
+    attachmentKeys: text("attachment_keys"),
+    updatedAt: integer("updated_at").notNull(),
+    createdAt: integer("created_at").notNull(),
   },
   (table) => [
     uniqueIndex("drafts_compose_key_idx").on(table.userId, table.composeKey),

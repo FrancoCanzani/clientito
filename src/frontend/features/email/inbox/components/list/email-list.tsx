@@ -15,7 +15,7 @@ import type { EmailListItem } from "@/features/email/inbox/types";
 import { VIEW_LABELS } from "@/features/email/inbox/utils/inbox-filters";
 import { MagnifyingGlassIcon, NotePencilIcon } from "@phosphor-icons/react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
-import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
 import { EmailRow } from "./email-row";
 
@@ -28,11 +28,15 @@ export function EmailList({
   onOpen,
   onAction,
   selectedEmailId,
+  pageTitle: pageTitleOverride,
+  onFocusChange,
 }: {
   emailData: ReturnType<typeof useEmailData>;
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
   selectedEmailId?: string | null;
+  pageTitle?: string;
+  onFocusChange?: (emailId: string | null) => void;
 }) {
   const {
     view,
@@ -46,7 +50,7 @@ export function EmailList({
   const { openCompose } = useInboxCompose();
   const { mailboxId } = mailboxRoute.useParams();
   const navigate = useNavigate();
-  const pageTitle = (VIEW_LABELS as Record<string, string>)[view] ?? view;
+  const pageTitle = pageTitleOverride ?? (VIEW_LABELS as Record<string, string>)[view] ?? view;
 
   const goToSearch = () =>
     navigate({ to: "/$mailboxId/inbox/search", params: { mailboxId } });
@@ -59,19 +63,21 @@ export function EmailList({
     onSearch: goToSearch,
   });
 
-  const listRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const virtualizer = useWindowVirtualizer({
+  const virtualizer = useVirtualizer({
     count: threadGroups.length,
     estimateSize: () => ROW_HEIGHT,
     overscan: 10,
-    scrollMargin: listRef.current?.offsetTop ?? 0,
+    getScrollElement: () => scrollRef.current,
   });
 
   useEffect(() => {
     if (focusedIndex < 0) return;
     if (focusedIndex < threadGroups.length) {
       virtualizer.scrollToIndex(focusedIndex, { align: "auto" });
+      const group = threadGroups[focusedIndex];
+      onFocusChange?.(group?.representative.id ?? null);
     }
   }, [focusedIndex, threadGroups.length, virtualizer]);
 
@@ -118,47 +124,45 @@ export function EmailList({
       />
 
       {hasEmails ? (
-        <>
-          <div ref={listRef}>
-            <div
-              className="relative w-full"
-              style={{ height: virtualizer.getTotalSize() }}
-            >
-              {virtualItems.map((virtualItem) => {
-                const group = threadGroups[virtualItem.index]!;
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+          <div
+            className="relative w-full"
+            style={{ height: virtualizer.getTotalSize() }}
+          >
+            {virtualItems.map((virtualItem) => {
+              const group = threadGroups[virtualItem.index]!;
 
-                return (
-                  <div
-                    key={group.representative.id}
-                    className="absolute left-0 w-full"
-                    style={{
-                      height: virtualItem.size,
-                      transform: `translateY(${virtualItem.start - virtualizer.options.scrollMargin}px)`,
-                    }}
-                  >
-                    <EmailRow
-                      group={group}
-                      view={view}
-                      onOpen={onOpen}
-                      onAction={onAction}
-                      isFocused={virtualItem.index === focusedIndex}
-                      isSelected={group.representative.id === selectedEmailId}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-
-            {(hasNextPage || isFetchingNextPage) && (
-              <div
-                ref={loadMoreRef}
-                className="pt-2 text-center text-xs text-muted-foreground"
-              >
-                {isFetchingNextPage ? "Loading more..." : "Scroll for more"}
-              </div>
-            )}
+              return (
+                <div
+                  key={group.representative.id}
+                  className="absolute left-0 w-full"
+                  style={{
+                    height: virtualItem.size,
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                >
+                  <EmailRow
+                    group={group}
+                    view={view}
+                    onOpen={onOpen}
+                    onAction={onAction}
+                    isFocused={virtualItem.index === focusedIndex}
+                    isSelected={group.representative.id === selectedEmailId}
+                  />
+                </div>
+              );
+            })}
           </div>
-        </>
+
+          {(hasNextPage || isFetchingNextPage) && (
+            <div
+              ref={loadMoreRef}
+              className="pt-2 text-center text-xs text-muted-foreground"
+            >
+              {isFetchingNextPage ? "Loading more..." : "Scroll for more"}
+            </div>
+          )}
+        </div>
       ) : (
         <Empty className="min-h-56 flex-1 justify-center">
           <EmptyHeader>

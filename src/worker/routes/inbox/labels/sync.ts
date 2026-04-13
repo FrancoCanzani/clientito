@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { z } from "zod";
-import { mailboxes } from "../../../db/schema";
+import { labels, mailboxes } from "../../../db/schema";
 import { syncGmailLabels } from "../../../lib/gmail/sync/labels";
 import type { AppRouteEnv } from "../../types";
 
@@ -27,6 +27,11 @@ export function registerSyncLabels(api: Hono<AppRouteEnv>) {
       GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
     });
 
-    return c.json({ success: true }, 200);
+    const rows = await db
+      .select()
+      .from(labels)
+      .where(and(eq(labels.mailboxId, mailboxId), eq(labels.userId, user.id)));
+
+    return c.json({ data: rows }, 200);
   });
 }

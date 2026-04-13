@@ -71,49 +71,6 @@ CREATE TABLE `drafts` (
 --> statement-breakpoint
 CREATE UNIQUE INDEX `drafts_user_compose_key_idx` ON `drafts` (`user_id`,`compose_key`);--> statement-breakpoint
 CREATE INDEX `drafts_user_updated_idx` ON `drafts` (`user_id`,`updated_at`);--> statement-breakpoint
-CREATE TABLE `email_filters` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`user_id` text NOT NULL,
-	`name` text NOT NULL,
-	`description` text DEFAULT '' NOT NULL,
-	`conditions` text DEFAULT '[]' NOT NULL,
-	`actions` text NOT NULL,
-	`enabled` integer DEFAULT true NOT NULL,
-	`priority` integer DEFAULT 0 NOT NULL,
-	`created_at` integer NOT NULL,
-	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `email_filters_user_idx` ON `email_filters` (`user_id`);--> statement-breakpoint
-CREATE INDEX `email_filters_user_priority_idx` ON `email_filters` (`user_id`,`priority`);--> statement-breakpoint
-CREATE TABLE `email_intelligence` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`email_id` integer NOT NULL,
-	`user_id` text NOT NULL,
-	`mailbox_id` integer,
-	`category` text,
-	`urgency` text,
-	`summary` text,
-	`suspicious_json` text DEFAULT '{"isSuspicious":false,"kind":null,"reason":null,"confidence":null}' NOT NULL,
-	`actions_json` text DEFAULT '[]' NOT NULL,
-	`status` text DEFAULT 'pending' NOT NULL,
-	`source_hash` text,
-	`model` text,
-	`schema_version` integer DEFAULT 1 NOT NULL,
-	`attempt_count` integer DEFAULT 0 NOT NULL,
-	`error` text,
-	`last_processed_at` integer,
-	`created_at` integer NOT NULL,
-	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`email_id`) REFERENCES `emails`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`mailbox_id`) REFERENCES `mailboxes`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `email_intelligence_email_idx` ON `email_intelligence` (`email_id`);--> statement-breakpoint
-CREATE INDEX `email_intelligence_user_status_idx` ON `email_intelligence` (`user_id`,`status`);--> statement-breakpoint
-CREATE INDEX `email_intelligence_user_updated_idx` ON `email_intelligence` (`user_id`,`updated_at`);--> statement-breakpoint
-CREATE INDEX `email_intelligence_mailbox_idx` ON `email_intelligence` (`mailbox_id`);--> statement-breakpoint
 CREATE TABLE `email_subscriptions` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` text NOT NULL,
@@ -172,6 +129,24 @@ CREATE INDEX `emails_user_date_idx` ON `emails` (`user_id`,`date`);--> statement
 CREATE INDEX `emails_thread_idx` ON `emails` (`thread_id`);--> statement-breakpoint
 CREATE INDEX `emails_user_snoozed_idx` ON `emails` (`user_id`,`snoozed_until`);--> statement-breakpoint
 CREATE INDEX `emails_mailbox_date_idx` ON `emails` (`mailbox_id`,`date`);--> statement-breakpoint
+CREATE TABLE `labels` (
+	`gmail_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`mailbox_id` integer NOT NULL,
+	`name` text NOT NULL,
+	`type` text DEFAULT 'user' NOT NULL,
+	`text_color` text,
+	`background_color` text,
+	`messages_total` integer DEFAULT 0 NOT NULL,
+	`messages_unread` integer DEFAULT 0 NOT NULL,
+	`synced_at` integer NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`mailbox_id`) REFERENCES `mailboxes`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `labels_mailbox_gmail_idx` ON `labels` (`mailbox_id`,`gmail_id`);--> statement-breakpoint
+CREATE INDEX `labels_user_idx` ON `labels` (`user_id`);--> statement-breakpoint
+CREATE INDEX `labels_mailbox_idx` ON `labels` (`mailbox_id`);--> statement-breakpoint
 CREATE TABLE `mailboxes` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` text NOT NULL,

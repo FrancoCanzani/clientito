@@ -67,14 +67,15 @@ export const EmailRow = memo(function EmailRow({
     }
   };
 
+  const isActive = isFocused || isSelected;
+
   return (
     <div
       role="button"
       tabIndex={0}
       className={cn(
-        "group flex h-10 w-full first:rounded-tl-md first:rounded-tr-md border-dashed border-b cursor-default items-center gap-2 px-2 text-left text-sm transition-all duration-200 ease-out hover:bg-muted/40",
-        isFocused && "bg-blue-50 dark:bg-blue-950",
-        isSelected && "bg-muted",
+        "group flex h-10 w-full border-dashed border-b cursor-default items-center gap-2 px-2 text-left text-sm transition-colors hover:bg-muted/40",
+        isActive && "bg-muted",
       )}
       onMouseEnter={() => {
         prefetchEmailData();
@@ -92,26 +93,48 @@ export const EmailRow = memo(function EmailRow({
       <span
         className={cn(
           "size-1.5 shrink-0 rounded-full",
-          email.isRead ? "hidden" : "bg-blue-500",
+          email.isRead ? "invisible" : "bg-blue-500",
         )}
         aria-hidden
       />
 
-      <div className="min-w-0 flex-1 items-center gap-2 overflow-hidden flex">
-        <span className="shrink-0 truncate tracking-[-0.6px] text-foreground">
-          {participantLabel}
+      <span
+        className={cn(
+          "min-w-0 max-w-[30%] shrink-0 truncate text-sm",
+          email.isRead ? "text-foreground/70" : "font-medium text-foreground",
+        )}
+      >
+        {participantLabel}
+      </span>
+
+      {threadCount > 1 && (
+        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+          {threadCount}
         </span>
-        <span className="min-w-0 overflow-hidden whitespace-nowrap tracking-[-0.2px] text-foreground/50">
-          {email.subject ?? "(no subject)"}
-          {email.snippet && (
-            <span className="text-foreground/30"> {email.snippet}</span>
+      )}
+
+      <span className="mx-0.5 shrink-0 text-foreground/20">-</span>
+
+      <div className="min-w-0 flex-1 truncate">
+        <span
+          className={cn(
+            "text-sm",
+            email.isRead ? "text-foreground/50" : "text-foreground/70",
           )}
+        >
+          {email.subject ?? "(no subject)"}
         </span>
+        {email.snippet && (
+          <span className="text-sm text-foreground/30">
+            {" "}
+            {email.snippet}
+          </span>
+        )}
       </div>
 
       <div className="shrink-0">
-        <div className="relative flex md:min-w-24 justify-end text-xs text-muted-foreground">
-          <div className="flex items-center gap-2 md:group-hover:invisible">
+        <div className="relative flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 md:group-hover:invisible">
             {isStarred && (
               <StarIcon
                 className="size-3.5 text-yellow-400"
@@ -122,10 +145,7 @@ export const EmailRow = memo(function EmailRow({
             {email.hasAttachment && (
               <PaperclipIcon className="size-3.5" aria-hidden />
             )}
-            {threadCount > 1 && (
-              <span className="tabular-nums">[{threadCount}]</span>
-            )}
-            <span className="tabular-nums">
+            <span className="tabular-nums whitespace-nowrap">
               {formatInboxRowDate(email.date)}
             </span>
           </div>

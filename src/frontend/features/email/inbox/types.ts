@@ -57,12 +57,6 @@ export type InboxSearchSuggestionsResponse = {
   subjects: InboxSearchSubjectSuggestion[];
 };
 
-export type EmailDetailIntelligence = {
-  summary: string | null;
-  isSuspicious: boolean;
-  replyDraft: string | null;
-};
-
 export type EmailListItem = {
   id: string;
   mailboxId: number | null;
@@ -120,6 +114,7 @@ export type EmailListResponse = {
     limit: number;
     offset: number;
     hasMore: boolean;
+    cursor?: number;
   };
   searchMeta?: {
     hiddenJunkCount: number;

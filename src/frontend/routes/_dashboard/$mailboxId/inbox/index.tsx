@@ -9,26 +9,23 @@ import { queryKeys } from "@/lib/query-keys";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/")({
-  loader: async ({ context, params }) => {
-    const initialData = await context.queryClient.ensureInfiniteQueryData({
+  loader: ({ context, params }) => {
+    context.queryClient.prefetchInfiniteQuery({
       queryKey: queryKeys.emails.list("inbox", params.mailboxId),
       queryFn: ({ pageParam }) =>
         fetchEmails({
           view: "inbox",
           mailboxId: params.mailboxId,
           limit: EMAIL_LIST_PAGE_SIZE,
-          offset: pageParam,
+          cursor: pageParam === 0 ? undefined : pageParam,
         }),
       initialPageParam: 0,
+      pages: 2,
       getNextPageParam: (lastPage: EmailListResponse) =>
-        lastPage.pagination.hasMore
-          ? lastPage.pagination.offset + lastPage.pagination.limit
+        lastPage.pagination.hasMore && lastPage.pagination.cursor
+          ? lastPage.pagination.cursor
           : undefined,
     });
-
-    return {
-      initialPage: initialData.pages[0],
-    };
   },
   errorComponent: RouteError,
   component: InboxPage,

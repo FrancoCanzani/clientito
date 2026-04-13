@@ -3,7 +3,6 @@ import {
   CheckIcon,
   FileDashedIcon,
   FlagIcon,
-  FunnelIcon,
   GearIcon,
   MagnifyingGlassIcon,
   NewspaperIcon,
@@ -92,8 +91,7 @@ function navigateToMailboxPath(
   to:
     | "/$mailboxId/inbox/drafts"
     | "/$mailboxId/inbox/search"
-    | "/$mailboxId/inbox/subscriptions"
-    | "/$mailboxId/inbox/filters",
+    | "/$mailboxId/inbox/subscriptions",
   services: CommandServices,
 ) {
   services.navigate({
@@ -190,14 +188,6 @@ const navigationCommands: Command[] = [
         "/$mailboxId/inbox/subscriptions",
         services,
       ),
-  }),
-  makeNavCommand({
-    id: "nav:filters",
-    label: "Filters",
-    icon: paletteIcon(FunnelIcon),
-    keywords: ["filters", "rules"],
-    perform: (mailboxId, services) =>
-      navigateToMailboxPath(mailboxId, "/$mailboxId/inbox/filters", services),
   }),
   {
     id: "nav:docs",

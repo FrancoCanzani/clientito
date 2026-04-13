@@ -1,3 +1,4 @@
+import { Kbd } from "@/components/ui/kbd";
 import {
   Sidebar,
   SidebarContent,
@@ -10,18 +11,19 @@ import {
   SidebarProvider,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { useAuth, useLogout } from "@/hooks/use-auth";
-import {
-  type MailboxAccount,
-  getMailboxDisplayEmail,
-  useMailboxes,
-} from "@/hooks/use-mailboxes";
+import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
+import { LabelSidebarSection } from "@/features/email/labels/components/label-sidebar-section";
+import { useSyncStatus } from "@/features/onboarding/hooks/use-sync-status";
+import { useAuth } from "@/hooks/use-auth";
+import { useHotkeys } from "@/hooks/use-hotkeys";
+import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import {
   BellSimpleIcon,
-  CaretUpDownIcon,
   CheckIcon,
   ClockIcon,
-  FunnelSimpleIcon,
+  GearIcon,
+  MagnifyingGlassIcon,
+  NotePencilIcon,
   PaperPlaneTiltIcon,
   PencilSimpleLineIcon,
   StarIcon,
@@ -36,18 +38,6 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { type ReactNode, useMemo } from "react";
-import { Kbd } from "@/components/ui/kbd";
-import { useHotkeys } from "@/hooks/use-hotkeys";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { LabelSidebarSection } from "@/features/email/labels/components/label-sidebar-section";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
@@ -67,11 +57,9 @@ function formatDisplayName(
   return localPart.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function AccountSwitcher({ mailboxId }: { mailboxId: number }) {
+function AccountHeader({ mailboxId }: { mailboxId: number }) {
   const { user } = useAuth();
   const accounts = useMailboxes().data?.accounts ?? [];
-  const logout = useLogout();
-  const navigate = useNavigate();
 
   const activeMailbox = accounts.find((a) => a.mailboxId === mailboxId) ?? null;
   const activeEmail =
@@ -80,80 +68,18 @@ function AccountSwitcher({ mailboxId }: { mailboxId: number }) {
     "Inbox";
   const displayName = formatDisplayName(user?.name, activeEmail);
 
-  const otherAccounts = accounts.filter(
-    (a): a is MailboxAccount & { mailboxId: number } =>
-      a.mailboxId !== null && a.mailboxId !== mailboxId,
-  );
-
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <SidebarMenuButton
-          size="lg"
-          className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center"
-        >
-          <div className="hidden size-5 items-center justify-center rounded-md border border-border bg-muted text-[10px] font-medium uppercase text-muted-foreground group-data-[collapsible=icon]:flex">
-            {displayName.charAt(0)}
-          </div>
-          <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="truncate font-medium">{displayName}</span>
-            <span className="truncate text-xs text-muted-foreground">
-              {activeEmail}
-            </span>
-          </div>
-          <CaretUpDownIcon className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
-        </SidebarMenuButton>
-      </DropdownMenuTrigger>
-
-      <DropdownMenuContent
-        className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
-        align="start"
-        side="bottom"
-        sideOffset={4}
-      >
-        {otherAccounts.length > 0 && (
-          <>
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Switch account
-            </DropdownMenuLabel>
-            <DropdownMenuGroup>
-              {otherAccounts.map((account) => {
-                const email = getMailboxDisplayEmail(account) ?? "Unknown";
-                return (
-                  <DropdownMenuItem
-                    key={account.accountId}
-                    onClick={() =>
-                      navigate({
-                        to: "/$mailboxId/inbox",
-                        params: { mailboxId: account.mailboxId },
-                      })
-                    }
-                  >
-                    <span className="truncate">{email}</span>
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-          </>
-        )}
-
-        <DropdownMenuGroup>
-          <DropdownMenuItem onClick={() => navigate({ to: "/get-started" })}>
-            Add account
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => navigate({ to: "/settings" })}>
-            Settings
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-
-        <DropdownMenuSeparator />
-
-        <DropdownMenuItem onClick={() => logout.mutate()}>
-          Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="flex items-center gap-2 px-2 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+      <div className="flex size-5 items-center justify-center rounded-md border border-border bg-muted text-[10px] font-medium uppercase text-muted-foreground">
+        {displayName.charAt(0)}
+      </div>
+      <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+        <span className="truncate font-medium">{displayName}</span>
+        <span className="truncate text-xs text-muted-foreground">
+          {activeEmail}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -168,7 +94,6 @@ type NavView =
   | "snoozed"
   | "important"
   | "drafts"
-  | "filters"
   | "subscriptions";
 
 function useActiveView(): NavView {
@@ -178,7 +103,6 @@ function useActiveView(): NavView {
       const leaf = matches[matches.length - 1]?.routeId;
       if (leaf === "/_dashboard/$mailboxId/inbox/search") return "search";
       if (leaf === "/_dashboard/$mailboxId/inbox/drafts") return "drafts";
-      if (leaf === "/_dashboard/$mailboxId/inbox/filters") return "filters";
       if (leaf === "/_dashboard/$mailboxId/inbox/subscriptions") {
         return "subscriptions";
       }
@@ -232,8 +156,6 @@ function getNavTo(
       };
     case "drafts":
       return { to: "/$mailboxId/inbox/drafts", params: { mailboxId } };
-    case "filters":
-      return { to: "/$mailboxId/inbox/filters", params: { mailboxId } };
     case "subscriptions":
       return { to: "/$mailboxId/inbox/subscriptions", params: { mailboxId } };
     default:
@@ -250,13 +172,13 @@ const NAV_ITEMS = [
   { view: "archived", icon: CheckIcon, label: "Done" },
   { view: "spam", icon: WarningIcon, label: "Spam" },
   { view: "trash", icon: TrashIcon, label: "Trash" },
-  { view: "filters", icon: FunnelSimpleIcon, label: "Filters" },
   { view: "subscriptions", icon: BellSimpleIcon, label: "Subscriptions" },
 ] as const;
 
 function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   const activeView = useActiveView();
   const navigate = useNavigate();
+  const { openCompose } = useInboxCompose();
 
   const hotkeyBindings = useMemo(() => {
     const bindings: Record<string, () => void> = {};
@@ -273,9 +195,32 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <SidebarMenu>
+        <AccountHeader mailboxId={mailboxId} />
+        <SidebarMenu className="group-data-[collapsible=icon]:hidden">
           <SidebarMenuItem>
-            <AccountSwitcher mailboxId={mailboxId} />
+            <SidebarMenuButton onClick={() => openCompose()}>
+              <NotePencilIcon className="size-4 shrink-0" />
+              <span>Compose</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() =>
+                navigate({
+                  to: "/$mailboxId/inbox/search",
+                  params: { mailboxId },
+                })
+              }
+            >
+              <MagnifyingGlassIcon className="size-4 shrink-0" />
+              <span>Search</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => navigate({ to: "/settings" })}>
+              <GearIcon className="size-4 shrink-0" />
+              <span>Settings</span>
+            </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -299,8 +244,10 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
                         params={nav.params}
                         preload={item.view === "inbox" ? undefined : "intent"}
                       >
-                        <Icon className="hidden group-data-[collapsible=icon]:block" />
-                        <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                        <Icon className="size-4 shrink-0" />
+                        <span className="group-data-[collapsible=icon]:hidden">
+                          {item.label}
+                        </span>
                         <Kbd className="ml-auto opacity-0 transition-opacity group-hover/nav:opacity-100 group-data-[collapsible=icon]:hidden">
                           ⌘{i + 1}
                         </Kbd>
@@ -323,11 +270,31 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
 
 export function InboxSidebarShell({ children }: { children: ReactNode }) {
   const { mailboxId } = mailboxRoute.useParams();
+  const { user } = useAuth();
+  const syncStatus = useSyncStatus();
+  const isSyncing = syncStatus.data?.state === "syncing";
+  const isInitialSync = isSyncing && !syncStatus.data?.hasSynced;
+
+  if (isInitialSync) {
+    const firstName = user?.name?.split(" ")[0] ?? "";
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3">
+        <p className="animate-pulse">
+          Pulling your emails{firstName ? `, ${firstName}` : ""}...
+        </p>
+        <p className="text-sm text-muted-foreground ">
+          This will take a second
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <SidebarProvider className="min-h-0 flex-1">
+    <SidebarProvider className="h-full min-h-0 flex-1 overflow-hidden">
       <InboxSidebar mailboxId={mailboxId} />
-      <main className="min-w-0 flex-1 px-4">{children}</main>
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-4">
+        {children}
+      </main>
     </SidebarProvider>
   );
 }

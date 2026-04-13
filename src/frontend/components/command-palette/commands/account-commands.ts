@@ -89,14 +89,6 @@ export function useAccountCommands(ctx: CommandContext): Command[] {
               });
             } else if (
               currentRouteId ===
-              "/_dashboard/$mailboxId/inbox/filters"
-            ) {
-              services.navigate({
-                to: "/$mailboxId/inbox/filters",
-                params: { mailboxId },
-              });
-            } else if (
-              currentRouteId ===
               "/_dashboard/$mailboxId/inbox/drafts"
             ) {
               services.navigate({

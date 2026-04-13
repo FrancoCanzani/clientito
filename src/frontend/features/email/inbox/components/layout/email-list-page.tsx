@@ -7,17 +7,19 @@ import { SplitDetailPanel } from "@/features/email/inbox/components/layout/split
 import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
 import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { getRouteApi } from "@tanstack/react-router";
 
-const route = getRouteApi("/_dashboard/$mailboxId/$folder/");
-
-export default function FolderPage() {
-  const { mailboxId, folder } = route.useParams();
-  const emailData = useEmailData({ view: folder, mailboxId });
+export function EmailListPage({
+  view,
+  mailboxId,
+}: {
+  view: string;
+  mailboxId: number;
+}) {
+  const emailData = useEmailData({ view, mailboxId });
   const isMobile = useIsMobile();
   const splitView = useSplitView();
   const { openEmail, executeEmailAction } = useEmailInboxActions({
-    view: folder,
+    view,
     mailboxId,
   });
 
@@ -41,20 +43,22 @@ export default function FolderPage() {
 
   if (!isMobile && splitView.enabled) {
     return (
-      <SplitViewLayout
-        list={list}
-        detail={
-          splitView.selectedEmailId ? (
-            <SplitDetailPanel
-              emailId={splitView.selectedEmailId}
-              mailboxId={mailboxId}
-              view={folder}
-              onClose={() => splitView.select(null)}
-              onNavigate={splitView.select}
-            />
-          ) : null
-        }
-      />
+      <div className="h-full min-h-0 min-w-0 overflow-hidden">
+        <SplitViewLayout
+          list={list}
+          detail={
+            splitView.selectedEmailId ? (
+              <SplitDetailPanel
+                emailId={splitView.selectedEmailId}
+                mailboxId={mailboxId}
+                view={view}
+                onClose={() => splitView.select(null)}
+                onNavigate={splitView.select}
+              />
+            ) : null
+          }
+        />
+      </div>
     );
   }
 

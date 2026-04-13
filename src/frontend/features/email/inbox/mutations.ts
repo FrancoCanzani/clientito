@@ -65,7 +65,7 @@ export async function patchEmail(
     throwApiError(json, "Failed to update email");
   }
 
-  await syncLocalPatch([emailId], data);
+  void syncLocalPatch([emailId], data);
 }
 
 export async function batchPatchEmails(
@@ -86,7 +86,7 @@ export async function batchPatchEmails(
     throwApiError(json, "Failed to update emails");
   }
 
-  await syncLocalPatch(emailIds, data);
+  void syncLocalPatch(emailIds, data);
 }
 
 export async function markEmailRead(emailId: string): Promise<void> {

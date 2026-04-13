@@ -28,9 +28,9 @@ export function useEmailData({
         view,
         mailboxId,
         limit: EMAIL_LIST_PAGE_SIZE,
-        offset: pageParam,
+        cursor: pageParam || undefined,
       }),
-    initialPageParam: 0,
+    initialPageParam: 0 as number,
     ...(initialPage
       ? {
           initialData: {
@@ -41,7 +41,7 @@ export function useEmailData({
       : {}),
     getNextPageParam: (lastPage) =>
       lastPage?.pagination?.hasMore
-        ? lastPage.pagination.offset + lastPage.pagination.limit
+        ? lastPage.pagination.cursor
         : undefined,
     staleTime: isSyncing ? 0 : 30_000,
     refetchOnWindowFocus: true,

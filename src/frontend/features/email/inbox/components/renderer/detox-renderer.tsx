@@ -1,5 +1,4 @@
 import { openCompose } from "@/features/email/inbox/components/compose/compose-events";
-import type { Preferences } from "@/features/settings/schema";
 import { cn } from "@/lib/utils";
 import Defuddle from "defuddle";
 import DOMPurify from "dompurify";
@@ -10,7 +9,7 @@ import { EmailHtmlRenderer } from "./email-html-renderer";
 
 const MIN_READABLE_CHARS = 40;
 
-const PROSE_SIZE_CLASS: Record<Preferences["fontSize"], string> = {
+const PROSE_SIZE_CLASS: Record<string, string> = {
   sm: "prose-sm",
   base: "prose-base",
   lg: "prose-lg",
@@ -300,7 +299,7 @@ export function DetoxRenderer({
   defaultShowQuoted,
 }: {
   html: string;
-  fontSize: Preferences["fontSize"];
+  fontSize: string;
   defaultShowImages: boolean;
   defaultShowQuoted: boolean;
 }) {

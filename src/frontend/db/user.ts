@@ -1,6 +1,6 @@
 import { authClient } from "@/lib/auth-client";
 
-const USER_CACHE_TTL_MS = 15_000;
+const USER_CACHE_TTL_MS = 5 * 60_000;
 
 let cachedUserId: string | null | undefined;
 let cachedAt = 0;

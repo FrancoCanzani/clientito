@@ -6,6 +6,9 @@ import path from "path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  worker: {
+    format: "es",
+  },
   plugins: [
     tanstackRouter({
       target: "react",
@@ -26,7 +29,7 @@ export default defineConfig({
     }),
   ],
   optimizeDeps: {
-    exclude: ["@electric-sql/pglite"],
+    exclude: ["wa-sqlite"],
   },
   resolve: {
     alias: {

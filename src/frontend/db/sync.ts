@@ -30,6 +30,8 @@ type SyncEmailListItem = EmailListItem & {
 };
 
 function emailListItemToRow(item: SyncEmailListItem, userId: string): typeof emails.$inferInsert {
+  const labelIds = item.labelIds ?? [];
+  const labels = new Set(labelIds);
   return {
     id: Number(item.id),
     userId,
@@ -45,7 +47,12 @@ function emailListItemToRow(item: SyncEmailListItem, userId: string): typeof ema
     date: item.date,
     direction: item.direction,
     isRead: item.isRead,
-    labelIds: item.labelIds,
+    labelIds: JSON.stringify(labelIds),
+    hasInbox: labels.has("INBOX"),
+    hasSent: labels.has("SENT"),
+    hasTrash: labels.has("TRASH"),
+    hasSpam: labels.has("SPAM"),
+    hasStarred: labels.has("STARRED"),
     unsubscribeUrl: item.unsubscribeUrl,
     unsubscribeEmail: item.unsubscribeEmail,
     snoozedUntil: item.snoozedUntil,
@@ -86,11 +93,11 @@ async function pullAll(userId: string, mailboxId: number) {
     const emailRows = items.map((item) => emailListItemToRow(item, userId));
     await localDb.insertEmails(emailRows);
 
-    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
-
     hasMore = page.pagination.hasMore;
     offset += items.length;
   }
+
+  queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
 }
 
 async function alignActiveUser(userId: string) {

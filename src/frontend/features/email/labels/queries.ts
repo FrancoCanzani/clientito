@@ -15,12 +15,13 @@ export async function syncLabelsFromServer(mailboxId: number): Promise<Label[]> 
     body: JSON.stringify({ mailboxId }),
   });
   if (!response.ok) throw new Error("Failed to sync labels");
-  const result: { data: Label[] } = await response.json();
+  const result: { data?: Label[] } = await response.json();
+  const labels = result.data ?? [];
 
   const userId = await getCurrentUserId();
-  if (userId) {
-    await localDb.upsertLabels(userId, mailboxId, result.data);
+  if (userId && labels.length > 0) {
+    await localDb.upsertLabels(userId, mailboxId, labels);
   }
 
-  return result.data;
+  return labels;
 }

@@ -1,4 +1,5 @@
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
+import { fetchEmailDetail } from "@/features/email/inbox/queries";
 import type { EmailListItem } from "@/features/email/inbox/types";
 import type { ThreadGroup } from "@/features/email/inbox/utils/group-emails-by-thread";
 import {
@@ -6,6 +7,7 @@ import {
   clearFocusedEmail,
 } from "@/hooks/use-focused-email";
 import { useHotkeys } from "@/hooks/use-hotkeys";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 type InboxHotkeysOptions = {
@@ -14,6 +16,7 @@ type InboxHotkeysOptions = {
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
   onCompose: () => void;
   onSearch: () => void;
+  onFocusChange?: (emailId: string | null) => void;
 };
 
 export function useInboxHotkeys({
@@ -22,7 +25,9 @@ export function useInboxHotkeys({
   onAction,
   onCompose,
   onSearch,
+  onFocusChange,
 }: InboxHotkeysOptions) {
+  const queryClient = useQueryClient();
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const lastIndexRef = useRef(-1);
 
@@ -43,6 +48,7 @@ export function useInboxHotkeys({
     const clamped = Math.max(0, Math.min(next, groups.length - 1));
     const target = groups[clamped]?.representative.id ?? null;
     setFocusedId(target);
+    onFocusChange?.(target);
   };
 
   useHotkeys({
@@ -104,6 +110,27 @@ export function useInboxHotkeys({
       onSearch();
     },
   });
+
+  // Prefetch adjacent email details for instant navigation.
+  useEffect(() => {
+    if (focusedIndex < 0) return;
+    const neighbors = [focusedIndex - 1, focusedIndex + 1];
+    for (const idx of neighbors) {
+      const email = groups[idx]?.representative;
+      if (!email) continue;
+      const key = ["email-detail", email.id];
+      if (queryClient.getQueryState(key)?.status === "success") continue;
+      void queryClient.prefetchQuery({
+        queryKey: key,
+        queryFn: () =>
+          fetchEmailDetail(email.id, {
+            mailboxId: email.mailboxId ?? undefined,
+          }),
+        staleTime: 45_000,
+        gcTime: 120_000,
+      });
+    }
+  }, [focusedIndex, groups, queryClient]);
 
   // Sync focused email to the global store for the command palette.
   useEffect(() => {

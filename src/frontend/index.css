@@ -133,24 +133,6 @@
     @apply font-sans antialiased;
     --reading-font: var(--font-sans);
   }
-  [data-font="sans"] {
-    --reading-font: var(--font-sans);
-  }
-  [data-font="serif"] {
-    --reading-font: var(--font-serif);
-  }
-  [data-font="mono"] {
-    --reading-font: var(--font-mono);
-  }
-  [data-warmth="on"] {
-    --background: oklch(98.8% 0.003 106.5);
-    --muted: oklch(0.96 0.006 85);
-  }
-  .dark [data-warmth="on"],
-  [data-warmth="on"].dark {
-    --background: oklch(0.16 0.004 75);
-    --muted: oklch(0.25 0.005 75);
-  }
   html[data-zen="on"] [data-zen-hide] {
     display: none !important;
   }

@@ -1,4 +1,3 @@
-import { usePreferences } from "@/features/settings/hooks/use-preferences";
 import { DetoxRenderer } from "./detox-renderer";
 import { useState } from "react";
 import type { EmailBodySource } from "../../types";
@@ -89,7 +88,6 @@ export function MessageBody({
   detail?: EmailBodySource | null;
   readingMode?: "detox" | "original";
 }) {
-  const { fontSize, showImages, showQuoted } = usePreferences();
   const bodyHtml = detail?.resolvedBodyHtml ?? detail?.bodyHtml;
   const bodyText = detail?.resolvedBodyText ?? detail?.bodyText;
 
@@ -98,9 +96,9 @@ export function MessageBody({
       return (
         <DetoxRenderer
           html={bodyHtml}
-          fontSize={fontSize}
-          defaultShowImages={showImages === "always"}
-          defaultShowQuoted={showQuoted === "expanded"}
+          fontSize="base"
+          defaultShowImages={false}
+          defaultShowQuoted={false}
         />
       );
     }

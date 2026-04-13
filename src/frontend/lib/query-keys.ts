@@ -4,7 +4,6 @@ export const queryKeys = {
     list: (view: string, mailboxId: number) =>
       ["emails", view, mailboxId] as const,
     detail: (emailId: string) => ["email-detail", emailId] as const,
-    aiDetail: (emailId: string) => ["email-ai-detail", emailId] as const,
     thread: (threadId: string) => ["email-thread", threadId] as const,
     search: {
       results: (
@@ -34,7 +33,6 @@ export const queryKeys = {
     "drafts",
     mailboxId ?? "none",
   ],
-  filters: () => ["filters"] as const,
   labels: (mailboxId: number) => ["labels", mailboxId] as const,
   subscriptions: () => ["subscriptions"] as const,
   subscriptionSuggestions: () => ["subscription-suggestions"] as const,

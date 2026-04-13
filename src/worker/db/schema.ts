@@ -7,35 +7,6 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { account, user } from "./auth-schema";
 
-export type EmailActionType = "reply";
-
-export type EmailActionTrustLevel = "auto" | "approve";
-
-export type EmailActionStatus =
-  | "pending"
-  | "executed"
-  | "dismissed"
-  | "failed";
-
-export type EmailAction = {
-  id: string;
-  type: EmailActionType;
-  label: string;
-  payload: Record<string, unknown>;
-  trustLevel: EmailActionTrustLevel;
-  status: EmailActionStatus;
-  error: string | null;
-  executedAt: number | null;
-  updatedAt: number;
-};
-
-export type EmailSuspiciousFlag = {
-  isSuspicious: boolean;
-};
-
-export type EmailIntelligenceStatus = "pending" | "ready" | "error";
-
-
 export const emails = sqliteTable(
   "emails",
   {
@@ -122,90 +93,6 @@ export const emailSubscriptions = sqliteTable(
     ),
   ],
 );
-
-export const emailIntelligence = sqliteTable(
-  "email_intelligence",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    emailId: integer("email_id")
-      .notNull()
-      .references(() => emails.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    mailboxId: integer("mailbox_id").references(() => mailboxes.id, {
-      onDelete: "cascade",
-    }),
-    category: text("category").$type<"to_respond" | "to_follow_up" | "fyi" | "notification" | "invoice" | "marketing">(),
-    summary: text("summary"),
-    suspiciousJson: text("suspicious_json", { mode: "json" })
-      .$type<EmailSuspiciousFlag>()
-      .notNull()
-      .default({
-        isSuspicious: false,
-      }),
-    actionsJson: text("actions_json", { mode: "json" })
-      .$type<EmailAction[]>()
-      .notNull()
-      .default([]),
-    status: text("status")
-      .$type<EmailIntelligenceStatus>()
-      .notNull()
-      .default("pending"),
-    sourceHash: text("source_hash"),
-    model: text("model"),
-    schemaVersion: integer("schema_version").notNull().default(1),
-    attemptCount: integer("attempt_count").notNull().default(0),
-    error: text("error"),
-    lastProcessedAt: integer("last_processed_at"),
-    createdAt: integer("created_at").notNull(),
-    updatedAt: integer("updated_at").notNull(),
-  },
-  (table) => [
-    uniqueIndex("email_intelligence_email_idx").on(table.emailId),
-    index("email_intelligence_user_status_idx").on(table.userId, table.status),
-    index("email_intelligence_user_updated_idx").on(table.userId, table.updatedAt),
-    index("email_intelligence_mailbox_idx").on(table.mailboxId),
-  ],
-);
-
-export const emailFilters = sqliteTable(
-  "email_filters",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    description: text("description").notNull().default(""),
-    conditions: text("conditions", { mode: "json" })
-      .$type<FilterCondition[]>()
-      .notNull()
-      .default([]),
-    actions: text("actions", { mode: "json" }).$type<FilterActions>().notNull(),
-    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
-    priority: integer("priority").notNull().default(0),
-    createdAt: integer("created_at").notNull(),
-  },
-  (table) => [
-    index("email_filters_user_idx").on(table.userId),
-    index("email_filters_user_priority_idx").on(table.userId, table.priority),
-  ],
-);
-
-export type FilterCondition = {
-  field: "from" | "to" | "subject" | "body";
-  operator: "contains" | "equals" | "startsWith" | "endsWith" | "notContains";
-  value: string;
-};
-
-export type FilterActions = {
-  archive?: boolean;
-  markRead?: boolean;
-  star?: boolean;
-  applyLabel?: string;
-  trash?: boolean;
-};
 
 export const mailboxes = sqliteTable(
   "mailboxes",

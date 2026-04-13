@@ -1,42 +1,52 @@
-import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import {
-  EmailDetailContent,
   type EmailDetailContentHandle,
 } from "@/features/email/inbox/components/thread/email-detail-content";
-import { patchEmail } from "@/features/email/inbox/mutations";
+import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import {
   fetchEmailDetail,
   fetchEmailThread,
 } from "@/features/email/inbox/queries";
 import type {
   ComposeInitial,
+  EmailDetailItem,
   EmailListResponse,
 } from "@/features/email/inbox/types";
 import { buildForwardedEmailHtml } from "@/features/email/inbox/utils/build-forwarded-html";
+import {
+  setFocusedEmail,
+  clearFocusedEmail,
+} from "@/hooks/use-focused-email";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { queryKeys } from "@/lib/query-keys";
+import { patchEmail } from "@/features/email/inbox/mutations";
 import {
   useMutation,
   useQuery,
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
-export function SplitDetailPanel({
-  emailId,
-  mailboxId,
-  view,
-  onClose,
-  onNavigate,
-}: {
+type UseEmailDetailOptions = {
+  email?: EmailDetailItem | null;
   emailId: string;
   mailboxId: number;
   view: string;
   onClose: () => void;
-  onNavigate: (nextId: string) => void;
-}) {
+  onNavigateToEmail: (nextId: string) => void;
+  fetchOnMount?: boolean;
+};
+
+export function useEmailDetail({
+  email: providedEmail,
+  emailId,
+  mailboxId,
+  view,
+  onClose,
+  onNavigateToEmail,
+  fetchOnMount = false,
+}: UseEmailDetailOptions) {
   const queryClient = useQueryClient();
   const { openCompose } = useInboxCompose();
   const contentRef = useRef<EmailDetailContentHandle>(null);
@@ -45,9 +55,24 @@ export function SplitDetailPanel({
     queryKey: queryKeys.emails.detail(emailId),
     queryFn: () => fetchEmailDetail(emailId, { mailboxId, view }),
     staleTime: 60_000,
+    enabled: fetchOnMount && !providedEmail,
   });
 
-  const email = detailQuery.data;
+  const email = providedEmail ?? detailQuery.data ?? null;
+  const isLoading = fetchOnMount && !providedEmail && detailQuery.isLoading;
+
+  useEffect(() => {
+    if (!email) return;
+    setFocusedEmail({
+      id: email.id,
+      fromAddr: email.fromAddr,
+      fromName: email.fromName,
+      subject: email.subject,
+      threadId: email.threadId,
+      mailboxId: email.mailboxId,
+    });
+    return () => clearFocusedEmail();
+  }, [email?.id, email?.fromAddr, email?.fromName, email?.subject, email?.threadId, email?.mailboxId]);
 
   const orderedEmails = useMemo(() => {
     const cached = queryClient.getQueryData<InfiniteData<EmailListResponse>>([
@@ -68,9 +93,9 @@ export function SplitDetailPanel({
       const nextIndex =
         direction === "next" ? currentIndex + 1 : currentIndex - 1;
       const nextId = orderedIds[nextIndex];
-      if (nextId) onNavigate(nextId);
+      if (nextId) onNavigateToEmail(nextId);
     },
-    [currentIndex, orderedIds, onNavigate],
+    [currentIndex, orderedIds, onNavigateToEmail],
   );
 
   const threadQuery = useQuery({
@@ -128,6 +153,7 @@ export function SplitDetailPanel({
       onKeyDown: () => goToEmail("prev"),
     },
     r: () => contentRef.current?.triggerReply(),
+    c: () => openCompose(),
     f: () => handleForward(),
     e: () => {
       emailPatchMutation.mutate(
@@ -160,25 +186,33 @@ export function SplitDetailPanel({
     Escape: onClose,
   });
 
-  if (!email) {
-    return;
-  }
+  useEffect(() => {
+    const previousId = currentIndex > 0 ? orderedIds[currentIndex - 1] : null;
+    const nextId =
+      currentIndex >= 0 && currentIndex < orderedIds.length - 1
+        ? orderedIds[currentIndex + 1]
+        : null;
 
-  return (
-    <div className="h-full min-h-0 min-w-0 overflow-hidden px-4">
-      <EmailDetailContent
-        ref={contentRef}
-        email={email}
-        threadMessages={threadMessages}
-        threadError={threadQuery.isError}
-        onClose={onClose}
-        onBack={onClose}
-        onPrev={() => goToEmail("prev")}
-        onNext={() => goToEmail("next")}
-        hasPrev={hasPrev}
-        hasNext={hasNext}
-        onForward={handleForward}
-      />
-    </div>
-  );
+    for (const neighborId of [previousId, nextId]) {
+      if (!neighborId) continue;
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.emails.detail(neighborId),
+        queryFn: () =>
+          fetchEmailDetail(neighborId, { mailboxId, view }),
+      });
+    }
+  }, [currentIndex, orderedIds, queryClient, mailboxId, view]);
+
+  return {
+    email,
+    isLoading,
+    contentRef,
+    threadMessages,
+    threadError: threadQuery.isError,
+    hasPrev,
+    hasNext,
+    goToEmail,
+    handleForward,
+    onClose,
+  };
 }

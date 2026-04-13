@@ -13,26 +13,23 @@ export const Route = createFileRoute(
     parse: (raw) => ({ label: parseInboxLabelParam(raw.label) }),
   },
   skipRouteOnParseError: { params: true },
-  loader: async ({ context, params }) => {
-    const initialData = await context.queryClient.ensureInfiniteQueryData({
+  loader: ({ context, params }) => {
+    context.queryClient.prefetchInfiniteQuery({
       queryKey: queryKeys.emails.list(params.label, params.mailboxId),
       queryFn: ({ pageParam }) =>
         fetchEmails({
           view: params.label,
           mailboxId: params.mailboxId,
           limit: EMAIL_LIST_PAGE_SIZE,
-          offset: pageParam,
+          cursor: pageParam === 0 ? undefined : pageParam,
         }),
       initialPageParam: 0,
+      pages: 2,
       getNextPageParam: (lastPage: EmailListResponse) =>
-        lastPage.pagination.hasMore
-          ? lastPage.pagination.offset + lastPage.pagination.limit
+        lastPage.pagination.hasMore && lastPage.pagination.cursor
+          ? lastPage.pagination.cursor
           : undefined,
     });
-
-    return {
-      initialPage: initialData.pages[0],
-    };
   },
   errorComponent: RouteError,
   component: LabelPage,

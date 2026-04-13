@@ -51,10 +51,6 @@ import type {
   GmailSyncResult,
   SyncProgressFn,
 } from "../types";
-import {
-  enqueueEmailIntelligence,
-  processInlineEmailIntelligence,
-} from "../intelligence/background-intelligence";
 import { STANDARD_LABELS } from "../types";
 import { syncGmailLabels } from "./labels";
 
@@ -91,14 +87,12 @@ type ProcessMessagesInput = {
   userId: string;
   mailboxId: number;
   messageIds: string[];
-  env?: Env;
   refreshExisting?: boolean;
   onProgress?: SyncProgressFn;
   onHeartbeat?: () => Promise<void> | Promise<boolean>;
   progressOffset?: number;
   progressTotal?: number;
   minDateMs?: number | null;
-  skipInlineIntelligence?: boolean;
 };
 
 async function processMessageIds({
@@ -107,14 +101,12 @@ async function processMessageIds({
   userId,
   mailboxId,
   messageIds,
-  env,
   refreshExisting = false,
   onProgress,
   onHeartbeat,
   progressOffset = 0,
   progressTotal,
   minDateMs,
-  skipInlineIntelligence = false,
 }: ProcessMessagesInput): Promise<GmailSyncResult> {
   const result: GmailSyncResult = {
     processed: 0,
@@ -149,7 +141,6 @@ async function processMessageIds({
     const batchResults = await fetchMessagesBatch(accessToken, messageIdsToFetch, format as "full" | "minimal");
 
     const pendingInserts: Array<typeof emails.$inferInsert> = [];
-    const intelligenceCandidateMessageIds: string[] = [];
     const subscriptionEvents: Array<{
       fromAddr: string;
       fromName: string | null;
@@ -334,9 +325,6 @@ async function processMessageIds({
             .update(emails)
             .set(emailValues)
             .where(eq(emails.id, existingEmailId));
-          if (direction === "received") {
-            intelligenceCandidateMessageIds.push(message.id!);
-          }
         } else {
           pendingInserts.push({
             userId,
@@ -345,9 +333,6 @@ async function processMessageIds({
             ...emailValues,
             createdAt: Date.now(),
           });
-          if (direction === "received") {
-            intelligenceCandidateMessageIds.push(message.id!);
-          }
           result.inserted += 1;
         }
 
@@ -361,34 +346,6 @@ async function processMessageIds({
     if (pendingInserts.length > 0) {
       for (const insertChunk of chunkArray(pendingInserts, DB_INSERT_CHUNK_SIZE)) {
         await db.insert(emails).values(insertChunk).onConflictDoNothing({ target: emails.providerMessageId });
-      }
-    }
-
-    if (intelligenceCandidateMessageIds.length > 0) {
-      try {
-        const candidateRows = await db
-          .select({ id: emails.id })
-          .from(emails)
-          .where(
-            and(
-              eq(emails.userId, userId),
-              inArray(
-                emails.providerMessageId,
-                [...new Set(intelligenceCandidateMessageIds)],
-              ),
-            ),
-          );
-
-        const intelligenceEmailIds = await enqueueEmailIntelligence(
-          db,
-          candidateRows.map((row) => row.id),
-        );
-
-        if (env && intelligenceEmailIds.length > 0 && !skipInlineIntelligence) {
-          await processInlineEmailIntelligence(db, env, intelligenceEmailIds);
-        }
-      } catch (error) {
-        console.error("Email intelligence enqueue failed, skipping", error);
       }
     }
 
@@ -461,13 +418,11 @@ export async function startFullGmailSync(
       userId,
       mailboxId,
       messageIds: allMessageIds,
-      env,
       onProgress,
       onHeartbeat: () => touchMailboxSyncLock(db, mailboxId),
       progressOffset: 0,
       progressTotal: allMessageIds.length,
       minDateMs: effectiveCutoffAt,
-      skipInlineIntelligence: true,
     });
 
     if (historyIdBeforeFullSync) {
@@ -481,7 +436,6 @@ export async function startFullGmailSync(
         userId,
         mailboxId,
         startHistoryId: historyIdBeforeFullSync,
-        env,
       });
 
       return {
@@ -571,7 +525,6 @@ type IncrementalSyncCoreInput = {
   userId: string;
   mailboxId: number;
   startHistoryId: string;
-  env?: Env;
 };
 
 async function runIncrementalGmailSyncWithAccessToken({
@@ -580,7 +533,6 @@ async function runIncrementalGmailSyncWithAccessToken({
   userId,
   mailboxId,
   startHistoryId,
-  env,
 }: IncrementalSyncCoreInput): Promise<GmailSyncResult> {
   const { syncCutoffAt } = await getMailboxSyncPreferences(db, mailboxId);
   let pageToken: string | undefined;
@@ -625,7 +577,6 @@ async function runIncrementalGmailSyncWithAccessToken({
       userId,
       mailboxId,
       messageIds: pageChangedMessageIds,
-      env,
       refreshExisting: true,
       onHeartbeat: heartbeat,
       minDateMs: syncCutoffAt,
@@ -682,7 +633,6 @@ async function runIncrementalGmailSync(
       userId,
       mailboxId,
       startHistoryId,
-      env,
     });
   } finally {
     if (options?.skipLock !== true) {
@@ -886,7 +836,6 @@ export async function syncGmailMessageIds(
     userId,
     mailboxId,
     messageIds: dedupedMessageIds,
-    env,
     refreshExisting,
     minDateMs: syncCutoffAt,
   });
