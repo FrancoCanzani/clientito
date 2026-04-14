@@ -34,8 +34,6 @@ export const queryKeys = {
     mailboxId ?? "none",
   ],
   labels: (mailboxId: number) => ["labels", mailboxId] as const,
-  subscriptions: () => ["subscriptions"] as const,
-  subscriptionSuggestions: () => ["subscription-suggestions"] as const,
   accounts: () => ["accounts"] as const,
   syncStatus: () => ["sync-status"] as const,
   contactSuggestions: (query: string) =>

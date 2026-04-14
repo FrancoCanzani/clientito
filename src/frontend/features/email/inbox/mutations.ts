@@ -1,5 +1,4 @@
 import { localDb } from "@/db/client";
-import { isSynced } from "@/db/sync";
 import { getCurrentUserId } from "@/db/user";
 
 function getErrorMessage(payload: unknown): string | null {
@@ -21,13 +20,20 @@ type EmailPatchPayload = {
   snoozedUntil?: number | null;
 };
 
+export type EmailIdentifier = {
+  id: string;
+  providerMessageId: string;
+  mailboxId: number;
+  labelIds?: string[];
+};
+
 async function syncLocalPatch(emailIds: string[], patch: EmailPatchPayload) {
   if (typeof window === "undefined") {
     return;
   }
 
   const userId = await getCurrentUserId();
-  if (!userId || !(await isSynced(userId))) {
+  if (!userId) {
     return;
   }
 
@@ -51,13 +57,18 @@ async function syncLocalPatch(emailIds: string[], patch: EmailPatchPayload) {
 }
 
 export async function patchEmail(
-  emailId: string,
+  email: EmailIdentifier,
   data: EmailPatchPayload,
 ): Promise<void> {
-  const response = await fetch(`/api/inbox/emails/${emailId}`, {
+  const response = await fetch(`/api/inbox/emails/${email.id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      providerMessageId: email.providerMessageId,
+      mailboxId: email.mailboxId,
+      labelIds: email.labelIds,
+      ...data,
+    }),
   });
 
   if (!response.ok) {
@@ -65,18 +76,22 @@ export async function patchEmail(
     throwApiError(json, "Failed to update email");
   }
 
-  void syncLocalPatch([emailId], data);
+  void syncLocalPatch([email.id], data);
 }
 
 export async function batchPatchEmails(
-  emailIds: string[],
+  emails: EmailIdentifier[],
   data: EmailPatchPayload,
 ): Promise<void> {
   const response = await fetch("/api/inbox/emails/batch", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      emailIds: emailIds.map((id) => Number(id)),
+      items: emails.map((e) => ({
+        providerMessageId: e.providerMessageId,
+        mailboxId: e.mailboxId,
+        labelIds: e.labelIds,
+      })),
       ...data,
     }),
   });
@@ -86,11 +101,11 @@ export async function batchPatchEmails(
     throwApiError(json, "Failed to update emails");
   }
 
-  void syncLocalPatch(emailIds, data);
+  void syncLocalPatch(emails.map((e) => e.id), data);
 }
 
-export async function markEmailRead(emailId: string): Promise<void> {
-  await patchEmail(emailId, { isRead: true });
+export async function markEmailRead(email: EmailIdentifier): Promise<void> {
+  await patchEmail(email, { isRead: true });
 }
 
 type SendEmailInput = {

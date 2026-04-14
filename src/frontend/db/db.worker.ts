@@ -46,28 +46,6 @@ CREATE INDEX IF NOT EXISTS emails_subject ON emails(subject COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS emails_from_name ON emails(from_name COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS emails_from_addr ON emails(from_addr COLLATE NOCASE);
 
-CREATE TABLE IF NOT EXISTS email_subscriptions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id TEXT NOT NULL,
-  mailbox_id INTEGER,
-  sender_key TEXT NOT NULL,
-  from_addr TEXT NOT NULL,
-  from_name TEXT,
-  unsubscribe_url TEXT,
-  unsubscribe_email TEXT,
-  status TEXT NOT NULL DEFAULT 'active',
-  email_count INTEGER NOT NULL DEFAULT 0,
-  last_received_at INTEGER,
-  unsubscribe_method TEXT,
-  unsubscribe_requested_at INTEGER,
-  unsubscribed_at INTEGER,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
-  UNIQUE(mailbox_id, sender_key)
-);
-
-CREATE INDEX IF NOT EXISTS email_subscriptions_status ON email_subscriptions(status);
-
 CREATE TABLE IF NOT EXISTS labels (
   gmail_id TEXT PRIMARY KEY NOT NULL,
   user_id TEXT NOT NULL,

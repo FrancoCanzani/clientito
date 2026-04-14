@@ -13,12 +13,10 @@ import {
 } from "@/components/ui/sidebar";
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import { LabelSidebarSection } from "@/features/email/labels/components/label-sidebar-section";
-import { useSyncStatus } from "@/features/onboarding/hooks/use-sync-status";
 import { useAuth } from "@/hooks/use-auth";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import {
-  BellSimpleIcon,
   CheckIcon,
   ClockIcon,
   GearIcon,
@@ -69,8 +67,8 @@ function AccountHeader({ mailboxId }: { mailboxId: number }) {
   const displayName = formatDisplayName(user?.name, activeEmail);
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-      <div className="flex size-5 items-center justify-center rounded-md border border-border bg-muted text-[10px] font-medium uppercase text-muted-foreground">
+    <div className="flex items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+      <div className="flex size-6 items-center justify-center rounded-lg bg-foreground text-[11px] font-semibold uppercase text-background">
         {displayName.charAt(0)}
       </div>
       <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
@@ -94,8 +92,6 @@ type NavView =
   | "snoozed"
   | "important"
   | "drafts"
-  | "subscriptions";
-
 function useActiveView(): NavView {
   return useRouterState({
     select: (state): NavView => {
@@ -103,9 +99,6 @@ function useActiveView(): NavView {
       const leaf = matches[matches.length - 1]?.routeId;
       if (leaf === "/_dashboard/$mailboxId/inbox/search") return "search";
       if (leaf === "/_dashboard/$mailboxId/inbox/drafts") return "drafts";
-      if (leaf === "/_dashboard/$mailboxId/inbox/subscriptions") {
-        return "subscriptions";
-      }
 
       const label = matches.find(
         (match) =>
@@ -156,8 +149,6 @@ function getNavTo(
       };
     case "drafts":
       return { to: "/$mailboxId/inbox/drafts", params: { mailboxId } };
-    case "subscriptions":
-      return { to: "/$mailboxId/inbox/subscriptions", params: { mailboxId } };
     default:
       return { to: "/$mailboxId/inbox", params: { mailboxId } };
   }
@@ -172,7 +163,6 @@ const NAV_ITEMS = [
   { view: "archived", icon: CheckIcon, label: "Done" },
   { view: "spam", icon: WarningIcon, label: "Spam" },
   { view: "trash", icon: TrashIcon, label: "Trash" },
-  { view: "subscriptions", icon: BellSimpleIcon, label: "Subscriptions" },
 ] as const;
 
 function InboxSidebar({ mailboxId }: { mailboxId: number }) {
@@ -198,7 +188,10 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
         <AccountHeader mailboxId={mailboxId} />
         <SidebarMenu className="group-data-[collapsible=icon]:hidden">
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => openCompose()}>
+            <SidebarMenuButton
+              onClick={() => openCompose()}
+              className="bg-background font-medium shadow-sm ring-1 ring-border hover:bg-accent"
+            >
               <NotePencilIcon className="size-4 shrink-0" />
               <span>Compose</span>
             </SidebarMenuButton>
@@ -270,29 +263,11 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
 
 export function InboxSidebarShell({ children }: { children: ReactNode }) {
   const { mailboxId } = mailboxRoute.useParams();
-  const { user } = useAuth();
-  const syncStatus = useSyncStatus();
-  const isSyncing = syncStatus.data?.state === "syncing";
-  const isInitialSync = isSyncing && !syncStatus.data?.hasSynced;
-
-  if (isInitialSync) {
-    const firstName = user?.name?.split(" ")[0] ?? "";
-    return (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-3">
-        <p className="animate-pulse">
-          Pulling your emails{firstName ? `, ${firstName}` : ""}...
-        </p>
-        <p className="text-sm text-muted-foreground ">
-          This will take a second
-        </p>
-      </div>
-    );
-  }
 
   return (
     <SidebarProvider className="h-full min-h-0 flex-1 overflow-hidden">
       <InboxSidebar mailboxId={mailboxId} />
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-4">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
         {children}
       </main>
     </SidebarProvider>

@@ -12,6 +12,7 @@ import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-in
 import { useInboxHotkeys } from "@/features/email/inbox/hooks/use-inbox-hotkeys";
 import type { EmailListItem } from "@/features/email/inbox/types";
 import { VIEW_LABELS } from "@/features/email/inbox/utils/inbox-filters";
+import { CircleNotchIcon } from "@phosphor-icons/react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
@@ -19,7 +20,7 @@ import { EmailRow } from "./email-row";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
-const ROW_HEIGHT = 40;
+const ROW_HEIGHT = 48;
 
 export function EmailList({
   emailData,
@@ -130,6 +131,13 @@ export function EmailList({
               {isFetchingNextPage ? "Loading more..." : "Scroll for more"}
             </div>
           )}
+        </div>
+      ) : emailData.isSyncing ? (
+        <div className="flex min-h-56 flex-1 flex-col items-center justify-center gap-3">
+          <CircleNotchIcon className="size-5 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">
+            Syncing your emails...
+          </p>
         </div>
       ) : (
         <Empty className="min-h-56 flex-1 justify-center">

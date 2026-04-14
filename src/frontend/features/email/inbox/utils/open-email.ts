@@ -34,7 +34,7 @@ export function openEmail(
   queryClient: QueryClient,
   navigate: NavigateToEmail,
   routeMailboxId: number,
-  email: Pick<EmailListItem, "id" | "isRead">,
+  email: Pick<EmailListItem, "id" | "isRead" | "providerMessageId" | "mailboxId" | "labelIds">,
   options?: { replace?: boolean; context?: string },
 ) {
   void queryClient.prefetchQuery({
@@ -72,7 +72,7 @@ export function openEmail(
 
 export function markEmailOpened(
   queryClient: QueryClient,
-  email: Pick<EmailListItem, "id" | "isRead">,
+  email: Pick<EmailListItem, "id" | "isRead" | "providerMessageId" | "mailboxId" | "labelIds">,
 ) {
   if (email.isRead) return;
   queryClient.setQueriesData<InfiniteData<EmailListResponse>>(
@@ -102,7 +102,12 @@ export function markEmailOpened(
     },
   );
 
-  void markEmailRead(email.id).catch(() => {
+  void markEmailRead({
+    id: email.id,
+    providerMessageId: email.providerMessageId,
+    mailboxId: email.mailboxId!,
+    labelIds: email.labelIds,
+  }).catch(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
     queryClient.invalidateQueries({ queryKey: queryKeys.emails.detail(email.id) });
   });

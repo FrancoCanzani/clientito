@@ -108,8 +108,7 @@ export async function processScheduledEmails(db: Database, env: Env) {
     try {
       await sendScheduledEmail(db, env, row);
       await db
-        .update(scheduledEmails)
-        .set({ status: "sent" })
+        .delete(scheduledEmails)
         .where(eq(scheduledEmails.id, row.id));
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);

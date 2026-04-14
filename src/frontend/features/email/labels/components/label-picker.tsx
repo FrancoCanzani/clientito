@@ -108,9 +108,14 @@ export function LabelPicker({
                 className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
               >
                 <span
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: label.backgroundColor ?? "#999" }}
-                />
+                  className="flex size-4 shrink-0 items-center justify-center rounded-full"
+                  style={{ backgroundColor: `${label.backgroundColor ?? "#999"}30` }}
+                >
+                  <span
+                    className="size-1.5 rounded-full"
+                    style={{ backgroundColor: label.backgroundColor ?? "#999" }}
+                  />
+                </span>
                 <span className="flex-1 truncate text-left">{label.name}</span>
                 {isApplied && <CheckIcon className="size-3.5 text-primary" />}
               </button>

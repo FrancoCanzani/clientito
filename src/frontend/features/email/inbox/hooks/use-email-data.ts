@@ -18,8 +18,9 @@ export function useEmailData({
   mailboxId: number;
   initialPage?: EmailListResponse;
 }) {
-  const { data: syncStatus } = useSyncStatus();
-  const isSyncing = syncStatus?.state === "syncing";
+
+  const syncStatus = useSyncStatus();
+  const isSyncing = syncStatus.data?.state === "syncing";
 
   const emailsQuery = useInfiniteQuery({
     queryKey: queryKeys.emails.list(view, mailboxId),
@@ -43,9 +44,7 @@ export function useEmailData({
       lastPage?.pagination?.hasMore
         ? lastPage.pagination.cursor
         : undefined,
-    staleTime: isSyncing ? 0 : 30_000,
-    // Poll every 3s while server-side Gmail→D1 sync is running
-    refetchInterval: isSyncing ? 3_000 : false,
+    staleTime: 5_000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
   });

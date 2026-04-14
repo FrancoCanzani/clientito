@@ -1,58 +1,47 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
-import { emails } from "../../../db/schema";
 import { GmailDriver } from "../../../lib/gmail/driver";
-import type { AppRouteEnv } from "../../types";
+import { resolveMailbox } from "../../../lib/gmail/mailboxes";
 import { applyEmailPatch } from "./internal/mutation";
-import { patchEmailBodySchema, patchEmailParamsSchema } from "./schemas";
+import type { AppRouteEnv } from "../../types";
+import { patchEmailBodySchema } from "./schemas";
 
 export function registerPatchEmail(api: Hono<AppRouteEnv>) {
   api.patch(
     "/:emailId",
-    zValidator("param", patchEmailParamsSchema),
     zValidator("json", patchEmailBodySchema),
     async (c) => {
       const db = c.get("db");
       const user = c.get("user")!;
-
-      const { emailId } = c.req.valid("param");
       const body = c.req.valid("json");
 
-      const row = await db
-        .select({
-          id: emails.id,
-          providerMessageId: emails.providerMessageId,
-          mailboxId: emails.mailboxId,
-          isRead: emails.isRead,
-          labelIds: emails.labelIds,
-          snoozedUntil: emails.snoozedUntil,
-        })
-        .from(emails)
-        .where(and(eq(emails.userId, user.id), eq(emails.id, emailId)))
-        .limit(1);
+      const { providerMessageId, mailboxId, labelIds: currentLabelIds, ...mutation } = body;
 
-      const email = row[0];
-      if (!email || !email.mailboxId) return c.json({ error: "Email not found" }, 404);
+      const mailbox = await resolveMailbox(db, user.id, mailboxId);
+      if (!mailbox) return c.json({ error: "Mailbox not found" }, 404);
 
-      const nextState = applyEmailPatch(email, body);
-      const { dbUpdates } = nextState;
+      const source = {
+        isRead: mutation.isRead ?? true,
+        labelIds: currentLabelIds ?? [],
+        snoozedUntil: mutation.snoozedUntil ?? null,
+      };
+
+      const nextState = applyEmailPatch(source, mutation);
 
       if (
         nextState.addLabelIds.length > 0 ||
         nextState.removeLabelIds.length > 0
       ) {
         try {
-          const provider = new GmailDriver(db, c.env, email.mailboxId);
+          const provider = new GmailDriver(db, c.env, mailbox.id);
           await provider.modifyLabels(
-            [email.providerMessageId],
+            [providerMessageId],
             nextState.addLabelIds,
             nextState.removeLabelIds,
           );
         } catch (error) {
           console.warn("Provider label modify failed", {
-            emailId,
-            providerMessageId: email.providerMessageId,
+            providerMessageId,
             error,
           });
           return c.json(
@@ -67,17 +56,10 @@ export function registerPatchEmail(api: Hono<AppRouteEnv>) {
         }
       }
 
-      if (Object.keys(dbUpdates).length > 0) {
-        await db
-          .update(emails)
-          .set(dbUpdates)
-          .where(and(eq(emails.userId, user.id), eq(emails.id, emailId)));
-      }
-
       return c.json(
         {
           data: {
-            id: String(emailId),
+            providerMessageId,
             isRead: nextState.isRead,
             archived: nextState.archived,
             trashed: nextState.trashed,

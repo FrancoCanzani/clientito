@@ -1,8 +1,6 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { and, eq, lt } from "drizzle-orm";
 import { z } from "zod";
-import { emails } from "../../db/schema";
 import { getMailboxSyncPreferences, setMailboxSyncPreferences } from "../../lib/gmail/sync/state";
 import { resolveMailbox } from "../../lib/gmail/mailboxes";
 import {
@@ -39,18 +37,6 @@ export function registerPutSyncSettings(settingsRoutes: Hono<AppRouteEnv>) {
         syncWindowMonths: nextMonths,
         syncCutoffAt: nextCutoffAt,
       });
-
-      if (typeof nextCutoffAt === "number") {
-        await db
-          .delete(emails)
-          .where(
-            and(
-              eq(emails.userId, user.id),
-              eq(emails.mailboxId, mailbox.id),
-              lt(emails.date, nextCutoffAt),
-            ),
-          );
-      }
 
       return c.json({
         data: {

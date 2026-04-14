@@ -3,59 +3,14 @@ import type { Hono } from "hono";
 import { GmailDriver } from "../../../lib/gmail/driver";
 import { resolveOutgoingMailbox } from "../../../lib/gmail/mailboxes";
 import { appendSignature } from "../../../lib/gmail/mailbox/signature";
-import { sleep } from "../../../lib/utils";
-import { and, eq } from "drizzle-orm";
-import { emails, mailboxes, scheduledEmails } from "../../../db/schema";
-import type { Database } from "../../../db/client";
+import { eq } from "drizzle-orm";
+import { mailboxes, scheduledEmails } from "../../../db/schema";
 import type { AppRouteEnv } from "../../types";
 import { sendEmailBodySchema } from "./schemas";
 import {
   deleteAttachmentFile,
   getAttachmentContent,
 } from "./internal/storage";
-
-const SENT_EMAIL_PROJECTION_RETRIES = 3;
-const SENT_EMAIL_PROJECTION_DELAY_MS = 300;
-
-async function projectSentEmail(
-  db: Database,
-  env: Env,
-  mailboxId: number,
-  userId: string,
-  providerMessageId: string,
-): Promise<boolean> {
-  const provider = new GmailDriver(db, env, mailboxId);
-
-  for (let attempt = 0; attempt < SENT_EMAIL_PROJECTION_RETRIES; attempt += 1) {
-    try {
-      await provider.syncMessageIds(userId, [providerMessageId], true);
-    } catch (error) {
-      console.warn("Sent email projection attempt failed", {
-        userId,
-        mailboxId,
-        providerMessageId,
-        attempt: attempt + 1,
-        error,
-      });
-    }
-
-    const row = await db
-      .select({ id: emails.id })
-      .from(emails)
-      .where(and(eq(emails.userId, userId), eq(emails.providerMessageId, providerMessageId)))
-      .limit(1);
-
-    if (row[0]) {
-      return true;
-    }
-
-    if (attempt < SENT_EMAIL_PROJECTION_RETRIES - 1) {
-      await sleep(SENT_EMAIL_PROJECTION_DELAY_MS * (attempt + 1));
-    }
-  }
-
-  return false;
-}
 
 export function registerPostEmail(api: Hono<AppRouteEnv>) {
   api.post("/send", zValidator("json", sendEmailBodySchema), async (c) => {
@@ -146,21 +101,6 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
         },
       );
 
-      const projected = await projectSentEmail(
-        db,
-        env,
-        mailbox.id,
-        user.id,
-        result.providerMessageId,
-      );
-
-      if (!projected) {
-        console.warn("Sent email was not projected into D1 immediately", {
-          userId: user.id,
-          providerMessageId: result.providerMessageId,
-        });
-      }
-
       if (input.attachments) {
         await Promise.allSettled(
           input.attachments.map((att) => deleteAttachmentFile(env, att.key)),
@@ -171,7 +111,6 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
         {
           providerMessageId: result.providerMessageId,
           threadId: result.threadId,
-          projected,
         },
         200,
       );

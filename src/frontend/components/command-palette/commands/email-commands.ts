@@ -1,5 +1,5 @@
-import { patchEmail } from "@/features/email/inbox/mutations";
-import type { EmailListResponse } from "@/features/email/inbox/types";
+import { patchEmail, type EmailIdentifier } from "@/features/email/inbox/mutations";
+import type { EmailListItem, EmailListResponse } from "@/features/email/inbox/types";
 import { queryKeys } from "@/lib/query-keys";
 import {
   CheckIcon,
@@ -54,6 +54,28 @@ async function performEmailAction(
 
   const emailId = ctx.selectedEmailId;
 
+  // Resolve full email from cache
+  let emailItem: EmailListItem | undefined;
+  const caches = services.queryClient.getQueriesData<
+    InfiniteData<EmailListResponse>
+  >({ queryKey: queryKeys.emails.all() });
+  for (const [, cache] of caches) {
+    for (const page of cache?.pages ?? []) {
+      const found = page.data.find((e) => e.id === emailId);
+      if (found) { emailItem = found; break; }
+    }
+    if (emailItem) break;
+  }
+
+  if (!emailItem || !emailItem.mailboxId) return;
+
+  const identifier: EmailIdentifier = {
+    id: emailItem.id,
+    providerMessageId: emailItem.providerMessageId,
+    mailboxId: emailItem.mailboxId,
+    labelIds: emailItem.labelIds,
+  };
+
   // Optimistically remove from all list caches if this action hides the email.
   if (removesFromList(data)) {
     services.queryClient.setQueriesData<InfiniteData<EmailListResponse>>(
@@ -63,7 +85,7 @@ async function performEmailAction(
   }
 
   try {
-    await patchEmail(emailId, data);
+    await patchEmail(identifier, data);
   } catch (error) {
     toast.error(error instanceof Error ? error.message : "Action failed");
   }

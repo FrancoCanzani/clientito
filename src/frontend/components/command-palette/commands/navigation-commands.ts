@@ -5,7 +5,6 @@ import {
   FlagIcon,
   GearIcon,
   MagnifyingGlassIcon,
-  NewspaperIcon,
   PaperPlaneTiltIcon,
   StarIcon,
   TrashIcon,
@@ -90,8 +89,7 @@ function navigateToMailboxPath(
   mailboxId: number,
   to:
     | "/$mailboxId/inbox/drafts"
-    | "/$mailboxId/inbox/search"
-    | "/$mailboxId/inbox/subscriptions",
+    | "/$mailboxId/inbox/search",
   services: CommandServices,
 ) {
   services.navigate({
@@ -176,18 +174,6 @@ const navigationCommands: Command[] = [
     keywords: ["search", "find", "lookup"],
     perform: (mailboxId, services) =>
       navigateToMailboxPath(mailboxId, "/$mailboxId/inbox/search", services),
-  }),
-  makeNavCommand({
-    id: "nav:subscriptions",
-    label: "Subscriptions",
-    icon: paletteIcon(NewspaperIcon),
-    keywords: ["subscriptions", "newsletters", "unsubscribe"],
-    perform: (mailboxId, services) =>
-      navigateToMailboxPath(
-        mailboxId,
-        "/$mailboxId/inbox/subscriptions",
-        services,
-      ),
   }),
   {
     id: "nav:docs",

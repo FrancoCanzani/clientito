@@ -47,13 +47,13 @@ export async function deleteLabel(labelId: string, mailboxId: number): Promise<v
   queryClient.invalidateQueries({ queryKey: queryKeys.labels(mailboxId) });
 }
 
-export async function applyLabel(emailIds: string[], labelId: string, mailboxId: number): Promise<void> {
+export async function applyLabel(providerMessageIds: string[], labelId: string, mailboxId: number): Promise<void> {
   const response = await fetch("/api/inbox/labels/apply", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       mailboxId,
-      emailIds: emailIds.map(Number),
+      providerMessageIds,
       labelId,
     }),
   });
@@ -61,13 +61,13 @@ export async function applyLabel(emailIds: string[], labelId: string, mailboxId:
   queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
 }
 
-export async function removeLabel(emailIds: string[], labelId: string, mailboxId: number): Promise<void> {
+export async function removeLabel(providerMessageIds: string[], labelId: string, mailboxId: number): Promise<void> {
   const response = await fetch("/api/inbox/labels/remove", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       mailboxId,
-      emailIds: emailIds.map(Number),
+      providerMessageIds,
       labelId,
     }),
   });

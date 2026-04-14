@@ -8,8 +8,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
+import { LabelPicker } from "@/features/email/labels/components/label-picker";
 import { useAuth } from "@/hooks/use-auth";
 import { useMailboxes } from "@/hooks/use-mailboxes";
+import { queryKeys } from "@/lib/query-keys";
 import type { Icon } from "@phosphor-icons/react";
 import {
   ArrowBendDoubleUpLeftIcon,
@@ -29,8 +31,6 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { queryKeys } from "@/lib/query-keys";
-import { LabelPicker } from "@/features/email/labels/components/label-picker";
 import { unsubscribe } from "../../../subscriptions/queries";
 import { patchEmail } from "../../mutations";
 import type { ComposeInitial, EmailDetailItem } from "../../types";
@@ -80,12 +80,22 @@ export function EmailActions({
 
   const invalidateEmails = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
-    queryClient.invalidateQueries({ queryKey: queryKeys.emails.detail(email.id) });
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.emails.detail(email.id),
+    });
     void router.invalidate();
   };
 
+  const emailIdentifier = {
+    id: email.id,
+    providerMessageId: email.providerMessageId,
+    mailboxId: email.mailboxId!,
+    labelIds: email.labelIds,
+  };
+
   const emailPatchMutation = useMutation({
-    mutationFn: (payload: EmailPatchPayload) => patchEmail(email.id, payload),
+    mutationFn: (payload: EmailPatchPayload) =>
+      patchEmail(emailIdentifier, payload),
   });
 
   const runEmailPatch = (
@@ -106,7 +116,7 @@ export function EmailActions({
 
   const snoozeMutation = useMutation({
     mutationFn: (timestamp: number | null) =>
-      patchEmail(email.id, { snoozedUntil: timestamp }),
+      patchEmail(emailIdentifier, { snoozedUntil: timestamp }),
     onSuccess: (_data, timestamp) => {
       toast.success(timestamp ? "Snoozed" : "Unsnoozed");
       invalidateEmails();
@@ -245,7 +255,6 @@ export function EmailActions({
 
   return (
     <div className="flex items-center gap-0.5">
-      {/* Done & Delete — always visible */}
       <IconButton
         label={isInInbox ? "Done" : "Move to inbox"}
         shortcut="E"
@@ -279,7 +288,6 @@ export function EmailActions({
         />
       )}
 
-      {/* Reply, Reply All, Forward — visible on desktop */}
       <div className="hidden items-center gap-0.5 sm:flex">
         <IconButton
           label="Reply"
@@ -290,16 +298,24 @@ export function EmailActions({
           <ArrowBendUpLeftIcon className="size-3.5" />
         </IconButton>
         {showReplyAll && (
-          <IconButton label="Reply all" variant="ghost" onClick={handleReplyAll}>
+          <IconButton
+            label="Reply all"
+            variant="ghost"
+            onClick={handleReplyAll}
+          >
             <ArrowBendDoubleUpLeftIcon className="size-3.5" />
           </IconButton>
         )}
-        <IconButton label="Forward" shortcut="F" variant="ghost" onClick={handleForward}>
+        <IconButton
+          label="Forward"
+          shortcut="F"
+          variant="ghost"
+          onClick={handleForward}
+        >
           <ArrowBendUpRightIcon className="size-3.5" />
         </IconButton>
       </div>
 
-      {/* Overflow menu */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -314,7 +330,6 @@ export function EmailActions({
         </DropdownMenuTrigger>
 
         <DropdownMenuContent align="end">
-          {/* Reply/Forward — mobile only */}
           <div className="sm:hidden">
             <DropdownMenuItem onSelect={() => onReply?.()}>
               <ArrowBendUpLeftIcon className="size-3.5" />
@@ -343,10 +358,7 @@ export function EmailActions({
                 disabled={actionsPending}
                 onSelect={item.action}
               >
-                <IconComponent
-                  className="size-3.5"
-                  weight={item.iconWeight}
-                />
+                <IconComponent className="size-3.5" weight={item.iconWeight} />
                 <span className="flex-1">{item.label}</span>
                 {item.shortcut && <Kbd>{item.shortcut}</Kbd>}
               </DropdownMenuItem>

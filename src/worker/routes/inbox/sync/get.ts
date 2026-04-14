@@ -3,7 +3,6 @@ import type { Hono } from "hono";
 import { mailboxes } from "../../../db/schema";
 import { getMailboxSyncSnapshot } from "../../../lib/gmail/sync/state";
 import { ensureGoogleMailboxesForUser } from "../../../lib/gmail/mailboxes";
-import { catchUpAllMailboxes } from "../../../lib/gmail/sync/engine";
 import type { AppRouteEnv } from "../../types";
 
 type SyncWorkflowState =
@@ -11,7 +10,6 @@ type SyncWorkflowState =
   | "needs_reconnect"
   | "ready_to_sync"
   | "error"
-  | "syncing"
   | "ready";
 
 export function registerGetSync(api: Hono<AppRouteEnv>) {
@@ -31,7 +29,6 @@ export function registerGetSync(api: Hono<AppRouteEnv>) {
       ? await getMailboxSyncSnapshot(db, firstMailbox.id)
       : { mailbox: null, latestJob: null, activeJob: null, hasLiveLock: false };
     const mailbox = snapshot.mailbox;
-    const activeJob = snapshot.activeJob;
     const latestJob = snapshot.latestJob;
 
     const hasSynced = Boolean(mailbox?.historyId);
@@ -63,44 +60,16 @@ export function registerGetSync(api: Hono<AppRouteEnv>) {
     const hasSyncError =
       Boolean(errorMessage) && !needsMailboxConnect && !needsGoogleReconnect;
 
+    // Browser drives sync via POST /api/inbox/sync/pull — no server-side sync needed.
     const workflowState: SyncWorkflowState = needsMailboxConnect
       ? "needs_mailbox_connect"
       : needsGoogleReconnect
         ? "needs_reconnect"
-        : activeJob
-          ? "syncing"
-          : hasSynced
-            ? "ready"
-            : hasSyncError
-              ? "error"
-              : "ready_to_sync";
-
-    // Trigger catch-up for all mailboxes
-    c.executionCtx.waitUntil(
-      catchUpAllMailboxes(db, c.env, user.id).catch((err) => {
-        console.error("Background catch-up failed", {
-          userId: user.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }),
-    );
-
-    // Auto-trigger 6-month sync for new mailboxes that have never synced
-    if (workflowState === "ready_to_sync" && firstMailbox) {
-      c.executionCtx.waitUntil(
-        c.env.SYNC_QUEUE.send({
-          type: "full-sync" as const,
-          userId: user.id,
-          mailboxId: firstMailbox.id,
-          months: 6,
-        }).catch((err: unknown) => {
-          console.error("Auto-trigger sync failed", {
-            userId: user.id,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }),
-      );
-    }
+        : hasSynced
+          ? "ready"
+          : hasSyncError
+            ? "error"
+            : "ready_to_sync";
 
     return c.json(
       {
@@ -108,9 +77,9 @@ export function registerGetSync(api: Hono<AppRouteEnv>) {
         hasSynced,
         historyId: mailbox?.historyId ?? null,
         lastSync: mailbox?.lastSuccessfulSyncAt ?? null,
-        phase: activeJob?.phase ?? null,
-        progressCurrent: activeJob?.progressCurrent ?? null,
-        progressTotal: activeJob?.progressTotal ?? null,
+        phase: null,
+        progressCurrent: null,
+        progressTotal: null,
         error: errorMessage,
         needsMailboxConnect,
         needsGoogleReconnect,

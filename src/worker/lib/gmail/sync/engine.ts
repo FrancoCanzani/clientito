@@ -1,15 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Database } from "../../../db/client";
-import { emails, mailboxes } from "../../../db/schema";
-import { parseParticipants } from "../mailbox/participants";
-import {
-  normalizeUnsubscribeEmail,
-  normalizeUnsubscribeUrl,
-  syncEmailSubscriptions,
-} from "../subscriptions/service";
+import { mailboxes } from "../../../db/schema";
 import {
   MESSAGE_CHUNK_SIZE,
-  fetchMessage,
   fetchMessagesBatch,
   getCurrentHistoryId,
   getGmailTokenForMailbox,
@@ -39,25 +32,15 @@ import {
   type SyncJobTrigger,
 } from "../sync/state";
 import { buildGmailQueryFromCutoff } from "./preferences";
-import {
-  extractMessageAttachments,
-  extractMessageBodyHtml,
-  extractMessageBodyText,
-  getHeaderValue,
-} from "../mailbox/read";
 import { chunkArray } from "../../utils";
 import type {
   GmailHistoryResponse,
   GmailSyncResult,
   SyncProgressFn,
 } from "../types";
-import { STANDARD_LABELS } from "../types";
-import { syncGmailLabels } from "./labels";
 
-const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
 const ON_DEMAND_SYNC_MIN_INTERVAL_MS = 60_000;
 const RATE_LIMIT_COOLDOWN_MS = 5 * 60_000;
-const DB_INSERT_CHUNK_SIZE = 5;
 const ESCALATE_TO_FULL_SYNC_AFTER = 5;
 
 function maxHistoryId(
@@ -74,18 +57,8 @@ function maxHistoryId(
   }
 }
 
-function extractAddress(headerValue: string | null): string {
-  if (!headerValue) return "";
-
-  const match = headerValue.match(/<([^>]+)>/);
-  return (match?.[1] ?? headerValue).trim();
-}
-
 type ProcessMessagesInput = {
-  db: Database;
   accessToken: string;
-  userId: string;
-  mailboxId: number;
   messageIds: string[];
   refreshExisting?: boolean;
   onProgress?: SyncProgressFn;
@@ -96,10 +69,7 @@ type ProcessMessagesInput = {
 };
 
 async function processMessageIds({
-  db,
   accessToken,
-  userId,
-  mailboxId,
   messageIds,
   refreshExisting = false,
   onProgress,
@@ -120,56 +90,19 @@ async function processMessageIds({
   for (const chunk of chunkArray(messageIds, MESSAGE_CHUNK_SIZE)) {
     if (chunk.length === 0) continue;
 
-    const existingRows = await db
-      .select({ id: emails.id, providerMessageId: emails.providerMessageId, labelIds: emails.labelIds })
-      .from(emails)
-      .where(inArray(emails.providerMessageId, chunk));
-
-    const existingByMessageId = new Map(
-      existingRows.map((row) => [row.providerMessageId, row]),
-    );
-    const messageIdsToFetch = refreshExisting
-      ? chunk
-      : chunk.filter((id) => !existingByMessageId.has(id));
-
-    if (!refreshExisting) {
-      result.skipped += chunk.length - messageIdsToFetch.length;
-      result.processed += chunk.length - messageIdsToFetch.length;
-    }
-
     const format = refreshExisting ? "minimal" : "full";
-    const batchResults = await fetchMessagesBatch(accessToken, messageIdsToFetch, format as "full" | "minimal");
+    const batchResults = await fetchMessagesBatch(accessToken, chunk, format as "full" | "minimal");
 
-    const pendingInserts: Array<typeof emails.$inferInsert> = [];
-    const subscriptionEvents: Array<{
-      fromAddr: string;
-      fromName: string | null;
-      unsubscribeUrl: string | null;
-      unsubscribeEmail: string | null;
-      receivedAt: number;
-      emailCountDelta: number;
-    }> = [];
-
-    for (const messageId of messageIdsToFetch) {
+    for (const messageId of chunk) {
       result.processed += 1;
-      let message = batchResults.get(messageId) ?? null;
-      const existingRow = existingByMessageId.get(messageId);
+      const message = batchResults.get(messageId) ?? null;
 
       if (!message) {
-        if (refreshExisting && existingRow) {
-          await db
-            .delete(emails)
-            .where(
-              and(eq(emails.userId, userId), eq(emails.providerMessageId, messageId)),
-            );
-        }
         result.skipped += 1;
         continue;
       }
 
       try {
-        const existingEmailId = existingRow?.id ?? null;
-        const existingLabelIds = existingRow?.labelIds ?? [];
         const internalDate = Number(message.internalDate ?? "");
         const normalizedInternalDate =
           Number.isFinite(internalDate) && internalDate > 0 ? internalDate : null;
@@ -179,177 +112,24 @@ async function processMessageIds({
           normalizedInternalDate !== null &&
           normalizedInternalDate < minDateMs
         ) {
-          if (existingEmailId && refreshExisting) {
-            await db
-              .delete(emails)
-              .where(and(eq(emails.userId, userId), eq(emails.id, existingEmailId)));
-          }
           result.skipped += 1;
           result.historyId = maxHistoryId(result.historyId, message.historyId);
           continue;
         }
 
-        const minimalLabelIds = [...(message.labelIds ?? [])];
-        if (
-          existingLabelIds.includes(HAS_ATTACHMENT_LABEL) &&
-          !minimalLabelIds.includes(HAS_ATTACHMENT_LABEL)
-        ) {
-          minimalLabelIds.push(HAS_ATTACHMENT_LABEL);
-        }
-
-        if (!message.payload) {
-          if (existingEmailId && refreshExisting) {
-            await db
-              .update(emails)
-              .set({
-                threadId: message.threadId ?? null,
-                date: Number(message.internalDate ?? "") || undefined,
-                isRead: !minimalLabelIds.includes(STANDARD_LABELS.UNREAD),
-                labelIds: minimalLabelIds,
-              })
-              .where(eq(emails.id, existingEmailId));
-            result.historyId = maxHistoryId(result.historyId, message.historyId);
-            continue;
-          }
-
-          if (message.id) {
-            try {
-              message = await fetchMessage(accessToken, message.id, "full");
-            } catch {
-              result.skipped += 1;
-              continue;
-            }
-          } else {
-            result.skipped += 1;
-            continue;
-          }
-        }
-
-        const rawFrom = getHeaderValue(message.payload?.headers, "From");
-        const rawTo = getHeaderValue(message.payload?.headers, "To");
-        const rawCc = getHeaderValue(message.payload?.headers, "Cc");
-        const rawMessageId = getHeaderValue(message.payload?.headers, "Message-ID");
-        const fromAddr = extractAddress(rawFrom);
-        const toAddr = extractAddress(rawTo);
-
-        if (!fromAddr) {
-          result.skipped += 1;
-          continue;
-        }
-
-        const subject = getHeaderValue(message.payload?.headers, "Subject");
-        const bodyText = extractMessageBodyText(message);
-        const bodyHtml = extractMessageBodyHtml(message);
-        const labelIds = [...(message.labelIds ?? [])];
-        const hasAttachments = extractMessageAttachments(message).length > 0;
-        if (hasAttachments && !labelIds.includes(HAS_ATTACHMENT_LABEL)) {
-          labelIds.push(HAS_ATTACHMENT_LABEL);
-        }
-        const isRead = !labelIds.includes(STANDARD_LABELS.UNREAD);
-        const date =
-          normalizedInternalDate !== null
-            ? normalizedInternalDate
-            : Date.now();
-
-        if (typeof minDateMs === "number" && date < minDateMs) {
-          if (existingEmailId && refreshExisting) {
-            await db
-              .delete(emails)
-              .where(and(eq(emails.userId, userId), eq(emails.id, existingEmailId)));
-          }
+        if (!message.payload && !refreshExisting) {
           result.skipped += 1;
           result.historyId = maxHistoryId(result.historyId, message.historyId);
           continue;
         }
 
-        const isSent = labelIds.includes(STANDARD_LABELS.SENT);
-        const direction: "sent" | "received" = isSent ? "sent" : "received";
-
-        const fromParticipants = parseParticipants(rawFrom);
-        const senderParticipant =
-          fromParticipants.find(
-            (participant) => participant.email === fromAddr.toLowerCase(),
-          ) ??
-          fromParticipants[0] ??
-          null;
-        const fromName = senderParticipant?.name ?? null;
-        const rawUnsubscribe = getHeaderValue(message.payload?.headers, "List-Unsubscribe");
-        let unsubscribeUrl: string | null = null;
-        let unsubscribeEmail: string | null = null;
-        if (rawUnsubscribe) {
-          const urls =
-            rawUnsubscribe.match(/<([^>]+)>/g)?.map((m) => m.slice(1, -1)) ?? [];
-          unsubscribeUrl = normalizeUnsubscribeUrl(
-            urls.find((u) => u.startsWith("http")) ?? null,
-          );
-          unsubscribeEmail = normalizeUnsubscribeEmail(
-            urls.find((u) => u.startsWith("mailto:")) ?? null,
-          );
-        }
-
-        const emailValues = {
-          threadId: message.threadId ?? null,
-          messageId: rawMessageId ?? null,
-          fromAddr,
-          fromName,
-          toAddr: toAddr || null,
-          ccAddr: rawCc || null,
-          subject,
-          snippet: message.snippet ?? null,
-          bodyText: bodyText || null,
-          bodyHtml: bodyHtml || null,
-          date,
-          direction,
-          isRead,
-          labelIds,
-          unsubscribeUrl,
-          unsubscribeEmail,
-        };
-
-        if (
-          direction === "received" &&
-          (unsubscribeUrl || unsubscribeEmail)
-        ) {
-          subscriptionEvents.push({
-            fromAddr,
-            fromName,
-            unsubscribeUrl,
-            unsubscribeEmail,
-            receivedAt: date,
-            emailCountDelta: existingEmailId ? 0 : 1,
-          });
-        }
-
-        if (existingEmailId) {
-          await db
-            .update(emails)
-            .set(emailValues)
-            .where(eq(emails.id, existingEmailId));
-        } else {
-          pendingInserts.push({
-            userId,
-            mailboxId,
-            providerMessageId: message.id,
-            ...emailValues,
-            createdAt: Date.now(),
-          });
-          result.inserted += 1;
-        }
-
+        result.inserted += 1;
         result.historyId = maxHistoryId(result.historyId, message.historyId);
       } catch (error) {
         result.skipped += 1;
-        console.error("Failed to store Gmail message", { messageId: message.id, error });
+        console.error("Failed to process Gmail message", { messageId: message.id, error });
       }
     }
-
-    if (pendingInserts.length > 0) {
-      for (const insertChunk of chunkArray(pendingInserts, DB_INSERT_CHUNK_SIZE)) {
-        await db.insert(emails).values(insertChunk).onConflictDoNothing({ target: emails.providerMessageId });
-      }
-    }
-
-    await syncEmailSubscriptions(db, userId, mailboxId, subscriptionEvents);
 
     if (onProgress) {
       await onProgress("fetching", progressOffset + result.processed, total);
@@ -361,7 +141,7 @@ async function processMessageIds({
   return result;
 }
 
-type HistoryDelta = {
+export type HistoryDelta = {
   changedMessageIds: string[];
   deletedMessageIds: string[];
 };
@@ -375,7 +155,7 @@ export async function startFullGmailSync(
   db: Database,
   env: Env,
   mailboxId: number,
-  userId: string,
+  _userId: string,
   onProgress?: SyncProgressFn,
   options?: SyncExecutionOptions,
 ): Promise<GmailSyncResult> {
@@ -413,10 +193,7 @@ export async function startFullGmailSync(
 
     await onProgress?.("fetching", 0, allMessageIds.length);
     const result = await processMessageIds({
-      db,
       accessToken,
-      userId,
-      mailboxId,
       messageIds: allMessageIds,
       onProgress,
       onHeartbeat: () => touchMailboxSyncLock(db, mailboxId),
@@ -433,7 +210,6 @@ export async function startFullGmailSync(
       const deltaResult = await runIncrementalGmailSyncWithAccessToken({
         db,
         accessToken,
-        userId,
         mailboxId,
         startHistoryId: historyIdBeforeFullSync,
       });
@@ -453,11 +229,6 @@ export async function startFullGmailSync(
     await persistMailboxHistoryState(db, mailboxId, latestHistoryId);
     console.log(`[full-sync] mailbox=${mailboxId} done: inserted=${result.inserted} skipped=${result.skipped}`);
 
-    await syncGmailLabels(db, mailboxId, userId, {
-      GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
-      GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
-    }).catch((err) => console.error("[full-sync] label sync failed", err));
-
     return result;
   } catch (error) {
     console.error(`[full-sync] mailbox=${mailboxId} failed`, error instanceof Error ? error.message : error);
@@ -469,7 +240,7 @@ export async function startFullGmailSync(
   }
 }
 
-function extractHistoryDelta(
+export function extractHistoryDelta(
   history: GmailHistoryResponse["history"],
 ): HistoryDelta {
   const changedMessageIds = new Set<string>();
@@ -507,22 +278,9 @@ function extractHistoryDelta(
   };
 }
 
-async function deleteMessagesByProviderIds(
-  db: Database,
-  userId: string,
-  messageIds: string[],
-): Promise<void> {
-  if (messageIds.length === 0) return;
-
-  await db
-    .delete(emails)
-    .where(and(eq(emails.userId, userId), inArray(emails.providerMessageId, messageIds)));
-}
-
 type IncrementalSyncCoreInput = {
   db: Database;
   accessToken: string;
-  userId: string;
   mailboxId: number;
   startHistoryId: string;
 };
@@ -530,7 +288,6 @@ type IncrementalSyncCoreInput = {
 async function runIncrementalGmailSyncWithAccessToken({
   db,
   accessToken,
-  userId,
   mailboxId,
   startHistoryId,
 }: IncrementalSyncCoreInput): Promise<GmailSyncResult> {
@@ -568,14 +325,10 @@ async function runIncrementalGmailSyncWithAccessToken({
       return true;
     });
 
-    await deleteMessagesByProviderIds(db, userId, pageDeletedMessageIds);
     aggregate.processed += pageDeletedMessageIds.length;
 
     const pageResult = await processMessageIds({
-      db,
       accessToken,
-      userId,
-      mailboxId,
       messageIds: pageChangedMessageIds,
       refreshExisting: true,
       onHeartbeat: heartbeat,
@@ -603,7 +356,7 @@ async function runIncrementalGmailSync(
   db: Database,
   env: Env,
   mailboxId: number,
-  userId: string,
+  _userId: string,
   startHistoryIdInput?: string | null,
   options?: SyncExecutionOptions,
 ): Promise<GmailSyncResult> {
@@ -630,7 +383,6 @@ async function runIncrementalGmailSync(
     return await runIncrementalGmailSyncWithAccessToken({
       db,
       accessToken,
-      userId,
       mailboxId,
       startHistoryId,
     });
@@ -770,29 +522,6 @@ export async function catchUpMailboxOnDemand(
   });
 }
 
-export async function catchUpAllMailboxes(
-  db: Database,
-  env: Env,
-  userId: string,
-) {
-  const userMailboxes = await db
-    .select({ id: mailboxes.id })
-    .from(mailboxes)
-    .where(eq(mailboxes.userId, userId));
-  if (userMailboxes.length === 0) return;
-
-  await Promise.allSettled(
-    userMailboxes.map((mb) =>
-      catchUpMailboxOnDemand(db, env, mb.id, userId).catch((err) => {
-        console.error("catchUpAllMailboxes: mailbox failed", {
-          mailboxId: mb.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }),
-    ),
-  );
-}
-
 export async function recoverMailboxSync(
   db: Database,
   env: Env,
@@ -808,35 +537,5 @@ export async function recoverMailboxSync(
         updateSyncJobProgress(db, mailboxId, jobId, phase, current, total),
       { skipLock: true },
     );
-  });
-}
-
-export async function syncGmailMessageIds(
-  db: Database,
-  env: Env,
-  mailboxId: number,
-  userId: string,
-  messageIds: string[],
-  refreshExisting = true,
-): Promise<GmailSyncResult> {
-  const dedupedMessageIds = Array.from(new Set(messageIds.filter(Boolean)));
-  if (dedupedMessageIds.length === 0) {
-    return { processed: 0, inserted: 0, skipped: 0, historyId: null };
-  }
-
-  const accessToken = await getGmailTokenForMailbox(db, mailboxId, {
-    GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
-  });
-  const { syncCutoffAt } = await getMailboxSyncPreferences(db, mailboxId);
-
-  return processMessageIds({
-    db,
-    accessToken,
-    userId,
-    mailboxId,
-    messageIds: dedupedMessageIds,
-    refreshExisting,
-    minDateMs: syncCutoffAt,
   });
 }

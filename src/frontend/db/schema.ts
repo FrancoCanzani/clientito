@@ -31,30 +31,6 @@ export type EmailRow = {
 
 export type EmailInsert = Omit<EmailRow, "id"> & { id?: number };
 
-export type SubscriptionStatus = "active" | "pending_manual" | "unsubscribed";
-export type UnsubscribeMethod = "one-click" | "mailto" | "manual";
-
-export type EmailSubscriptionRow = {
-  id: number;
-  userId: string;
-  mailboxId: number | null;
-  senderKey: string;
-  fromAddr: string;
-  fromName: string | null;
-  unsubscribeUrl: string | null;
-  unsubscribeEmail: string | null;
-  status: SubscriptionStatus;
-  emailCount: number;
-  lastReceivedAt: number | null;
-  unsubscribeMethod: UnsubscribeMethod | null;
-  unsubscribeRequestedAt: number | null;
-  unsubscribedAt: number | null;
-  createdAt: number;
-  updatedAt: number;
-};
-
-export type EmailSubscriptionInsert = Omit<EmailSubscriptionRow, "id"> & { id?: number };
-
 export type LabelType = "system" | "user";
 
 export type LabelRow = {

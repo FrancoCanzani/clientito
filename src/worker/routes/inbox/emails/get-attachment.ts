@@ -1,7 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
-import { emails } from "../../../db/schema";
 import { GmailDriver } from "../../../lib/gmail/driver";
 import type { AppRouteEnv } from "../../types";
 import { normalizeFilename, normalizeMimeType } from "./utils";
@@ -13,20 +11,9 @@ export function registerGetAttachment(api: Hono<AppRouteEnv>) {
     zValidator("query", emailAttachmentQuerySchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
 
-      const { providerMessageId, attachmentId, filename, mimeType, inline } =
+      const { providerMessageId, attachmentId, filename, mimeType, inline, mailboxId } =
         c.req.valid("query");
-
-      const emailRow = await db
-        .select({ mailboxId: emails.mailboxId })
-        .from(emails)
-        .where(and(eq(emails.userId, user.id), eq(emails.providerMessageId, providerMessageId)))
-        .limit(1);
-      const mailboxId = emailRow[0]?.mailboxId;
-      if (!mailboxId) {
-        return c.json({ error: "Email not found" }, 404);
-      }
 
       let reconnectRequired = false;
 

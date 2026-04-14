@@ -3,8 +3,6 @@ import type {
   DraftAttachmentKey,
   DraftRow,
   EmailInsert,
-  EmailSubscriptionInsert,
-  EmailSubscriptionRow,
   LabelInsert,
 } from "./schema";
 
@@ -660,59 +658,6 @@ export const localDb = {
     }
   },
 
-  async upsertSubscriptions(rows: EmailSubscriptionInsert[]): Promise<void> {
-    if (!rows.length) return;
-    for (const row of rows) {
-      await dbClient.exec(
-        `INSERT INTO email_subscriptions (
-          user_id, mailbox_id, sender_key, from_addr, from_name,
-          unsubscribe_url, unsubscribe_email, status, email_count, last_received_at,
-          unsubscribe_method, unsubscribe_requested_at, unsubscribed_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT (mailbox_id, sender_key) DO UPDATE SET
-          from_addr = excluded.from_addr,
-          from_name = excluded.from_name,
-          unsubscribe_url = excluded.unsubscribe_url,
-          unsubscribe_email = excluded.unsubscribe_email,
-          status = excluded.status,
-          email_count = excluded.email_count,
-          last_received_at = excluded.last_received_at,
-          unsubscribe_method = excluded.unsubscribe_method,
-          updated_at = excluded.updated_at`,
-        [
-          row.userId,
-          row.mailboxId ?? null,
-          row.senderKey,
-          row.fromAddr,
-          row.fromName ?? null,
-          row.unsubscribeUrl ?? null,
-          row.unsubscribeEmail ?? null,
-          row.status,
-          row.emailCount,
-          row.lastReceivedAt ?? null,
-          row.unsubscribeMethod ?? null,
-          row.unsubscribeRequestedAt ?? null,
-          row.unsubscribedAt ?? null,
-          row.createdAt,
-          row.updatedAt,
-        ],
-        "run",
-      );
-    }
-  },
-
-  async getSubscriptions(userId: string, status?: string) {
-    const fragments: SqlFragment[] = [{ sql: "user_id = ?", params: [userId] }];
-    if (status) fragments.push({ sql: "status = ?", params: [status] });
-    const { where, params } = composeWhere(fragments);
-    const res = await dbClient.exec(
-      `SELECT id, user_id, mailbox_id, sender_key, from_addr, from_name, unsubscribe_url, unsubscribe_email, status, email_count, last_received_at, unsubscribe_method, unsubscribe_requested_at, unsubscribed_at, created_at, updated_at FROM email_subscriptions ${where} ORDER BY last_received_at DESC`,
-      params,
-      "rows",
-    );
-    return rowsToObjects<EmailSubscriptionRow>(res);
-  },
-
   async searchEmails(params: {
     userId: string;
     query: string;
@@ -776,10 +721,10 @@ export const localDb = {
   async getContactSuggestions(userId: string, query: string, limit?: number) {
     const pattern = `%${query}%`;
     const res = await dbClient.exec(
-      `SELECT from_addr, from_name, max(date) AS last_date, count(*) AS count
+      `SELECT from_addr, max(from_name) AS from_name, max(date) AS last_date, count(*) AS count
        FROM emails
        WHERE user_id = ? AND (from_addr LIKE ? OR from_name LIKE ?)
-       GROUP BY from_addr, from_name
+       GROUP BY from_addr
        ORDER BY count(*) DESC
        LIMIT ?`,
       [userId, pattern, pattern, limit ?? 8],
@@ -955,12 +900,25 @@ export const localDb = {
 
   async clear(): Promise<void> {
     await dbClient.batch([
-      { sql: "DELETE FROM email_subscriptions" },
       { sql: "DELETE FROM labels" },
       { sql: "DELETE FROM drafts" },
       { sql: "DELETE FROM emails" },
       { sql: "DELETE FROM _meta" },
     ]);
+  },
+
+  async deleteEmailsByProviderMessageId(providerMessageIds: string[]): Promise<void> {
+    if (!providerMessageIds.length) return;
+    const CHUNK = 50;
+    for (let i = 0; i < providerMessageIds.length; i += CHUNK) {
+      const chunk = providerMessageIds.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => "?").join(", ");
+      await dbClient.exec(
+        `DELETE FROM emails WHERE provider_message_id IN (${placeholders})`,
+        chunk,
+        "run",
+      );
+    }
   },
 
   async emailCount(userId: string, mailboxId?: number): Promise<number> {

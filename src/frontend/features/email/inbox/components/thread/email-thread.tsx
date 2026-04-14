@@ -1,3 +1,4 @@
+import { ContactAvatar } from "@/components/ui/contact-avatar";
 import type {
   EmailAttachment,
   EmailBodySource,
@@ -33,17 +34,18 @@ function formatSenderLabel(
 ) {
   const fromName = email.fromName?.trim();
   if (!fromName || fromName === email.fromAddr) return email.fromAddr;
+  return fromName;
+}
+
+function formatSenderFull(
+  email: Pick<EmailListItem, "fromAddr" | "fromName">,
+) {
+  const fromName = email.fromName?.trim();
+  if (!fromName || fromName === email.fromAddr) return email.fromAddr;
   return `${fromName} <${email.fromAddr}>`;
 }
 
-function getCollapsedPreview(
-  email: EmailListItem,
-  detail?: EmailBodySource | null,
-) {
-  const text =
-    detail?.resolvedBodyText ?? detail?.bodyText ?? email.snippet ?? "";
-  return text.replace(/\s+/g, " ").trim();
-}
+
 
 export function EmailThread({
   email,
@@ -85,7 +87,7 @@ export function EmailThread({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="space-y-2">
         <h1 className="min-w-0 font-medium text-foreground">{subject}</h1>
 
@@ -118,7 +120,7 @@ export function EmailThread({
       )}
 
       {showThread ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {threadMessages.map((threadEmail) => {
             const isSelected = threadEmail.id === email.id;
             return (
@@ -135,13 +137,13 @@ export function EmailThread({
           })}
         </div>
       ) : (
-        <div>
-          <div className="min-w-0">
+        <div className="overflow-hidden rounded-xl border border-border bg-background shadow-sm">
+          <div className="p-5">
             <MessageBody detail={email} readingMode={readingMode} />
           </div>
 
           {hasAttachments && (
-            <section className="mt-5 space-y-3 border-t border-border/70 pt-5">
+            <section className="space-y-3 border-t border-border/70 px-5 py-4">
               <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 <PaperclipIcon className="size-3" />
                 Attachments
@@ -178,48 +180,46 @@ function ThreadMessage({
   readingMode?: "detox" | "original";
 }) {
   const formattedDate = formatEmailThreadDate(email.date);
-  const collapsedPreview = getCollapsedPreview(email, body ?? email);
-  const senderLabel = formatSenderLabel(email);
+  const senderName = formatSenderLabel(email);
+  const senderFull = formatSenderFull(email);
   const hasAttachments = attachments.length > 0;
 
   return (
-    <div className="border-b border-dashed last:border-b-0">
-      <div className="relative">
-        <button
-          type="button"
-          onClick={onToggle}
-          className="flex w-full items-start gap-3 px-0 py-3 text-left transition-[color,transform] duration-150 ease-out hover:text-foreground active:scale-[0.995]"
-        >
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-foreground">
-                  {senderLabel}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="tabular-nums">{formattedDate}</span>
-                {expanded ? (
-                  <CaretDownIcon className="size-3 shrink-0" />
-                ) : (
-                  <CaretRightIcon className="size-3 shrink-0" />
-                )}
-              </div>
-            </div>
-          </div>
-        </button>
-
-        <div className="min-w-0 pb-4">
-          {expanded ? (
-            <MessageBody detail={body ?? email} readingMode={readingMode} />
-          ) : (
-            <p className="line-clamp-3 text-xs text-muted-foreground">
-              {collapsedPreview}
+    <div className="overflow-hidden rounded-xl border border-border bg-background shadow-sm">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
+      >
+        <ContactAvatar name={email.fromName} email={email.fromAddr} size="lg" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-foreground">
+            {expanded ? senderFull : senderName}
+          </p>
+          {expanded && email.toAddr && (
+            <p className="truncate text-xs text-muted-foreground">
+              To: {email.toAddr}
             </p>
           )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+          <span className="tabular-nums">{formattedDate}</span>
+          {expanded ? (
+            <CaretDownIcon className="size-3" />
+          ) : (
+            <CaretRightIcon className="size-3" />
+          )}
+        </div>
+      </button>
 
-          {expanded && hasAttachments && (
-            <section className="mt-5 space-y-1 border-t border-border/50 pt-4">
+      {expanded && (
+        <>
+          <div className="border-t border-border/60 px-5 pb-5 pt-4">
+            <MessageBody detail={body ?? email} readingMode={readingMode} />
+          </div>
+
+          {hasAttachments && (
+            <section className="space-y-3 border-t border-border/70 px-5 py-4">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <PaperclipIcon className="size-3" />
                 Attachments
@@ -234,8 +234,8 @@ function ThreadMessage({
               </div>
             </section>
           )}
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

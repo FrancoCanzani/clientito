@@ -1,14 +1,12 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { z } from "zod";
 import { account } from "../../../db/auth-schema";
-import type { Database } from "../../../db/client";
-import { emails, mailboxes } from "../../../db/schema";
+import { mailboxes } from "../../../db/schema";
 import { GmailDriver } from "../../../lib/gmail/driver";
 import { ensureMailbox } from "../../../lib/gmail/mailboxes";
 import {
-  markEmailSubscriptionStatus,
   normalizeUnsubscribeEmail,
   normalizeUnsubscribeUrl,
 } from "../../../lib/gmail/subscriptions/service";
@@ -18,40 +16,7 @@ const unsubscribeSchema = z.object({
   unsubscribeUrl: z.string().optional(),
   unsubscribeEmail: z.string().optional(),
   fromAddr: z.string(),
-  trashExisting: z.boolean().optional(),
 });
-
-export async function trashEmailsFromSender(
-  db: Database,
-  userId: string,
-  fromAddr: string,
-): Promise<number> {
-  const senderLower = fromAddr.trim().toLowerCase();
-
-  const rows = await db
-    .select({ id: emails.id, labelIds: emails.labelIds })
-    .from(emails)
-    .where(
-      and(
-        eq(emails.userId, userId),
-        sql`lower(${emails.fromAddr}) = ${senderLower}`,
-      ),
-    );
-
-  let count = 0;
-  for (const row of rows) {
-    const current: string[] = Array.isArray(row.labelIds) ? row.labelIds : [];
-    if (current.includes("TRASH")) continue;
-    const updated = current.filter((l) => l !== "INBOX");
-    updated.push("TRASH");
-    await db
-      .update(emails)
-      .set({ labelIds: updated })
-      .where(eq(emails.id, row.id));
-    count++;
-  }
-  return count;
-}
 
 export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
   api.post(
@@ -60,7 +25,7 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
     async (c) => {
       const db = c.get("db");
       const user = c.get("user")!;
-      const { unsubscribeUrl: rawUnsubscribeUrl, unsubscribeEmail: rawUnsubscribeEmail, fromAddr, trashExisting } =
+      const { unsubscribeUrl: rawUnsubscribeUrl, unsubscribeEmail: rawUnsubscribeEmail, fromAddr } =
         c.req.valid("json");
       const unsubscribeUrl = normalizeUnsubscribeUrl(rawUnsubscribeUrl);
       const unsubscribeEmail = normalizeUnsubscribeEmail(rawUnsubscribeEmail);
@@ -74,18 +39,7 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
           });
 
           if (res.ok || res.status === 204 || res.status === 302) {
-            await markEmailSubscriptionStatus(db, user.id, {
-              fromAddr,
-              unsubscribeUrl,
-              unsubscribeEmail,
-              status: "unsubscribed",
-              method: "one-click",
-            });
-            let trashedCount = 0;
-            if (trashExisting) {
-              trashedCount = await trashEmailsFromSender(db, user.id, fromAddr);
-            }
-            return c.json({ method: "one-click", fromAddr, success: true, trashedCount }, 200);
+            return c.json({ method: "one-click", fromAddr, success: true }, 200);
           }
         } catch (error) {
           console.warn("One-click unsubscribe failed, falling back", {
@@ -95,20 +49,8 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
           });
         }
 
-        await markEmailSubscriptionStatus(db, user.id, {
-          fromAddr,
-          unsubscribeUrl,
-          unsubscribeEmail,
-          status: "pending_manual",
-          method: "manual",
-        });
         return c.json(
-          {
-            method: "manual",
-            fromAddr,
-            url: unsubscribeUrl,
-            success: false,
-          },
+          { method: "manual", fromAddr, url: unsubscribeUrl, success: false },
           200,
         );
       }
@@ -137,18 +79,7 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
             body: "Unsubscribe",
           });
 
-          await markEmailSubscriptionStatus(db, user.id, {
-            fromAddr,
-            unsubscribeUrl,
-            unsubscribeEmail,
-            status: "unsubscribed",
-            method: "mailto",
-          });
-          let trashedCount = 0;
-          if (trashExisting) {
-            trashedCount = await trashEmailsFromSender(db, user.id, fromAddr);
-          }
-          return c.json({ method: "mailto", fromAddr, success: true, trashedCount }, 200);
+          return c.json({ method: "mailto", fromAddr, success: true }, 200);
         } catch (error) {
           return c.json(
             {

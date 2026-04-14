@@ -11,7 +11,6 @@ import {
   batchModifyGmailMessages,
 } from "./mailbox/send";
 import { isGmailReconnectRequiredError } from "./errors";
-import { catchUpAllMailboxes, syncGmailMessageIds } from "./sync/engine";
 import type {
   RawMessage,
   SendParams,
@@ -80,25 +79,6 @@ export class GmailDriver {
       messageIds,
       addLabelIds,
       removeLabelIds,
-    );
-  }
-
-  async syncMessages(userId: string): Promise<void> {
-    await catchUpAllMailboxes(this.db, this.env, userId);
-  }
-
-  async syncMessageIds(
-    userId: string,
-    messageIds: string[],
-    forceFull?: boolean,
-  ): Promise<void> {
-    await syncGmailMessageIds(
-      this.db,
-      this.env,
-      this.mailboxId,
-      userId,
-      messageIds,
-      forceFull,
     );
   }
 

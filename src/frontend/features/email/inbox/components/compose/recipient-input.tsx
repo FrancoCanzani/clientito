@@ -454,7 +454,7 @@ export function RecipientInput({
         <div className="absolute top-full left-0 z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-lg">
           {suggestions.map((suggestion, i) => (
             <button
-              key={suggestion.email}
+              key={`${suggestion.email}:${i}`}
               type="button"
               className={`flex w-full items-center gap-2 px-2 py-1 text-left text-xs transition-colors ${
                 i === activeIndex ? "bg-muted" : "hover:bg-muted/50"

@@ -150,6 +150,31 @@ export function useEmailInboxActions({
         InfiniteData<EmailListResponse>
       >({ queryKey: queryKeys.emails.all() });
 
+      // Resolve full email objects from the cache for API calls
+      const emailMap = new Map<string, EmailListItem>();
+      for (const [, cache] of snapshots) {
+        for (const page of cache?.pages ?? []) {
+          for (const item of page.data) {
+            if (idSet.has(item.id)) emailMap.set(item.id, item);
+          }
+        }
+      }
+
+      const emailIdentifiers = ids
+        .map((id) => {
+          const item = emailMap.get(id);
+          if (!item || !item.mailboxId) return null;
+          return {
+            id: item.id,
+            providerMessageId: item.providerMessageId,
+            mailboxId: item.mailboxId,
+            labelIds: item.labelIds,
+          };
+        })
+        .filter((e): e is NonNullable<typeof e> => e !== null);
+
+      if (emailIdentifiers.length === 0) return;
+
       for (const [key] of snapshots) {
         const queryView = key[1] as string | undefined;
         if (!queryView) continue;
@@ -159,10 +184,10 @@ export function useEmailInboxActions({
       }
 
       try {
-        if (ids.length === 1) {
-          await patchEmail(ids[0]!, data);
+        if (emailIdentifiers.length === 1) {
+          await patchEmail(emailIdentifiers[0]!, data);
         } else {
-          await batchPatchEmails(ids, data);
+          await batchPatchEmails(emailIdentifiers, data);
         }
 
         for (const id of ids) {

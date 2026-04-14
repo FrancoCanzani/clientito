@@ -49,13 +49,20 @@ export async function fetchEmails(
 
   const offset = params?.offset ?? 0;
   const synced = await isSynced(userId, mailboxId);
-  if (offset === 0 && !params?.cursor && !synced) {
-    await ensureLocalSync(userId, mailboxId);
-  } else if (offset === 0 && !params?.cursor && synced) {
-    // Already synced — pull newest emails from D1 so new mail appears
-    await pullNewEmails(userId, mailboxId).catch(() => {});
+  if (offset === 0 && !params?.cursor) {
+    if (!synced) {
+      // Kick off initial sync in the background — don't block the query.
+      // Per-page query invalidations in pullAll() will cause refetches
+      // so emails appear progressively as they arrive.
+      void ensureLocalSync(userId, mailboxId);
+    } else {
+      // Already synced — incremental pull from Gmail for new/changed emails
+      await pullNewEmails(userId, mailboxId).catch(() => {});
+    }
   }
 
+  // Always read from local DB — during initial sync this returns
+  // whatever has been inserted so far (progressively filled by pullAll).
   const result = await localDb.getEmails({
     userId,
     view: params?.view,

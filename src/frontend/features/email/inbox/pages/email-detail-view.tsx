@@ -144,9 +144,16 @@ export function EmailDetailView({
     staleTime: 60_000,
   });
 
+  const emailIdentifier = {
+    id: email.id,
+    providerMessageId: email.providerMessageId,
+    mailboxId: email.mailboxId!,
+    labelIds: email.labelIds,
+  };
+
   const emailPatchMutation = useMutation({
     mutationFn: (payload: Parameters<typeof patchEmail>[1]) =>
-      patchEmail(email.id, payload),
+      patchEmail(emailIdentifier, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.emails.detail(email.id) });

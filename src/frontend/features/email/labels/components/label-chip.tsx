@@ -8,14 +8,16 @@ type LabelChipProps = {
 };
 
 export function LabelChip({ label, onRemove, className }: LabelChipProps) {
-  const bg = label.backgroundColor ?? "#e0e0e0";
-  const text = label.textColor ?? "#000000";
+  const color = label.backgroundColor ?? "#999";
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] font-medium leading-none ${className ?? ""}`}
-      style={{ backgroundColor: bg, color: text }}
+      className={`inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background px-2 py-0.5 text-[11px] font-medium leading-none text-foreground ${className ?? ""}`}
     >
+      <span
+        className="size-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: color }}
+      />
       {label.name}
       {onRemove && (
         <button

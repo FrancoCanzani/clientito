@@ -92,9 +92,14 @@ export function LabelSidebarSection({ mailboxId, activeLabelId }: LabelSidebarSe
                   preload="intent"
                 >
                   <span
-                    className="size-1.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: label.backgroundColor ?? "#999" }}
-                  />
+                    className="flex size-4 shrink-0 items-center justify-center rounded-full"
+                    style={{ backgroundColor: `${label.backgroundColor ?? "#999"}30` }}
+                  >
+                    <span
+                      className="size-1.5 rounded-full"
+                      style={{ backgroundColor: label.backgroundColor ?? "#999" }}
+                    />
+                  </span>
                   <span className="truncate group-data-[collapsible=icon]:hidden">
                     {label.name}
                   </span>

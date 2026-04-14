@@ -1,4 +1,3 @@
-import { emails } from "../../../../db/schema";
 import { STANDARD_LABELS } from "../../../../lib/gmail/types";
 
 type EmailPatchMutation = {
@@ -24,18 +23,9 @@ type EmailPatchResult = {
   spam: boolean;
   starred: boolean;
   snoozedUntil: number | null;
-  dbUpdates: Partial<typeof emails.$inferInsert>;
   addLabelIds: string[];
   removeLabelIds: string[];
 };
-
-function areLabelIdsEqual(left: string[], right: string[]): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  return left.every((value, index) => value === right[index]);
-}
 
 export function applyEmailPatch(
   email: EmailPatchSource,
@@ -45,7 +35,6 @@ export function applyEmailPatch(
   const nextLabelIds = new Set(currentLabelIds);
   const addLabelIds = new Set<string>();
   const removeLabelIds = new Set<string>();
-  const dbUpdates: Partial<typeof emails.$inferInsert> = {};
   let isRead = email.isRead;
   let snoozedUntil: number | null = email.snoozedUntil ?? null;
 
@@ -71,7 +60,6 @@ export function applyEmailPatch(
 
   if (mutation.isRead !== undefined && mutation.isRead !== email.isRead) {
     isRead = mutation.isRead;
-    dbUpdates.isRead = mutation.isRead;
     if (mutation.isRead) {
       queueRemove(STANDARD_LABELS.UNREAD);
     } else {
@@ -126,13 +114,9 @@ export function applyEmailPatch(
 
   if (mutation.snoozedUntil !== undefined) {
     snoozedUntil = mutation.snoozedUntil;
-    dbUpdates.snoozedUntil = mutation.snoozedUntil;
   }
 
   const resolvedLabelIds = Array.from(nextLabelIds);
-  if (!areLabelIdsEqual(currentLabelIds, resolvedLabelIds)) {
-    dbUpdates.labelIds = resolvedLabelIds;
-  }
 
   return {
     isRead,
@@ -142,7 +126,6 @@ export function applyEmailPatch(
     spam: nextLabelIds.has(STANDARD_LABELS.SPAM),
     starred: nextLabelIds.has(STANDARD_LABELS.STARRED),
     snoozedUntil,
-    dbUpdates,
     addLabelIds: Array.from(addLabelIds),
     removeLabelIds: Array.from(removeLabelIds),
   };
