@@ -6,6 +6,12 @@ import path from "path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  server: {
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "credentialless",
+    },
+  },
   worker: {
     format: "es",
   },
@@ -29,7 +35,7 @@ export default defineConfig({
     }),
   ],
   optimizeDeps: {
-    exclude: ["wa-sqlite"],
+    exclude: ["@sqlite.org/sqlite-wasm"],
   },
   resolve: {
     alias: {

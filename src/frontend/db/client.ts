@@ -1,7 +1,12 @@
-import { type SQL, and, asc, desc, eq, gt, inArray, isNull, like, lt, lte, or, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/sqlite-proxy";
-import { deleteDatabase as deleteSqliteDb, execSql, initSqliteRpc, waitForReady } from "./sqlite-rpc";
-import * as schema from "./schema";
+import { dbClient, type ExecResult } from "./worker-client";
+import type {
+  DraftAttachmentKey,
+  DraftRow,
+  EmailInsert,
+  EmailSubscriptionInsert,
+  EmailSubscriptionRow,
+  LabelInsert,
+} from "./schema";
 
 type LocalEmailPatch = {
   isRead?: boolean;
@@ -26,11 +31,9 @@ type ViewFilter =
   | "important"
   | (string & {});
 
-type EmailInsert = typeof schema.emails.$inferInsert;
-type SubscriptionInsert = typeof schema.emailSubscriptions.$inferInsert;
-type LabelInsert = typeof schema.labels.$inferInsert;
+type BindParam = string | number | boolean | null | Uint8Array;
 
-type EmailQueryRow = {
+type EmailRowDb = {
   id: number;
   mailboxId: number | null;
   providerMessageId: string;
@@ -43,35 +46,20 @@ type EmailQueryRow = {
   threadId: string | null;
   date: number;
   direction: "sent" | "received" | null;
-  isRead: boolean;
+  isRead: number;
   labelIds: string | null;
-  hasInbox: boolean;
-  hasSent: boolean;
-  hasTrash: boolean;
-  hasSpam: boolean;
-  hasStarred: boolean;
+  hasInbox: number;
+  hasSent: number;
+  hasTrash: number;
+  hasSpam: number;
+  hasStarred: number;
   createdAt: number;
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
   snoozedUntil: number | null;
+  bodyText?: string | null;
+  bodyHtml?: string | null;
 };
-
-const db = drizzle(async (sql_query, params, method) => {
-  return execSql(sql_query, params, method);
-}, { schema });
-
-let initPromise: Promise<void> | null = null;
-
-async function ensureDb() {
-  if (!initPromise) {
-    initPromise = (async () => {
-      initSqliteRpc();
-      await waitForReady();
-    })();
-  }
-  await initPromise;
-  return db;
-}
 
 const STANDARD_LABELS = {
   INBOX: "INBOX",
@@ -82,10 +70,34 @@ const STANDARD_LABELS = {
   UNREAD: "UNREAD",
 } as const;
 
+const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
+
+const snakeToCamel = (s: string) =>
+  s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+
+function rowsToObjects<T>(res: ExecResult): T[] {
+  const keys = res.columns.map(snakeToCamel);
+  return res.rows.map((row) => {
+    const obj: Record<string, unknown> = {};
+    for (let i = 0; i < keys.length; i++) obj[keys[i]!] = row[i];
+    return obj as T;
+  });
+}
+
+function firstRow<T>(res: ExecResult): T | null {
+  const rows = rowsToObjects<T>(res);
+  return rows[0] ?? null;
+}
+
+function toBool(v: unknown): boolean {
+  return v === 1 || v === true || v === "1";
+}
+
 function parseLabelIds(raw: string | null): string[] {
   if (!raw) return [];
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -107,19 +119,32 @@ function areLabelIdsEqual(left: string[], right: string[]): boolean {
   return left.every((value, i) => value === right[i]);
 }
 
+type EmailUpdateSet = {
+  isRead?: boolean;
+  labelIds?: string;
+  hasInbox?: boolean;
+  hasSent?: boolean;
+  hasTrash?: boolean;
+  hasSpam?: boolean;
+  hasStarred?: boolean;
+  snoozedUntil?: number | null;
+  bodyText?: string | null;
+  bodyHtml?: string | null;
+};
+
 function applyEmailPatch(
   current: { isRead: boolean; labelIds: string | null; snoozedUntil: number | null },
   patch: LocalEmailPatch,
-) {
+): EmailUpdateSet {
   const currentLabelIds = parseLabelIds(current.labelIds);
   const nextLabelIds = new Set(currentLabelIds);
-  const dbUpdates: Partial<EmailInsert> = {};
+  const updates: EmailUpdateSet = {};
 
   const queueAdd = (labelId: string) => nextLabelIds.add(labelId);
   const queueRemove = (labelId: string) => nextLabelIds.delete(labelId);
 
   if (patch.isRead !== undefined && patch.isRead !== current.isRead) {
-    dbUpdates.isRead = patch.isRead;
+    updates.isRead = patch.isRead;
     if (patch.isRead) queueRemove(STANDARD_LABELS.UNREAD);
     else queueAdd(STANDARD_LABELS.UNREAD);
   }
@@ -142,9 +167,7 @@ function applyEmailPatch(
       queueRemove(STANDARD_LABELS.SPAM);
     } else {
       queueRemove(STANDARD_LABELS.TRASH);
-      if (!nextLabelIds.has(STANDARD_LABELS.SPAM)) {
-        queueAdd(STANDARD_LABELS.INBOX);
-      }
+      if (!nextLabelIds.has(STANDARD_LABELS.SPAM)) queueAdd(STANDARD_LABELS.INBOX);
     }
   }
 
@@ -155,9 +178,7 @@ function applyEmailPatch(
       queueRemove(STANDARD_LABELS.TRASH);
     } else {
       queueRemove(STANDARD_LABELS.SPAM);
-      if (!nextLabelIds.has(STANDARD_LABELS.TRASH)) {
-        queueAdd(STANDARD_LABELS.INBOX);
-      }
+      if (!nextLabelIds.has(STANDARD_LABELS.TRASH)) queueAdd(STANDARD_LABELS.INBOX);
     }
   }
 
@@ -166,92 +187,131 @@ function applyEmailPatch(
     else queueRemove(STANDARD_LABELS.STARRED);
   }
 
-  if (patch.snoozedUntil !== undefined) dbUpdates.snoozedUntil = patch.snoozedUntil;
-  if (patch.bodyText !== undefined) dbUpdates.bodyText = patch.bodyText;
-  if (patch.bodyHtml !== undefined) dbUpdates.bodyHtml = patch.bodyHtml;
+  if (patch.snoozedUntil !== undefined) updates.snoozedUntil = patch.snoozedUntil;
+  if (patch.bodyText !== undefined) updates.bodyText = patch.bodyText;
+  if (patch.bodyHtml !== undefined) updates.bodyHtml = patch.bodyHtml;
 
   if (patch.labelIds !== undefined) {
     const resolved = patch.labelIds ?? [];
-    dbUpdates.labelIds = JSON.stringify(resolved);
-    Object.assign(dbUpdates, labelBooleans(resolved));
-    return dbUpdates;
+    updates.labelIds = JSON.stringify(resolved);
+    Object.assign(updates, labelBooleans(resolved));
+    return updates;
   }
 
   const resolvedLabelIds = Array.from(nextLabelIds);
   if (!areLabelIdsEqual(currentLabelIds, resolvedLabelIds)) {
-    dbUpdates.labelIds = JSON.stringify(resolvedLabelIds);
-    Object.assign(dbUpdates, labelBooleans(resolvedLabelIds));
+    updates.labelIds = JSON.stringify(resolvedLabelIds);
+    Object.assign(updates, labelBooleans(resolvedLabelIds));
   }
 
-  return dbUpdates;
+  return updates;
 }
 
-function buildViewConditions(view: ViewFilter, now: number): SQL[] {
+const EMAIL_COL_MAP: Record<keyof EmailUpdateSet, string> = {
+  isRead: "is_read",
+  labelIds: "label_ids",
+  hasInbox: "has_inbox",
+  hasSent: "has_sent",
+  hasTrash: "has_trash",
+  hasSpam: "has_spam",
+  hasStarred: "has_starred",
+  snoozedUntil: "snoozed_until",
+  bodyText: "body_text",
+  bodyHtml: "body_html",
+};
+
+function buildEmailUpdate(updates: EmailUpdateSet): {
+  setClause: string;
+  params: BindParam[];
+} | null {
+  const parts: string[] = [];
+  const params: BindParam[] = [];
+  for (const key of Object.keys(updates) as Array<keyof EmailUpdateSet>) {
+    const col = EMAIL_COL_MAP[key];
+    if (!col) continue;
+    const value = updates[key];
+    if (value === undefined) continue;
+    parts.push(`${col} = ?`);
+    params.push(value as BindParam);
+  }
+  if (parts.length === 0) return null;
+  return { setClause: parts.join(", "), params };
+}
+
+type SqlFragment = { sql: string; params: BindParam[] };
+
+function buildViewConditions(view: ViewFilter, now: number): SqlFragment[] {
   switch (view) {
-    case "inbox": {
-      const snoozeCondition = or(isNull(schema.emails.snoozedUntil), lte(schema.emails.snoozedUntil, now));
-      return snoozeCondition
-        ? [eq(schema.emails.hasInbox, true), snoozeCondition]
-        : [eq(schema.emails.hasInbox, true)];
-    }
+    case "inbox":
+      return [
+        { sql: "has_inbox = 1", params: [] },
+        { sql: "(snoozed_until IS NULL OR snoozed_until <= ?)", params: [now] },
+      ];
     case "sent":
-      return [eq(schema.emails.hasSent, true)];
+      return [{ sql: "has_sent = 1", params: [] }];
     case "spam":
-      return [eq(schema.emails.hasSpam, true)];
+      return [{ sql: "has_spam = 1", params: [] }];
     case "trash":
-      return [eq(schema.emails.hasTrash, true)];
+      return [{ sql: "has_trash = 1", params: [] }];
     case "snoozed":
-      return [gt(schema.emails.snoozedUntil, now)];
+      return [{ sql: "snoozed_until > ?", params: [now] }];
     case "archived":
       return [
-        eq(schema.emails.hasInbox, false),
-        eq(schema.emails.hasSent, false),
-        eq(schema.emails.hasTrash, false),
-        eq(schema.emails.hasSpam, false),
+        { sql: "has_inbox = 0", params: [] },
+        { sql: "has_sent = 0", params: [] },
+        { sql: "has_trash = 0", params: [] },
+        { sql: "has_spam = 0", params: [] },
       ];
     case "starred":
-      return [eq(schema.emails.hasStarred, true)];
+      return [{ sql: "has_starred = 1", params: [] }];
     case "important":
-      return [sql`EXISTS (SELECT 1 FROM json_each(${schema.emails.labelIds}) WHERE value = 'IMPORTANT')`];
+      return [
+        {
+          sql: "EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value = 'IMPORTANT')",
+          params: [],
+        },
+      ];
     default:
-      if (view.startsWith("Label_")) {
-        return [sql`EXISTS (SELECT 1 FROM json_each(${schema.emails.labelIds}) WHERE value = ${view})`];
+      if (typeof view === "string" && view.startsWith("Label_")) {
+        return [
+          {
+            sql: "EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value = ?)",
+            params: [view],
+          },
+        ];
       }
       return [];
   }
 }
 
-const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
+const EMAIL_SUMMARY_SELECT = `
+  id,
+  mailbox_id,
+  provider_message_id,
+  from_addr,
+  from_name,
+  to_addr,
+  cc_addr,
+  subject,
+  snippet,
+  thread_id,
+  date,
+  direction,
+  is_read,
+  label_ids,
+  has_inbox,
+  has_sent,
+  has_trash,
+  has_spam,
+  has_starred,
+  created_at,
+  unsubscribe_url,
+  unsubscribe_email,
+  snoozed_until
+`;
 
-const emailSummaryColumns = {
-  id: schema.emails.id,
-  mailboxId: schema.emails.mailboxId,
-  providerMessageId: schema.emails.providerMessageId,
-  fromAddr: schema.emails.fromAddr,
-  fromName: schema.emails.fromName,
-  toAddr: schema.emails.toAddr,
-  ccAddr: schema.emails.ccAddr,
-  subject: schema.emails.subject,
-  snippet: schema.emails.snippet,
-  threadId: schema.emails.threadId,
-  date: schema.emails.date,
-  direction: schema.emails.direction,
-  isRead: schema.emails.isRead,
-  labelIds: schema.emails.labelIds,
-  hasInbox: schema.emails.hasInbox,
-  hasSent: schema.emails.hasSent,
-  hasTrash: schema.emails.hasTrash,
-  hasSpam: schema.emails.hasSpam,
-  hasStarred: schema.emails.hasStarred,
-  createdAt: schema.emails.createdAt,
-  unsubscribeUrl: schema.emails.unsubscribeUrl,
-  unsubscribeEmail: schema.emails.unsubscribeEmail,
-  snoozedUntil: schema.emails.snoozedUntil,
-} as const;
-
-function toEmailListItem(row: EmailQueryRow) {
+function toEmailListItem(row: EmailRowDb) {
   const labelIds = parseLabelIds(row.labelIds);
-
   return {
     id: String(row.id),
     mailboxId: row.mailboxId,
@@ -265,7 +325,7 @@ function toEmailListItem(row: EmailQueryRow) {
     threadId: row.threadId,
     date: row.date,
     direction: row.direction,
-    isRead: row.isRead,
+    isRead: toBool(row.isRead),
     labelIds,
     hasAttachment: labelIds.includes(HAS_ATTACHMENT_LABEL),
     createdAt: row.createdAt,
@@ -275,9 +335,47 @@ function toEmailListItem(row: EmailQueryRow) {
   };
 }
 
+function composeWhere(fragments: SqlFragment[]): {
+  where: string;
+  params: BindParam[];
+} {
+  const nonEmpty = fragments.filter((f) => f.sql.length > 0);
+  if (nonEmpty.length === 0) return { where: "", params: [] };
+  return {
+    where: "WHERE " + nonEmpty.map((f) => f.sql).join(" AND "),
+    params: nonEmpty.flatMap((f) => f.params),
+  };
+}
+
+function boolParam(v: boolean): 0 | 1 {
+  return v ? 1 : 0;
+}
+
+function normalizeLabelIds(raw: string | string[] | null | undefined): string[] {
+  if (raw == null) return [];
+  if (typeof raw === "string") return parseLabelIds(raw);
+  return raw;
+}
+
+async function updateEmailByIds(
+  userId: string,
+  emailIds: number[],
+  set: EmailUpdateSet,
+): Promise<void> {
+  const update = buildEmailUpdate(set);
+  if (!update) return;
+  if (emailIds.length === 0) return;
+  const placeholders = emailIds.map(() => "?").join(", ");
+  await dbClient.exec(
+    `UPDATE emails SET ${update.setClause} WHERE user_id = ? AND id IN (${placeholders})`,
+    [...update.params, userId, ...emailIds],
+    "run",
+  );
+}
+
 export const localDb = {
   async ensureReady(): Promise<void> {
-    await ensureDb();
+    await dbClient.init();
   },
 
   async getEmails(params: {
@@ -290,48 +388,40 @@ export const localDb = {
     search?: string;
     isRead?: "true" | "false";
   }) {
-    await ensureDb();
     const { userId, view = "inbox", mailboxId, limit = 100, offset = 0, cursor, search, isRead } = params;
     const now = Date.now();
-    const conditions: SQL[] = [eq(schema.emails.userId, userId)];
+    const fragments: SqlFragment[] = [{ sql: "user_id = ?", params: [userId] }];
 
-    if (mailboxId != null) conditions.push(eq(schema.emails.mailboxId, mailboxId));
-
-    if (isRead === "true") conditions.push(eq(schema.emails.isRead, true));
-    else if (isRead === "false") conditions.push(eq(schema.emails.isRead, false));
+    if (mailboxId != null) fragments.push({ sql: "mailbox_id = ?", params: [mailboxId] });
+    if (isRead === "true") fragments.push({ sql: "is_read = 1", params: [] });
+    else if (isRead === "false") fragments.push({ sql: "is_read = 0", params: [] });
 
     if (search) {
       const pattern = `%${search}%`;
-      conditions.push(
-        or(
-          like(schema.emails.subject, pattern),
-          like(schema.emails.fromName, pattern),
-          like(schema.emails.fromAddr, pattern),
-          like(schema.emails.snippet, pattern),
-        )!,
-      );
+      fragments.push({
+        sql: "(subject LIKE ? OR from_name LIKE ? OR from_addr LIKE ? OR snippet LIKE ?)",
+        params: [pattern, pattern, pattern, pattern],
+      });
     }
 
-    conditions.push(...buildViewConditions(view, now));
+    fragments.push(...buildViewConditions(view, now));
 
-    if (cursor != null) {
-      conditions.push(lt(schema.emails.date, cursor));
-    }
+    if (cursor != null) fragments.push({ sql: "date < ?", params: [cursor] });
 
-    const rowsWithExtra = await db
-      .select({ ...emailSummaryColumns })
-      .from(schema.emails)
-      .where(and(...conditions))
-      .orderBy(desc(schema.emails.date))
-      .limit(limit + 1)
-      .offset(cursor != null ? 0 : offset);
+    const { where, params: whereParams } = composeWhere(fragments);
+    const effectiveOffset = cursor != null ? 0 : offset;
 
-    const hasMore = rowsWithExtra.length > limit;
-    const rows = hasMore ? rowsWithExtra.slice(0, limit) : rowsWithExtra;
+    const sql = `SELECT ${EMAIL_SUMMARY_SELECT} FROM emails ${where} ORDER BY date DESC LIMIT ? OFFSET ?`;
+    const allParams = [...whereParams, limit + 1, effectiveOffset];
+    const res = await dbClient.exec(sql, allParams, "rows");
+
+    const all = rowsToObjects<EmailRowDb>(res);
+    const hasMore = all.length > limit;
+    const rows = hasMore ? all.slice(0, limit) : all;
     const lastRow = rows[rows.length - 1];
 
     return {
-      data: rows.map((r) => toEmailListItem(r as unknown as EmailQueryRow)),
+      data: rows.map(toEmailListItem),
       pagination: {
         limit,
         offset,
@@ -342,80 +432,65 @@ export const localDb = {
   },
 
   async getEmailDetail(userId: string, emailId: number) {
-    await ensureDb();
-
-    const rows = await db
-      .select({
-        ...emailSummaryColumns,
-        bodyText: schema.emails.bodyText,
-        bodyHtml: schema.emails.bodyHtml,
-      })
-      .from(schema.emails)
-      .where(and(eq(schema.emails.userId, userId), eq(schema.emails.id, emailId)))
-      .limit(1);
-
-    const row = rows[0];
+    const res = await dbClient.exec(
+      `SELECT ${EMAIL_SUMMARY_SELECT}, body_text, body_html FROM emails WHERE user_id = ? AND id = ? LIMIT 1`,
+      [userId, emailId],
+      "get",
+    );
+    const row = firstRow<EmailRowDb>(res);
     if (!row) return null;
-
     return {
-      ...toEmailListItem(row as unknown as EmailQueryRow),
-      bodyText: row.bodyText,
-      bodyHtml: row.bodyHtml,
-      resolvedBodyText: row.bodyText,
-      resolvedBodyHtml: row.bodyHtml,
+      ...toEmailListItem(row),
+      bodyText: row.bodyText ?? null,
+      bodyHtml: row.bodyHtml ?? null,
+      resolvedBodyText: row.bodyText ?? null,
+      resolvedBodyHtml: row.bodyHtml ?? null,
       attachments: [] as [],
     };
   },
 
   async getEmailThread(userId: string, threadId: string) {
-    await ensureDb();
-
-    const rows = await db
-      .select({
-        ...emailSummaryColumns,
-        bodyText: schema.emails.bodyText,
-        bodyHtml: schema.emails.bodyHtml,
-      })
-      .from(schema.emails)
-      .where(and(eq(schema.emails.userId, userId), eq(schema.emails.threadId, threadId)))
-      .orderBy(asc(schema.emails.date));
-
+    const res = await dbClient.exec(
+      `SELECT ${EMAIL_SUMMARY_SELECT}, body_text, body_html FROM emails WHERE user_id = ? AND thread_id = ? ORDER BY date ASC`,
+      [userId, threadId],
+      "rows",
+    );
+    const rows = rowsToObjects<EmailRowDb>(res);
     return rows.map((row) => ({
-      ...toEmailListItem(row as unknown as EmailQueryRow),
-      bodyText: row.bodyText,
-      bodyHtml: row.bodyHtml,
+      ...toEmailListItem(row),
+      bodyText: row.bodyText ?? null,
+      bodyHtml: row.bodyHtml ?? null,
     }));
   },
 
   async getDrafts(userId: string, mailboxId?: number) {
-    await ensureDb();
-    const conditions: SQL[] = [eq(schema.drafts.userId, userId)];
-    if (mailboxId != null) conditions.push(eq(schema.drafts.mailboxId, mailboxId));
-
-    const rows = await db
-      .select()
-      .from(schema.drafts)
-      .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(desc(schema.drafts.updatedAt));
-
-    return rows.map(({ userId: _, attachmentKeys, ...rest }) => ({
-      ...rest,
-      attachmentKeys: attachmentKeys ? JSON.parse(attachmentKeys) : null,
+    const fragments: SqlFragment[] = [{ sql: "user_id = ?", params: [userId] }];
+    if (mailboxId != null) fragments.push({ sql: "mailbox_id = ?", params: [mailboxId] });
+    const { where, params } = composeWhere(fragments);
+    const res = await dbClient.exec(
+      `SELECT id, compose_key, mailbox_id, to_addr, cc_addr, bcc_addr, subject, body, forwarded_content, thread_id, attachment_keys, updated_at, created_at FROM drafts ${where} ORDER BY updated_at DESC`,
+      params,
+      "rows",
+    );
+    const rows = rowsToObjects<Omit<DraftRow, "userId">>(res);
+    return rows.map((r) => ({
+      ...r,
+      attachmentKeys: r.attachmentKeys ? (JSON.parse(r.attachmentKeys) as DraftAttachmentKey[]) : null,
     }));
   },
 
   async getDraftByKey(userId: string, composeKey: string) {
-    await ensureDb();
-
-    const rows = await db
-      .select()
-      .from(schema.drafts)
-      .where(and(eq(schema.drafts.userId, userId), eq(schema.drafts.composeKey, composeKey)))
-      .limit(1);
-
-    if (!rows[0]) return null;
-    const { userId: _, attachmentKeys, ...rest } = rows[0];
-    return { ...rest, attachmentKeys: attachmentKeys ? JSON.parse(attachmentKeys) : null };
+    const res = await dbClient.exec(
+      `SELECT id, compose_key, mailbox_id, to_addr, cc_addr, bcc_addr, subject, body, forwarded_content, thread_id, attachment_keys, updated_at, created_at FROM drafts WHERE user_id = ? AND compose_key = ? LIMIT 1`,
+      [userId, composeKey],
+      "get",
+    );
+    const row = firstRow<Omit<DraftRow, "userId">>(res);
+    if (!row) return null;
+    return {
+      ...row,
+      attachmentKeys: row.attachmentKeys ? (JSON.parse(row.attachmentKeys) as DraftAttachmentKey[]) : null,
+    };
   },
 
   async upsertDraft(params: {
@@ -429,185 +504,213 @@ export const localDb = {
     body: string;
     forwardedContent: string;
     threadId?: string | null;
-    attachmentKeys?: Array<{ key: string; filename: string; mimeType: string }> | null;
+    attachmentKeys?: DraftAttachmentKey[] | null;
   }) {
-    await ensureDb();
     const now = Date.now();
+    const attachmentKeysJson = params.attachmentKeys ? JSON.stringify(params.attachmentKeys) : null;
+    await dbClient.exec(
+      `INSERT INTO drafts (user_id, compose_key, mailbox_id, to_addr, cc_addr, bcc_addr, subject, body, forwarded_content, thread_id, attachment_keys, updated_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (user_id, compose_key) DO UPDATE SET
+         mailbox_id = excluded.mailbox_id,
+         to_addr = excluded.to_addr,
+         cc_addr = excluded.cc_addr,
+         bcc_addr = excluded.bcc_addr,
+         subject = excluded.subject,
+         body = excluded.body,
+         forwarded_content = excluded.forwarded_content,
+         thread_id = excluded.thread_id,
+         attachment_keys = excluded.attachment_keys,
+         updated_at = excluded.updated_at`,
+      [
+        params.userId,
+        params.composeKey,
+        params.mailboxId ?? null,
+        params.toAddr,
+        params.ccAddr,
+        params.bccAddr,
+        params.subject,
+        params.body,
+        params.forwardedContent,
+        params.threadId ?? null,
+        attachmentKeysJson,
+        now,
+        now,
+      ],
+      "run",
+    );
 
-    const inserted = await db
-      .insert(schema.drafts)
-      .values({
-        userId: params.userId,
-        composeKey: params.composeKey,
-        mailboxId: params.mailboxId ?? null,
-        toAddr: params.toAddr,
-        ccAddr: params.ccAddr,
-        bccAddr: params.bccAddr,
-        subject: params.subject,
-        body: params.body,
-        forwardedContent: params.forwardedContent,
-        threadId: params.threadId ?? null,
-        attachmentKeys: params.attachmentKeys ? JSON.stringify(params.attachmentKeys) : null,
-        updatedAt: now,
-        createdAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [schema.drafts.userId, schema.drafts.composeKey],
-        set: {
-          mailboxId: sql`excluded.mailbox_id`,
-          toAddr: sql`excluded.to_addr`,
-          ccAddr: sql`excluded.cc_addr`,
-          bccAddr: sql`excluded.bcc_addr`,
-          subject: sql`excluded.subject`,
-          body: sql`excluded.body`,
-          forwardedContent: sql`excluded.forwarded_content`,
-          threadId: sql`excluded.thread_id`,
-          attachmentKeys: sql`excluded.attachment_keys`,
-          updatedAt: sql`excluded.updated_at`,
-        },
-      })
-      .returning();
-
-    const { userId: _, attachmentKeys, ...rest } = inserted[0]!;
-    return { ...rest, attachmentKeys: attachmentKeys ? JSON.parse(attachmentKeys) : null };
+    const saved = await localDb.getDraftByKey(params.userId, params.composeKey);
+    if (!saved) throw new Error("Draft upsert failed");
+    return saved;
   },
 
   async deleteDraft(id: number, userId: string): Promise<void> {
-    await ensureDb();
-    await db
-      .delete(schema.drafts)
-      .where(and(eq(schema.drafts.id, id), eq(schema.drafts.userId, userId)));
+    await dbClient.exec(
+      `DELETE FROM drafts WHERE id = ? AND user_id = ?`,
+      [id, userId],
+      "run",
+    );
   },
 
   async updateEmail(userId: string, emailId: number, patch: LocalEmailPatch): Promise<void> {
-    await ensureDb();
-
-    const rows = await db
-      .select({
-        isRead: schema.emails.isRead,
-        labelIds: schema.emails.labelIds,
-        snoozedUntil: schema.emails.snoozedUntil,
-      })
-      .from(schema.emails)
-      .where(and(eq(schema.emails.userId, userId), eq(schema.emails.id, emailId)))
-      .limit(1);
-
-    const current = rows[0];
-    if (!current) return;
-
-    const dbUpdates = applyEmailPatch(current, patch);
-    if (Object.keys(dbUpdates).length === 0) return;
-
-    await db
-      .update(schema.emails)
-      .set(dbUpdates)
-      .where(and(eq(schema.emails.userId, userId), eq(schema.emails.id, emailId)));
+    const res = await dbClient.exec(
+      `SELECT is_read, label_ids, snoozed_until FROM emails WHERE user_id = ? AND id = ? LIMIT 1`,
+      [userId, emailId],
+      "get",
+    );
+    const row = firstRow<{ isRead: number; labelIds: string | null; snoozedUntil: number | null }>(res);
+    if (!row) return;
+    const updates = applyEmailPatch(
+      { isRead: toBool(row.isRead), labelIds: row.labelIds, snoozedUntil: row.snoozedUntil },
+      patch,
+    );
+    await updateEmailByIds(userId, [emailId], updates);
   },
 
   async updateEmails(userId: string, emailIds: number[], patch: LocalEmailPatch): Promise<void> {
     if (emailIds.length === 0) return;
-    await ensureDb();
+    const placeholders = emailIds.map(() => "?").join(", ");
+    const res = await dbClient.exec(
+      `SELECT id, is_read, label_ids, snoozed_until FROM emails WHERE user_id = ? AND id IN (${placeholders})`,
+      [userId, ...emailIds],
+      "rows",
+    );
+    const rows = rowsToObjects<{ id: number; isRead: number; labelIds: string | null; snoozedUntil: number | null }>(res);
+    if (rows.length === 0) return;
 
-    const currentRows = await db
-      .select({
-        id: schema.emails.id,
-        isRead: schema.emails.isRead,
-        labelIds: schema.emails.labelIds,
-        snoozedUntil: schema.emails.snoozedUntil,
-      })
-      .from(schema.emails)
-      .where(and(eq(schema.emails.userId, userId), inArray(schema.emails.id, emailIds)));
-
-    if (currentRows.length === 0) return;
-
-    for (const current of currentRows) {
-      const dbUpdates = applyEmailPatch(current, patch);
-      if (Object.keys(dbUpdates).length === 0) continue;
-      await db
-        .update(schema.emails)
-        .set(dbUpdates)
-        .where(and(eq(schema.emails.userId, userId), eq(schema.emails.id, current.id)));
+    for (const current of rows) {
+      const updates = applyEmailPatch(
+        { isRead: toBool(current.isRead), labelIds: current.labelIds, snoozedUntil: current.snoozedUntil },
+        patch,
+      );
+      await updateEmailByIds(userId, [current.id], updates);
     }
   },
 
   async insertEmails(rows: EmailInsert[]): Promise<void> {
     if (!rows.length) return;
-    await ensureDb();
     const CHUNK = 50;
     for (let i = 0; i < rows.length; i += CHUNK) {
-      const chunk = rows.slice(i, i + CHUNK).map((row) => {
-        const ids = typeof row.labelIds === "string"
-          ? parseLabelIds(row.labelIds)
-          : Array.isArray(row.labelIds) ? row.labelIds : [];
-        return {
-          ...row,
-          labelIds: JSON.stringify(ids),
-          ...labelBooleans(ids),
-        };
-      });
-      await db
-        .insert(schema.emails)
-        .values(chunk)
-        .onConflictDoUpdate({
-          target: schema.emails.providerMessageId,
-          set: {
-            fromAddr: sql`excluded.from_addr`,
-            fromName: sql`excluded.from_name`,
-            toAddr: sql`excluded.to_addr`,
-            ccAddr: sql`excluded.cc_addr`,
-            subject: sql`excluded.subject`,
-            snippet: sql`excluded.snippet`,
-            bodyText: sql`excluded.body_text`,
-            bodyHtml: sql`excluded.body_html`,
-            isRead: sql`excluded.is_read`,
-            labelIds: sql`excluded.label_ids`,
-            hasInbox: sql`excluded.has_inbox`,
-            hasSent: sql`excluded.has_sent`,
-            hasTrash: sql`excluded.has_trash`,
-            hasSpam: sql`excluded.has_spam`,
-            hasStarred: sql`excluded.has_starred`,
-            snoozedUntil: sql`excluded.snoozed_until`,
-          },
-      });
+      const chunk = rows.slice(i, i + CHUNK);
+      const values: string[] = [];
+      const params: BindParam[] = [];
+      for (const row of chunk) {
+        const ids = normalizeLabelIds(row.labelIds as unknown as string | string[] | null);
+        const bools = labelBooleans(ids);
+        values.push(
+          "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        );
+        params.push(
+          row.id ?? null,
+          row.userId,
+          row.mailboxId ?? null,
+          row.providerMessageId,
+          row.threadId ?? null,
+          row.fromAddr,
+          row.fromName ?? null,
+          row.toAddr ?? null,
+          row.ccAddr ?? null,
+          row.subject ?? null,
+          row.snippet ?? null,
+          row.bodyText ?? null,
+          row.bodyHtml ?? null,
+          row.date,
+          row.direction ?? null,
+          boolParam(row.isRead ?? false),
+          JSON.stringify(ids),
+          boolParam(bools.hasInbox),
+          boolParam(bools.hasSent),
+          boolParam(bools.hasTrash),
+          boolParam(bools.hasSpam),
+          boolParam(bools.hasStarred),
+          row.unsubscribeUrl ?? null,
+          row.unsubscribeEmail ?? null,
+          row.snoozedUntil ?? null,
+          row.createdAt,
+        );
+      }
+      await dbClient.exec(
+        `INSERT INTO emails (
+          id, user_id, mailbox_id, provider_message_id, thread_id, from_addr, from_name,
+          to_addr, cc_addr, subject, snippet, body_text, body_html, date, direction,
+          is_read, label_ids, has_inbox, has_sent, has_trash, has_spam, has_starred,
+          unsubscribe_url, unsubscribe_email, snoozed_until, created_at
+        ) VALUES ${values.join(", ")}
+        ON CONFLICT (provider_message_id) DO UPDATE SET
+          from_addr = excluded.from_addr,
+          from_name = excluded.from_name,
+          to_addr = excluded.to_addr,
+          cc_addr = excluded.cc_addr,
+          subject = excluded.subject,
+          snippet = excluded.snippet,
+          body_text = excluded.body_text,
+          body_html = excluded.body_html,
+          is_read = excluded.is_read,
+          label_ids = excluded.label_ids,
+          has_inbox = excluded.has_inbox,
+          has_sent = excluded.has_sent,
+          has_trash = excluded.has_trash,
+          has_spam = excluded.has_spam,
+          has_starred = excluded.has_starred,
+          snoozed_until = excluded.snoozed_until`,
+        params,
+        "run",
+      );
     }
   },
 
-  async upsertSubscriptions(rows: SubscriptionInsert[]): Promise<void> {
+  async upsertSubscriptions(rows: EmailSubscriptionInsert[]): Promise<void> {
     if (!rows.length) return;
-    await ensureDb();
-    await db
-      .insert(schema.emailSubscriptions)
-      .values(rows)
-      .onConflictDoUpdate({
-        target: [schema.emailSubscriptions.mailboxId, schema.emailSubscriptions.senderKey],
-        set: {
-          fromAddr: sql`excluded.from_addr`,
-          fromName: sql`excluded.from_name`,
-          unsubscribeUrl: sql`excluded.unsubscribe_url`,
-          unsubscribeEmail: sql`excluded.unsubscribe_email`,
-          status: sql`excluded.status`,
-          emailCount: sql`excluded.email_count`,
-          lastReceivedAt: sql`excluded.last_received_at`,
-          unsubscribeMethod: sql`excluded.unsubscribe_method`,
-          updatedAt: sql`excluded.updated_at`,
-        },
-      });
+    for (const row of rows) {
+      await dbClient.exec(
+        `INSERT INTO email_subscriptions (
+          user_id, mailbox_id, sender_key, from_addr, from_name,
+          unsubscribe_url, unsubscribe_email, status, email_count, last_received_at,
+          unsubscribe_method, unsubscribe_requested_at, unsubscribed_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (mailbox_id, sender_key) DO UPDATE SET
+          from_addr = excluded.from_addr,
+          from_name = excluded.from_name,
+          unsubscribe_url = excluded.unsubscribe_url,
+          unsubscribe_email = excluded.unsubscribe_email,
+          status = excluded.status,
+          email_count = excluded.email_count,
+          last_received_at = excluded.last_received_at,
+          unsubscribe_method = excluded.unsubscribe_method,
+          updated_at = excluded.updated_at`,
+        [
+          row.userId,
+          row.mailboxId ?? null,
+          row.senderKey,
+          row.fromAddr,
+          row.fromName ?? null,
+          row.unsubscribeUrl ?? null,
+          row.unsubscribeEmail ?? null,
+          row.status,
+          row.emailCount,
+          row.lastReceivedAt ?? null,
+          row.unsubscribeMethod ?? null,
+          row.unsubscribeRequestedAt ?? null,
+          row.unsubscribedAt ?? null,
+          row.createdAt,
+          row.updatedAt,
+        ],
+        "run",
+      );
+    }
   },
 
   async getSubscriptions(userId: string, status?: string) {
-    await ensureDb();
-    const conditions: SQL[] = [eq(schema.emailSubscriptions.userId, userId)];
-    if (status) {
-      conditions.push(
-        eq(schema.emailSubscriptions.status, status as typeof schema.emailSubscriptions.$inferSelect.status),
-      );
-    }
-
-    return db
-      .select()
-      .from(schema.emailSubscriptions)
-      .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(desc(schema.emailSubscriptions.lastReceivedAt));
+    const fragments: SqlFragment[] = [{ sql: "user_id = ?", params: [userId] }];
+    if (status) fragments.push({ sql: "status = ?", params: [status] });
+    const { where, params } = composeWhere(fragments);
+    const res = await dbClient.exec(
+      `SELECT id, user_id, mailbox_id, sender_key, from_addr, from_name, unsubscribe_url, unsubscribe_email, status, email_count, last_received_at, unsubscribe_method, unsubscribe_requested_at, unsubscribed_at, created_at, updated_at FROM email_subscriptions ${where} ORDER BY last_received_at DESC`,
+      params,
+      "rows",
+    );
+    return rowsToObjects<EmailSubscriptionRow>(res);
   },
 
   async searchEmails(params: {
@@ -619,84 +722,82 @@ export const localDb = {
     offset?: number;
     includeJunk?: boolean;
   }) {
-    await ensureDb();
     const { userId, query, mailboxId, view, limit = 30, offset = 0, includeJunk = false } = params;
     const pattern = `%${query}%`;
-    const searchCondition = or(
-      like(schema.emails.subject, pattern),
-      like(schema.emails.fromName, pattern),
-      like(schema.emails.fromAddr, pattern),
-      like(schema.emails.snippet, pattern),
-    )!;
-    const baseConditions: SQL[] = [
-      eq(schema.emails.userId, userId),
-      searchCondition,
+
+    const baseFragments: SqlFragment[] = [
+      { sql: "user_id = ?", params: [userId] },
+      {
+        sql: "(subject LIKE ? OR from_name LIKE ? OR from_addr LIKE ? OR snippet LIKE ?)",
+        params: [pattern, pattern, pattern, pattern],
+      },
     ];
+    if (mailboxId != null) baseFragments.push({ sql: "mailbox_id = ?", params: [mailboxId] });
 
-    if (mailboxId != null) baseConditions.push(eq(schema.emails.mailboxId, mailboxId));
-
-    const conditions = [...baseConditions];
+    const fragments = [...baseFragments];
     if (view) {
-      conditions.push(...buildViewConditions(view, Date.now()));
+      fragments.push(...buildViewConditions(view, Date.now()));
     } else if (!includeJunk) {
-      conditions.push(eq(schema.emails.hasSpam, false));
-      conditions.push(eq(schema.emails.hasTrash, false));
+      fragments.push({ sql: "has_spam = 0", params: [] });
+      fragments.push({ sql: "has_trash = 0", params: [] });
     }
 
-    const rowsWithExtra = await db
-      .select({ ...emailSummaryColumns })
-      .from(schema.emails)
-      .where(and(...conditions))
-      .orderBy(desc(schema.emails.date))
-      .limit(limit + 1)
-      .offset(offset);
+    const { where, params: whereParams } = composeWhere(fragments);
+    const res = await dbClient.exec(
+      `SELECT ${EMAIL_SUMMARY_SELECT} FROM emails ${where} ORDER BY date DESC LIMIT ? OFFSET ?`,
+      [...whereParams, limit + 1, offset],
+      "rows",
+    );
+    const all = rowsToObjects<EmailRowDb>(res);
+    const hasMore = all.length > limit;
+    const rows = hasMore ? all.slice(0, limit) : all;
 
-    const hasMore = rowsWithExtra.length > limit;
-    const rows = hasMore ? rowsWithExtra.slice(0, limit) : rowsWithExtra;
     let hiddenJunkCount = 0;
-
     if (!includeJunk && !view) {
-      const hiddenRows = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(schema.emails)
-        .where(and(...baseConditions, or(eq(schema.emails.hasSpam, true), eq(schema.emails.hasTrash, true))!));
-      hiddenJunkCount = hiddenRows[0]?.count ?? 0;
+      const { where: baseWhere, params: baseParams } = composeWhere([
+        ...baseFragments,
+        { sql: "(has_spam = 1 OR has_trash = 1)", params: [] },
+      ]);
+      const countRes = await dbClient.exec(
+        `SELECT count(*) AS count FROM emails ${baseWhere}`,
+        baseParams,
+        "get",
+      );
+      hiddenJunkCount = Number(firstRow<{ count: number }>(countRes)?.count ?? 0);
     }
 
     return {
-      data: rows.map((r) => toEmailListItem(r as unknown as EmailQueryRow)),
+      data: rows.map(toEmailListItem),
       pagination: { limit, offset, hasMore },
       searchMeta: { hiddenJunkCount },
     };
   },
 
   async getContactSuggestions(userId: string, query: string, limit?: number) {
-    await ensureDb();
     const pattern = `%${query}%`;
-    const rows = await db
-      .select({
-        fromAddr: schema.emails.fromAddr,
-        fromName: schema.emails.fromName,
-        lastDate: sql<number>`max(${schema.emails.date})`,
-        count: sql<number>`count(*)`,
-      })
-      .from(schema.emails)
-      .where(
-        and(
-          eq(schema.emails.userId, userId),
-          or(like(schema.emails.fromAddr, pattern), like(schema.emails.fromName, pattern)),
-        ),
-      )
-      .groupBy(schema.emails.fromAddr, schema.emails.fromName)
-      .orderBy(desc(sql`count(*)`))
-      .limit(limit ?? 8);
+    const res = await dbClient.exec(
+      `SELECT from_addr, from_name, max(date) AS last_date, count(*) AS count
+       FROM emails
+       WHERE user_id = ? AND (from_addr LIKE ? OR from_name LIKE ?)
+       GROUP BY from_addr, from_name
+       ORDER BY count(*) DESC
+       LIMIT ?`,
+      [userId, pattern, pattern, limit ?? 8],
+      "rows",
+    );
+    const rows = rowsToObjects<{
+      fromAddr: string;
+      fromName: string | null;
+      lastDate: number | null;
+      count: number;
+    }>(res);
 
     return rows.map((r) => ({
       email: r.fromAddr,
       name: r.fromName,
       avatarUrl: null as string | null,
       lastInteractionAt: r.lastDate,
-      interactionCount: r.count,
+      interactionCount: Number(r.count),
     }));
   },
 
@@ -706,36 +807,30 @@ export const localDb = {
     mailboxId?: number;
     view?: ViewFilter;
   }) {
-    await ensureDb();
-    const { userId, query: rawQuery, mailboxId, view } = params;
-    const normalized = rawQuery.trim();
+    const { userId, query, mailboxId, view } = params;
+    const normalized = query.trim();
 
     const contacts = normalized
       ? await localDb.getContactSuggestions(userId, normalized, 6)
       : [];
 
-    const conditions: SQL[] = [eq(schema.emails.userId, userId)];
-    if (mailboxId != null) conditions.push(eq(schema.emails.mailboxId, mailboxId));
-    if (view) conditions.push(...buildViewConditions(view, Date.now()));
+    const fragments: SqlFragment[] = [{ sql: "user_id = ?", params: [userId] }];
+    if (mailboxId != null) fragments.push({ sql: "mailbox_id = ?", params: [mailboxId] });
+    if (view) fragments.push(...buildViewConditions(view, Date.now()));
 
-    const subjectPattern = `%${normalized}%`;
+    fragments.push({ sql: "coalesce(subject, '') <> ''", params: [] });
+    fragments.push({ sql: "subject LIKE ?", params: [`%${normalized}%`] });
+
+    const { where, params: whereParams } = composeWhere(fragments);
+
     const subjectRows = normalized
-      ? await db
-          .select({
-            subject: schema.emails.subject,
-            lastUsedAt: sql<number>`max(${schema.emails.date})`,
-          })
-          .from(schema.emails)
-          .where(
-            and(
-              ...conditions,
-              sql`coalesce(${schema.emails.subject}, '') <> ''`,
-              like(schema.emails.subject, subjectPattern),
-            ),
-          )
-          .groupBy(schema.emails.subject)
-          .orderBy(desc(sql`max(${schema.emails.date})`))
-          .limit(8)
+      ? rowsToObjects<{ subject: string | null; lastUsedAt: number | null }>(
+          await dbClient.exec(
+            `SELECT subject, max(date) AS last_used_at FROM emails ${where} GROUP BY subject ORDER BY max(date) DESC LIMIT 8`,
+            whereParams,
+            "rows",
+          ),
+        )
       : [];
 
     return {
@@ -749,7 +844,7 @@ export const localDb = {
         ...contact,
       })),
       subjects: subjectRows
-        .filter((row): row is typeof row & { subject: string } => row.subject !== null)
+        .filter((row): row is { subject: string; lastUsedAt: number | null } => row.subject !== null)
         .map((row) => ({
           kind: "subject" as const,
           id: `subject:${row.subject}`,
@@ -763,25 +858,20 @@ export const localDb = {
   },
 
   async getLabels(userId: string, mailboxId: number) {
-    await ensureDb();
-    return db
-      .select({
-        gmailId: schema.labels.gmailId,
-        name: schema.labels.name,
-        type: schema.labels.type,
-        textColor: schema.labels.textColor,
-        backgroundColor: schema.labels.backgroundColor,
-        messagesTotal: schema.labels.messagesTotal,
-        messagesUnread: schema.labels.messagesUnread,
-      })
-      .from(schema.labels)
-      .where(
-        and(
-          eq(schema.labels.userId, userId),
-          eq(schema.labels.mailboxId, mailboxId),
-        ),
-      )
-      .orderBy(asc(schema.labels.name));
+    const res = await dbClient.exec(
+      `SELECT gmail_id, name, type, text_color, background_color, messages_total, messages_unread FROM labels WHERE user_id = ? AND mailbox_id = ? ORDER BY name ASC`,
+      [userId, mailboxId],
+      "rows",
+    );
+    return rowsToObjects<{
+      gmailId: string;
+      name: string;
+      type: "system" | "user";
+      textColor: string | null;
+      backgroundColor: string | null;
+      messagesTotal: number;
+      messagesUnread: number;
+    }>(res);
   },
 
   async upsertLabels(
@@ -798,7 +888,6 @@ export const localDb = {
     }>,
   ): Promise<void> {
     if (labels.length === 0) return;
-    await ensureDb();
     const now = Date.now();
     const rows: LabelInsert[] = labels.map((l) => ({
       gmailId: l.gmailId,
@@ -813,59 +902,81 @@ export const localDb = {
       syncedAt: now,
     }));
 
-    await db
-      .insert(schema.labels)
-      .values(rows)
-      .onConflictDoUpdate({
-        target: schema.labels.gmailId,
-        set: {
-          name: sql`excluded.name`,
-          type: sql`excluded.type`,
-          textColor: sql`excluded.text_color`,
-          backgroundColor: sql`excluded.background_color`,
-          messagesTotal: sql`excluded.messages_total`,
-          messagesUnread: sql`excluded.messages_unread`,
-          syncedAt: sql`excluded.synced_at`,
-        },
-      });
+    for (const row of rows) {
+      await dbClient.exec(
+        `INSERT INTO labels (gmail_id, user_id, mailbox_id, name, type, text_color, background_color, messages_total, messages_unread, synced_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (gmail_id) DO UPDATE SET
+           name = excluded.name,
+           type = excluded.type,
+           text_color = excluded.text_color,
+           background_color = excluded.background_color,
+           messages_total = excluded.messages_total,
+           messages_unread = excluded.messages_unread,
+           synced_at = excluded.synced_at`,
+        [
+          row.gmailId,
+          row.userId,
+          row.mailboxId,
+          row.name,
+          row.type,
+          row.textColor,
+          row.backgroundColor,
+          row.messagesTotal,
+          row.messagesUnread,
+          row.syncedAt,
+        ],
+        "run",
+      );
+    }
   },
 
   async deleteLabel(gmailId: string): Promise<void> {
-    await ensureDb();
-    await db.delete(schema.labels).where(eq(schema.labels.gmailId, gmailId));
+    await dbClient.exec(`DELETE FROM labels WHERE gmail_id = ?`, [gmailId], "run");
   },
 
   async setMeta(key: string, value: string): Promise<void> {
-    await ensureDb();
-    await execSql(
-      "INSERT INTO _meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = ?",
+    await dbClient.exec(
+      `INSERT INTO _meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = ?`,
       [key, value, value],
       "run",
     );
   },
 
   async getMeta(key: string): Promise<string | null> {
-    await ensureDb();
-    const result = await execSql(
-      "SELECT value FROM _meta WHERE key = ?",
+    const res = await dbClient.exec(
+      `SELECT value FROM _meta WHERE key = ? LIMIT 1`,
       [key],
       "get",
     );
-    const row = result.rows[0] as [string] | undefined;
-    return row?.[0] ?? null;
+    const row = firstRow<{ value: string }>(res);
+    return row?.value ?? null;
   },
 
   async clear(): Promise<void> {
-    await ensureDb();
-    await db.delete(schema.emailSubscriptions);
-    await db.delete(schema.labels);
-    await db.delete(schema.drafts);
-    await db.delete(schema.emails);
-    await execSql("DELETE FROM _meta", [], "run");
+    await dbClient.batch([
+      { sql: "DELETE FROM email_subscriptions" },
+      { sql: "DELETE FROM labels" },
+      { sql: "DELETE FROM drafts" },
+      { sql: "DELETE FROM emails" },
+      { sql: "DELETE FROM _meta" },
+    ]);
+  },
+
+  async emailCount(userId: string, mailboxId?: number): Promise<number> {
+    const fragments: SqlFragment[] = [{ sql: "user_id = ?", params: [userId] }];
+    if (mailboxId != null) fragments.push({ sql: "mailbox_id = ?", params: [mailboxId] });
+    const { where, params } = composeWhere(fragments);
+    const res = await dbClient.exec(
+      `SELECT count(*) AS count FROM emails ${where}`,
+      params,
+      "get",
+    );
+    const row = firstRow<{ count: number }>(res);
+    return Number(row?.count ?? 0);
   },
 
   async deleteDatabase(): Promise<void> {
-    await ensureDb();
-    await deleteSqliteDb();
+    await dbClient.deleteDb();
   },
 };

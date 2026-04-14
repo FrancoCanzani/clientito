@@ -1,4 +1,6 @@
 import { InboxSidebarShell } from "@/features/email/inbox/components/shell/inbox-sidebar-shell";
+import { startFullSync } from "@/features/onboarding/mutations";
+import { fetchSyncStatus } from "@/features/onboarding/queries";
 import { accountsQueryOptions } from "@/hooks/use-mailboxes";
 import {
   createFileRoute,
@@ -22,12 +24,22 @@ export const Route = createFileRoute("/_dashboard/$mailboxId")({
     );
 
     if (accounts.length === 0) {
-      throw redirect({ to: "/inbox-redirect" });
+      throw redirect({ to: "/login" });
     }
 
     if (!accounts.some((account) => account.mailboxId === params.mailboxId)) {
       throw notFound();
     }
+
+    // Trigger initial full sync if the mailbox hasn't synced yet
+    fetchSyncStatus().then((status) => {
+      if (
+        status.state === "ready_to_sync" ||
+        status.state === "needs_mailbox_connect"
+      ) {
+        startFullSync(6, params.mailboxId).catch(() => {});
+      }
+    });
   },
   component: () => (
     <InboxSidebarShell>

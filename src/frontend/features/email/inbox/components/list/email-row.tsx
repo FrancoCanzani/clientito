@@ -22,14 +22,12 @@ export const EmailRow = memo(function EmailRow({
   onOpen,
   onAction,
   isFocused = false,
-  isSelected = false,
 }: {
   group: ThreadGroup;
   view: string;
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
   isFocused?: boolean;
-  isSelected?: boolean;
 }) {
   const queryClient = useQueryClient();
   const prefetchedRef = useRef(false);
@@ -39,7 +37,9 @@ export const EmailRow = memo(function EmailRow({
   const isInInbox = email.labelIds.includes("INBOX");
   const archiveAction = isInInbox ? "archive" : "move-to-inbox";
   const archiveLabel = isInInbox ? "Done" : "Move to inbox";
+
   const threadCount = group.threadCount;
+
   const participantLabel =
     view === "sent"
       ? email.toAddr
@@ -51,30 +51,26 @@ export const EmailRow = memo(function EmailRow({
     if (prefetchedRef.current) return;
     prefetchedRef.current = true;
 
-    const detailKey = ["email-detail", email.id];
-    const detailState = queryClient.getQueryState(detailKey);
-    if (detailState?.status !== "success") {
-      void queryClient.prefetchQuery({
-        queryKey: detailKey,
-        queryFn: () =>
-          fetchEmailDetail(email.id, {
-            mailboxId: email.mailboxId ?? undefined,
-            view,
-          }),
-        staleTime: 45_000,
-        gcTime: 120_000,
-      });
-    }
+    void queryClient.prefetchQuery({
+      queryKey: ["email-detail", email.id],
+      queryFn: () =>
+        fetchEmailDetail(email.id, {
+          mailboxId: email.mailboxId ?? undefined,
+          view,
+        }),
+      staleTime: 45_000,
+      gcTime: 120_000,
+    });
   };
 
-  const isActive = isFocused || isSelected;
+  const isActive = isFocused;
 
   return (
     <div
       role="button"
       tabIndex={0}
       className={cn(
-        "group flex h-10 w-full border-dashed border-b cursor-default items-center gap-2 px-2 text-left text-sm transition-colors hover:bg-muted/40",
+        "group flex h-10 w-full border-b cursor-default items-center gap-2 border-border/50 text-left text-sm transition-colors hover:bg-muted/40",
         isActive && "bg-muted",
       )}
       onMouseEnter={() => {
@@ -98,37 +94,13 @@ export const EmailRow = memo(function EmailRow({
         aria-hidden
       />
 
-      <span
-        className={cn(
-          "min-w-0 max-w-[30%] shrink-0 truncate text-sm",
-          email.isRead ? "text-foreground/70" : "font-medium text-foreground",
-        )}
-      >
-        {participantLabel}
-      </span>
+      <span className="w-60 shrink-0 truncate text-sm">{participantLabel}</span>
 
-      {threadCount > 1 && (
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-          {threadCount}
-        </span>
-      )}
-
-      <span className="mx-0.5 shrink-0 text-foreground/20">-</span>
-
-      <div className="min-w-0 flex-1 truncate">
-        <span
-          className={cn(
-            "text-sm",
-            email.isRead ? "text-foreground/50" : "text-foreground/70",
-          )}
-        >
-          {email.subject ?? "(no subject)"}
-        </span>
+      <div className="min-w-0 flex-1 truncate pr-2">
+        <span className="text-sm">{email.subject ?? "(no subject)"}</span>
+        {" - "}
         {email.snippet && (
-          <span className="text-sm text-foreground/30">
-            {" "}
-            {email.snippet}
-          </span>
+          <span className="text-sm text-muted-foreground">{email.snippet}</span>
         )}
       </div>
 
@@ -144,6 +116,11 @@ export const EmailRow = memo(function EmailRow({
             )}
             {email.hasAttachment && (
               <PaperclipIcon className="size-3.5" aria-hidden />
+            )}
+            {threadCount > 1 && (
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                [{threadCount}]
+              </span>
             )}
             <span className="tabular-nums whitespace-nowrap">
               {formatInboxRowDate(email.date)}

@@ -19,8 +19,19 @@ export async function syncLabelsFromServer(mailboxId: number): Promise<Label[]> 
   const labels = result.data ?? [];
 
   const userId = await getCurrentUserId();
-  if (userId && labels.length > 0) {
-    await localDb.upsertLabels(userId, mailboxId, labels);
+  if (userId) {
+    // Remove local labels that no longer exist on the server
+    const serverGmailIds = new Set(labels.map((l) => l.gmailId));
+    const localLabels = await localDb.getLabels(userId, mailboxId);
+    for (const local of localLabels) {
+      if (!serverGmailIds.has(local.gmailId)) {
+        await localDb.deleteLabel(local.gmailId);
+      }
+    }
+
+    if (labels.length > 0) {
+      await localDb.upsertLabels(userId, mailboxId, labels);
+    }
   }
 
   return labels;

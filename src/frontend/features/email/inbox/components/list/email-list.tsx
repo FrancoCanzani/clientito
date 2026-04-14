@@ -5,7 +5,6 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { IconButton } from "@/components/ui/icon-button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
@@ -13,7 +12,6 @@ import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-in
 import { useInboxHotkeys } from "@/features/email/inbox/hooks/use-inbox-hotkeys";
 import type { EmailListItem } from "@/features/email/inbox/types";
 import { VIEW_LABELS } from "@/features/email/inbox/utils/inbox-filters";
-import { MagnifyingGlassIcon, NotePencilIcon } from "@phosphor-icons/react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
@@ -27,16 +25,12 @@ export function EmailList({
   emailData,
   onOpen,
   onAction,
-  selectedEmailId,
   pageTitle: pageTitleOverride,
-  onFocusChange,
 }: {
   emailData: ReturnType<typeof useEmailData>;
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
-  selectedEmailId?: string | null;
   pageTitle?: string;
-  onFocusChange?: (emailId: string | null) => void;
 }) {
   const {
     view,
@@ -50,7 +44,8 @@ export function EmailList({
   const { openCompose } = useInboxCompose();
   const { mailboxId } = mailboxRoute.useParams();
   const navigate = useNavigate();
-  const pageTitle = pageTitleOverride ?? (VIEW_LABELS as Record<string, string>)[view] ?? view;
+  const pageTitle =
+    pageTitleOverride ?? (VIEW_LABELS as Record<string, string>)[view] ?? view;
 
   const goToSearch = () =>
     navigate({ to: "/$mailboxId/inbox/search", params: { mailboxId } });
@@ -76,8 +71,6 @@ export function EmailList({
     if (focusedIndex < 0) return;
     if (focusedIndex < threadGroups.length) {
       virtualizer.scrollToIndex(focusedIndex, { align: "auto" });
-      const group = threadGroups[focusedIndex];
-      onFocusChange?.(group?.representative.id ?? null);
     }
   }, [focusedIndex, threadGroups.length, virtualizer]);
 
@@ -91,35 +84,11 @@ export function EmailList({
             <SidebarTrigger className="md:hidden" />
             <span>{pageTitle}</span>
             {isSyncing && (
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-foreground/40" />
-                <span className="relative inline-flex size-2 rounded-full bg-foreground/60" />
+              <span className="animate-pulse text-xs text-muted-foreground">
+                Syncing...
               </span>
             )}
           </div>
-        }
-        actions={
-          <>
-            <IconButton
-              label="Search"
-              shortcut="/"
-              onClick={() =>
-                navigate({
-                  to: "/$mailboxId/inbox/search",
-                  params: { mailboxId },
-                })
-              }
-            >
-              <MagnifyingGlassIcon className="size-3.5" />
-            </IconButton>
-            <IconButton
-              label="New Email"
-              shortcut="C"
-              onClick={() => openCompose()}
-            >
-              <NotePencilIcon className="size-3.5" />
-            </IconButton>
-          </>
         }
       />
 
@@ -147,7 +116,6 @@ export function EmailList({
                     onOpen={onOpen}
                     onAction={onAction}
                     isFocused={virtualItem.index === focusedIndex}
-                    isSelected={group.representative.id === selectedEmailId}
                   />
                 </div>
               );

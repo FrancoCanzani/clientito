@@ -1,5 +1,5 @@
 import { localDb } from "@/db/client";
-import { ensureLocalSync, isSynced } from "@/db/sync";
+import { ensureLocalSync, isSynced, pullNewEmails } from "@/db/sync";
 import { getCurrentUserId } from "@/db/user";
 import type {
   ContactSuggestion,
@@ -48,11 +48,15 @@ export async function fetchEmails(
   }
 
   const offset = params?.offset ?? 0;
-  if (offset === 0 && !params?.cursor && !(await isSynced(userId, mailboxId))) {
+  const synced = await isSynced(userId, mailboxId);
+  if (offset === 0 && !params?.cursor && !synced) {
     await ensureLocalSync(userId, mailboxId);
+  } else if (offset === 0 && !params?.cursor && synced) {
+    // Already synced — pull newest emails from D1 so new mail appears
+    await pullNewEmails(userId, mailboxId).catch(() => {});
   }
 
-  return localDb.getEmails({
+  const result = await localDb.getEmails({
     userId,
     view: params?.view,
     mailboxId,
@@ -62,6 +66,7 @@ export async function fetchEmails(
     search: params?.search,
     isRead: params?.isRead,
   });
+  return result;
 }
 
 export async function fetchSearchEmails(

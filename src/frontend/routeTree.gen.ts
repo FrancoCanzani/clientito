@@ -10,8 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as InboxRedirectRouteImport } from './routes/inbox-redirect'
-import { Route as GetStartedRouteImport } from './routes/get-started'
 import { Route as DocsRouteRouteImport } from './routes/docs/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -33,16 +31,6 @@ import { Route as DashboardMailboxIdInboxLabelsLabelEmailEmailIdRouteImport } fr
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InboxRedirectRoute = InboxRedirectRouteImport.update({
-  id: '/inbox-redirect',
-  path: '/inbox-redirect',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GetStartedRoute = GetStartedRouteImport.update({
-  id: '/get-started',
-  path: '/get-started',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsRouteRoute = DocsRouteRouteImport.update({
@@ -143,8 +131,6 @@ const DashboardMailboxIdInboxLabelsLabelEmailEmailIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/docs': typeof DocsRouteRouteWithChildren
-  '/get-started': typeof GetStartedRoute
-  '/inbox-redirect': typeof InboxRedirectRoute
   '/login': typeof LoginRoute
   '/$mailboxId': typeof DashboardMailboxIdRouteRouteWithChildren
   '/settings': typeof DashboardSettingsRoute
@@ -163,8 +149,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/get-started': typeof GetStartedRoute
-  '/inbox-redirect': typeof InboxRedirectRoute
   '/login': typeof LoginRoute
   '/$mailboxId': typeof DashboardMailboxIdRouteRouteWithChildren
   '/settings': typeof DashboardSettingsRoute
@@ -186,8 +170,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_dashboard': typeof DashboardRouteRouteWithChildren
   '/docs': typeof DocsRouteRouteWithChildren
-  '/get-started': typeof GetStartedRoute
-  '/inbox-redirect': typeof InboxRedirectRoute
   '/login': typeof LoginRoute
   '/_dashboard/$mailboxId': typeof DashboardMailboxIdRouteRouteWithChildren
   '/_dashboard/settings': typeof DashboardSettingsRoute
@@ -209,8 +191,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/docs'
-    | '/get-started'
-    | '/inbox-redirect'
     | '/login'
     | '/$mailboxId'
     | '/settings'
@@ -229,8 +209,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/get-started'
-    | '/inbox-redirect'
     | '/login'
     | '/$mailboxId'
     | '/settings'
@@ -251,8 +229,6 @@ export interface FileRouteTypes {
     | '/'
     | '/_dashboard'
     | '/docs'
-    | '/get-started'
-    | '/inbox-redirect'
     | '/login'
     | '/_dashboard/$mailboxId'
     | '/_dashboard/settings'
@@ -274,8 +250,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
   DocsRouteRoute: typeof DocsRouteRouteWithChildren
-  GetStartedRoute: typeof GetStartedRoute
-  InboxRedirectRoute: typeof InboxRedirectRoute
   LoginRoute: typeof LoginRoute
 }
 
@@ -286,20 +260,6 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inbox-redirect': {
-      id: '/inbox-redirect'
-      path: '/inbox-redirect'
-      fullPath: '/inbox-redirect'
-      preLoaderRoute: typeof InboxRedirectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/get-started': {
-      id: '/get-started'
-      path: '/get-started'
-      fullPath: '/get-started'
-      preLoaderRoute: typeof GetStartedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs': {
@@ -493,8 +453,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   DocsRouteRoute: DocsRouteRouteWithChildren,
-  GetStartedRoute: GetStartedRoute,
-  InboxRedirectRoute: InboxRedirectRoute,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport

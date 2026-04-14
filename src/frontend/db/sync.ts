@@ -3,9 +3,9 @@ import { syncLabelsFromServer } from "@/features/email/labels/queries";
 import { queryClient } from "@/lib/query-client";
 import { queryKeys } from "@/lib/query-keys";
 import { localDb } from "./client";
-import type { emails } from "./schema";
+import type { EmailInsert } from "./schema";
 
-const SYNC_PAGE_SIZE = 200;
+const SYNC_PAGE_SIZE = 20;
 const SYNCED_MAILBOX_KEY_PREFIX = "synced-mailbox";
 const SYNCED_ANY_KEY_PREFIX = "synced-any";
 const ACTIVE_USER_META_KEY = "active-user-id";
@@ -29,7 +29,7 @@ type SyncEmailListItem = EmailListItem & {
   bodyHtml?: string | null;
 };
 
-function emailListItemToRow(item: SyncEmailListItem, userId: string): typeof emails.$inferInsert {
+function emailListItemToRow(item: SyncEmailListItem, userId: string): EmailInsert {
   const labelIds = item.labelIds ?? [];
   const labels = new Set(labelIds);
   return {
@@ -81,9 +81,10 @@ async function fetchEmailPage(
   return response.json();
 }
 
-async function pullAll(userId: string, mailboxId: number) {
+async function pullAll(userId: string, mailboxId: number): Promise<number> {
   let offset = 0;
   let hasMore = true;
+  let totalInserted = 0;
 
   while (hasMore) {
     const page = await fetchEmailPage(mailboxId, offset);
@@ -92,12 +93,16 @@ async function pullAll(userId: string, mailboxId: number) {
 
     const emailRows = items.map((item) => emailListItemToRow(item, userId));
     await localDb.insertEmails(emailRows);
+    totalInserted += items.length;
+
+    // Show emails progressively as each page lands
+    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
 
     hasMore = page.pagination.hasMore;
     offset += items.length;
   }
 
-  queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+  return totalInserted;
 }
 
 async function alignActiveUser(userId: string) {
@@ -118,13 +123,31 @@ async function runInitialSync(
   const mailboxKey = mailboxSyncKey(userId, mailboxId);
   if ((await localDb.getMeta(mailboxKey)) === "true") return;
 
-  await pullAll(userId, mailboxId);
+  const inserted = await pullAll(userId, mailboxId);
   await syncLabelsFromServer(mailboxId).catch((err) => {
     console.warn("Label sync failed during initial sync", err);
   });
 
-  await localDb.setMeta(mailboxKey, "true");
-  await localDb.setMeta(userSyncKey(userId), "true");
+  // Only mark as synced if we actually got emails — the server-side
+  // Gmail→D1 sync may still be in progress, so we'll retry next visit.
+  if (inserted > 0) {
+    await localDb.setMeta(mailboxKey, "true");
+    await localDb.setMeta(userSyncKey(userId), "true");
+  }
+}
+
+/**
+ * Pull the newest page of emails from D1 and upsert into local SQLite.
+ * Called on each poll tick while the server-side sync is running so
+ * new emails appear progressively without a full re-sync.
+ */
+export async function pullNewEmails(userId: string, mailboxId: number) {
+  await localDb.ensureReady();
+  const page = await fetchEmailPage(mailboxId, 0);
+  const items = page.data as SyncEmailListItem[];
+  if (items.length === 0) return;
+  const emailRows = items.map((item) => emailListItemToRow(item, userId));
+  await localDb.insertEmails(emailRows);
 }
 
 export async function ensureLocalSync(
@@ -155,7 +178,16 @@ export async function isSynced(
   await localDb.ensureReady();
 
   if (mailboxId != null) {
-    return (await localDb.getMeta(mailboxSyncKey(userId, mailboxId))) === "true";
+    const flagSet = (await localDb.getMeta(mailboxSyncKey(userId, mailboxId))) === "true";
+    if (!flagSet) return false;
+    // Guard against stale meta flag (e.g. after sqlite driver migration)
+    const count = await localDb.emailCount(userId, mailboxId);
+    if (count === 0) {
+      await localDb.setMeta(mailboxSyncKey(userId, mailboxId), "");
+      await localDb.setMeta(userSyncKey(userId), "");
+      return false;
+    }
+    return true;
   }
 
   return (await localDb.getMeta(userSyncKey(userId))) === "true";

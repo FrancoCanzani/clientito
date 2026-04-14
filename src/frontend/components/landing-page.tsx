@@ -52,7 +52,7 @@ export default function LandingPage() {
             <Button asChild className="h-9 text-lg">
               {isAuthenticated ? (
                 <Link
-                  to={preferredMailboxId ? "/$mailboxId/inbox" : "/inbox-redirect"}
+                  to={preferredMailboxId ? "/$mailboxId/inbox" : "/login"}
                   params={
                     preferredMailboxId
                       ? { mailboxId: String(preferredMailboxId) }

@@ -44,6 +44,8 @@ export function useEmailData({
         ? lastPage.pagination.cursor
         : undefined,
     staleTime: isSyncing ? 0 : 30_000,
+    // Poll every 3s while server-side Gmail→D1 sync is running
+    refetchInterval: isSyncing ? 3_000 : false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
   });
@@ -77,6 +79,7 @@ export function useEmailData({
     mailboxId,
     hasEmails,
     threadGroups,
+    isLoading: emailsQuery.isLoading,
     isError: emailsQuery.isError,
     hasNextPage: hasNextPage ?? false,
     isFetchingNextPage,

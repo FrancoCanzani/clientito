@@ -18,7 +18,9 @@ import { handleSyncQueue, type SyncQueueMessage } from "./queue";
 const app = new Hono<AppRouteEnv>();
 
 app.use("*", logger());
-app.use("*", secureHeaders());
+app.use("*", secureHeaders({
+  crossOriginEmbedderPolicy: "credentialless",
+}));
 
 app.use(
   "/api/*",

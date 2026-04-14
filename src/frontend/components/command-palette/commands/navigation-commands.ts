@@ -47,7 +47,7 @@ function makeNavCommand({
     perform: (ctx, services) => {
       const mailboxId = ctx.defaultMailboxId;
       if (mailboxId == null) {
-        services.navigate({ to: "/get-started" });
+        services.navigate({ to: "/login" });
         services.close();
         return;
       }
