@@ -64,7 +64,7 @@ function ImageLightbox({
       aria-modal="true"
       aria-label={alt}
       tabIndex={-1}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(12%_0.01_250)]/80"
       onClick={onClose}
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
@@ -133,7 +133,7 @@ export function AttachmentItem({
               className="h-40 w-full object-cover transition-transform duration-150 group-hover:scale-[1.02]"
               loading="lazy"
             />
-            <span className="absolute bottom-2 right-2 flex size-7 items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition-opacity group-hover:opacity-100">
+            <span className="absolute bottom-2 right-2 flex size-7 items-center justify-center rounded-full bg-[oklch(12%_0.01_250)]/50 text-white opacity-0 transition-opacity group-hover:opacity-100">
               <ArrowsOutIcon className="size-3.5" />
             </span>
           </button>

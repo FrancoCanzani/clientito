@@ -27,6 +27,7 @@ export function LabelPicker({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
+  const [optimisticIds, setOptimisticIds] = useState<Set<string>>(new Set(appliedLabelIds));
 
   const labelsQuery = useQuery({
     queryKey: queryKeys.labels(mailboxId),
@@ -38,12 +39,15 @@ export function LabelPicker({
     ? labels.filter((l) => l.name.toLowerCase().includes(search.toLowerCase()))
     : labels;
 
-  const appliedSet = new Set(appliedLabelIds);
-
   async function toggleLabel(label: Label) {
-    if (appliedSet.has(label.gmailId)) {
+    const next = new Set(optimisticIds);
+    if (next.has(label.gmailId)) {
+      next.delete(label.gmailId);
+      setOptimisticIds(next);
       await removeLabel(emailIds, label.gmailId, mailboxId);
     } else {
+      next.add(label.gmailId);
+      setOptimisticIds(next);
       await applyLabel(emailIds, label.gmailId, mailboxId);
     }
   }
@@ -53,6 +57,7 @@ export function LabelPicker({
     setCreating(true);
     try {
       const label = await createLabel(mailboxId, { name: search.trim() });
+      setOptimisticIds((prev) => new Set(prev).add(label.gmailId));
       await applyLabel(emailIds, label.gmailId, mailboxId);
       setSearch("");
     } finally {
@@ -67,7 +72,9 @@ export function LabelPicker({
       open={open}
       onOpenChange={(v) => {
         setOpen(v);
-        if (!v) {
+        if (v) {
+          setOptimisticIds(new Set(appliedLabelIds));
+        } else {
           setSearch("");
           onDone?.();
         }
@@ -99,7 +106,7 @@ export function LabelPicker({
         </div>
         <div className="max-h-48 overflow-y-auto p-1">
           {filtered.map((label) => {
-            const isApplied = appliedSet.has(label.gmailId);
+            const isApplied = optimisticIds.has(label.gmailId);
             return (
               <button
                 key={label.gmailId}

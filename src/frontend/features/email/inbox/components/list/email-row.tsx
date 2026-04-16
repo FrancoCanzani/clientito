@@ -1,4 +1,3 @@
-import { ContactAvatar } from "@/components/ui/contact-avatar";
 import { IconButton } from "@/components/ui/icon-button";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import { fetchEmailDetail } from "@/features/email/inbox/queries";
@@ -80,8 +79,6 @@ export const EmailRow = memo(function EmailRow({
         }
       }}
     >
-      <ContactAvatar name={email.fromName} email={email.fromAddr} size="sm" />
-
       <div className="flex w-36 shrink-0 items-center gap-2 lg:w-48">
         <span
           className={cn(

@@ -194,8 +194,13 @@ const navigationCommands: Command[] = [
     icon: paletteIcon(GearIcon),
     group: "navigation",
     keywords: ["settings", "preferences", "account"],
-    perform: (_ctx, services) => {
-      services.navigate({ to: "/settings" });
+    perform: (ctx, services) => {
+      const mailboxId = ctx.defaultMailboxId;
+      if (mailboxId != null) {
+        services.navigate({ to: "/$mailboxId/settings", params: { mailboxId } });
+      } else {
+        services.navigate({ to: "/login" });
+      }
       services.close();
     },
   },

@@ -5,7 +5,7 @@ import type {
   EmailFolderView,
   InboxLabelView,
 } from "@/features/email/inbox/utils/inbox-filters";
-import { INBOX_LABEL_VALUES } from "@/features/email/inbox/utils/inbox-filters";
+import { isInboxLabelView } from "@/features/email/inbox/utils/inbox-filters";
 import { queryKeys } from "@/lib/query-keys";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 
@@ -28,7 +28,6 @@ type NavigateToEmail = (
       },
 ) => void;
 
-const LABEL_VIEW_SET = new Set<string>(INBOX_LABEL_VALUES);
 
 export function openEmail(
   queryClient: QueryClient,
@@ -47,7 +46,7 @@ export function openEmail(
   });
 
   const context = options?.context ?? "inbox";
-  if (LABEL_VIEW_SET.has(context)) {
+  if (isInboxLabelView(context)) {
     navigate({
       to: "/$mailboxId/inbox/labels/$label/email/$emailId",
       params: { mailboxId: routeMailboxId, label: context as InboxLabelView, emailId: email.id },

@@ -1,21 +1,20 @@
-import { clearLocalData } from "@/db/sync";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
+import { clearLocalData } from "@/db/sync";
+import { LabelsSettingsSection } from "@/features/settings/components/labels-settings-section";
 import { SignatureField } from "@/features/settings/components/signature-field";
-import { updateSyncPreference } from "@/features/settings/mutations";
 import { useSettingsMutations } from "@/features/settings/hooks/use-settings-mutations";
+import { updateSyncPreference } from "@/features/settings/mutations";
 import {
   formatImportHistoryHint,
   getMailboxStatusCopy,
 } from "@/features/settings/utils/sync-formatting";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  getMailboxDisplayEmail,
-  useMailboxes,
-} from "@/hooks/use-mailboxes";
+import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import { useTheme } from "@/hooks/use-theme";
+import { queryKeys } from "@/lib/query-keys";
 import {
   ArrowClockwiseIcon,
   MonitorIcon,
@@ -24,11 +23,12 @@ import {
   SunIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import { queryKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+
+const settingsRoute = getRouteApi("/_dashboard/$mailboxId/settings");
 
 type SyncWindowOption = {
   value: 6 | 12 | null;
@@ -60,6 +60,7 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const [confirmText, setConfirmText] = useState("");
   const handledConnectedImportRef = useRef(false);
+  const { mailboxId } = settingsRoute.useParams();
 
   const accountsQuery = useMailboxes();
   const accounts = accountsQuery.data?.accounts ?? [];
@@ -115,7 +116,9 @@ export default function SettingsPage() {
             mailboxId,
             months: 6,
           });
-          await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+          await queryClient.invalidateQueries({
+            queryKey: queryKeys.accounts(),
+          });
         } catch {
           toast.error("Failed to set import history for the new account");
           return;
@@ -131,7 +134,7 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-8 px-4 pb-12">
-      <PageHeader title="Settings" />
+      <PageHeader title="Settings" className="px-0" />
 
       <section className="space-y-3">
         <div className="space-y-1">
@@ -265,7 +268,9 @@ export default function SettingsPage() {
 
                   <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-0.5">
-                      <p className="text-sm font-medium">{statusCopy.sectionTitle}</p>
+                      <p className="text-sm font-medium">
+                        {statusCopy.sectionTitle}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {statusCopy.detail}
                       </p>
@@ -352,6 +357,8 @@ export default function SettingsPage() {
           </div>
         </div>
       </section>
+
+      <LabelsSettingsSection mailboxId={mailboxId} />
 
       <section className="space-y-3">
         <div className="space-y-1">

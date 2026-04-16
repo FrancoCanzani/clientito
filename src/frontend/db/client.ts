@@ -921,6 +921,50 @@ export const localDb = {
     }
   },
 
+  async addLabelToEmails(providerMessageIds: string[], labelId: string): Promise<void> {
+    if (!providerMessageIds.length) return;
+    const placeholders = providerMessageIds.map(() => "?").join(", ");
+    const res = await dbClient.exec(
+      `SELECT id, label_ids FROM emails WHERE provider_message_id IN (${placeholders})`,
+      providerMessageIds,
+      "rows",
+    );
+    const rows = rowsToObjects<{ id: number; labelIds: string | null }>(res);
+    for (const row of rows) {
+      const ids = parseLabelIds(row.labelIds);
+      if (ids.includes(labelId)) continue;
+      const next = [...ids, labelId];
+      const bools = labelBooleans(next);
+      await dbClient.exec(
+        `UPDATE emails SET label_ids = ?, has_inbox = ?, has_sent = ?, has_trash = ?, has_spam = ?, has_starred = ? WHERE id = ?`,
+        [JSON.stringify(next), bools.hasInbox ? 1 : 0, bools.hasSent ? 1 : 0, bools.hasTrash ? 1 : 0, bools.hasSpam ? 1 : 0, bools.hasStarred ? 1 : 0, row.id],
+        "run",
+      );
+    }
+  },
+
+  async removeLabelFromEmails(providerMessageIds: string[], labelId: string): Promise<void> {
+    if (!providerMessageIds.length) return;
+    const placeholders = providerMessageIds.map(() => "?").join(", ");
+    const res = await dbClient.exec(
+      `SELECT id, label_ids FROM emails WHERE provider_message_id IN (${placeholders})`,
+      providerMessageIds,
+      "rows",
+    );
+    const rows = rowsToObjects<{ id: number; labelIds: string | null }>(res);
+    for (const row of rows) {
+      const ids = parseLabelIds(row.labelIds);
+      if (!ids.includes(labelId)) continue;
+      const next = ids.filter((id) => id !== labelId);
+      const bools = labelBooleans(next);
+      await dbClient.exec(
+        `UPDATE emails SET label_ids = ?, has_inbox = ?, has_sent = ?, has_trash = ?, has_spam = ?, has_starred = ? WHERE id = ?`,
+        [JSON.stringify(next), bools.hasInbox ? 1 : 0, bools.hasSent ? 1 : 0, bools.hasTrash ? 1 : 0, bools.hasSpam ? 1 : 0, bools.hasStarred ? 1 : 0, row.id],
+        "run",
+      );
+    }
+  },
+
   async emailCount(userId: string, mailboxId?: number): Promise<number> {
     const fragments: SqlFragment[] = [{ sql: "user_id = ?", params: [userId] }];
     if (mailboxId != null) fragments.push({ sql: "mailbox_id = ?", params: [mailboxId] });

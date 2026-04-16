@@ -15,8 +15,8 @@ import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsSlugRouteImport } from './routes/docs/$slug'
-import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
 import { Route as DashboardMailboxIdRouteRouteImport } from './routes/_dashboard/$mailboxId/route'
+import { Route as DashboardMailboxIdSettingsRouteImport } from './routes/_dashboard/$mailboxId/settings'
 import { Route as DashboardMailboxIdInboxIndexRouteImport } from './routes/_dashboard/$mailboxId/inbox/index'
 import { Route as DashboardMailboxIdFolderIndexRouteImport } from './routes/_dashboard/$mailboxId/$folder/index'
 import { Route as DashboardMailboxIdInboxSearchRouteImport } from './routes/_dashboard/$mailboxId/inbox/search'
@@ -56,16 +56,17 @@ const DocsSlugRoute = DocsSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => DocsRouteRoute,
 } as any)
-const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
 const DashboardMailboxIdRouteRoute = DashboardMailboxIdRouteRouteImport.update({
   id: '/$mailboxId',
   path: '/$mailboxId',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardMailboxIdSettingsRoute =
+  DashboardMailboxIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => DashboardMailboxIdRouteRoute,
+  } as any)
 const DashboardMailboxIdInboxIndexRoute =
   DashboardMailboxIdInboxIndexRouteImport.update({
     id: '/inbox/',
@@ -126,9 +127,9 @@ export interface FileRoutesByFullPath {
   '/docs': typeof DocsRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/$mailboxId': typeof DashboardMailboxIdRouteRouteWithChildren
-  '/settings': typeof DashboardSettingsRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
+  '/$mailboxId/settings': typeof DashboardMailboxIdSettingsRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
@@ -143,9 +144,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/$mailboxId': typeof DashboardMailboxIdRouteRouteWithChildren
-  '/settings': typeof DashboardSettingsRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs': typeof DocsIndexRoute
+  '/$mailboxId/settings': typeof DashboardMailboxIdSettingsRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
@@ -163,9 +164,9 @@ export interface FileRoutesById {
   '/docs': typeof DocsRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/_dashboard/$mailboxId': typeof DashboardMailboxIdRouteRouteWithChildren
-  '/_dashboard/settings': typeof DashboardSettingsRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
+  '/_dashboard/$mailboxId/settings': typeof DashboardMailboxIdSettingsRoute
   '/_dashboard/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/_dashboard/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/_dashboard/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
@@ -183,9 +184,9 @@ export interface FileRouteTypes {
     | '/docs'
     | '/login'
     | '/$mailboxId'
-    | '/settings'
     | '/docs/$slug'
     | '/docs/'
+    | '/$mailboxId/settings'
     | '/$mailboxId/inbox/drafts'
     | '/$mailboxId/inbox/new'
     | '/$mailboxId/inbox/search'
@@ -200,9 +201,9 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/$mailboxId'
-    | '/settings'
     | '/docs/$slug'
     | '/docs'
+    | '/$mailboxId/settings'
     | '/$mailboxId/inbox/drafts'
     | '/$mailboxId/inbox/new'
     | '/$mailboxId/inbox/search'
@@ -219,9 +220,9 @@ export interface FileRouteTypes {
     | '/docs'
     | '/login'
     | '/_dashboard/$mailboxId'
-    | '/_dashboard/settings'
     | '/docs/$slug'
     | '/docs/'
+    | '/_dashboard/$mailboxId/settings'
     | '/_dashboard/$mailboxId/inbox/drafts'
     | '/_dashboard/$mailboxId/inbox/new'
     | '/_dashboard/$mailboxId/inbox/search'
@@ -284,19 +285,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsSlugRouteImport
       parentRoute: typeof DocsRouteRoute
     }
-    '/_dashboard/settings': {
-      id: '/_dashboard/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof DashboardSettingsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
     '/_dashboard/$mailboxId': {
       id: '/_dashboard/$mailboxId'
       path: '/$mailboxId'
       fullPath: '/$mailboxId'
       preLoaderRoute: typeof DashboardMailboxIdRouteRouteImport
       parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/$mailboxId/settings': {
+      id: '/_dashboard/$mailboxId/settings'
+      path: '/settings'
+      fullPath: '/$mailboxId/settings'
+      preLoaderRoute: typeof DashboardMailboxIdSettingsRouteImport
+      parentRoute: typeof DashboardMailboxIdRouteRoute
     }
     '/_dashboard/$mailboxId/inbox/': {
       id: '/_dashboard/$mailboxId/inbox/'
@@ -365,6 +366,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardMailboxIdRouteRouteChildren {
+  DashboardMailboxIdSettingsRoute: typeof DashboardMailboxIdSettingsRoute
   DashboardMailboxIdInboxDraftsRoute: typeof DashboardMailboxIdInboxDraftsRoute
   DashboardMailboxIdInboxNewRoute: typeof DashboardMailboxIdInboxNewRoute
   DashboardMailboxIdInboxSearchRoute: typeof DashboardMailboxIdInboxSearchRoute
@@ -378,6 +380,7 @@ interface DashboardMailboxIdRouteRouteChildren {
 
 const DashboardMailboxIdRouteRouteChildren: DashboardMailboxIdRouteRouteChildren =
   {
+    DashboardMailboxIdSettingsRoute: DashboardMailboxIdSettingsRoute,
     DashboardMailboxIdInboxDraftsRoute: DashboardMailboxIdInboxDraftsRoute,
     DashboardMailboxIdInboxNewRoute: DashboardMailboxIdInboxNewRoute,
     DashboardMailboxIdInboxSearchRoute: DashboardMailboxIdInboxSearchRoute,
@@ -400,12 +403,10 @@ const DashboardMailboxIdRouteRouteWithChildren =
 
 interface DashboardRouteRouteChildren {
   DashboardMailboxIdRouteRoute: typeof DashboardMailboxIdRouteRouteWithChildren
-  DashboardSettingsRoute: typeof DashboardSettingsRoute
 }
 
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardMailboxIdRouteRoute: DashboardMailboxIdRouteRouteWithChildren,
-  DashboardSettingsRoute: DashboardSettingsRoute,
 }
 
 const DashboardRouteRouteWithChildren = DashboardRouteRoute._addFileChildren(

@@ -37,7 +37,7 @@ export const Route = createFileRoute("/_dashboard/$mailboxId")({
         status.state === "ready_to_sync" ||
         status.state === "needs_mailbox_connect"
       ) {
-        startFullSync(6, params.mailboxId).catch(() => {});
+        startFullSync(undefined, params.mailboxId).catch(() => {});
       }
     });
   },

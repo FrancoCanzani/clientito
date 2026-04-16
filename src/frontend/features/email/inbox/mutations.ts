@@ -1,5 +1,7 @@
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
+import { queryClient } from "@/lib/query-client";
+import { queryKeys } from "@/lib/query-keys";
 
 function getErrorMessage(payload: unknown): string | null {
   if (typeof payload !== "object" || payload === null) return null;
@@ -53,6 +55,8 @@ async function syncLocalPatch(emailIds: string[], patch: EmailPatchPayload) {
     }
   } catch (error) {
     console.warn("Failed to sync local email patch", error);
+    // Force refetch so UI stays consistent with Gmail state
+    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
   }
 }
 

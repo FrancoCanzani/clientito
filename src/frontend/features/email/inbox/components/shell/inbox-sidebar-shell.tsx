@@ -4,12 +4,12 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarRail,
 } from "@/components/ui/sidebar";
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import { LabelSidebarSection } from "@/features/email/labels/components/label-sidebar-section";
@@ -67,11 +67,11 @@ function AccountHeader({ mailboxId }: { mailboxId: number }) {
   const displayName = formatDisplayName(user?.name, activeEmail);
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+    <div className="flex items-center gap-2 px-2 py-1.5">
       <div className="flex size-6 items-center justify-center rounded-lg bg-foreground text-[11px] font-semibold uppercase text-background">
         {displayName.charAt(0)}
       </div>
-      <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+      <div className="grid flex-1 text-left text-sm leading-tight">
         <span className="truncate font-medium">{displayName}</span>
         <span className="truncate text-xs text-muted-foreground">
           {activeEmail}
@@ -91,7 +91,8 @@ type NavView =
   | "inbox"
   | "snoozed"
   | "important"
-  | "drafts"
+  | "drafts";
+
 function useActiveView(): NavView {
   return useRouterState({
     select: (state): NavView => {
@@ -183,16 +184,16 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   useHotkeys(hotkeyBindings, { allowInEditable: true });
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="none" className="*:bg-sidebar/30 border-border/40">
       <SidebarHeader>
         <AccountHeader mailboxId={mailboxId} />
-        <SidebarMenu className="group-data-[collapsible=icon]:hidden">
+        <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={() => openCompose()}
-              className="bg-background font-medium shadow-sm ring-1 ring-border hover:bg-accent"
+              className="bg-white px-2 box-border py-2 shadow-sm"
             >
-              <NotePencilIcon className="size-4 shrink-0" />
+              <NotePencilIcon />
               <span>Compose</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -210,7 +211,11 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => navigate({ to: "/settings" })}>
+            <SidebarMenuButton
+              onClick={() =>
+                navigate({ to: "/$mailboxId/settings", params: { mailboxId } })
+              }
+            >
               <GearIcon className="size-4 shrink-0" />
               <span>Settings</span>
             </SidebarMenuButton>
@@ -220,6 +225,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
 
       <SidebarContent>
         <SidebarGroup>
+          <SidebarGroupLabel>MAIL</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {NAV_ITEMS.map((item, i) => {
@@ -237,11 +243,9 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
                         params={nav.params}
                         preload={item.view === "inbox" ? undefined : "intent"}
                       >
-                        <Icon className="size-4 shrink-0" />
-                        <span className="group-data-[collapsible=icon]:hidden">
-                          {item.label}
-                        </span>
-                        <Kbd className="ml-auto opacity-0 transition-opacity group-hover/nav:opacity-100 group-data-[collapsible=icon]:hidden">
+                        <Icon className="size-3 shrink-0" />
+                        <span>{item.label}</span>
+                        <Kbd className="ml-auto opacity-0 transition-opacity group-hover/nav:opacity-100">
                           ⌘{i + 1}
                         </Kbd>
                       </Link>
@@ -255,8 +259,6 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
 
         <LabelSidebarSection mailboxId={mailboxId} />
       </SidebarContent>
-
-      <SidebarRail />
     </Sidebar>
   );
 }

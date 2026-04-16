@@ -9,6 +9,8 @@ import {
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
 import { LabelPicker } from "@/features/email/labels/components/label-picker";
+import { removeLabel } from "@/features/email/labels/mutations";
+import { fetchLabels } from "@/features/email/labels/queries";
 import { useAuth } from "@/hooks/use-auth";
 import { useMailboxes } from "@/hooks/use-mailboxes";
 import { queryKeys } from "@/lib/query-keys";
@@ -27,8 +29,9 @@ import {
   TagIcon,
   TrashIcon,
   WarningIcon,
+  XIcon,
 } from "@phosphor-icons/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { unsubscribe } from "../../../subscriptions/queries";
@@ -77,6 +80,16 @@ export function EmailActions({
   const hasUnsubscribe = Boolean(
     email.unsubscribeUrl || email.unsubscribeEmail,
   );
+
+  const labelsQuery = useQuery({
+    queryKey: queryKeys.labels(email.mailboxId!),
+    queryFn: () => fetchLabels(email.mailboxId!),
+    staleTime: 60_000,
+    enabled: email.mailboxId != null,
+  });
+  const allLabels = labelsQuery.data ?? [];
+  const userLabelIds = email.labelIds.filter((id) => id.startsWith("Label_"));
+  const appliedLabels = allLabels.filter((l) => userLabelIds.includes(l.gmailId));
 
   const invalidateEmails = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
@@ -277,7 +290,7 @@ export function EmailActions({
       {email.mailboxId != null && (
         <LabelPicker
           mailboxId={email.mailboxId}
-          emailIds={[email.id]}
+          emailIds={[email.providerMessageId]}
           appliedLabelIds={email.labelIds}
           onDone={invalidateEmails}
           trigger={
@@ -287,6 +300,25 @@ export function EmailActions({
           }
         />
       )}
+
+      {appliedLabels.map((label) => (
+        <button
+          key={label.gmailId}
+          type="button"
+          onClick={() => {
+            void removeLabel([email.providerMessageId], label.gmailId, email.mailboxId!).then(invalidateEmails);
+          }}
+          className="group/label flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-colors hover:opacity-80"
+          style={{ backgroundColor: `${label.backgroundColor ?? "#999"}25`, color: label.backgroundColor ?? "#999" }}
+        >
+          <span
+            className="size-1.5 rounded-full"
+            style={{ backgroundColor: label.backgroundColor ?? "#999" }}
+          />
+          {label.name}
+          <XIcon className="size-2.5 opacity-0 transition-opacity group-hover/label:opacity-100" />
+        </button>
+      ))}
 
       <div className="hidden items-center gap-0.5 sm:flex">
         <IconButton

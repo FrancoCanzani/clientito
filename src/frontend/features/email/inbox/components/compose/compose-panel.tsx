@@ -90,7 +90,7 @@ function ComposePanelBody({
   return (
     <>
       <motion.div
-        className="fixed inset-0 z-50 bg-black/25"
+        className="fixed inset-0 z-50 bg-[oklch(12%_0.01_250)]/25"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}

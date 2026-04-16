@@ -1,5 +1,7 @@
+import { localDb } from "@/db/client";
 import { queryClient } from "@/lib/query-client";
 import { queryKeys } from "@/lib/query-keys";
+import { syncLabelsFromServer } from "./queries";
 import type { CreateLabelInput, Label, UpdateLabelInput } from "./types";
 
 async function throwOnError(response: Response, fallback: string) {
@@ -7,6 +9,11 @@ async function throwOnError(response: Response, fallback: string) {
   const json = await response.json().catch(() => null);
   const msg = json && typeof json === "object" && "error" in json ? String(json.error) : fallback;
   throw new Error(msg);
+}
+
+async function refreshLabels(mailboxId: number) {
+  await syncLabelsFromServer(mailboxId);
+  await queryClient.invalidateQueries({ queryKey: queryKeys.labels(mailboxId) });
 }
 
 export async function createLabel(mailboxId: number, input: CreateLabelInput): Promise<Label> {
@@ -17,7 +24,7 @@ export async function createLabel(mailboxId: number, input: CreateLabelInput): P
   });
   await throwOnError(response, "Failed to create label");
   const result: { data: Label } = await response.json();
-  queryClient.invalidateQueries({ queryKey: queryKeys.labels(mailboxId) });
+  await refreshLabels(mailboxId);
   return result.data;
 }
 
@@ -33,21 +40,23 @@ export async function updateLabel(
   });
   await throwOnError(response, "Failed to update label");
   const result: { data: Label } = await response.json();
-  queryClient.invalidateQueries({ queryKey: queryKeys.labels(mailboxId) });
+  await refreshLabels(mailboxId);
   return result.data;
 }
 
 export async function deleteLabel(labelId: string, mailboxId: number): Promise<void> {
-  const response = await fetch(`/api/inbox/labels/${encodeURIComponent(labelId)}`, {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mailboxId }),
-  });
+  const response = await fetch(
+    `/api/inbox/labels/${encodeURIComponent(labelId)}?mailboxId=${mailboxId}`,
+    { method: "DELETE" },
+  );
   await throwOnError(response, "Failed to delete label");
-  queryClient.invalidateQueries({ queryKey: queryKeys.labels(mailboxId) });
+  await refreshLabels(mailboxId);
 }
 
 export async function applyLabel(providerMessageIds: string[], labelId: string, mailboxId: number): Promise<void> {
+  await localDb.addLabelToEmails(providerMessageIds, labelId);
+  queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+
   const response = await fetch("/api/inbox/labels/apply", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -57,11 +66,18 @@ export async function applyLabel(providerMessageIds: string[], labelId: string, 
       labelId,
     }),
   });
-  await throwOnError(response, "Failed to apply label");
-  queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+  if (!response.ok) {
+    // Rollback local change
+    await localDb.removeLabelFromEmails(providerMessageIds, labelId);
+    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+    await throwOnError(response, "Failed to apply label");
+  }
 }
 
 export async function removeLabel(providerMessageIds: string[], labelId: string, mailboxId: number): Promise<void> {
+  await localDb.removeLabelFromEmails(providerMessageIds, labelId);
+  queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+
   const response = await fetch("/api/inbox/labels/remove", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -71,6 +87,10 @@ export async function removeLabel(providerMessageIds: string[], labelId: string,
       labelId,
     }),
   });
-  await throwOnError(response, "Failed to remove label");
-  queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+  if (!response.ok) {
+    // Rollback local change
+    await localDb.addLabelToEmails(providerMessageIds, labelId);
+    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+    await throwOnError(response, "Failed to remove label");
+  }
 }
