@@ -5,6 +5,10 @@ import DOMPurify from "dompurify";
 import { useMemo, useState } from "react";
 import { parseMailtoComposeInitial } from "../../utils/parse-mailto-compose";
 import { prepareEmailHtml } from "../../utils/prepare-email-html";
+import {
+  rewriteCidImages,
+  type InlineImageContext,
+} from "../../utils/cid-images";
 import { EmailHtmlRenderer } from "./email-html-renderer";
 
 const MIN_READABLE_CHARS = 40;
@@ -229,7 +233,11 @@ function processImages(doc: Document, showImages: boolean): {
   return { hasImages, blockedTrackers };
 }
 
-function detox(rawHtml: string, showImages: boolean): DetoxResult {
+function detox(
+  rawHtml: string,
+  showImages: boolean,
+  inlineContext?: InlineImageContext | null,
+): DetoxResult {
   const sanitized = DOMPurify.sanitize(rawHtml, {
     USE_PROFILES: { html: true },
     FORBID_TAGS,
@@ -270,6 +278,7 @@ function detox(rawHtml: string, showImages: boolean): DetoxResult {
   }
   handleTransactionalMail(contentDoc);
   lightenDarkText(contentDoc);
+  rewriteCidImages(contentDoc, inlineContext);
   const { hasImages, blockedTrackers } = processImages(contentDoc, showImages);
 
   const cleaned = DOMPurify.sanitize(contentDoc.body.innerHTML, {
@@ -279,6 +288,7 @@ function detox(rawHtml: string, showImages: boolean): DetoxResult {
     ADD_ATTR: [
       "data-quoted",
       "data-blocked",
+      "data-cid",
       "data-transactional-table",
       "data-transactional-stack",
       "data-transactional-cell",
@@ -297,22 +307,27 @@ export function DetoxRenderer({
   fontSize,
   defaultShowImages,
   defaultShowQuoted,
+  inlineContext,
 }: {
   html: string;
   fontSize: string;
   defaultShowImages: boolean;
   defaultShowQuoted: boolean;
+  inlineContext?: InlineImageContext | null;
 }) {
   const [showImages, setShowImages] = useState(defaultShowImages);
   const [showQuoted, setShowQuoted] = useState(defaultShowQuoted);
   const [forceOriginal, setForceOriginal] = useState(false);
 
-  const result = useMemo(() => detox(html, showImages), [html, showImages]);
+  const result = useMemo(
+    () => detox(html, showImages, inlineContext),
+    [html, showImages, inlineContext],
+  );
   const isEmpty = result.textLength < MIN_READABLE_CHARS;
   const showOriginal = forceOriginal || isEmpty;
   const preparedOriginal = useMemo(
-    () => (showOriginal ? prepareEmailHtml(html) : ""),
-    [showOriginal, html],
+    () => (showOriginal ? prepareEmailHtml(html, inlineContext) : ""),
+    [showOriginal, html, inlineContext],
   );
 
   if (showOriginal) {

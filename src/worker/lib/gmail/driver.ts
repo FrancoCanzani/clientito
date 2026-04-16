@@ -9,7 +9,12 @@ import {
 import {
   sendGmailMessage,
   batchModifyGmailMessages,
+  hardDeleteGmailMessage,
 } from "./mailbox/send";
+import {
+  createBlockSenderFilter,
+  listMessageIdsFromSender,
+} from "./mailbox/filters";
 import { isGmailReconnectRequiredError } from "./errors";
 import type {
   RawMessage,
@@ -80,6 +85,41 @@ export class GmailDriver {
       addLabelIds,
       removeLabelIds,
     );
+  }
+
+  async hardDelete(messageId: string): Promise<void> {
+    await hardDeleteGmailMessage(
+      this.db,
+      this.mailboxId,
+      this.env,
+      messageId,
+    );
+  }
+
+  async blockSender(fromEmail: string): Promise<{ trashedCount: number }> {
+    await createBlockSenderFilter(
+      this.db,
+      this.mailboxId,
+      this.env,
+      fromEmail,
+    );
+    const ids = await listMessageIdsFromSender(
+      this.db,
+      this.mailboxId,
+      this.env,
+      fromEmail,
+    );
+    if (ids.length > 0) {
+      await batchModifyGmailMessages(
+        this.db,
+        this.mailboxId,
+        this.env,
+        ids,
+        ["TRASH"],
+        ["INBOX", "UNREAD"],
+      );
+    }
+    return { trashedCount: ids.length };
   }
 
   isReconnectError(error: unknown): boolean {

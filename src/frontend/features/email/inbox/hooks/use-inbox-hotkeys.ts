@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 
 type InboxHotkeysOptions = {
   groups: ThreadGroup[];
+  view: string;
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
   onCompose: () => void;
@@ -22,6 +23,7 @@ type InboxHotkeysOptions = {
 export function useInboxHotkeys({
   groups,
   onOpen,
+  view,
   onAction,
   onCompose,
   onSearch,
@@ -72,7 +74,12 @@ export function useInboxHotkeys({
       enabled: Boolean(focusedEmail),
       onKeyDown: () => {
         if (focusedEmail) {
-          onAction("archive", [focusedEmail.id]);
+          onAction(
+            view === "archived" || view === "trash"
+              ? "move-to-inbox"
+              : "archive",
+            [focusedEmail.id],
+          );
         }
       },
     },
@@ -89,7 +96,10 @@ export function useInboxHotkeys({
       enabled: Boolean(focusedEmail),
       onKeyDown: () => {
         if (focusedEmail) {
-          onAction("trash", [focusedEmail.id]);
+          onAction(
+            view === "trash" ? "delete-forever" : "trash",
+            [focusedEmail.id],
+          );
         }
       },
     },

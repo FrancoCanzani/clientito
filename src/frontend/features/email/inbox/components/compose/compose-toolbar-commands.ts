@@ -1,7 +1,6 @@
 import {
   CodeBlockIcon,
   CodeIcon,
-  EraserIcon,
   LinkSimpleIcon,
   ListBulletsIcon,
   ListNumbersIcon,
@@ -9,7 +8,6 @@ import {
   TextBIcon,
   TextItalicIcon,
   TextStrikethroughIcon,
-  TextTIcon,
 } from "@phosphor-icons/react";
 import type { Editor } from "@tiptap/core";
 import type { ComponentType } from "react";
@@ -30,51 +28,20 @@ export type ComposeToolbarGroup = {
   commands: ComposeToolbarCommand[];
 };
 
-export type HeadingOption = {
-  id: "paragraph" | "heading-1" | "heading-2";
-  label: string;
-  active: (editor: Editor) => boolean;
-  run: (editor: Editor) => void;
-};
-
-export const HEADING_OPTIONS: HeadingOption[] = [
-  {
-    id: "paragraph",
-    label: "Text",
-    active: (editor) => editor.isActive("paragraph"),
-    run: (editor) => {
-      editor.chain().focus().setParagraph().run();
-    },
-  },
-  {
-    id: "heading-1",
-    label: "H1",
-    active: (editor) => editor.isActive("heading", { level: 1 }),
-    run: (editor) => {
-      editor.chain().focus().toggleHeading({ level: 1 }).run();
-    },
-  },
-  {
-    id: "heading-2",
-    label: "H2",
-    active: (editor) => editor.isActive("heading", { level: 2 }),
-    run: (editor) => {
-      editor.chain().focus().toggleHeading({ level: 2 }).run();
-    },
-  },
-];
-
-export function getHeadingLabel(editor: Editor): string {
-  if (editor.isActive("heading", { level: 1 })) return "H1";
-  if (editor.isActive("heading", { level: 2 })) return "H2";
-  return "Text";
+function insertIf<T>(cond: unknown, ...items: T[]): T[] {
+  return cond ? items : [];
 }
 
 export function getComposeToolbarGroups({
+  editor,
   onOpenLink,
 }: {
+  editor: Editor;
   onOpenLink: () => void;
 }): ComposeToolbarGroup[] {
+  const insideLink = editor.isActive("link");
+  const insideCodeBlock = editor.isActive("codeBlock");
+
   return [
     {
       id: "marks",
@@ -121,7 +88,7 @@ export function getComposeToolbarGroups({
         },
       ],
     },
-    {
+    ...insertIf<ComposeToolbarGroup>(!insideCodeBlock, {
       id: "blocks",
       commands: [
         {
@@ -139,16 +106,12 @@ export function getComposeToolbarGroups({
           icon: CodeBlockIcon,
           active: (editor) => editor.isActive("codeBlock"),
           run: (editor) => {
-            if (editor.isActive("codeBlock")) {
-              editor.chain().focus().setParagraph().run();
-              return;
-            }
-            editor.chain().focus().setCodeBlock().run();
+            editor.chain().focus().toggleCodeBlock().run();
           },
         },
       ],
-    },
-    {
+    }),
+    ...insertIf<ComposeToolbarGroup>(!insideCodeBlock, {
       id: "lists",
       commands: [
         {
@@ -172,8 +135,8 @@ export function getComposeToolbarGroups({
           },
         },
       ],
-    },
-    {
+    }),
+    ...insertIf<ComposeToolbarGroup>(!insideLink && !insideCodeBlock, {
       id: "links",
       commands: [
         {
@@ -187,27 +150,6 @@ export function getComposeToolbarGroups({
           },
         },
       ],
-    },
-    {
-      id: "cleanup",
-      commands: [
-        {
-          id: "clear",
-          label: "Clear formatting",
-          icon: EraserIcon,
-          run: (editor) => {
-            editor.chain().focus().unsetAllMarks().clearNodes().run();
-          },
-        },
-        {
-          id: "paragraph",
-          label: "Paragraph",
-          icon: TextTIcon,
-          run: (editor) => {
-            editor.chain().focus().setParagraph().run();
-          },
-        },
-      ],
-    },
+    }),
   ];
 }

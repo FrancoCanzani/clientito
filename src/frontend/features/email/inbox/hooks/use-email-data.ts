@@ -1,7 +1,8 @@
+import { useLocalSyncSnapshot } from "@/hooks/use-local-sync";
 import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/email/inbox/queries";
 import type { EmailListResponse } from "@/features/email/inbox/types";
 import { groupEmailsByThread } from "@/features/email/inbox/utils/group-emails-by-thread";
-import { useSyncStatus } from "@/features/onboarding/hooks/use-sync-status";
+import { useAuth } from "@/hooks/use-auth";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { queryKeys } from "@/lib/query-keys";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -19,8 +20,10 @@ export function useEmailData({
   initialPage?: EmailListResponse;
 }) {
 
-  const syncStatus = useSyncStatus();
-  const isSyncing = syncStatus.data?.state === "syncing";
+  const { user } = useAuth();
+  const localSync = useLocalSyncSnapshot(user?.id, mailboxId);
+  const isInitialSync = localSync.status === "initial";
+  const isSyncing = localSync.status !== "idle";
 
   const emailsQuery = useInfiniteQuery({
     queryKey: queryKeys.emails.list(view, mailboxId),
@@ -45,7 +48,7 @@ export function useEmailData({
         ? lastPage.pagination.cursor
         : undefined,
     staleTime: 5_000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 
@@ -83,6 +86,9 @@ export function useEmailData({
     hasNextPage: hasNextPage ?? false,
     isFetchingNextPage,
     isSyncing,
+    isInitialSync,
+    syncPulled: localSync.pulled,
+    syncTotal: localSync.total,
     loadMoreRef,
   };
 }

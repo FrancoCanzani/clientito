@@ -12,7 +12,10 @@ import {
   PaperclipIcon,
 } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
-import { formatEmailDetailDate, formatEmailThreadDate } from "../../utils/formatters";
+import {
+  formatEmailDetailDate,
+  formatEmailThreadDate,
+} from "../../utils/formatters";
 import { AttachmentItem } from "../compose/attachment-item";
 import { MessageBody } from "../renderer/message-body";
 
@@ -37,15 +40,11 @@ function formatSenderLabel(
   return fromName;
 }
 
-function formatSenderFull(
-  email: Pick<EmailListItem, "fromAddr" | "fromName">,
-) {
+function formatSenderFull(email: Pick<EmailListItem, "fromAddr" | "fromName">) {
   const fromName = email.fromName?.trim();
   if (!fromName || fromName === email.fromAddr) return email.fromAddr;
   return `${fromName} <${email.fromAddr}>`;
 }
-
-
 
 export function EmailThread({
   email,
@@ -66,7 +65,11 @@ export function EmailThread({
   const subject = email.subject ?? "(no subject)";
   const recipientRows = buildRecipientRows(email);
   const showThread = Boolean(email.threadId && threadMessages.length > 1);
-  const hasAttachments = email.attachments.length > 0;
+  const visibleAttachments = useMemo(
+    () => email.attachments.filter((a) => !(a.isInline && a.isImage)),
+    [email.attachments],
+  );
+  const hasAttachments = visibleAttachments.length > 0;
 
   const defaultExpandedIds = useMemo(() => {
     const next = new Set<string>();
@@ -130,14 +133,20 @@ export function EmailThread({
                 body={isSelected ? email : threadEmail}
                 expanded={isExpanded(threadEmail.id)}
                 onToggle={() => toggleMessage(threadEmail.id)}
-                attachments={isSelected ? email.attachments : []}
+                attachments={
+                  isSelected
+                    ? visibleAttachments
+                    : (threadEmail.attachments ?? []).filter(
+                        (a) => !(a.isInline && a.isImage),
+                      )
+                }
                 readingMode={readingMode}
               />
             );
           })}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-background shadow-sm">
+        <div className="overflow-hidden rounded-md border border-border/50 bg-background shadow-xs">
           <div className="p-5">
             <MessageBody detail={email} readingMode={readingMode} />
           </div>
@@ -148,8 +157,8 @@ export function EmailThread({
                 <PaperclipIcon className="size-3" />
                 Attachments
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {email.attachments.map((attachment) => (
+              <div className="divide-y divide-border/60">
+                {visibleAttachments.map((attachment) => (
                   <AttachmentItem
                     key={attachment.attachmentId}
                     attachment={attachment}
@@ -224,7 +233,7 @@ function ThreadMessage({
                 <PaperclipIcon className="size-3" />
                 Attachments
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="divide-y divide-border/60">
                 {attachments.map((attachment) => (
                   <AttachmentItem
                     key={attachment.attachmentId}

@@ -30,7 +30,6 @@ export const mailboxes = sqliteTable(
     lastSuccessfulSyncAt: integer("last_successful_sync_at"),
     lastErrorAt: integer("last_error_at"),
     lastErrorMessage: text("last_error_message"),
-    lockUntil: integer("lock_until"),
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
@@ -38,37 +37,6 @@ export const mailboxes = sqliteTable(
     uniqueIndex("mailboxes_account_idx").on(table.accountId),
     index("mailboxes_auth_state_idx").on(table.authState),
     index("mailboxes_last_success_idx").on(table.lastSuccessfulSyncAt),
-  ],
-);
-
-export const syncJobs = sqliteTable(
-  "sync_jobs",
-  {
-    id: text("id").primaryKey(),
-    mailboxId: integer("mailbox_id")
-      .notNull()
-      .references(() => mailboxes.id, { onDelete: "cascade" }),
-    kind: text("kind").$type<"full" | "incremental">().notNull(),
-    trigger: text("trigger")
-      .$type<"manual" | "scheduled" | "system">()
-      .notNull(),
-    status: text("status")
-      .$type<"running" | "succeeded" | "failed">()
-      .notNull(),
-    phase: text("phase"),
-    progressCurrent: integer("progress_current"),
-    progressTotal: integer("progress_total"),
-    attempt: integer("attempt").notNull().default(1),
-    errorClass: text("error_class"),
-    errorMessage: text("error_message"),
-    runAfterAt: integer("run_after_at"),
-    startedAt: integer("started_at"),
-    finishedAt: integer("finished_at"),
-    createdAt: integer("created_at").notNull(),
-  },
-  (table) => [
-    index("sync_jobs_mailbox_created_idx").on(table.mailboxId, table.createdAt),
-    index("sync_jobs_mailbox_status_idx").on(table.mailboxId, table.status),
   ],
 );
 

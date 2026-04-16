@@ -18,9 +18,50 @@ import {
 } from "../../../lib/gmail/sync/state";
 import { buildGmailQueryFromCutoff } from "../../../lib/gmail/sync/preferences";
 import { parseGmailMessage, type ParsedEmail } from "../../../lib/gmail/sync/parse";
-import { extractHistoryDelta } from "../../../lib/gmail/sync/engine";
 import { isGmailHistoryExpiredError } from "../../../lib/gmail/errors";
+import { resetMailboxSyncState } from "../../../lib/gmail/sync/state";
+import type { GmailHistoryResponse } from "../../../lib/gmail/types";
 import type { AppRouteEnv } from "../../types";
+
+type HistoryDelta = {
+  changedMessageIds: string[];
+  deletedMessageIds: string[];
+};
+
+function extractHistoryDelta(
+  history: GmailHistoryResponse["history"],
+): HistoryDelta {
+  const changedMessageIds = new Set<string>();
+  const deletedMessageIds = new Set<string>();
+
+  for (const entry of history ?? []) {
+    for (const added of entry.messagesAdded ?? []) {
+      const messageId = added.message?.id;
+      if (messageId) changedMessageIds.add(messageId);
+    }
+    for (const labelsAdded of entry.labelsAdded ?? []) {
+      const messageId = labelsAdded.message?.id;
+      if (messageId) changedMessageIds.add(messageId);
+    }
+    for (const labelsRemoved of entry.labelsRemoved ?? []) {
+      const messageId = labelsRemoved.message?.id;
+      if (messageId) changedMessageIds.add(messageId);
+    }
+    for (const deleted of entry.messagesDeleted ?? []) {
+      const messageId = deleted.message?.id;
+      if (messageId) deletedMessageIds.add(messageId);
+    }
+  }
+
+  for (const deletedMessageId of deletedMessageIds) {
+    changedMessageIds.delete(deletedMessageId);
+  }
+
+  return {
+    changedMessageIds: [...changedMessageIds],
+    deletedMessageIds: [...deletedMessageIds],
+  };
+}
 
 const PULL_BATCH_SIZE = 20;
 
@@ -50,7 +91,29 @@ function decodeCursor(encoded: string): PullCursor {
   return JSON.parse(atob(encoded));
 }
 
+const resetRequestSchema = z.object({
+  mailboxId: z.number().int().positive(),
+});
+
 export function registerPullSync(api: Hono<AppRouteEnv>) {
+  api.post(
+    "/reset",
+    zValidator("json", resetRequestSchema),
+    async (c) => {
+      const db = c.get("db");
+      const user = c.get("user")!;
+      const { mailboxId } = c.req.valid("json");
+
+      const mailbox = await resolveMailbox(db, user.id, mailboxId);
+      if (!mailbox) {
+        return c.json({ error: "No mailbox found" }, 400);
+      }
+
+      await resetMailboxSyncState(db, mailbox.id);
+      return c.json({ status: "ok" });
+    },
+  );
+
   api.post(
     "/pull",
     zValidator("json", pullRequestSchema),

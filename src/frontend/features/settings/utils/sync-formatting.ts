@@ -23,19 +23,10 @@ function formatRelativeTime(value: number | null): string | null {
   return formatDistanceToNow(new Date(value), { addSuffix: true });
 }
 
-function humanizeSyncError(
-  error: string | null,
-  hasSynced: boolean,
-): string | null {
+function humanizeSyncError(error: string | null): string | null {
   if (!error) return null;
 
   const normalized = error.toLowerCase();
-
-  if (normalized.includes("stalled or timed out")) {
-    return hasSynced
-      ? "The latest sync stopped before finishing."
-      : "The first import stopped before finishing.";
-  }
 
   if (
     normalized.includes("history is too old") ||
@@ -43,14 +34,6 @@ function humanizeSyncError(
     normalized.includes("full sync first")
   ) {
     return "Petit needs a fresh full import to catch up with Gmail.";
-  }
-
-  if (normalized.includes("no sync state found")) {
-    return "This mailbox has not completed its first import yet.";
-  }
-
-  if (normalized.includes("sync already in progress")) {
-    return "Another sync is already running for this mailbox.";
   }
 
   if (
@@ -63,49 +46,18 @@ function humanizeSyncError(
   return error;
 }
 
-function formatSyncProgress(account: MailboxAccount): string {
-  if (account.phase === "listing") {
-    return "Looking through Gmail to see what needs to be imported.";
-  }
-
-  if (
-    typeof account.progressCurrent === "number" &&
-    typeof account.progressTotal === "number" &&
-    account.progressTotal > 0
-  ) {
-    return `${new Intl.NumberFormat().format(account.progressCurrent)} of ${new Intl.NumberFormat().format(account.progressTotal)} emails imported.`;
-  }
-
-  if (typeof account.progressCurrent === "number") {
-    return `${new Intl.NumberFormat().format(account.progressCurrent)} emails imported so far.`;
-  }
-
-  return "Import in progress.";
-}
-
-export function getMailboxStatusCopy(account: MailboxAccount, isBusy: boolean) {
+export function getMailboxStatusCopy(account: MailboxAccount) {
   const lastSuccess = formatRelativeTime(account.lastSync);
-  const humanizedError = humanizeSyncError(account.error, account.hasSynced);
+  const humanizedError = humanizeSyncError(account.error);
 
   if (account.syncState === "needs_reconnect") {
     return {
       badge: "Reconnect Gmail",
       badgeTone: "bg-amber-500",
-      detail: "Google access expired. Reconnect this account to resume email sync.",
-      sectionTitle: "Connection status",
-      primaryLabel: "Reconnect Gmail",
-      reimportHint: "Run a fresh full import after reconnecting if this mailbox still looks incomplete.",
-    };
-  }
-
-  if (isBusy) {
-    return {
-      badge: "Import in progress",
-      badgeTone: "bg-sky-500",
-      detail: formatSyncProgress(account),
-      sectionTitle: "Current import",
-      primaryLabel: account.hasSynced ? "Sync now" : "Start import",
-      reimportHint: "Run a fresh full import using the history window above.",
+      detail:
+        "Google access expired. Reconnect this account to resume email sync.",
+      reimportHint:
+        "Run a fresh full import after reconnecting if this mailbox still looks incomplete.",
     };
   }
 
@@ -118,11 +70,11 @@ export function getMailboxStatusCopy(account: MailboxAccount, isBusy: boolean) {
       .join(" ");
 
     return {
-      badge: account.hasSynced ? "Sync needs attention" : "Import needs attention",
+      badge: account.hasSynced
+        ? "Sync needs attention"
+        : "Import needs attention",
       badgeTone: "bg-amber-500",
       detail,
-      sectionTitle: account.hasSynced ? "Latest sync" : "Import status",
-      primaryLabel: account.hasSynced ? "Try sync again" : "Start import again",
       reimportHint: "Run a fresh full import using the history window above.",
     };
   }
@@ -131,9 +83,8 @@ export function getMailboxStatusCopy(account: MailboxAccount, isBusy: boolean) {
     return {
       badge: "Ready to import",
       badgeTone: "bg-zinc-400",
-      detail: "Your account is connected. Start the first import when you're ready.",
-      sectionTitle: "Import status",
-      primaryLabel: "Start import",
+      detail:
+        "Your account is connected. Open the inbox to start the first import.",
       reimportHint: "Run a fresh full import using the history window above.",
     };
   }
@@ -144,8 +95,6 @@ export function getMailboxStatusCopy(account: MailboxAccount, isBusy: boolean) {
     detail: lastSuccess
       ? `Last completed sync was ${lastSuccess}.`
       : "Your mailbox is connected and syncing normally.",
-    sectionTitle: "Last completed sync",
-    primaryLabel: "Sync now",
     reimportHint: "Run a fresh full import using the history window above.",
   };
 }

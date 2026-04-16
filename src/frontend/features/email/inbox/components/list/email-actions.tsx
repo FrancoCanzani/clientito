@@ -1,5 +1,15 @@
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -25,6 +35,7 @@ import {
   DotsThreeIcon,
   EnvelopeSimpleIcon,
   EnvelopeSimpleOpenIcon,
+  ProhibitIcon,
   StarIcon,
   TagIcon,
   TrashIcon,
@@ -33,9 +44,10 @@ import {
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
 import { unsubscribe } from "../../../subscriptions/queries";
-import { patchEmail } from "../../mutations";
+import { blockSender, patchEmail } from "../../mutations";
 import type { ComposeInitial, EmailDetailItem } from "../../types";
 import { buildForwardedEmailHtml } from "../../utils/build-forwarded-html";
 import { formatQuotedDate } from "../../utils/formatters";
@@ -137,6 +149,14 @@ export function EmailActions({
     onError: () => toast.error("Failed to snooze"),
   });
 
+  const removeLabelMutation = useMutation({
+    mutationFn: (labelId: string) =>
+      removeLabel([email.providerMessageId], labelId, email.mailboxId!),
+    onSuccess: () => invalidateEmails(),
+    onError: (error: Error) =>
+      toast.error(error.message || "Failed to remove label"),
+  });
+
   const unsubscribeMutation = useMutation({
     mutationFn: () =>
       unsubscribe({
@@ -154,6 +174,26 @@ export function EmailActions({
       toast.success("Unsubscribed successfully");
     },
     onError: (error) => toast.error(error.message),
+  });
+
+  const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
+
+  const blockSenderMutation = useMutation({
+    mutationFn: () =>
+      blockSender({
+        fromAddr: email.fromAddr,
+        mailboxId: email.mailboxId ?? undefined,
+      }),
+    onSuccess: (result) => {
+      toast.success(
+        result.trashedCount > 0
+          ? `Blocked ${result.fromAddr} \u2014 moved ${result.trashedCount} ${result.trashedCount === 1 ? "email" : "emails"} to trash. Manage filters in Gmail.`
+          : `Blocked ${result.fromAddr}. Manage filters in Gmail.`,
+      );
+      invalidateEmails();
+      onClose?.();
+    },
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const handleForward = () => {
@@ -205,7 +245,8 @@ export function EmailActions({
   const actionsPending =
     emailPatchMutation.isPending ||
     snoozeMutation.isPending ||
-    unsubscribeMutation.isPending;
+    unsubscribeMutation.isPending ||
+    blockSenderMutation.isPending;
 
   const handleDone = () =>
     runEmailPatch(
@@ -305,9 +346,8 @@ export function EmailActions({
         <button
           key={label.gmailId}
           type="button"
-          onClick={() => {
-            void removeLabel([email.providerMessageId], label.gmailId, email.mailboxId!).then(invalidateEmails);
-          }}
+          disabled={removeLabelMutation.isPending}
+          onClick={() => removeLabelMutation.mutate(label.gmailId)}
           className="group/label flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-colors hover:opacity-80"
           style={{ backgroundColor: `${label.backgroundColor ?? "#999"}25`, color: label.backgroundColor ?? "#999" }}
         >
@@ -430,8 +470,43 @@ export function EmailActions({
               <span className="flex-1">Unsubscribe</span>
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem
+            disabled={actionsPending}
+            onSelect={(event) => {
+              event.preventDefault();
+              setBlockConfirmOpen(true);
+            }}
+          >
+            <ProhibitIcon className="size-3.5" />
+            <span className="flex-1">Block sender</span>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <AlertDialog open={blockConfirmOpen} onOpenChange={setBlockConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Block {email.fromAddr}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Future emails from {email.fromAddr} will be sent to Trash. Existing
+              emails from this sender will also be moved to Trash. You can undo
+              this in Gmail Settings &rarr; Filters.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setBlockConfirmOpen(false);
+                blockSenderMutation.mutate();
+              }}
+            >
+              Block sender
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

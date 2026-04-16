@@ -98,9 +98,7 @@ async function rewrite(
   return json.rewritten;
 }
 
-function getComposerInput():
-  | { text: string; target: ComposerAiTarget }
-  | null {
+function getComposerInput(): { text: string; target: ComposerAiTarget } | null {
   const selection = getComposerSelection();
   const editor = getComposerEditor();
 
@@ -148,7 +146,7 @@ export function getComposerAiLabel(action: ComposerAiActionId) {
 
   switch (action) {
     case "grammar":
-      return hasSelection ? "Fix grammar of selection" : "Fix grammar";
+      return "Fix grammar";
     case "improve":
       return hasSelection ? "Improve selection" : "Improve writing";
     case "formal":

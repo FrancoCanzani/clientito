@@ -20,6 +20,23 @@ function extractAddress(headerValue: string | null): string {
   return (match?.[1] ?? headerValue).trim();
 }
 
+export type ParsedInlineAttachment = {
+  contentId: string;
+  attachmentId: string;
+  mimeType: string | null;
+  filename: string | null;
+};
+
+export type ParsedAttachment = {
+  attachmentId: string;
+  filename: string | null;
+  mimeType: string | null;
+  size: number | null;
+  contentId: string | null;
+  isInline: boolean;
+  isImage: boolean;
+};
+
 export type ParsedEmail = {
   providerMessageId: string;
   threadId: string | null;
@@ -38,6 +55,8 @@ export type ParsedEmail = {
   labelIds: string[];
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
+  inlineAttachments: ParsedInlineAttachment[];
+  attachments: ParsedAttachment[];
 };
 
 /**
@@ -76,11 +95,30 @@ export function parseGmailMessage(
   const subject = getHeaderValue(message.payload.headers, "Subject");
   const bodyText = extractMessageBodyText(message);
   const bodyHtml = extractMessageBodyHtml(message);
+  const attachments = extractMessageAttachments(message);
   const labelIds = [...(message.labelIds ?? [])];
-  const hasAttachments = extractMessageAttachments(message).length > 0;
+  const hasAttachments = attachments.length > 0;
   if (hasAttachments && !labelIds.includes(HAS_ATTACHMENT_LABEL)) {
     labelIds.push(HAS_ATTACHMENT_LABEL);
   }
+
+  const inlineAttachments: ParsedInlineAttachment[] = attachments
+    .filter((a) => a.isInline && a.contentId && a.attachmentId)
+    .map((a) => ({
+      contentId: a.contentId!,
+      attachmentId: a.attachmentId,
+      mimeType: a.mimeType,
+      filename: a.filename,
+    }));
+  const parsedAttachments: ParsedAttachment[] = attachments.map((a) => ({
+    attachmentId: a.attachmentId,
+    filename: a.filename,
+    mimeType: a.mimeType,
+    size: a.size,
+    contentId: a.contentId,
+    isInline: a.isInline,
+    isImage: a.isImage,
+  }));
   const isRead = !labelIds.includes(STANDARD_LABELS.UNREAD);
   const date = normalizedDate ?? Date.now();
 
@@ -130,5 +168,7 @@ export function parseGmailMessage(
     labelIds,
     unsubscribeUrl,
     unsubscribeEmail,
+    inlineAttachments,
+    attachments: parsedAttachments,
   };
 }

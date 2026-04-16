@@ -45,7 +45,7 @@ export function LabelSidebarSection({
         </Link>
       </SidebarGroupLabel>
       <SidebarGroupContent className="max-h-48 overflow-y-auto">
-        <SidebarMenu>
+        <SidebarMenu className="gap-1">
           {labels.map((label) => (
             <SidebarMenuItem key={label.gmailId}>
               <SidebarMenuButton

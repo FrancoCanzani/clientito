@@ -4,6 +4,9 @@ import type {
   DraftRow,
   EmailInsert,
   LabelInsert,
+  PendingMutationKind,
+  PendingMutationPayload,
+  PendingMutationRow,
 } from "./schema";
 
 type LocalEmailPatch = {
@@ -57,6 +60,8 @@ type EmailRowDb = {
   snoozedUntil: number | null;
   bodyText?: string | null;
   bodyHtml?: string | null;
+  inlineAttachments?: string | null;
+  attachments?: string | null;
 };
 
 const STANDARD_LABELS = {
@@ -99,6 +104,121 @@ function parseLabelIds(raw: string | null): string[] {
   } catch {
     return [];
   }
+}
+
+export type LocalInlineAttachment = {
+  contentId: string;
+  attachmentId: string;
+  mimeType: string | null;
+  filename: string | null;
+};
+
+function parseInlineAttachments(
+  raw: string | null | undefined,
+): LocalInlineAttachment[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (entry): entry is Record<string, unknown> =>
+          typeof entry === "object" && entry !== null,
+      )
+      .map((entry) => ({
+        contentId: String(entry.contentId ?? ""),
+        attachmentId: String(entry.attachmentId ?? ""),
+        mimeType:
+          typeof entry.mimeType === "string" ? entry.mimeType : null,
+        filename:
+          typeof entry.filename === "string" ? entry.filename : null,
+      }))
+      .filter((a) => a.contentId && a.attachmentId);
+  } catch {
+    return [];
+  }
+}
+
+export type LocalAttachment = {
+  attachmentId: string;
+  filename: string | null;
+  mimeType: string | null;
+  size: number | null;
+  contentId: string | null;
+  isInline: boolean;
+  isImage: boolean;
+};
+
+function parseAttachments(
+  raw: string | null | undefined,
+): LocalAttachment[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (entry): entry is Record<string, unknown> =>
+          typeof entry === "object" && entry !== null,
+      )
+      .map((entry) => ({
+        attachmentId: String(entry.attachmentId ?? ""),
+        filename:
+          typeof entry.filename === "string" ? entry.filename : null,
+        mimeType:
+          typeof entry.mimeType === "string" ? entry.mimeType : null,
+        size:
+          typeof entry.size === "number" && Number.isFinite(entry.size)
+            ? entry.size
+            : null,
+        contentId:
+          typeof entry.contentId === "string" ? entry.contentId : null,
+        isInline: Boolean(entry.isInline),
+        isImage: Boolean(entry.isImage),
+      }))
+      .filter((a) => a.attachmentId);
+  } catch {
+    return [];
+  }
+}
+
+function buildAttachmentUrl(
+  a: LocalAttachment,
+  providerMessageId: string,
+  mailboxId: number | null,
+  inline: boolean,
+): string | null {
+  if (!providerMessageId || mailboxId == null) return null;
+  const params = new URLSearchParams({
+    providerMessageId,
+    attachmentId: a.attachmentId,
+    mailboxId: String(mailboxId),
+  });
+  if (inline) params.set("inline", "true");
+  if (a.mimeType) params.set("mimeType", a.mimeType);
+  if (a.filename) params.set("filename", a.filename);
+  return `/api/inbox/emails/attachment?${params.toString()}`;
+}
+
+function toEmailAttachments(
+  raw: string | null | undefined,
+  providerMessageId: string,
+  mailboxId: number | null,
+) {
+  return parseAttachments(raw).map((a) => ({
+    attachmentId: a.attachmentId,
+    filename: a.filename,
+    mimeType: a.mimeType,
+    size: a.size,
+    contentId: a.contentId,
+    isInline: a.isInline,
+    isImage: a.isImage,
+    downloadUrl:
+      buildAttachmentUrl(a, providerMessageId, mailboxId, false) ?? "",
+    inlineUrl: a.isInline
+      ? buildAttachmentUrl(a, providerMessageId, mailboxId, true)
+      : null,
+  }));
 }
 
 function labelBooleans(labelIds: string[]) {
@@ -431,25 +551,32 @@ export const localDb = {
 
   async getEmailDetail(userId: string, emailId: number) {
     const res = await dbClient.exec(
-      `SELECT ${EMAIL_SUMMARY_SELECT}, body_text, body_html FROM emails WHERE user_id = ? AND id = ? LIMIT 1`,
+      `SELECT ${EMAIL_SUMMARY_SELECT}, body_text, body_html, inline_attachments, attachments FROM emails WHERE user_id = ? AND id = ? LIMIT 1`,
       [userId, emailId],
       "get",
     );
     const row = firstRow<EmailRowDb>(res);
     if (!row) return null;
+    const inlineAttachments = parseInlineAttachments(row.inlineAttachments);
+    const attachments = toEmailAttachments(
+      row.attachments,
+      row.providerMessageId,
+      row.mailboxId ?? null,
+    );
     return {
       ...toEmailListItem(row),
       bodyText: row.bodyText ?? null,
       bodyHtml: row.bodyHtml ?? null,
       resolvedBodyText: row.bodyText ?? null,
       resolvedBodyHtml: row.bodyHtml ?? null,
-      attachments: [] as [],
+      attachments,
+      inlineAttachments,
     };
   },
 
   async getEmailThread(userId: string, threadId: string) {
     const res = await dbClient.exec(
-      `SELECT ${EMAIL_SUMMARY_SELECT}, body_text, body_html FROM emails WHERE user_id = ? AND thread_id = ? ORDER BY date ASC`,
+      `SELECT ${EMAIL_SUMMARY_SELECT}, body_text, body_html, inline_attachments, attachments FROM emails WHERE user_id = ? AND thread_id = ? ORDER BY date ASC`,
       [userId, threadId],
       "rows",
     );
@@ -458,6 +585,12 @@ export const localDb = {
       ...toEmailListItem(row),
       bodyText: row.bodyText ?? null,
       bodyHtml: row.bodyHtml ?? null,
+      inlineAttachments: parseInlineAttachments(row.inlineAttachments),
+      attachments: toEmailAttachments(
+        row.attachments,
+        row.providerMessageId,
+        row.mailboxId ?? null,
+      ),
     }));
   },
 
@@ -589,72 +722,108 @@ export const localDb = {
   async insertEmails(rows: EmailInsert[]): Promise<void> {
     if (!rows.length) return;
     const CHUNK = 50;
-    for (let i = 0; i < rows.length; i += CHUNK) {
-      const chunk = rows.slice(i, i + CHUNK);
+    const INSERT_COLUMNS = `
+      id, user_id, mailbox_id, provider_message_id, thread_id, from_addr, from_name,
+      to_addr, cc_addr, subject, snippet, body_text, body_html, date, direction,
+      is_read, label_ids, has_inbox, has_sent, has_trash, has_spam, has_starred,
+      unsubscribe_url, unsubscribe_email, snoozed_until, inline_attachments, attachments, created_at`;
+    const TUPLE = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+    // Fields that ARE safe to overwrite (immutable from the user's point of view).
+    const CONFLICT_SAFE = `
+      from_addr = excluded.from_addr,
+      from_name = excluded.from_name,
+      to_addr = excluded.to_addr,
+      cc_addr = excluded.cc_addr,
+      subject = excluded.subject,
+      snippet = excluded.snippet,
+      body_text = excluded.body_text,
+      body_html = excluded.body_html,
+      inline_attachments = excluded.inline_attachments,
+      attachments = excluded.attachments`;
+    // Fields we overwrite only when the row has no pending local mutation.
+    const CONFLICT_MUTABLE = `
+      is_read = excluded.is_read,
+      label_ids = excluded.label_ids,
+      has_inbox = excluded.has_inbox,
+      has_sent = excluded.has_sent,
+      has_trash = excluded.has_trash,
+      has_spam = excluded.has_spam,
+      has_starred = excluded.has_starred,
+      snoozed_until = excluded.snoozed_until`;
+
+    function rowParams(row: EmailInsert): BindParam[] {
+      const ids = normalizeLabelIds(row.labelIds as unknown as string | string[] | null);
+      const bools = labelBooleans(ids);
+      return [
+        row.id ?? null,
+        row.userId,
+        row.mailboxId ?? null,
+        row.providerMessageId,
+        row.threadId ?? null,
+        row.fromAddr,
+        row.fromName ?? null,
+        row.toAddr ?? null,
+        row.ccAddr ?? null,
+        row.subject ?? null,
+        row.snippet ?? null,
+        row.bodyText ?? null,
+        row.bodyHtml ?? null,
+        row.date,
+        row.direction ?? null,
+        boolParam(row.isRead ?? false),
+        JSON.stringify(ids),
+        boolParam(bools.hasInbox),
+        boolParam(bools.hasSent),
+        boolParam(bools.hasTrash),
+        boolParam(bools.hasSpam),
+        boolParam(bools.hasStarred),
+        row.unsubscribeUrl ?? null,
+        row.unsubscribeEmail ?? null,
+        row.snoozedUntil ?? null,
+        row.inlineAttachments ?? null,
+        row.attachments ?? null,
+        row.createdAt,
+      ];
+    }
+
+    async function insertBatch(batch: EmailInsert[], includeMutable: boolean) {
+      if (batch.length === 0) return;
       const values: string[] = [];
       const params: BindParam[] = [];
-      for (const row of chunk) {
-        const ids = normalizeLabelIds(row.labelIds as unknown as string | string[] | null);
-        const bools = labelBooleans(ids);
-        values.push(
-          "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        );
-        params.push(
-          row.id ?? null,
-          row.userId,
-          row.mailboxId ?? null,
-          row.providerMessageId,
-          row.threadId ?? null,
-          row.fromAddr,
-          row.fromName ?? null,
-          row.toAddr ?? null,
-          row.ccAddr ?? null,
-          row.subject ?? null,
-          row.snippet ?? null,
-          row.bodyText ?? null,
-          row.bodyHtml ?? null,
-          row.date,
-          row.direction ?? null,
-          boolParam(row.isRead ?? false),
-          JSON.stringify(ids),
-          boolParam(bools.hasInbox),
-          boolParam(bools.hasSent),
-          boolParam(bools.hasTrash),
-          boolParam(bools.hasSpam),
-          boolParam(bools.hasStarred),
-          row.unsubscribeUrl ?? null,
-          row.unsubscribeEmail ?? null,
-          row.snoozedUntil ?? null,
-          row.createdAt,
-        );
+      for (const row of batch) {
+        values.push(TUPLE);
+        params.push(...rowParams(row));
       }
+      const setClause = includeMutable
+        ? `${CONFLICT_SAFE},\n${CONFLICT_MUTABLE}`
+        : CONFLICT_SAFE;
       await dbClient.exec(
-        `INSERT INTO emails (
-          id, user_id, mailbox_id, provider_message_id, thread_id, from_addr, from_name,
-          to_addr, cc_addr, subject, snippet, body_text, body_html, date, direction,
-          is_read, label_ids, has_inbox, has_sent, has_trash, has_spam, has_starred,
-          unsubscribe_url, unsubscribe_email, snoozed_until, created_at
-        ) VALUES ${values.join(", ")}
-        ON CONFLICT (provider_message_id) DO UPDATE SET
-          from_addr = excluded.from_addr,
-          from_name = excluded.from_name,
-          to_addr = excluded.to_addr,
-          cc_addr = excluded.cc_addr,
-          subject = excluded.subject,
-          snippet = excluded.snippet,
-          body_text = excluded.body_text,
-          body_html = excluded.body_html,
-          is_read = excluded.is_read,
-          label_ids = excluded.label_ids,
-          has_inbox = excluded.has_inbox,
-          has_sent = excluded.has_sent,
-          has_trash = excluded.has_trash,
-          has_spam = excluded.has_spam,
-          has_starred = excluded.has_starred,
-          snoozed_until = excluded.snoozed_until`,
+        `INSERT INTO emails (${INSERT_COLUMNS}) VALUES ${values.join(", ")}
+         ON CONFLICT (provider_message_id) DO UPDATE SET ${setClause}`,
         params,
         "run",
       );
+    }
+
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK);
+      const pmids = chunk.map((r) => r.providerMessageId);
+      const locked = await localDb.getPendingProviderMessageIds(pmids);
+
+      if (locked.size === 0) {
+        await insertBatch(chunk, true);
+        continue;
+      }
+
+      const free: EmailInsert[] = [];
+      const pending: EmailInsert[] = [];
+      for (const row of chunk) {
+        if (locked.has(row.providerMessageId)) pending.push(row);
+        else free.push(row);
+      }
+      await insertBatch(free, true);
+      await insertBatch(pending, false);
     }
   },
 
@@ -903,8 +1072,128 @@ export const localDb = {
       { sql: "DELETE FROM labels" },
       { sql: "DELETE FROM drafts" },
       { sql: "DELETE FROM emails" },
+      { sql: "DELETE FROM pending_mutations" },
       { sql: "DELETE FROM _meta" },
     ]);
+  },
+
+  async insertPendingMutation(row: PendingMutationRow): Promise<void> {
+    await dbClient.exec(
+      `INSERT INTO pending_mutations (
+        id, user_id, mailbox_id, kind, provider_message_ids, email_ids, payload,
+        status, attempts, last_error, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.userId,
+        row.mailboxId,
+        row.kind,
+        JSON.stringify(row.providerMessageIds),
+        JSON.stringify(row.emailIds),
+        JSON.stringify(row.payload),
+        row.status,
+        row.attempts,
+        row.lastError,
+        row.createdAt,
+        row.updatedAt,
+      ],
+      "run",
+    );
+  },
+
+  async deletePendingMutation(id: string): Promise<void> {
+    await dbClient.exec(
+      `DELETE FROM pending_mutations WHERE id = ?`,
+      [id],
+      "run",
+    );
+  },
+
+  async markPendingMutationFailed(
+    id: string,
+    attempts: number,
+    lastError: string,
+  ): Promise<void> {
+    await dbClient.exec(
+      `UPDATE pending_mutations
+         SET status = 'failed', attempts = ?, last_error = ?, updated_at = ?
+       WHERE id = ?`,
+      [attempts, lastError, Date.now(), id],
+      "run",
+    );
+  },
+
+  async touchPendingMutationAttempt(
+    id: string,
+    attempts: number,
+    lastError: string | null,
+  ): Promise<void> {
+    await dbClient.exec(
+      `UPDATE pending_mutations
+         SET attempts = ?, last_error = ?, updated_at = ?
+       WHERE id = ?`,
+      [attempts, lastError, Date.now(), id],
+      "run",
+    );
+  },
+
+  async listPendingMutations(userId: string): Promise<PendingMutationRow[]> {
+    const res = await dbClient.exec(
+      `SELECT id, user_id, mailbox_id, kind, provider_message_ids, email_ids,
+              payload, status, attempts, last_error, created_at, updated_at
+       FROM pending_mutations
+       WHERE user_id = ? AND status = 'pending'
+       ORDER BY created_at ASC`,
+      [userId],
+      "rows",
+    );
+    const rows = rowsToObjects<{
+      id: string;
+      userId: string;
+      mailboxId: number;
+      kind: string;
+      providerMessageIds: string;
+      emailIds: string;
+      payload: string;
+      status: string;
+      attempts: number;
+      lastError: string | null;
+      createdAt: number;
+      updatedAt: number;
+    }>(res);
+    return rows.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      mailboxId: r.mailboxId,
+      kind: r.kind as PendingMutationKind,
+      providerMessageIds: JSON.parse(r.providerMessageIds) as string[],
+      emailIds: JSON.parse(r.emailIds) as number[],
+      payload: JSON.parse(r.payload) as PendingMutationPayload,
+      status: r.status as "pending" | "failed",
+      attempts: Number(r.attempts),
+      lastError: r.lastError,
+      createdAt: Number(r.createdAt),
+      updatedAt: Number(r.updatedAt),
+    }));
+  },
+
+  async getPendingProviderMessageIds(
+    providerMessageIds: string[],
+  ): Promise<Set<string>> {
+    if (providerMessageIds.length === 0) return new Set();
+    const placeholders = providerMessageIds.map(() => "?").join(", ");
+    const res = await dbClient.exec(
+      `SELECT DISTINCT je.value AS pmid
+       FROM pending_mutations, json_each(pending_mutations.provider_message_ids) je
+       WHERE pending_mutations.status = 'pending'
+         AND je.value IN (${placeholders})`,
+      providerMessageIds,
+      "rows",
+    );
+    const rows = rowsToObjects<{ pmid: string }>(res);
+    const pending = new Set<string>();
+    for (const row of rows) pending.add(row.pmid);
+    return pending;
   },
 
   async deleteEmailsByProviderMessageId(providerMessageIds: string[]): Promise<void> {

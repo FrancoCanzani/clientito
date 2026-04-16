@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import {
   ArrowClockwiseIcon,
-  ArrowsOutIcon,
   DownloadSimpleIcon,
   ImageIcon,
   PaperclipIcon,
@@ -120,89 +119,83 @@ export function AttachmentItem({
 
   return (
     <>
-      <div className="border-b border-border/70 py-3 text-xs last:border-b-0">
-        {previewUrl && (
-          <button
-            type="button"
-            className="group relative mb-3 block w-full overflow-hidden rounded-lg bg-muted/30"
-            onClick={() => setLightboxOpen(true)}
-          >
+      <div className="flex items-center gap-3 py-2 text-sm">
+        <button
+          type="button"
+          onClick={() => {
+            if (previewUrl) setLightboxOpen(true);
+          }}
+          disabled={!previewUrl}
+          className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/60 text-muted-foreground disabled:cursor-default"
+          aria-label={previewUrl ? "Preview image" : undefined}
+        >
+          {previewUrl ? (
             <img
               src={previewUrl}
               alt={attachment.filename || "Image attachment"}
-              className="h-40 w-full object-cover transition-transform duration-150 group-hover:scale-[1.02]"
+              className="size-full object-cover"
               loading="lazy"
             />
-            <span className="absolute bottom-2 right-2 flex size-7 items-center justify-center rounded-full bg-[oklch(12%_0.01_250)]/50 text-white opacity-0 transition-opacity group-hover:opacity-100">
-              <ArrowsOutIcon className="size-3.5" />
-            </span>
-          </button>
-        )}
+          ) : attachment.isImage ? (
+            <ImageIcon className="size-4" />
+          ) : (
+            <PaperclipIcon className="size-4" />
+          )}
+        </button>
 
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0 flex items-center gap-2">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted/45">
-              {attachment.isImage ? (
-                <ImageIcon className="size-3 text-muted-foreground" />
-              ) : (
-                <PaperclipIcon className="size-3 text-muted-foreground" />
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">
-                {attachment.filename || "Untitled attachment"}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">
-                {formatBytes(attachment.size)}
-                {attachment.mimeType ? ` · ${attachment.mimeType}` : ""}
-              </p>
-            </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">
+            {attachment.filename || "Untitled attachment"}
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {formatBytes(attachment.size)}
+            {attachment.mimeType ? ` · ${attachment.mimeType}` : ""}
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="ghost"
+          className="size-8 shrink-0 text-muted-foreground"
+          onClick={(event) => {
+            event.stopPropagation();
+            handleDownload();
+          }}
+          disabled={isDownloading}
+          aria-label={
+            errorMessage ? "Retry attachment download" : "Download attachment"
+          }
+        >
+          {errorMessage ? (
+            <ArrowClockwiseIcon className="size-4" />
+          ) : (
+            <DownloadSimpleIcon className="size-4" />
+          )}
+        </Button>
+      </div>
+
+      {errorMessage && (
+        <div className="mb-2 flex items-center justify-between gap-2 border-l border-destructive/40 pl-3 text-xs text-destructive">
+          <div className="flex min-w-0 items-center gap-2">
+            <WarningCircleIcon className="size-4 shrink-0" />
+            <p className="truncate">{errorMessage}</p>
           </div>
-
           <Button
             type="button"
-            size="icon-sm"
             variant="ghost"
-            className="size-8 shrink-0 text-muted-foreground"
+            size="sm"
+            className="h-7 px-2 text-destructive"
             onClick={(event) => {
               event.stopPropagation();
               handleDownload();
             }}
             disabled={isDownloading}
-            aria-label={
-              errorMessage ? "Retry attachment download" : "Download attachment"
-            }
           >
-            {errorMessage ? (
-              <ArrowClockwiseIcon className="size-4" />
-            ) : (
-              <DownloadSimpleIcon className="size-4" />
-            )}
+            Retry
           </Button>
         </div>
-
-        {errorMessage && (
-          <div className="mt-3 flex items-center justify-between gap-2 border-l border-destructive/40 pl-3 text-destructive">
-            <div className="flex min-w-0 items-center gap-2">
-              <WarningCircleIcon className="size-4 shrink-0" />
-              <p className="truncate">{errorMessage}</p>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-destructive"
-              onClick={(event) => {
-                event.stopPropagation();
-                handleDownload();
-              }}
-              disabled={isDownloading}
-            >
-              Retry
-            </Button>
-          </div>
-        )}
-      </div>
+      )}
 
       {lightboxOpen && previewUrl && (
         <ImageLightbox

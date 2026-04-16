@@ -35,22 +35,6 @@
 		"vars": {
 			"BETTER_AUTH_URL": "https://petit.francocanzani.workers.dev"
 		},
-	"queues": {
-		"producers": [
-			{
-				"queue": "petit-sync",
-				"binding": "SYNC_QUEUE"
-			}
-		],
-		"consumers": [
-			{
-				"queue": "petit-sync",
-				"max_batch_size": 1,
-				"max_retries": 3,
-				"dead_letter_queue": "petit-sync-dlq"
-			}
-		]
-	},
 	"triggers": {
 		"crons": [
 			"*/1 * * * *",

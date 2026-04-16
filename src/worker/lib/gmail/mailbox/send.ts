@@ -215,3 +215,27 @@ export async function batchModifyGmailMessages(
       : [],
   });
 }
+
+export async function hardDeleteGmailMessage(
+  db: Database,
+  mailboxId: number,
+  env: GoogleOAuthConfig,
+  gmailMessageId: string,
+): Promise<void> {
+  if (!gmailMessageId) return;
+  const accessToken = await getGmailTokenForMailbox(db, mailboxId, env);
+  const response = await fetch(
+    `${GMAIL_API_BASE}/messages/${encodeURIComponent(gmailMessageId)}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
+  // Gmail returns 204 on success; 404 is fine (already gone).
+  if (!response.ok && response.status !== 404) {
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `Gmail delete failed (${response.status}): ${text || response.statusText}`,
+    );
+  }
+}

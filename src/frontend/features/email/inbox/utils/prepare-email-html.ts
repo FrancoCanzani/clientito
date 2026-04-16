@@ -1,7 +1,11 @@
 import DOMPurify from "dompurify";
 import { EMAIL_CONTENT_SHADOW_STYLE } from "./email-content-shadow-style";
+import { rewriteCidImages, type InlineImageContext } from "./cid-images";
 
-export function prepareEmailHtml(html: string): string {
+export function prepareEmailHtml(
+  html: string,
+  inlineContext?: InlineImageContext | null,
+): string {
   const sanitized = DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true },
     FORBID_TAGS: ["form", "input", "button", "select", "textarea"],
@@ -18,6 +22,8 @@ export function prepareEmailHtml(html: string): string {
       link.setAttribute("rel", "noopener noreferrer");
     }
   }
+
+  rewriteCidImages(parsedDocument, inlineContext);
 
   const styleTag = parsedDocument.createElement("style");
   styleTag.textContent = EMAIL_CONTENT_SHADOW_STYLE;

@@ -1,7 +1,7 @@
+import { clearLocalData } from "@/db/sync";
 import {
   beginGmailConnection,
-  runIncrementalSync,
-  startFullSync,
+  resetMailboxSyncState,
 } from "@/features/onboarding/mutations";
 import {
   deleteAccount,
@@ -13,8 +13,6 @@ import { queryKeys } from "@/lib/query-keys";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-
-type SyncIntent = "initial" | "incremental" | "reimport" | "auto-connect";
 
 export function useSettingsMutations({
   navigate,
@@ -39,7 +37,6 @@ export function useSettingsMutations({
     onSuccess: async () => {
       toast.success("Account removed");
       await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.syncStatus() });
     },
     onError: (error) => toast.error(error.message),
     onSettled: () => setRemovingAccountId(null),
@@ -48,51 +45,25 @@ export function useSettingsMutations({
   const [pendingMailboxActionIds, setPendingMailboxActionIds] = useState<
     number[]
   >([]);
-  const mailboxSyncMutation = useMutation({
-    mutationFn: async ({
-      mailboxId,
-      intent,
-    }: {
-      mailboxId: number;
-      intent: SyncIntent;
-    }) => {
-      if (intent === "incremental") {
-        await runIncrementalSync(mailboxId);
-        return;
-      }
-
-      await startFullSync(undefined, mailboxId);
+  const fullReimportMutation = useMutation({
+    mutationFn: async (mailboxId: number) => {
+      await resetMailboxSyncState(mailboxId);
+      await clearLocalData();
+      queryClient.clear();
     },
-    onMutate: ({ mailboxId }) => {
+    onMutate: (mailboxId) => {
       setPendingMailboxActionIds((current) =>
         current.includes(mailboxId) ? current : [...current, mailboxId],
       );
     },
-    onSuccess: async (_data, variables) => {
-      toast.success(
-        variables.intent === "incremental"
-          ? "Sync started"
-          : variables.intent === "reimport"
-            ? "Full re-import started"
-            : variables.intent === "auto-connect"
-              ? "Account connected. Import started."
-              : "Import started",
-      );
-      await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.syncStatus() });
+    onSuccess: () => {
+      toast.success("Local data cleared — reloading…");
+      setTimeout(() => window.location.reload(), 600);
     },
-    onError: (_error, variables) => {
-      toast.error(
-        variables.intent === "incremental"
-          ? "Failed to start sync"
-          : variables.intent === "reimport"
-            ? "Failed to start re-import"
-            : "Failed to start import",
-      );
-    },
-    onSettled: (_data, _error, variables) => {
+    onError: () => toast.error("Failed to start full re-import"),
+    onSettled: (_data, _error, mailboxId) => {
       setPendingMailboxActionIds((current) =>
-        current.filter((mailboxId) => mailboxId !== variables.mailboxId),
+        current.filter((id) => id !== mailboxId),
       );
     },
   });
@@ -106,28 +77,8 @@ export function useSettingsMutations({
         current.includes(mailboxId) ? current : [...current, mailboxId],
       );
     },
-    onSuccess: async (result, variables) => {
-      const { mailboxId, months } = variables;
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.syncStatus() });
-
-      if (result.requiresBackfill) {
-        try {
-          await startFullSync(undefined, mailboxId);
-          toast.success(
-            months === null
-              ? "Import history updated. Full mailbox backfill started."
-              : "Import history updated. Backfill started.",
-          );
-          await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
-          await queryClient.invalidateQueries({ queryKey: queryKeys.syncStatus() });
-          return;
-        } catch {
-          toast.success("Import history updated");
-          return;
-        }
-      }
-
       toast.success("Import history updated");
     },
     onError: (error) => toast.error(error.message),
@@ -166,7 +117,7 @@ export function useSettingsMutations({
     addAccountMutation,
     removeAccountMutation,
     removingAccountId,
-    mailboxSyncMutation,
+    fullReimportMutation,
     pendingMailboxActionIds,
     syncPreferenceMutation,
     pendingSyncWindowMailboxIds,

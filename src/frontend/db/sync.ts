@@ -2,6 +2,7 @@ import { syncLabelsFromServer } from "@/features/email/labels/queries";
 import { queryClient } from "@/lib/query-client";
 import { queryKeys } from "@/lib/query-keys";
 import { localDb } from "./client";
+import { replayPendingMutations, resetMutationQueue } from "./mutation-queue";
 import type { EmailInsert } from "./schema";
 
 const SYNCED_MAILBOX_KEY_PREFIX = "synced-mailbox";
@@ -9,6 +10,51 @@ const SYNCED_ANY_KEY_PREFIX = "synced-any";
 const ACTIVE_USER_META_KEY = "active-user-id";
 
 const syncInFlight = new Map<string, Promise<void>>();
+
+export type LocalSyncStatus = "idle" | "initial" | "refresh";
+
+export type LocalSyncSnapshot = {
+  status: LocalSyncStatus;
+  pulled: number;
+  total: number | null;
+};
+
+const IDLE_SNAPSHOT: LocalSyncSnapshot = {
+  status: "idle",
+  pulled: 0,
+  total: null,
+};
+
+const progress = new Map<string, LocalSyncSnapshot>();
+const progressListeners = new Set<() => void>();
+
+function notifyProgress() {
+  for (const listener of progressListeners) listener();
+}
+
+function setProgress(key: string, snapshot: LocalSyncSnapshot) {
+  if (snapshot.status === "idle") {
+    progress.delete(key);
+  } else {
+    progress.set(key, snapshot);
+  }
+  notifyProgress();
+}
+
+export function subscribeLocalSync(listener: () => void) {
+  progressListeners.add(listener);
+  return () => {
+    progressListeners.delete(listener);
+  };
+}
+
+export function getLocalSyncSnapshot(
+  userId: string | null | undefined,
+  mailboxId: number | null | undefined,
+): LocalSyncSnapshot {
+  if (!userId || mailboxId == null) return IDLE_SNAPSHOT;
+  return progress.get(syncTaskKey(userId, mailboxId)) ?? IDLE_SNAPSHOT;
+}
 
 function mailboxSyncKey(userId: string, mailboxId: number) {
   return `${SYNCED_MAILBOX_KEY_PREFIX}:${userId}:${mailboxId}`;
@@ -32,6 +78,23 @@ type PullResponse = {
   requiresFullSync?: boolean;
 };
 
+type PulledInlineAttachment = {
+  contentId: string;
+  attachmentId: string;
+  mimeType: string | null;
+  filename: string | null;
+};
+
+type PulledAttachment = {
+  attachmentId: string;
+  filename: string | null;
+  mimeType: string | null;
+  size: number | null;
+  contentId: string | null;
+  isInline: boolean;
+  isImage: boolean;
+};
+
 type PulledEmail = {
   providerMessageId: string;
   threadId: string | null;
@@ -50,6 +113,8 @@ type PulledEmail = {
   labelIds: string[];
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
+  inlineAttachments?: PulledInlineAttachment[];
+  attachments?: PulledAttachment[];
 };
 
 function pulledEmailToRow(email: PulledEmail, userId: string, mailboxId: number): EmailInsert {
@@ -79,6 +144,14 @@ function pulledEmailToRow(email: PulledEmail, userId: string, mailboxId: number)
     snoozedUntil: null,
     bodyText: email.bodyText,
     bodyHtml: email.bodyHtml,
+    inlineAttachments:
+      email.inlineAttachments && email.inlineAttachments.length > 0
+        ? JSON.stringify(email.inlineAttachments)
+        : null,
+    attachments:
+      email.attachments && email.attachments.length > 0
+        ? JSON.stringify(email.attachments)
+        : null,
     createdAt: email.date,
   };
 }
@@ -110,36 +183,47 @@ async function pullPage(
  * Inserts each batch into OPFS progressively, invalidating queries so
  * emails appear in the UI as they arrive.
  */
-async function pullAll(userId: string, mailboxId: number): Promise<number> {
+async function pullAll(
+  userId: string,
+  mailboxId: number,
+  status: Exclude<LocalSyncStatus, "idle">,
+): Promise<number> {
+  const key = syncTaskKey(userId, mailboxId);
   let cursor: string | undefined;
   let totalInserted = 0;
 
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const page = await pullPage(mailboxId, cursor);
+  setProgress(key, { status, pulled: 0, total: null });
 
-    // Handle history expired — retry as full sync (clear cursor)
-    if (page.requiresFullSync) {
-      cursor = undefined;
-      continue;
+  try {
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const page = await pullPage(mailboxId, cursor);
+
+      if (page.requiresFullSync) {
+        cursor = undefined;
+        totalInserted = 0;
+        setProgress(key, { status, pulled: 0, total: null });
+        continue;
+      }
+
+      if (page.deleted.length > 0) {
+        await localDb.deleteEmailsByProviderMessageId(page.deleted);
+      }
+
+      if (page.emails.length > 0) {
+        const rows = page.emails.map((e) => pulledEmailToRow(e, userId, mailboxId));
+        await localDb.insertEmails(rows);
+        totalInserted += rows.length;
+
+        setProgress(key, { status, pulled: totalInserted, total: null });
+        queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+      }
+
+      if (!page.cursor) break;
+      cursor = page.cursor;
     }
-
-    // Handle deletions
-    if (page.deleted.length > 0) {
-      await localDb.deleteEmailsByProviderMessageId(page.deleted);
-    }
-
-    // Insert new/updated emails
-    if (page.emails.length > 0) {
-      const rows = page.emails.map((e) => pulledEmailToRow(e, userId, mailboxId));
-      await localDb.insertEmails(rows);
-      totalInserted += rows.length;
-
-      queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
-    }
-
-    if (!page.cursor) break;
-    cursor = page.cursor;
+  } finally {
+    setProgress(key, IDLE_SNAPSHOT);
   }
 
   return totalInserted;
@@ -151,40 +235,52 @@ async function pullAll(userId: string, mailboxId: number): Promise<number> {
  */
 export async function pullNewEmails(userId: string, mailboxId: number) {
   await localDb.ensureReady();
+  await replayPendingMutations(userId);
 
+  const key = syncTaskKey(userId, mailboxId);
   let cursor: string | undefined;
+  let totalInserted = 0;
+  let announced = false;
 
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const page = await pullPage(mailboxId, cursor);
+  try {
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const page = await pullPage(mailboxId, cursor);
 
-    if (page.requiresFullSync) {
-      // History expired — need full re-sync. Clear synced flag so next query triggers it.
-      await localDb.setMeta(mailboxSyncKey(userId, mailboxId), "");
-      await localDb.setMeta(userSyncKey(userId), "");
-      return;
+      if (page.requiresFullSync) {
+        await localDb.setMeta(mailboxSyncKey(userId, mailboxId), "");
+        await localDb.setMeta(userSyncKey(userId), "");
+        return;
+      }
+
+      if (page.deleted.length > 0) {
+        await localDb.deleteEmailsByProviderMessageId(page.deleted);
+      }
+
+      if (page.emails.length > 0) {
+        const rows = page.emails.map((e) => pulledEmailToRow(e, userId, mailboxId));
+        await localDb.insertEmails(rows);
+        totalInserted += rows.length;
+        announced = true;
+        setProgress(key, { status: "refresh", pulled: totalInserted, total: null });
+      }
+
+      if (!page.cursor) break;
+      cursor = page.cursor;
     }
-
-    if (page.deleted.length > 0) {
-      await localDb.deleteEmailsByProviderMessageId(page.deleted);
-    }
-
-    if (page.emails.length > 0) {
-      const rows = page.emails.map((e) => pulledEmailToRow(e, userId, mailboxId));
-      await localDb.insertEmails(rows);
-    }
-
-    if (!page.cursor) break;
-    cursor = page.cursor;
+  } finally {
+    if (announced) setProgress(key, IDLE_SNAPSHOT);
   }
 }
 
 async function alignActiveUser(userId: string) {
   const activeUser = await localDb.getMeta(ACTIVE_USER_META_KEY);
   if (activeUser && activeUser !== userId) {
+    resetMutationQueue();
     await localDb.clear();
   }
   await localDb.setMeta(ACTIVE_USER_META_KEY, userId);
+  await replayPendingMutations(userId);
 }
 
 async function runInitialSync(
@@ -197,19 +293,15 @@ async function runInitialSync(
   const mailboxKey = mailboxSyncKey(userId, mailboxId);
   if ((await localDb.getMeta(mailboxKey)) === "true") return;
 
-  // Sync labels in parallel with email pulling — labels are fast and
-  // should appear immediately, not after all email pages finish.
-  const [inserted] = await Promise.all([
-    pullAll(userId, mailboxId),
+  await Promise.all([
+    pullAll(userId, mailboxId, "initial"),
     syncLabelsFromServer(mailboxId).catch((err) => {
       console.warn("Label sync failed during initial sync", err);
     }),
   ]);
 
-  if (inserted > 0) {
-    await localDb.setMeta(mailboxKey, "true");
-    await localDb.setMeta(userSyncKey(userId), "true");
-  }
+  await localDb.setMeta(mailboxKey, "true");
+  await localDb.setMeta(userSyncKey(userId), "true");
 }
 
 export async function ensureLocalSync(
@@ -240,15 +332,7 @@ export async function isSynced(
   await localDb.ensureReady();
 
   if (mailboxId != null) {
-    const flagSet = (await localDb.getMeta(mailboxSyncKey(userId, mailboxId))) === "true";
-    if (!flagSet) return false;
-    const count = await localDb.emailCount(userId, mailboxId);
-    if (count === 0) {
-      await localDb.setMeta(mailboxSyncKey(userId, mailboxId), "");
-      await localDb.setMeta(userSyncKey(userId), "");
-      return false;
-    }
-    return true;
+    return (await localDb.getMeta(mailboxSyncKey(userId, mailboxId))) === "true";
   }
 
   return (await localDb.getMeta(userSyncKey(userId))) === "true";
@@ -256,10 +340,11 @@ export async function isSynced(
 
 export async function clearLocalData() {
   syncInFlight.clear();
+  resetMutationQueue();
 
   try {
     await localDb.ensureReady();
-    await localDb.clear();
+    await localDb.deleteDatabase();
   } catch {
     // Ignore worker shutdown/initialization races during logout.
   }

@@ -48,22 +48,22 @@ export const EmailDetailContent = forwardRef<
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden">
-      <EmailDetailHeader
-        email={email}
-        onClose={onClose}
-        onBack={onBack}
-        onPrev={onPrev}
-        onNext={onNext}
-        hasPrev={hasPrev}
-        hasNext={hasNext}
-        onForward={onForward}
-        onReply={() => quickReplyRef.current?.scrollIntoViewAndFocus()}
-        readingMode={readingMode}
-        onReadingModeChange={setReadingMode}
-      />
-
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="mx-auto w-full max-w-4xl space-y-8 pb-24">
+        <EmailDetailHeader
+          email={email}
+          onClose={onClose}
+          onBack={onBack}
+          onPrev={onPrev}
+          onNext={onNext}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+          onForward={onForward}
+          onReply={() => quickReplyRef.current?.scrollIntoViewAndFocus()}
+          readingMode={readingMode}
+          onReadingModeChange={setReadingMode}
+        />
+
+        <div className="mx-auto w-full max-w-4xl space-y-8 px-4 pt-4 pb-24">
           <EmailThread
             email={email}
             threadMessages={threadMessages}

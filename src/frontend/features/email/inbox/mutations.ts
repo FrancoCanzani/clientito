@@ -1,7 +1,7 @@
 import { localDb } from "@/db/client";
+import { enqueueMutation } from "@/db/mutation-queue";
+import type { PendingMutationPayload, PendingMutationRow } from "@/db/schema";
 import { getCurrentUserId } from "@/db/user";
-import { queryClient } from "@/lib/query-client";
-import { queryKeys } from "@/lib/query-keys";
 
 function getErrorMessage(payload: unknown): string | null {
   if (typeof payload !== "object" || payload === null) return null;
@@ -29,24 +29,22 @@ export type EmailIdentifier = {
   labelIds?: string[];
 };
 
-async function syncLocalPatch(emailIds: string[], patch: EmailPatchPayload) {
-  if (typeof window === "undefined") {
-    return;
-  }
+function makeMutationId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `mut_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
 
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return;
-  }
-
-  const numericIds = emailIds
+function toNumericIds(ids: string[]): number[] {
+  return ids
     .map((id) => Number(id))
     .filter((value) => Number.isFinite(value));
+}
 
-  if (numericIds.length === 0) {
-    return;
-  }
-
+async function applyLocalPatch(
+  userId: string,
+  numericIds: number[],
+  patch: EmailPatchPayload,
+) {
+  if (numericIds.length === 0) return;
   try {
     if (numericIds.length === 1) {
       await localDb.updateEmail(userId, numericIds[0]!, patch);
@@ -54,9 +52,54 @@ async function syncLocalPatch(emailIds: string[], patch: EmailPatchPayload) {
       await localDb.updateEmails(userId, numericIds, patch);
     }
   } catch (error) {
-    console.warn("Failed to sync local email patch", error);
-    // Force refetch so UI stays consistent with Gmail state
-    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+    console.warn("Failed to apply local email patch", error);
+  }
+}
+
+async function enqueuePatch(
+  emails: EmailIdentifier[],
+  data: EmailPatchPayload,
+): Promise<void> {
+  if (emails.length === 0) return;
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("Not authenticated");
+
+  const mailboxId = emails[0]!.mailboxId;
+  const numericIds = toNumericIds(emails.map((e) => e.id));
+  await applyLocalPatch(userId, numericIds, data);
+
+  // Group by snapshot of labelIds so the server computes the correct
+  // add/remove set for each message. Most bulk actions come from a single
+  // view so this usually collapses to one enqueue.
+  const groups = new Map<string, EmailIdentifier[]>();
+  for (const email of emails) {
+    const key = JSON.stringify(email.labelIds ?? []);
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(email);
+    else groups.set(key, [email]);
+  }
+
+  const now = Date.now();
+  for (const [key, bucket] of groups) {
+    const payload: PendingMutationPayload = {
+      ...data,
+      labelIds: JSON.parse(key) as string[],
+    };
+    const row: PendingMutationRow = {
+      id: makeMutationId(),
+      userId,
+      mailboxId,
+      kind: "patch",
+      providerMessageIds: bucket.map((e) => e.providerMessageId),
+      emailIds: toNumericIds(bucket.map((e) => e.id)),
+      payload,
+      status: "pending",
+      attempts: 0,
+      lastError: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await enqueueMutation(row);
   }
 }
 
@@ -64,48 +107,75 @@ export async function patchEmail(
   email: EmailIdentifier,
   data: EmailPatchPayload,
 ): Promise<void> {
-  const response = await fetch(`/api/inbox/emails/${email.id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      providerMessageId: email.providerMessageId,
-      mailboxId: email.mailboxId,
-      labelIds: email.labelIds,
-      ...data,
-    }),
-  });
+  await enqueuePatch([email], data);
+}
 
-  if (!response.ok) {
-    const json = await response.json().catch(() => null);
-    throwApiError(json, "Failed to update email");
+export async function deleteEmailForever(
+  email: EmailIdentifier,
+): Promise<void> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("Not authenticated");
+
+  try {
+    await localDb.deleteEmailsByProviderMessageId([email.providerMessageId]);
+  } catch (error) {
+    console.warn("Failed to remove email locally", error);
   }
 
-  void syncLocalPatch([email.id], data);
+  const now = Date.now();
+  const row: PendingMutationRow = {
+    id: makeMutationId(),
+    userId,
+    mailboxId: email.mailboxId,
+    kind: "delete",
+    providerMessageIds: [email.providerMessageId],
+    emailIds: toNumericIds([email.id]),
+    payload: {},
+    status: "pending",
+    attempts: 0,
+    lastError: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await enqueueMutation(row);
+}
+
+export type BlockSenderResult = {
+  fromAddr: string;
+  trashedCount: number;
+};
+
+export async function blockSender(params: {
+  fromAddr: string;
+  mailboxId?: number;
+}): Promise<BlockSenderResult> {
+  const response = await fetch("/api/inbox/subscriptions/block", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  const json = (await response.json().catch(() => null)) as
+    | { data?: BlockSenderResult; error?: string; requiresReconnect?: boolean }
+    | null;
+
+  if (!response.ok || !json?.data) {
+    if (response.status === 403 && json?.requiresReconnect) {
+      throw new Error(
+        "Reconnect Gmail to grant the filter-management permission, then try again.",
+      );
+    }
+    throw new Error(json?.error ?? "Failed to block sender");
+  }
+
+  return json.data;
 }
 
 export async function batchPatchEmails(
   emails: EmailIdentifier[],
   data: EmailPatchPayload,
 ): Promise<void> {
-  const response = await fetch("/api/inbox/emails/batch", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      items: emails.map((e) => ({
-        providerMessageId: e.providerMessageId,
-        mailboxId: e.mailboxId,
-        labelIds: e.labelIds,
-      })),
-      ...data,
-    }),
-  });
-
-  if (!response.ok) {
-    const json = await response.json().catch(() => null);
-    throwApiError(json, "Failed to update emails");
-  }
-
-  void syncLocalPatch(emails.map((e) => e.id), data);
+  await enqueuePatch(emails, data);
 }
 
 export async function markEmailRead(email: EmailIdentifier): Promise<void> {

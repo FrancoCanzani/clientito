@@ -39,7 +39,9 @@ export function EmailList({
     threadGroups,
     hasNextPage,
     isFetchingNextPage,
+    isLoading,
     isSyncing,
+    isInitialSync,
     loadMoreRef,
   } = emailData;
   const { openCompose } = useInboxCompose();
@@ -53,6 +55,7 @@ export function EmailList({
 
   const { focusedIndex } = useInboxHotkeys({
     groups: threadGroups,
+    view,
     onOpen,
     onAction,
     onCompose: openCompose,
@@ -84,11 +87,6 @@ export function EmailList({
           <div className="flex items-center gap-2">
             <SidebarTrigger className="md:hidden" />
             <span>{pageTitle}</span>
-            {isSyncing && (
-              <span className="animate-pulse text-xs text-muted-foreground">
-                Syncing...
-              </span>
-            )}
           </div>
         }
       />
@@ -132,12 +130,21 @@ export function EmailList({
             </div>
           )}
         </div>
-      ) : emailData.isSyncing ? (
+      ) : isInitialSync ? (
+        <div className="flex min-h-56 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+          <CircleNotchIcon className="size-5 animate-spin text-muted-foreground" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Setting up your inbox</p>
+            <p className="text-xs text-muted-foreground">
+              This runs once. You can keep using the app — messages will appear
+              as they arrive.
+            </p>
+          </div>
+        </div>
+      ) : isSyncing || isLoading ? (
         <div className="flex min-h-56 flex-1 flex-col items-center justify-center gap-3">
           <CircleNotchIcon className="size-5 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            Syncing your emails...
-          </p>
+          <p className="text-sm text-muted-foreground">Checking for new mail…</p>
         </div>
       ) : (
         <Empty className="min-h-56 flex-1 justify-center">

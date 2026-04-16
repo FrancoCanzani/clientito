@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS emails (
   unsubscribe_url TEXT,
   unsubscribe_email TEXT,
   snoozed_until INTEGER,
+  inline_attachments TEXT,
+  attachments TEXT,
   created_at INTEGER NOT NULL
 );
 
@@ -85,6 +87,24 @@ CREATE TABLE IF NOT EXISTS _meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS pending_mutations (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  mailbox_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  provider_message_ids TEXT NOT NULL,
+  email_ids TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS pending_mutations_user_status ON pending_mutations(user_id, status, created_at);
+CREATE INDEX IF NOT EXISTS pending_mutations_created ON pending_mutations(created_at);
 `;
 
 const PRAGMAS = `
@@ -137,6 +157,35 @@ async function initDb(): Promise<void> {
   db = new sqlite3.oo1.OpfsDb(DB_FILENAME);
   db.exec(PRAGMAS);
   db.exec(SCHEMA_SQL);
+  ensureEmailColumn(db, "inline_attachments", "TEXT");
+  ensureEmailColumn(db, "attachments", "TEXT");
+}
+
+function ensureEmailColumn(
+  database: OpfsDatabase,
+  column: string,
+  type: string,
+): void {
+  try {
+    const stmt = database.prepare("PRAGMA table_info(emails)");
+    let exists = false;
+    try {
+      while (stmt.step()) {
+        const row = stmt.get({}) as Record<string, unknown>;
+        if (row.name === column) {
+          exists = true;
+          break;
+        }
+      }
+    } finally {
+      stmt.finalize();
+    }
+    if (!exists) {
+      database.exec(`ALTER TABLE emails ADD COLUMN ${column} ${type}`);
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 function getStmt(sql: string): PreparedStatement {

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowsOutSimpleIcon, TrashIcon, XIcon } from "@phosphor-icons/react";
+import { ArrowsOutSimpleIcon, XIcon } from "@phosphor-icons/react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo } from "react";
@@ -110,18 +110,6 @@ function ComposePanelBody({
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/40 px-3 py-2">
             <h3 className="text-xs font-medium">{title}</h3>
             <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  void handleDiscard();
-                }}
-                aria-label="Discard draft"
-                title="Discard draft"
-              >
-                <TrashIcon className="size-3" />
-              </Button>
               <Button
                 type="button"
                 variant="ghost"

@@ -35,7 +35,6 @@ export const queryKeys = {
   ],
   labels: (mailboxId: number) => ["labels", mailboxId] as const,
   accounts: () => ["accounts"] as const,
-  syncStatus: () => ["sync-status"] as const,
   contactSuggestions: (query: string) =>
     ["contact-suggestions", query] as const,
   scheduledEmails: () => ["scheduled-emails"] as const,

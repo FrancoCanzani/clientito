@@ -248,14 +248,14 @@ function buildBatchRequestBody(
   messageIds: string[],
   format: GmailMessageFormat,
 ): string {
-  const fields =
-    format === "minimal"
-      ? "id,threadId,historyId,internalDate,labelIds"
-      : "id,threadId,historyId,internalDate,snippet,labelIds,payload(mimeType,headers,body/data,parts(mimeType,headers,body/data,parts))";
-
   return messageIds
     .map((id) => {
-      const path = `/gmail/v1/users/me/messages/${id}?format=${format}&fields=${encodeURIComponent(fields)}`;
+      const path =
+        format === "minimal"
+          ? `/gmail/v1/users/me/messages/${id}?format=minimal&fields=${encodeURIComponent(
+              "id,threadId,historyId,internalDate,labelIds",
+            )}`
+          : `/gmail/v1/users/me/messages/${id}?format=full`;
       return `--${BATCH_BOUNDARY}\r\nContent-Type: application/http\r\n\r\nGET ${path}\r\n`;
     })
     .join("\r\n") + `\r\n--${BATCH_BOUNDARY}--`;

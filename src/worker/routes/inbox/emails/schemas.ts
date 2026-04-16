@@ -35,6 +35,11 @@ export const batchPatchEmailsBodySchema = z.object({
   snoozedUntil: z.number().nullable().optional(),
 });
 
+export const deleteEmailBodySchema = z.object({
+  providerMessageId: z.string().trim().min(1),
+  mailboxId: z.number().int().positive(),
+});
+
 export const sendEmailBodySchema = z.object({
   mailboxId: z.number().int().positive().optional(),
   to: z.string().min(1),

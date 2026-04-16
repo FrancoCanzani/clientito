@@ -79,11 +79,21 @@ export type EmailListItem = {
   snoozedUntil: number | null;
 };
 
+export type EmailInlineAttachment = {
+  contentId: string;
+  attachmentId: string;
+  mimeType: string | null;
+  filename: string | null;
+};
+
 export type EmailBodySource = {
   bodyText: string | null;
   bodyHtml: string | null;
   resolvedBodyText?: string | null;
   resolvedBodyHtml?: string | null;
+  inlineAttachments?: EmailInlineAttachment[] | null;
+  providerMessageId?: string;
+  mailboxId?: number | null;
 };
 
 export type EmailAttachment = {
@@ -104,9 +114,12 @@ export type EmailDetailItem = EmailListItem & {
   resolvedBodyText: string | null;
   resolvedBodyHtml: string | null;
   attachments: EmailAttachment[];
+  inlineAttachments: EmailInlineAttachment[];
 };
 
-export type EmailThreadItem = EmailListItem & EmailBodySource;
+export type EmailThreadItem = EmailListItem & EmailBodySource & {
+  attachments?: EmailAttachment[];
+};
 
 export type EmailListResponse = {
   data: EmailListItem[];

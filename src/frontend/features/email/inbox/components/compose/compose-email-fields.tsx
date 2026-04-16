@@ -21,10 +21,11 @@ import {
   PaperclipIcon,
   SparkleIcon,
   SpinnerGapIcon,
-  TrashIcon,
+  TextAaIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import DOMPurify from "dompurify";
+import type { Editor as TiptapEditor } from "@tiptap/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AttachmentBar } from "./attachment-bar";
@@ -38,6 +39,7 @@ import {
 } from "./compose-ai-actions";
 import { ComposeEditor } from "./compose-editor";
 import { useComposeEmail } from "./compose-email-state";
+import { ComposeDockedToolbar } from "./compose-docked-toolbar";
 import { GrammarDiffView } from "./grammar-diff-view";
 import { RecipientInput } from "./recipient-input";
 import { ScheduleSendPicker } from "./schedule-send-picker";
@@ -150,6 +152,8 @@ export function ComposeEmailFields({
     | { status: "loading"; action: ComposerAiActionId }
     | { status: "reviewing"; review: ComposerAiReview }
   >({ status: "idle" });
+  const [bodyEditor, setBodyEditor] = useState<TiptapEditor | null>(null);
+  const [showFormatToolbar, setShowFormatToolbar] = useState(false);
   const isReviewing = reviewState.status === "reviewing";
   const pendingAiAction =
     reviewState.status === "loading" ? reviewState.action : null;
@@ -413,6 +417,7 @@ export function ComposeEmailFields({
             autoFocus={editorAutoFocus}
             isFocused={focusedField === "body"}
             onFocusField={() => setFocusedField("body")}
+            onEditorReady={setBodyEditor}
           />
           {forwardedContent && (
             <ForwardedMessagePreview html={forwardedContent} />
@@ -421,6 +426,9 @@ export function ComposeEmailFields({
       </div>
 
       <div className="mt-auto px-2 py-2">
+        {!isReviewing && showFormatToolbar && (
+          <ComposeDockedToolbar editor={bodyEditor} />
+        )}
         <AttachmentBar
           files={attachments.files}
           uploading={attachments.uploading}
@@ -449,6 +457,20 @@ export function ComposeEmailFields({
               title="Attach files"
             >
               <PaperclipIcon className="size-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={isReviewing}
+              onClick={() => setShowFormatToolbar((v) => !v)}
+              title={
+                showFormatToolbar
+                  ? "Hide formatting options"
+                  : "Show formatting options"
+              }
+              className={cn(showFormatToolbar && "bg-muted")}
+            >
+              <TextAaIcon className="size-3" />
             </Button>
             {isReviewing ? (
               <>
@@ -524,24 +546,25 @@ export function ComposeEmailFields({
                 <ClockIcon className="size-3" />
               </Button>
             </ScheduleSendPicker>
+          </div>
+          <div className="flex items-center gap-2">
             {onDiscard && (
               <Button
-                variant="ghost"
-                size="icon"
+                variant="destructive"
                 onClick={onDiscard}
-                title="Discard draft"
+                disabled={isPending}
               >
-                <TrashIcon className="size-3" />
+                Discard
               </Button>
             )}
+            <Button
+              variant="secondary"
+              onClick={() => send()}
+              disabled={!canSend || isPending || isReviewing}
+            >
+              {isPending ? "Sending..." : "Send"}
+            </Button>
           </div>
-          <Button
-            variant="secondary"
-            onClick={() => send()}
-            disabled={!canSend || isPending || isReviewing}
-          >
-            {isPending ? "Sending..." : "Send"}
-          </Button>
         </div>
       </div>
     </div>

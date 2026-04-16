@@ -61,9 +61,10 @@ export function registerBatchPatchEmails(api: Hono<AppRouteEnv>) {
       for (const item of items) {
         if (!validMailboxIds.has(item.mailboxId)) continue;
 
+        const itemLabels = item.labelIds ?? [];
         const source = {
-          isRead: mutation.isRead ?? true,
-          labelIds: item.labelIds ?? [],
+          isRead: !itemLabels.includes("UNREAD"),
+          labelIds: itemLabels,
           snoozedUntil: mutation.snoozedUntil ?? null,
         };
 

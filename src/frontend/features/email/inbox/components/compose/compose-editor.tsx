@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { DotsThreeIcon } from "@phosphor-icons/react";
+import type { Editor } from "@tiptap/core";
 import { EditorContent } from "@tiptap/react";
 import { useEffect, useMemo, useState } from "react";
 import { useComposeEditor } from "../../hooks/use-compose-editor";
@@ -7,7 +8,6 @@ import {
   registerComposeEditor,
   unregisterComposeEditor,
 } from "./compose-editor-ref";
-import { ComposeBubbleMenu } from "./compose-bubble-menu";
 
 type ComposeEditorProps = {
   initialContent: string;
@@ -17,6 +17,7 @@ type ComposeEditorProps = {
   autoFocus?: boolean;
   isFocused?: boolean;
   onFocusField?: () => void;
+  onEditorReady?: (editor: Editor | null) => void;
 };
 
 export function ComposeEditor({
@@ -27,6 +28,7 @@ export function ComposeEditor({
   autoFocus,
   isFocused,
   onFocusField,
+  onEditorReady,
 }: ComposeEditorProps) {
   const editor = useComposeEditor({ initialContent, onChange });
   const [showForwardedContent, setShowForwardedContent] = useState(false);
@@ -37,6 +39,11 @@ export function ComposeEditor({
       ),
     [editor, initialContent],
   );
+
+  useEffect(() => {
+    onEditorReady?.(editor);
+    return () => onEditorReady?.(null);
+  }, [editor, onEditorReady]);
 
   useEffect(() => {
     if (!editor) return;
@@ -93,7 +100,6 @@ export function ComposeEditor({
         }
       }}
     >
-      <ComposeBubbleMenu editor={editor} />
       {hasForwardedContent && (
         <button
           type="button"

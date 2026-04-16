@@ -1,9 +1,8 @@
 import type { Hono } from "hono";
+import { eq } from "drizzle-orm";
 import { hasUsableAccessToken } from "../../lib/gmail/client";
-import { getMailboxSyncSnapshot } from "../../lib/gmail/sync/state";
 import { ensureMailbox, ensureGoogleMailboxesForUser } from "../../lib/gmail/mailboxes";
 import { mailboxes } from "../../db/schema";
-import { eq } from "drizzle-orm";
 import type { AppRouteEnv } from "../types";
 import { resolveGmailEmail } from "./utils";
 
@@ -34,27 +33,17 @@ export function registerGetSettings(api: Hono<AppRouteEnv>) {
         .map((mb) => [mb.accountId!, mb]),
     );
 
-    const accounts = await Promise.all(googleAccounts.map(async (ga) => {
-      const mb = mailboxByAccountId.get(ga.id);
-      const snapshot = mb ? await getMailboxSyncSnapshot(db, mb.id) : null;
-      const mailbox = snapshot?.mailbox ?? mb ?? null;
-      const latestJob = snapshot?.latestJob ?? null;
-      const activeJob = snapshot?.activeJob ?? null;
-      const syncError =
-        latestJob?.status === "failed"
-          ? (latestJob.errorMessage ?? mailbox?.lastErrorMessage ?? null)
-          : (mailbox?.lastErrorMessage ?? null);
+    const accounts = googleAccounts.map((ga) => {
+      const mailbox = mailboxByAccountId.get(ga.id) ?? null;
       const needsReconnect = mailbox?.authState === "reconnect_required";
       const hasSynced = Boolean(mailbox?.historyId);
       const syncState = needsReconnect
         ? "needs_reconnect"
-        : activeJob
-          ? "syncing"
-          : syncError
-            ? "error"
-            : hasSynced
-              ? "ready"
-              : "ready_to_sync";
+        : mailbox?.lastErrorMessage
+          ? "error"
+          : hasSynced
+            ? "ready"
+            : "ready_to_sync";
 
       return {
         accountId: ga.id,
@@ -70,10 +59,7 @@ export function registerGetSettings(api: Hono<AppRouteEnv>) {
           (mailbox?.syncWindowMonths as 6 | 12 | null | undefined) ?? null,
         syncCutoffAt: mailbox?.syncCutoffAt ?? null,
         syncState,
-        phase: activeJob?.phase ?? null,
-        progressCurrent: activeJob?.progressCurrent ?? null,
-        progressTotal: activeJob?.progressTotal ?? null,
-        error: syncError,
+        error: mailbox?.lastErrorMessage ?? null,
         createdAt:
           ga.createdAt instanceof Date
             ? ga.createdAt.getTime()
@@ -81,7 +67,7 @@ export function registerGetSettings(api: Hono<AppRouteEnv>) {
               ? ga.createdAt
               : null,
       };
-    }));
+    });
 
     return c.json({ data: { accounts } }, 200);
   });

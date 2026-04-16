@@ -117,14 +117,15 @@ export async function fetchEmailDetail(
     throw new Error("Not authenticated");
   }
 
-  if (
-    options?.mailboxId != null &&
-    !(await isSynced(userId, options.mailboxId))
-  ) {
+  const numericId = Number(emailId);
+  const existing = await localDb.getEmailDetail(userId, numericId);
+  if (existing) return existing;
+
+  if (options?.mailboxId != null) {
     await ensureLocalSync(userId, options.mailboxId);
   }
 
-  const local = await localDb.getEmailDetail(userId, Number(emailId));
+  const local = await localDb.getEmailDetail(userId, numericId);
   if (!local) {
     throw new Error("Email not found in local database");
   }

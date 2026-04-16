@@ -91,6 +91,18 @@ export function MessageBody({
   const bodyHtml = detail?.resolvedBodyHtml ?? detail?.bodyHtml;
   const bodyText = detail?.resolvedBodyText ?? detail?.bodyText;
 
+  const inlineContext =
+    detail?.providerMessageId &&
+    detail?.mailboxId != null &&
+    detail?.inlineAttachments &&
+    detail.inlineAttachments.length > 0
+      ? {
+          providerMessageId: detail.providerMessageId,
+          mailboxId: detail.mailboxId,
+          attachments: detail.inlineAttachments,
+        }
+      : null;
+
   if (bodyHtml) {
     if (readingMode === "detox") {
       return (
@@ -99,10 +111,11 @@ export function MessageBody({
           fontSize="base"
           defaultShowImages={false}
           defaultShowQuoted={false}
+          inlineContext={inlineContext}
         />
       );
     }
-    const preparedHtml = prepareEmailHtml(bodyHtml);
+    const preparedHtml = prepareEmailHtml(bodyHtml, inlineContext);
     return <EmailHtmlRenderer html={preparedHtml} />;
   }
 

@@ -13,7 +13,6 @@ import settingsRoutes from "./routes/settings/router";
 import draftsRoutes from "./routes/inbox/drafts/router";
 import type { AppRouteEnv } from "./routes/types";
 import { handleScheduled } from "./scheduled";
-import { handleSyncQueue, type SyncQueueMessage } from "./queue";
 
 const app = new Hono<AppRouteEnv>();
 
@@ -60,8 +59,5 @@ export default {
   },
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(handleScheduled(event, env));
-  },
-  async queue(batch: MessageBatch<SyncQueueMessage>, env: Env) {
-    await handleSyncQueue(batch, env);
   },
 };

@@ -3,7 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CheckIcon, PlusIcon, TagIcon } from "@phosphor-icons/react";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
 import { fetchLabels } from "../queries";
 import { createLabel, applyLabel, removeLabel } from "../mutations";
@@ -17,6 +18,8 @@ type LabelPickerProps = {
   onDone?: () => void;
 };
 
+type ToggleVars = { labelId: string; apply: boolean };
+
 export function LabelPicker({
   mailboxId,
   emailIds,
@@ -26,7 +29,6 @@ export function LabelPicker({
 }: LabelPickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [creating, setCreating] = useState(false);
   const [optimisticIds, setOptimisticIds] = useState<Set<string>>(new Set(appliedLabelIds));
 
   const labelsQuery = useQuery({
@@ -34,35 +36,59 @@ export function LabelPicker({
     queryFn: () => fetchLabels(mailboxId),
   });
 
+  const toggleMutation = useMutation<
+    void,
+    Error,
+    ToggleVars,
+    { previous: Set<string> }
+  >({
+    mutationFn: ({ labelId, apply }) =>
+      apply
+        ? applyLabel(emailIds, labelId, mailboxId)
+        : removeLabel(emailIds, labelId, mailboxId),
+    onMutate: ({ labelId, apply }) => {
+      const previous = optimisticIds;
+      const next = new Set(previous);
+      if (apply) next.add(labelId);
+      else next.delete(labelId);
+      setOptimisticIds(next);
+      return { previous };
+    },
+    onError: (error, _vars, context) => {
+      if (context) setOptimisticIds(context.previous);
+      toast.error(error.message || "Failed to update label");
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const label = await createLabel(mailboxId, { name });
+      await applyLabel(emailIds, label.gmailId, mailboxId);
+      return label;
+    },
+    onSuccess: (label) => {
+      setOptimisticIds((prev) => new Set(prev).add(label.gmailId));
+      setSearch("");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to create label");
+    },
+  });
+
   const labels = labelsQuery.data ?? [];
   const filtered = search
     ? labels.filter((l) => l.name.toLowerCase().includes(search.toLowerCase()))
     : labels;
 
-  async function toggleLabel(label: Label) {
-    const next = new Set(optimisticIds);
-    if (next.has(label.gmailId)) {
-      next.delete(label.gmailId);
-      setOptimisticIds(next);
-      await removeLabel(emailIds, label.gmailId, mailboxId);
-    } else {
-      next.add(label.gmailId);
-      setOptimisticIds(next);
-      await applyLabel(emailIds, label.gmailId, mailboxId);
-    }
+  function toggleLabel(label: Label) {
+    const apply = !optimisticIds.has(label.gmailId);
+    toggleMutation.mutate({ labelId: label.gmailId, apply });
   }
 
-  async function handleCreate() {
-    if (!search.trim()) return;
-    setCreating(true);
-    try {
-      const label = await createLabel(mailboxId, { name: search.trim() });
-      setOptimisticIds((prev) => new Set(prev).add(label.gmailId));
-      await applyLabel(emailIds, label.gmailId, mailboxId);
-      setSearch("");
-    } finally {
-      setCreating(false);
-    }
+  function handleCreate() {
+    const name = search.trim();
+    if (!name || createMutation.isPending) return;
+    createMutation.mutate(name);
   }
 
   const exactMatch = labels.some((l) => l.name.toLowerCase() === search.toLowerCase());
@@ -132,7 +158,7 @@ export function LabelPicker({
             <button
               type="button"
               onClick={handleCreate}
-              disabled={creating}
+              disabled={createMutation.isPending}
               className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted"
             >
               <PlusIcon className="size-3.5" />

@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import {
+  CaretDownIcon,
   CheckIcon,
   ClockIcon,
   GearIcon,
@@ -35,7 +36,7 @@ import {
   useNavigate,
   useRouterState,
 } from "@tanstack/react-router";
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
@@ -68,9 +69,6 @@ function AccountHeader({ mailboxId }: { mailboxId: number }) {
 
   return (
     <div className="flex items-center gap-2 px-2 py-1.5">
-      <div className="flex size-6 items-center justify-center rounded-lg bg-foreground text-[11px] font-semibold uppercase text-background">
-        {displayName.charAt(0)}
-      </div>
       <div className="grid flex-1 text-left text-sm leading-tight">
         <span className="truncate font-medium">{displayName}</span>
         <span className="truncate text-xs text-muted-foreground">
@@ -170,6 +168,15 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   const activeView = useActiveView();
   const navigate = useNavigate();
   const { openCompose } = useInboxCompose();
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const sentIndex = NAV_ITEMS.findIndex((item) => item.view === "sent");
+  const primaryItems = NAV_ITEMS.slice(0, sentIndex + 1);
+  const secondaryItems = NAV_ITEMS.slice(sentIndex + 1);
+  const hasActiveSecondary = secondaryItems.some(
+    (item) => item.view === activeView,
+  );
+  const showSecondary = moreOpen || hasActiveSecondary;
 
   const hotkeyBindings = useMemo(() => {
     const bindings: Record<string, () => void> = {};
@@ -183,15 +190,44 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
 
   useHotkeys(hotkeyBindings, { allowInEditable: true });
 
+  const renderNavItem = (
+    item: (typeof NAV_ITEMS)[number],
+    navIndex: number,
+  ) => {
+    const Icon = item.icon;
+    const nav = getNavTo(item.view, mailboxId);
+    return (
+      <SidebarMenuItem key={item.view} className="group/nav">
+        <SidebarMenuButton
+          asChild
+          isActive={activeView === item.view}
+          tooltip={item.label}
+        >
+          <Link
+            to={nav.to as string}
+            params={nav.params}
+            preload={item.view === "inbox" ? undefined : "intent"}
+          >
+            <Icon className="size-3 shrink-0" />
+            <span>{item.label}</span>
+            <Kbd className="ml-auto opacity-0 transition-opacity group-hover/nav:opacity-100">
+              ⌘{navIndex + 1}
+            </Kbd>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
+
   return (
-    <Sidebar collapsible="none" className="*:bg-sidebar/30 border-border/40">
-      <SidebarHeader>
+    <Sidebar className="*:bg-sidebar/30 border-border/40">
+      <SidebarHeader className="space-y-2">
         <AccountHeader mailboxId={mailboxId} />
-        <SidebarMenu>
+        <SidebarMenu className="gap-1">
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={() => openCompose()}
-              className="bg-white px-2 box-border py-2 shadow-sm"
+              className="bg-background px-2 box-border py-2 shadow-xs"
             >
               <NotePencilIcon />
               <span>Compose</span>
@@ -206,7 +242,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
                 })
               }
             >
-              <MagnifyingGlassIcon className="size-4 shrink-0" />
+              <MagnifyingGlassIcon />
               <span>Search</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -216,7 +252,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
                 navigate({ to: "/$mailboxId/settings", params: { mailboxId } })
               }
             >
-              <GearIcon className="size-4 shrink-0" />
+              <GearIcon />
               <span>Settings</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -227,32 +263,29 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
         <SidebarGroup>
           <SidebarGroupLabel>MAIL</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {NAV_ITEMS.map((item, i) => {
-                const Icon = item.icon;
-                const nav = getNavTo(item.view, mailboxId);
-                return (
-                  <SidebarMenuItem key={item.view} className="group/nav">
-                    <SidebarMenuButton
-                      asChild
-                      isActive={activeView === item.view}
-                      tooltip={item.label}
-                    >
-                      <Link
-                        to={nav.to as string}
-                        params={nav.params}
-                        preload={item.view === "inbox" ? undefined : "intent"}
-                      >
-                        <Icon className="size-3 shrink-0" />
-                        <span>{item.label}</span>
-                        <Kbd className="ml-auto opacity-0 transition-opacity group-hover/nav:opacity-100">
-                          ⌘{i + 1}
-                        </Kbd>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+            <SidebarMenu className="gap-1">
+              {primaryItems.map((item, i) => renderNavItem(item, i))}
+              {showSecondary &&
+                secondaryItems.map((item, i) =>
+                  renderNavItem(item, primaryItems.length + i),
+                )}
+              {!hasActiveSecondary && secondaryItems.length > 0 && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => setMoreOpen((prev) => !prev)}
+                    aria-expanded={moreOpen}
+                    aria-label={moreOpen ? "Show less" : "Show more"}
+                    tooltip={moreOpen ? "Less" : "More"}
+                    className="justify-center"
+                  >
+                    <CaretDownIcon
+                      className={`size-3 shrink-0 text-foreground transition-transform ${
+                        moreOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

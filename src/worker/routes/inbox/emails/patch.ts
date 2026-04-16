@@ -20,9 +20,10 @@ export function registerPatchEmail(api: Hono<AppRouteEnv>) {
       const mailbox = await resolveMailbox(db, user.id, mailboxId);
       if (!mailbox) return c.json({ error: "Mailbox not found" }, 404);
 
+      const currentLabels = currentLabelIds ?? [];
       const source = {
-        isRead: mutation.isRead ?? true,
-        labelIds: currentLabelIds ?? [],
+        isRead: !currentLabels.includes("UNREAD"),
+        labelIds: currentLabels,
         snoozedUntil: mutation.snoozedUntil ?? null,
       };
 
