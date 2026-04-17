@@ -503,14 +503,33 @@ export const localDb = {
     cursor?: number;
     search?: string;
     isRead?: "true" | "false";
+    starred?: boolean;
+    hasAttachment?: boolean;
   }) {
-    const { userId, view = "inbox", mailboxId, limit = 100, offset = 0, cursor, search, isRead } = params;
+    const {
+      userId,
+      view = "inbox",
+      mailboxId,
+      limit = 100,
+      offset = 0,
+      cursor,
+      search,
+      isRead,
+      starred,
+      hasAttachment,
+    } = params;
     const now = Date.now();
     const fragments: SqlFragment[] = [{ sql: "user_id = ?", params: [userId] }];
 
     if (mailboxId != null) fragments.push({ sql: "mailbox_id = ?", params: [mailboxId] });
     if (isRead === "true") fragments.push({ sql: "is_read = 1", params: [] });
     else if (isRead === "false") fragments.push({ sql: "is_read = 0", params: [] });
+    if (starred) fragments.push({ sql: "has_starred = 1", params: [] });
+    if (hasAttachment)
+      fragments.push({
+        sql: "EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value = ?)",
+        params: [HAS_ATTACHMENT_LABEL],
+      });
 
     if (search) {
       const pattern = `%${search}%`;
@@ -1024,32 +1043,29 @@ export const localDb = {
   ): Promise<void> {
     if (labels.length === 0) return;
     const now = Date.now();
-    const rows: LabelInsert[] = labels.map((l) => ({
-      gmailId: l.gmailId,
-      userId,
-      mailboxId,
-      name: l.name,
-      type: l.type ?? "user",
-      textColor: l.textColor ?? null,
-      backgroundColor: l.backgroundColor ?? null,
-      messagesTotal: l.messagesTotal ?? 0,
-      messagesUnread: l.messagesUnread ?? 0,
-      syncedAt: now,
-    }));
+    const CHUNK = 50;
+    const TUPLE = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-    for (const row of rows) {
-      await dbClient.exec(
-        `INSERT INTO labels (gmail_id, user_id, mailbox_id, name, type, text_color, background_color, messages_total, messages_unread, synced_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (gmail_id) DO UPDATE SET
-           name = excluded.name,
-           type = excluded.type,
-           text_color = excluded.text_color,
-           background_color = excluded.background_color,
-           messages_total = excluded.messages_total,
-           messages_unread = excluded.messages_unread,
-           synced_at = excluded.synced_at`,
-        [
+    for (let i = 0; i < labels.length; i += CHUNK) {
+      const batch = labels.slice(i, i + CHUNK);
+      const values: string[] = [];
+      const params: BindParam[] = [];
+
+      for (const label of batch) {
+        values.push(TUPLE);
+        const row: LabelInsert = {
+          gmailId: label.gmailId,
+          userId,
+          mailboxId,
+          name: label.name,
+          type: label.type ?? "user",
+          textColor: label.textColor ?? null,
+          backgroundColor: label.backgroundColor ?? null,
+          messagesTotal: label.messagesTotal ?? 0,
+          messagesUnread: label.messagesUnread ?? 0,
+          syncedAt: now,
+        };
+        params.push(
           row.gmailId,
           row.userId,
           row.mailboxId,
@@ -1060,7 +1076,21 @@ export const localDb = {
           row.messagesTotal,
           row.messagesUnread,
           row.syncedAt,
-        ],
+        );
+      }
+
+      await dbClient.exec(
+        `INSERT INTO labels (gmail_id, user_id, mailbox_id, name, type, text_color, background_color, messages_total, messages_unread, synced_at)
+         VALUES ${values.join(", ")}
+         ON CONFLICT (gmail_id) DO UPDATE SET
+           name = excluded.name,
+           type = excluded.type,
+           text_color = excluded.text_color,
+           background_color = excluded.background_color,
+           messages_total = excluded.messages_total,
+           messages_unread = excluded.messages_unread,
+           synced_at = excluded.synced_at`,
+        params,
         "run",
       );
     }

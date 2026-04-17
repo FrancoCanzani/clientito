@@ -199,9 +199,15 @@ async function runSync(userId: string, mailboxId: number) {
   // instead of waiting for the whole pull loop to finish.
   const labelsTask = wasSynced
     ? Promise.resolve()
-    : syncLabelsFromServer(mailboxId).catch((err) => {
-        console.warn("Label sync failed", err);
-      });
+    : syncLabelsFromServer(mailboxId)
+        .then(() => {
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.labels(mailboxId),
+          });
+        })
+        .catch((err) => {
+          console.warn("Label sync failed", err);
+        });
 
   try {
     let cursor: string | undefined;
@@ -262,22 +268,30 @@ export function pullViewMore(
   userId: string,
   mailboxId: number,
   view: string,
+  options?: { extraQuery?: string; beforeMs?: number },
 ): Promise<{ inserted: number; hasMore: boolean }> {
   const filter = viewToGmailFilter(view);
   if (!filter) return Promise.resolve({ inserted: 0, hasMore: false });
 
-  const key = `${userId}:${mailboxId}:${view}`;
+  const extra = options?.extraQuery?.trim();
+  const combinedQuery = [filter.query, extra].filter(Boolean).join(" ") || undefined;
+
+  const key = `${userId}:${mailboxId}:${view}:${extra ?? ""}:${options?.beforeMs ?? ""}`;
   const existing = backfillInFlight.get(key);
   if (existing) return existing;
 
   const task = (async () => {
     await localDb.ensureReady();
-    const meta = await localDb.getViewMeta({ userId, mailboxId, view });
+    let beforeMs = options?.beforeMs;
+    if (beforeMs === undefined) {
+      const meta = await localDb.getViewMeta({ userId, mailboxId, view });
+      beforeMs = meta.oldestDateMs ?? undefined;
+    }
     const page = await postPull("/api/inbox/sync/pull-view", {
       mailboxId,
-      query: filter.query,
+      query: combinedQuery,
       labelIds: filter.labelIds,
-      beforeMs: meta.oldestDateMs ?? undefined,
+      beforeMs,
     });
     await applyPage(userId, mailboxId, page);
     return { inserted: page.emails.length, hasMore: !!page.cursor };

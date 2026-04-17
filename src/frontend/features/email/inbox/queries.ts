@@ -18,7 +18,12 @@ function normalizeSearchQuery(query: string) {
 }
 
 export const EMAIL_LIST_PAGE_SIZE = 50;
+export const LABEL_PAGE_SIZE = 200;
 export const INBOX_SEARCH_PAGE_SIZE = 30;
+
+export function pageSizeForView(view: string) {
+  return view.startsWith("Label_") ? LABEL_PAGE_SIZE : EMAIL_LIST_PAGE_SIZE;
+}
 
 function emptyListResponse(
   limit: number,
@@ -41,6 +46,8 @@ export async function fetchEmails(
     offset?: number;
     cursor?: number;
     mailboxId?: number;
+    starred?: boolean;
+    hasAttachment?: boolean;
   },
 ): Promise<EmailListResponse> {
   const userId = await getCurrentUserId();
@@ -74,6 +81,8 @@ export async function fetchEmails(
     cursor: params?.cursor,
     search: params?.search,
     isRead: params?.isRead,
+    starred: params?.starred,
+    hasAttachment: params?.hasAttachment,
   });
   return result;
 }

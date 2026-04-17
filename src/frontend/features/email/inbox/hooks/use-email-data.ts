@@ -1,6 +1,6 @@
 import { pullViewMore } from "@/db/sync";
 import { useLocalSyncSnapshot } from "@/hooks/use-local-sync";
-import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/email/inbox/queries";
+import { fetchEmails, pageSizeForView } from "@/features/email/inbox/queries";
 import type { EmailListResponse } from "@/features/email/inbox/types";
 import { groupEmailsByThread } from "@/features/email/inbox/utils/group-emails-by-thread";
 import { viewToGmailFilter } from "@/features/email/inbox/utils/view-gmail-filter";
@@ -10,8 +10,32 @@ import { queryKeys } from "@/lib/query-keys";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+
 const LOAD_MORE_ROOT_MARGIN = "800px 0px";
 const GMAIL_PULL_MAX_PAGES_PER_TRIGGER = 5;
+
+export type InboxListFilters = {
+  unread?: boolean;
+  starred?: boolean;
+  hasAttachment?: boolean;
+};
+
+function filtersToKey(filters?: InboxListFilters): string | undefined {
+  if (!filters) return undefined;
+  const parts: string[] = [];
+  if (filters.unread) parts.push("unread");
+  if (filters.starred) parts.push("starred");
+  if (filters.hasAttachment) parts.push("attach");
+  return parts.length > 0 ? parts.join("|") : undefined;
+}
+
+function filtersToGmailQuery(filters: InboxListFilters): string | undefined {
+  const parts: string[] = [];
+  if (filters.unread) parts.push("is:unread");
+  if (filters.starred) parts.push("is:starred");
+  if (filters.hasAttachment) parts.push("has:attachment");
+  return parts.length > 0 ? parts.join(" ") : undefined;
+}
 
 export function useEmailData({
   view,
@@ -28,17 +52,29 @@ export function useEmailData({
   const isInitialSync = localSync.status === "initial";
   const isSyncing = localSync.status !== "idle";
 
+  const [filters, setFilters] = useState<InboxListFilters>({});
+  useEffect(() => {
+    setFilters({});
+  }, [view, mailboxId]);
+
+  const filterKey = filtersToKey(filters);
+  const hasActiveFilters = filterKey !== undefined;
+
+  const pageSize = pageSizeForView(view);
   const emailsQuery = useInfiniteQuery({
-    queryKey: queryKeys.emails.list(view, mailboxId),
+    queryKey: queryKeys.emails.list(view, mailboxId, filterKey),
     queryFn: ({ pageParam }) =>
       fetchEmails({
         view,
         mailboxId,
-        limit: EMAIL_LIST_PAGE_SIZE,
+        limit: pageSize,
         cursor: pageParam || undefined,
+        isRead: filters?.unread ? "false" : undefined,
+        starred: filters?.starred,
+        hasAttachment: filters?.hasAttachment,
       }),
     initialPageParam: 0 as number,
-    ...(initialPage
+    ...(initialPage && !hasActiveFilters
       ? {
           initialData: {
             pages: [initialPage],
@@ -77,6 +113,15 @@ export function useEmailData({
   const canPullFromGmail =
     !!user?.id && viewToGmailFilter(view) !== null && !gmailExhausted;
 
+  const gmailExtraQuery = hasActiveFilters
+    ? filtersToGmailQuery(filters)
+    : undefined;
+
+  const oldestLoadedDate = useMemo(() => {
+    const last = displayEmails[displayEmails.length - 1];
+    return last?.date ?? undefined;
+  }, [displayEmails]);
+
   const pullMoreFromGmail = useCallback(async () => {
     if (!user?.id) return;
     setIsPullingFromGmail(true);
@@ -86,6 +131,10 @@ export function useEmailData({
           user.id,
           mailboxId,
           view,
+          {
+            extraQuery: gmailExtraQuery,
+            beforeMs: hasActiveFilters ? oldestLoadedDate : undefined,
+          },
         );
         if (!hasMore) {
           setGmailExhausted(true);
@@ -98,7 +147,14 @@ export function useEmailData({
     } finally {
       setIsPullingFromGmail(false);
     }
-  }, [user?.id, mailboxId, view]);
+  }, [
+    user?.id,
+    mailboxId,
+    view,
+    hasActiveFilters,
+    gmailExtraQuery,
+    oldestLoadedDate,
+  ]);
 
   const loadMoreRef = useIntersectionObserver<HTMLDivElement>({
     root: null,
@@ -130,5 +186,9 @@ export function useEmailData({
     loadMoreRef,
     canPullFromGmail,
     isPullingFromGmail,
+    filters,
+    setFilters,
+    hasActiveFilters,
+    pullMoreFromGmail,
   };
 }

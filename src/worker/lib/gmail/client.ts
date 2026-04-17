@@ -249,8 +249,9 @@ export async function fetchThread(
 ): Promise<GmailThreadResponse> {
   return gmailRequest<GmailThreadResponse>(accessToken, `/threads/${threadId}`, {
     format,
-    fields:
-      "id,historyId,messages(id,threadId,historyId,internalDate,snippet,labelIds,payload(mimeType,headers,body/data,parts(mimeType,headers,body/data,parts)))",
+    // Use the whole payload tree so attachment metadata (filename, size,
+    // body.attachmentId) is always present for parsing.
+    fields: "id,historyId,messages(id,threadId,historyId,internalDate,snippet,labelIds,payload)",
   });
 }
 
@@ -307,7 +308,9 @@ export async function fetchMessage(
     fields:
       format === "minimal"
         ? "id,threadId,historyId,internalDate,labelIds"
-        : "id,threadId,historyId,internalDate,snippet,labelIds,payload(mimeType,headers,body/data,parts(mimeType,headers,body/data,parts))",
+        // Keep full payload for non-batch fallbacks so attachment parsing stays
+        // consistent with batched full fetches.
+        : "id,threadId,historyId,internalDate,snippet,labelIds,payload",
   });
 }
 

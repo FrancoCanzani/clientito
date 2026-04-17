@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { IconButton } from "@/components/ui/icon-button";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import { patchEmail } from "@/features/email/inbox/mutations";
@@ -17,12 +18,11 @@ import {
   type RowAction,
 } from "@/features/email/inbox/utils/row-actions";
 import { LabelChip } from "@/features/email/labels/components/label-chip";
-import { fetchLabels } from "@/features/email/labels/queries";
 import type { Label } from "@/features/email/labels/types";
 import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { PaperclipIcon, StarIcon } from "@phosphor-icons/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { memo, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { EmailListItem } from "../../types";
@@ -38,26 +38,29 @@ export const EmailRow = memo(function EmailRow({
   onOpen,
   onAction,
   isFocused = false,
+  index,
+  isSelected = false,
+  onToggleSelect,
+  anySelected = false,
+  allLabels,
 }: {
   group: ThreadGroup;
   view: string;
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
   isFocused?: boolean;
+  index: number;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string, index: number, shift: boolean) => void;
+  anySelected?: boolean;
+  allLabels?: Label[];
 }) {
   const queryClient = useQueryClient();
   const prefetchedRef = useRef(false);
   const [pendingConfirm, setPendingConfirm] = useState<RowAction | null>(null);
+  const [actionsMounted, setActionsMounted] = useState(false);
   const email = group.representative;
   const isStarred = email.labelIds.includes("STARRED");
-  const mailboxIdForLabels = email.mailboxId ?? undefined;
-
-  const { data: allLabels } = useQuery({
-    queryKey: queryKeys.labels(mailboxIdForLabels ?? -1),
-    queryFn: () => fetchLabels(mailboxIdForLabels!),
-    enabled: mailboxIdForLabels !== undefined,
-    staleTime: 60_000,
-  });
 
   const userLabels = useMemo<Label[]>(() => {
     if (!allLabels) return [];
@@ -73,6 +76,7 @@ export const EmailRow = memo(function EmailRow({
 
   const threadCount = group.threadCount;
   const rowActions = getRowActions(view, email);
+  const showCheckbox = anySelected || isSelected;
 
   const participantLabel =
     view === "sent"
@@ -86,7 +90,8 @@ export const EmailRow = memo(function EmailRow({
     [email.snippet],
   );
 
-  const prefetchEmailData = () => {
+  const handleMouseEnter = () => {
+    if (!actionsMounted) setActionsMounted(true);
     if (prefetchedRef.current) return;
     prefetchedRef.current = true;
 
@@ -110,26 +115,6 @@ export const EmailRow = memo(function EmailRow({
     onAction(rowAction.action, [email.id]);
   };
 
-  const snoozeMutation = useMutation({
-    mutationFn: (timestamp: number | null) => {
-      if (!email.mailboxId) throw new Error("Missing mailbox");
-      return patchEmail(
-        {
-          id: email.id,
-          providerMessageId: email.providerMessageId,
-          mailboxId: email.mailboxId,
-          labelIds: email.labelIds,
-        },
-        { snoozedUntil: timestamp },
-      );
-    },
-    onSuccess: (_data, timestamp) => {
-      toast.success(timestamp ? "Snoozed" : "Unsnoozed");
-      void queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to snooze"),
-  });
-
   const visibleChips = userLabels.slice(0, MAX_VISIBLE_CHIPS);
   const hiddenChipCount = userLabels.length - visibleChips.length;
 
@@ -139,10 +124,12 @@ export const EmailRow = memo(function EmailRow({
         role="button"
         tabIndex={0}
         className={cn(
-          "group flex w-full cursor-default items-center gap-3 px-3 h-12 text-left text-sm transition-colors hover:bg-muted/40",
+          "group flex h-12 w-full cursor-default items-center gap-3 pr-6 pl-16 text-left text-sm transition-colors hover:bg-muted/40 md:px-6",
           isFocused && "bg-muted",
+          isSelected && "bg-primary/5 hover:bg-primary/10",
         )}
-        onMouseEnter={prefetchEmailData}
+        onMouseEnter={handleMouseEnter}
+        onFocus={handleMouseEnter}
         onClick={() => onOpen(email)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -151,7 +138,25 @@ export const EmailRow = memo(function EmailRow({
           }
         }}
       >
-        <div className="flex w-44 shrink-0 items-center gap-2 lg:w-56 xl:w-64">
+        <div
+          className={cn(
+            "flex w-10 shrink-0 items-center gap-1",
+            !showCheckbox &&
+              "pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100",
+          )}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <Checkbox
+            aria-label={isSelected ? "Deselect email" : "Select email"}
+            checked={isSelected}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleSelect?.(email.id, index, event.shiftKey);
+            }}
+          />
+          <span className="size-5 shrink-0" aria-hidden />
+        </div>
+        <div className="flex w-36 shrink-0 items-center gap-2 lg:w-44 xl:w-52">
           <span
             className={cn(
               "truncate text-sm",
@@ -216,114 +221,154 @@ export const EmailRow = memo(function EmailRow({
             {formatInboxRowDate(email.date)}
           </span>
 
-          <div
-            className={cn(
-              "absolute inset-y-0 right-0 hidden items-center gap-0.5 rounded-md bg-muted px-1 shadow-sm ring-1 ring-border/60 group-hover:flex",
-            )}
-            onClick={(event) => event.stopPropagation()}
-          >
-            {rowActions.map((rowAction) => {
-              const Icon = rowAction.icon;
-              const iconEl = (
-                <Icon
-                  className={cn(
-                    "size-3.5",
-                    rowAction.key === "star" && "text-yellow-500",
-                  )}
-                  weight={rowAction.iconWeight}
-                />
-              );
-
-              if (rowAction.kind === "snooze") {
-                return (
-                  <SnoozePicker
-                    key={rowAction.key}
-                    onSnooze={(timestamp) => snoozeMutation.mutate(timestamp)}
-                  >
-                    <IconButton
-                      label={rowAction.label}
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      {iconEl}
-                    </IconButton>
-                  </SnoozePicker>
-                );
-              }
-
-              if (rowAction.kind === "unsnooze") {
-                return (
-                  <IconButton
-                    key={rowAction.key}
-                    label={rowAction.label}
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      snoozeMutation.mutate(null);
-                    }}
-                  >
-                    {iconEl}
-                  </IconButton>
-                );
-              }
-
-              return (
-                <IconButton
-                  key={rowAction.key}
-                  label={rowAction.label}
-                  shortcut={rowAction.shortcut}
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    runAction(rowAction);
-                  }}
-                  className={cn(
-                    rowAction.destructive &&
-                      "text-destructive hover:text-destructive",
-                  )}
-                >
-                  {iconEl}
-                </IconButton>
-              );
-            })}
-          </div>
+          {actionsMounted && (
+            <EmailRowActions
+              email={email}
+              rowActions={rowActions}
+              onRunAction={runAction}
+            />
+          )}
         </div>
       </div>
 
-      <AlertDialog
-        open={pendingConfirm !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendingConfirm(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {pendingConfirm?.confirm?.title ?? "Are you sure?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingConfirm?.confirm?.description}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() => {
-                if (pendingConfirm) {
+      {pendingConfirm !== null && (
+        <AlertDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setPendingConfirm(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {pendingConfirm.confirm?.title ?? "Are you sure?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {pendingConfirm.confirm?.description}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={() => {
                   onAction(pendingConfirm.action, [email.id]);
-                }
-                setPendingConfirm(null);
-              }}
-            >
-              {pendingConfirm?.confirm?.confirmLabel ?? "Confirm"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                  setPendingConfirm(null);
+                }}
+              >
+                {pendingConfirm.confirm?.confirmLabel ?? "Confirm"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </>
   );
 });
+
+function EmailRowActions({
+  email,
+  rowActions,
+  onRunAction,
+}: {
+  email: EmailListItem;
+  rowActions: RowAction[];
+  onRunAction: (rowAction: RowAction) => void;
+}) {
+  const queryClient = useQueryClient();
+
+  const snoozeMutation = useMutation({
+    mutationFn: (timestamp: number | null) => {
+      if (!email.mailboxId) throw new Error("Missing mailbox");
+      return patchEmail(
+        {
+          id: email.id,
+          providerMessageId: email.providerMessageId,
+          mailboxId: email.mailboxId,
+          labelIds: email.labelIds,
+        },
+        { snoozedUntil: timestamp },
+      );
+    },
+    onSuccess: (_data, timestamp) => {
+      toast.success(timestamp ? "Snoozed" : "Unsnoozed");
+      void queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+    },
+    onError: (error: Error) => toast.error(error.message || "Failed to snooze"),
+  });
+
+  return (
+    <div
+      className="absolute inset-y-0 right-0 hidden items-center gap-0.5 rounded-md bg-muted px-1 shadow-sm ring-1 ring-border/60 group-hover:flex"
+      onClick={(event) => event.stopPropagation()}
+    >
+      {rowActions.map((rowAction) => {
+        const Icon = rowAction.icon;
+        const iconEl = (
+          <Icon
+            className={cn(
+              "size-3.5",
+              rowAction.key === "star" && "text-yellow-500",
+            )}
+            weight={rowAction.iconWeight}
+          />
+        );
+
+        if (rowAction.kind === "snooze") {
+          return (
+            <SnoozePicker
+              key={rowAction.key}
+              onSnooze={(timestamp) => snoozeMutation.mutate(timestamp)}
+            >
+              <IconButton
+                label={rowAction.label}
+                variant="ghost"
+                size="icon-sm"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {iconEl}
+              </IconButton>
+            </SnoozePicker>
+          );
+        }
+
+        if (rowAction.kind === "unsnooze") {
+          return (
+            <IconButton
+              key={rowAction.key}
+              label={rowAction.label}
+              variant="ghost"
+              size="icon-sm"
+              onClick={(event) => {
+                event.stopPropagation();
+                snoozeMutation.mutate(null);
+              }}
+            >
+              {iconEl}
+            </IconButton>
+          );
+        }
+
+        return (
+          <IconButton
+            key={rowAction.key}
+            label={rowAction.label}
+            shortcut={rowAction.shortcut}
+            variant="ghost"
+            size="icon-sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRunAction(rowAction);
+            }}
+            className={cn(
+              rowAction.destructive &&
+                "text-destructive hover:text-destructive",
+            )}
+          >
+            {iconEl}
+          </IconButton>
+        );
+      })}
+    </div>
+  );
+}

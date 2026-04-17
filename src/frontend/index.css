@@ -75,7 +75,7 @@
 }
 
 @theme inline {
-  --font-sans: "Colfax", "Inter", sans-serif;
+  --font-sans: "Inter Variable", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
   --font-serif: "Gelasio", serif;
   --font-pixel: "Silkscreen", monospace;

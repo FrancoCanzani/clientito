@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowClockwiseIcon,
   DownloadSimpleIcon,
+  FilePdfIcon,
   ImageIcon,
   PaperclipIcon,
   WarningCircleIcon,
@@ -39,6 +40,24 @@ async function downloadAttachment(attachment: EmailAttachment) {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+}
+
+function toInlinePreviewUrl(url: string): string | null {
+  if (!url) return null;
+  try {
+    const next = new URL(url, window.location.origin);
+    next.searchParams.set("inline", "true");
+    return `${next.pathname}${next.search}`;
+  } catch {
+    return null;
+  }
+}
+
+function isPdfAttachment(attachment: EmailAttachment): boolean {
+  const mimeType = attachment.mimeType?.toLowerCase() ?? "";
+  if (mimeType === "application/pdf") return true;
+  const filename = attachment.filename?.toLowerCase() ?? "";
+  return filename.endsWith(".pdf");
 }
 
 function ImageLightbox({
@@ -87,6 +106,58 @@ function ImageLightbox({
   );
 }
 
+function PdfLightbox({
+  src,
+  title,
+  onClose,
+}: {
+  src: string;
+  title: string;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
+
+  return (
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(12%_0.01_250)]/80 p-4"
+      onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+    >
+      <button
+        type="button"
+        className="absolute right-4 top-4 z-10 flex size-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+        onClick={onClose}
+        aria-label="Close preview"
+      >
+        <XIcon className="size-5" />
+      </button>
+
+      <div
+        className="h-[88vh] w-[92vw] max-w-6xl overflow-hidden rounded-lg bg-background shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <iframe
+          src={src}
+          title={title}
+          className="h-full w-full"
+          referrerPolicy="no-referrer"
+        />
+      </div>
+    </div>
+  );
+}
+
 export function AttachmentItem({
   attachment,
 }: {
@@ -94,7 +165,7 @@ export function AttachmentItem({
 }) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState<"image" | "pdf" | null>(null);
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -113,9 +184,16 @@ export function AttachmentItem({
     }
   };
 
-  const previewUrl = attachment.isImage
-    ? (attachment.inlineUrl ?? attachment.downloadUrl)
+  const inlinePreviewUrl = toInlinePreviewUrl(attachment.downloadUrl);
+  const imagePreviewUrl = attachment.isImage
+    ? (attachment.inlineUrl ?? inlinePreviewUrl)
     : null;
+  const pdfPreviewUrl = isPdfAttachment(attachment) ? inlinePreviewUrl : null;
+  const previewType = imagePreviewUrl
+    ? "image"
+    : pdfPreviewUrl
+      ? "pdf"
+      : null;
 
   return (
     <>
@@ -123,19 +201,21 @@ export function AttachmentItem({
         <button
           type="button"
           onClick={() => {
-            if (previewUrl) setLightboxOpen(true);
+            if (previewType) setPreviewOpen(previewType);
           }}
-          disabled={!previewUrl}
+          disabled={!previewType}
           className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/60 text-muted-foreground disabled:cursor-default"
-          aria-label={previewUrl ? "Preview image" : undefined}
+          aria-label={previewType ? "Preview attachment" : undefined}
         >
-          {previewUrl ? (
+          {imagePreviewUrl ? (
             <img
-              src={previewUrl}
+              src={imagePreviewUrl}
               alt={attachment.filename || "Image attachment"}
               className="size-full object-cover"
               loading="lazy"
             />
+          ) : pdfPreviewUrl ? (
+            <FilePdfIcon className="size-4" />
           ) : attachment.isImage ? (
             <ImageIcon className="size-4" />
           ) : (
@@ -197,11 +277,19 @@ export function AttachmentItem({
         </div>
       )}
 
-      {lightboxOpen && previewUrl && (
+      {previewOpen === "image" && imagePreviewUrl && (
         <ImageLightbox
-          src={previewUrl}
+          src={imagePreviewUrl}
           alt={attachment.filename || "Image attachment"}
-          onClose={() => setLightboxOpen(false)}
+          onClose={() => setPreviewOpen(null)}
+        />
+      )}
+
+      {previewOpen === "pdf" && pdfPreviewUrl && (
+        <PdfLightbox
+          src={pdfPreviewUrl}
+          title={attachment.filename || "PDF attachment"}
+          onClose={() => setPreviewOpen(null)}
         />
       )}
     </>

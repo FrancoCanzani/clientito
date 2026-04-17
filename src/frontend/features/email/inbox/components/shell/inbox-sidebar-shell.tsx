@@ -88,23 +88,59 @@ type NavView =
   | "important"
   | "drafts";
 
-function useActiveView(): NavView {
+function useActiveSidebarState(): {
+  activeView: NavView;
+  activeLabelId?: string;
+  isSearchRoute: boolean;
+  isSettingsRoute: boolean;
+} {
   return useRouterState({
-    select: (state): NavView => {
+    select: (state) => {
       const matches = state.matches;
-      const leaf = matches[matches.length - 1]?.routeId;
-      if (leaf === "/_dashboard/$mailboxId/inbox/search") return "search";
-      if (leaf === "/_dashboard/$mailboxId/inbox/drafts") return "drafts";
+      const isSearchRoute = matches.some(
+        (match) => match.routeId === "/_dashboard/$mailboxId/inbox/search",
+      );
+      const isSettingsRoute = matches.some(
+        (match) => match.routeId === "/_dashboard/$mailboxId/settings",
+      );
+      const isDraftsRoute = matches.some(
+        (match) => match.routeId === "/_dashboard/$mailboxId/inbox/drafts",
+      );
 
-      const label = matches.find(
+      const activeLabelId = matches.find(
         (match) =>
-          match.routeId === "/_dashboard/$mailboxId/inbox/labels/$label/",
+          match.routeId === "/_dashboard/$mailboxId/inbox/labels/$label/" ||
+          match.routeId ===
+            "/_dashboard/$mailboxId/inbox/labels/$label/email/$emailId",
       )?.params.label;
 
-      if (label === "important") return "important";
+      if (isSearchRoute)
+        return {
+          activeView: "search" as const,
+          activeLabelId,
+          isSearchRoute,
+          isSettingsRoute,
+        };
+      if (isDraftsRoute)
+        return {
+          activeView: "drafts" as const,
+          activeLabelId,
+          isSearchRoute,
+          isSettingsRoute,
+        };
+
+      if (activeLabelId === "important")
+        return {
+          activeView: "important" as const,
+          activeLabelId,
+          isSearchRoute,
+          isSettingsRoute,
+        };
 
       const folder = matches.find(
-        (match) => match.routeId === "/_dashboard/$mailboxId/$folder/",
+        (match) =>
+          match.routeId === "/_dashboard/$mailboxId/$folder/" ||
+          match.routeId === "/_dashboard/$mailboxId/$folder/email/$emailId",
       )?.params.folder;
       if (
         folder === "archived" ||
@@ -114,9 +150,19 @@ function useActiveView(): NavView {
         folder === "spam" ||
         folder === "trash"
       )
-        return folder;
+        return {
+          activeView: folder,
+          activeLabelId,
+          isSearchRoute,
+          isSettingsRoute,
+        };
 
-      return "inbox";
+      return {
+        activeView: "inbox" as const,
+        activeLabelId,
+        isSearchRoute,
+        isSettingsRoute,
+      };
     },
   });
 }
@@ -162,10 +208,13 @@ const NAV_ITEMS = [
 ];
 
 function InboxSidebar({ mailboxId }: { mailboxId: number }) {
-  const activeView = useActiveView();
+  const { activeView, activeLabelId, isSearchRoute, isSettingsRoute } =
+    useActiveSidebarState();
   const navigate = useNavigate();
   const { openCompose } = useInboxCompose();
   const [moreOpen, setMoreOpen] = useState(false);
+  const hasStandaloneRouteSelection =
+    isSearchRoute || isSettingsRoute || Boolean(activeLabelId);
 
   const sentIndex = NAV_ITEMS.findIndex((item) => item.view === "sent");
   const primaryItems = NAV_ITEMS.slice(0, sentIndex + 1);
@@ -191,14 +240,14 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
     item: (typeof NAV_ITEMS)[number],
     navIndex: number,
   ) => {
-    const Icon = item.icon;
     const nav = getNavTo(item.view, mailboxId);
     return (
       <SidebarMenuItem key={item.view} className="group/nav">
         <SidebarMenuButton
           asChild
-          isActive={activeView === item.view}
+          isActive={!hasStandaloneRouteSelection && activeView === item.view}
           tooltip={item.label}
+          className="text-base text-gray-600"
         >
           <Link
             to={nav.to as string}
@@ -216,34 +265,41 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   };
 
   return (
-    <Sidebar className="*:bg-background border-border/40">
+    <Sidebar className="*:bg-neutral-50/50 border-border/50">
       <SidebarHeader className="space-y-2">
         <AccountHeader mailboxId={mailboxId} />
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => openCompose()}>
+            <SidebarMenuButton
+              className="text-base text-gray-600 group"
+              onClick={() => openCompose()}
+            >
               Compose
+              <Kbd className="ml-auto opacity-0 transition-opacity group-hover:opacity-100">
+                ⌘C
+              </Kbd>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
-              onClick={() =>
-                navigate({
-                  to: "/$mailboxId/inbox/search",
-                  params: { mailboxId },
-                })
-              }
+              className="text-base text-gray-600"
+              asChild
+              isActive={isSearchRoute}
             >
-              Search
+              <Link to="/$mailboxId/inbox/search" params={{ mailboxId }}>
+                Search
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
-              onClick={() =>
-                navigate({ to: "/$mailboxId/settings", params: { mailboxId } })
-              }
+              className="text-base text-gray-600"
+              asChild
+              isActive={isSettingsRoute}
             >
-              Settings
+              <Link to="/$mailboxId/settings" params={{ mailboxId }}>
+                Settings
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -251,7 +307,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>MAIL</SidebarGroupLabel>
+          <SidebarGroupLabel>Mail</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {primaryItems.map((item, i) => renderNavItem(item, i))}
@@ -280,7 +336,10 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <LabelSidebarSection mailboxId={mailboxId} />
+        <LabelSidebarSection
+          mailboxId={mailboxId}
+          activeLabelId={activeLabelId}
+        />
       </SidebarContent>
     </Sidebar>
   );

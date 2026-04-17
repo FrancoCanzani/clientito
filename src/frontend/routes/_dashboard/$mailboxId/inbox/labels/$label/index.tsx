@@ -1,6 +1,6 @@
 import { Error as RouteError } from "@/components/error";
 import LabelPage from "@/features/email/inbox/pages/label-page";
-import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/email/inbox/queries";
+import { fetchEmails, pageSizeForView } from "@/features/email/inbox/queries";
 import { parseInboxLabelParam } from "@/features/email/inbox/utils/inbox-filters";
 import type { EmailListResponse } from "@/features/email/inbox/types";
 import { queryKeys } from "@/lib/query-keys";
@@ -20,11 +20,11 @@ export const Route = createFileRoute(
         fetchEmails({
           view: params.label,
           mailboxId: params.mailboxId,
-          limit: EMAIL_LIST_PAGE_SIZE,
+          limit: pageSizeForView(params.label),
           cursor: pageParam === 0 ? undefined : pageParam,
         }),
       initialPageParam: 0,
-      pages: 2,
+      pages: 1,
       getNextPageParam: (lastPage: EmailListResponse) =>
         lastPage.pagination.hasMore && lastPage.pagination.cursor
           ? lastPage.pagination.cursor

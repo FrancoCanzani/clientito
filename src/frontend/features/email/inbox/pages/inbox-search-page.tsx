@@ -171,6 +171,7 @@ export default function InboxSearchPage() {
               <Input
                 className="h-7 text-xs"
                 value={query}
+                autoFocus
                 onChange={(event) => handleQueryChange(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {

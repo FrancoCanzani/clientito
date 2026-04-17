@@ -6,8 +6,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { GearIcon } from "@phosphor-icons/react";
 import { queryKeys } from "@/lib/query-keys";
+import { GearIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { fetchLabels } from "../../labels/queries";
@@ -34,7 +34,7 @@ export function LabelSidebarSection({
   return (
     <SidebarGroup>
       <SidebarGroupLabel className="group/labels">
-        <span className="uppercase">Labels</span>
+        <span>Labels</span>
         <Link
           to="/$mailboxId/settings"
           params={{ mailboxId }}
@@ -52,6 +52,7 @@ export function LabelSidebarSection({
                 asChild
                 isActive={activeLabelId === label.gmailId}
                 tooltip={label.name}
+                className="text-base text-gray-600"
               >
                 <Link
                   to="/$mailboxId/inbox/labels/$label"
@@ -59,21 +60,19 @@ export function LabelSidebarSection({
                   preload="intent"
                 >
                   <span
-                    className="flex size-4 shrink-0 items-center justify-center rounded-full"
+                    className="flex size-3 shrink-0 items-center justify-center rounded-full"
                     style={{
                       backgroundColor: `${label.backgroundColor ?? "#999"}30`,
                     }}
                   >
                     <span
-                      className="size-1.5 rounded-full"
+                      className="size-2 rounded-full"
                       style={{
                         backgroundColor: label.backgroundColor ?? "#999",
                       }}
                     />
                   </span>
-                  <span className="truncate">
-                    {label.name}
-                  </span>
+                  <span className="truncate">{label.name}</span>
                   {label.messagesUnread > 0 && (
                     <span className="ml-auto text-xs text-muted-foreground">
                       {label.messagesUnread}

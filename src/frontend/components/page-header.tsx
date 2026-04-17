@@ -13,7 +13,7 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "sticky top-0 z-20 flex min-h-14 shrink-0 items-center justify-between bg-background gap-3 px-3",
+        "sticky top-0 z-20 flex min-h-14 shrink-0 items-center justify-between bg-background gap-3 px-6",
         className,
       )}
     >
