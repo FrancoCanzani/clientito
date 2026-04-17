@@ -56,33 +56,6 @@ export type DraftAttachmentKey = {
   mimeType: string;
 };
 
-export type PendingMutationKind = "patch" | "delete";
-
-export type PendingMutationPayload = {
-  isRead?: boolean;
-  archived?: boolean;
-  trashed?: boolean;
-  spam?: boolean;
-  starred?: boolean;
-  snoozedUntil?: number | null;
-  labelIds?: string[] | null;
-};
-
-export type PendingMutationRow = {
-  id: string;
-  userId: string;
-  mailboxId: number;
-  kind: PendingMutationKind;
-  providerMessageIds: string[];
-  emailIds: number[];
-  payload: PendingMutationPayload;
-  status: "pending" | "failed";
-  attempts: number;
-  lastError: string | null;
-  createdAt: number;
-  updatedAt: number;
-};
-
 export type DraftRow = {
   id: number;
   userId: string;

@@ -1,7 +1,8 @@
-import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
+import { z } from "zod";
+import type { Database } from "../../../db/client";
 import { mailboxes } from "../../../db/schema";
 import {
   fetchMessage,
@@ -9,91 +10,126 @@ import {
   getCurrentHistoryId,
   getGmailTokenForMailbox,
   listHistoryPage,
-  listMessagesPage,
+  listThreadsPage,
 } from "../../../lib/gmail/client";
-import { resolveMailbox } from "../../../lib/gmail/mailboxes";
-import {
-  getMailboxSyncPreferences,
-  persistMailboxHistoryState,
-} from "../../../lib/gmail/sync/state";
-import { buildGmailQueryFromCutoff } from "../../../lib/gmail/sync/preferences";
-import { parseGmailMessage, type ParsedEmail } from "../../../lib/gmail/sync/parse";
 import { isGmailHistoryExpiredError } from "../../../lib/gmail/errors";
-import { resetMailboxSyncState } from "../../../lib/gmail/sync/state";
+import { resolveMailbox } from "../../../lib/gmail/mailboxes";
+import { parseGmailMessage, type ParsedEmail } from "../../../lib/gmail/sync/parse";
+import {
+  persistMailboxHistoryState,
+  resetMailboxSyncState,
+} from "../../../lib/gmail/sync/state";
+import { fetchThreadsAndParse } from "../../../lib/gmail/sync/threads";
 import type { GmailHistoryResponse } from "../../../lib/gmail/types";
 import type { AppRouteEnv } from "../../types";
 
-type HistoryDelta = {
-  changedMessageIds: string[];
-  deletedMessageIds: string[];
+type AppContext = Context<AppRouteEnv>;
+
+const MESSAGE_BATCH_SIZE = 20;
+const THREAD_BATCH_SIZE = 10;
+const INITIAL_SYNC_MESSAGE_TARGET = 200;
+
+type FullCursor = {
+  mode: "full";
+  threadIds: string[];
+  gmailPageToken: string | null;
+  baseHistoryId: string | null;
+  messagesPulled: number;
 };
 
-function extractHistoryDelta(
-  history: GmailHistoryResponse["history"],
-): HistoryDelta {
-  const changedMessageIds = new Set<string>();
-  const deletedMessageIds = new Set<string>();
+type IncrementalCursor = {
+  mode: "incremental";
+  messageIds: string[];
+  historyId: string | null;
+};
 
-  for (const entry of history ?? []) {
-    for (const added of entry.messagesAdded ?? []) {
-      const messageId = added.message?.id;
-      if (messageId) changedMessageIds.add(messageId);
-    }
-    for (const labelsAdded of entry.labelsAdded ?? []) {
-      const messageId = labelsAdded.message?.id;
-      if (messageId) changedMessageIds.add(messageId);
-    }
-    for (const labelsRemoved of entry.labelsRemoved ?? []) {
-      const messageId = labelsRemoved.message?.id;
-      if (messageId) changedMessageIds.add(messageId);
-    }
-    for (const deleted of entry.messagesDeleted ?? []) {
-      const messageId = deleted.message?.id;
-      if (messageId) deletedMessageIds.add(messageId);
-    }
-  }
+type PullCursor = FullCursor | IncrementalCursor;
 
-  for (const deletedMessageId of deletedMessageIds) {
-    changedMessageIds.delete(deletedMessageId);
-  }
+type ViewCursor = {
+  query: string | null;
+  labelIds: string[];
+  beforeMs: number | null;
+  threadIds: string[];
+  gmailPageToken: string | null;
+};
 
-  return {
-    changedMessageIds: [...changedMessageIds],
-    deletedMessageIds: [...deletedMessageIds],
-  };
+function encodeCursor<T>(cursor: T): string {
+  return btoa(JSON.stringify(cursor));
 }
 
-const PULL_BATCH_SIZE = 20;
+function decodeCursor<T>(encoded: string): T {
+  return JSON.parse(atob(encoded)) as T;
+}
 
 const pullRequestSchema = z.object({
   mailboxId: z.number().int().positive(),
   cursor: z.string().optional(),
 });
 
-type PullCursor = {
-  mode: "full";
-  messageIds: string[];
-  gmailPageToken: string | null;
-  baseHistoryId: string | null;
-  cutoffAt: number | null;
-} | {
-  mode: "incremental";
-  messageIds: string[];
-  deletedIds: string[];
-  historyId: string | null;
-};
-
-function encodeCursor(cursor: PullCursor): string {
-  return btoa(JSON.stringify(cursor));
-}
-
-function decodeCursor(encoded: string): PullCursor {
-  return JSON.parse(atob(encoded));
-}
+const pullViewRequestSchema = z.object({
+  mailboxId: z.number().int().positive(),
+  query: z.string().max(500).optional(),
+  labelIds: z.array(z.string().min(1).max(120)).max(10).optional(),
+  beforeMs: z.number().int().positive().optional(),
+  cursor: z.string().optional(),
+});
 
 const resetRequestSchema = z.object({
   mailboxId: z.number().int().positive(),
 });
+
+function extractHistoryDelta(history: GmailHistoryResponse["history"]): {
+  changedMessageIds: string[];
+  deletedMessageIds: string[];
+} {
+  const changed = new Set<string>();
+  const deleted = new Set<string>();
+
+  for (const entry of history ?? []) {
+    for (const added of entry.messagesAdded ?? []) {
+      if (added.message?.id) changed.add(added.message.id);
+    }
+    for (const labelsAdded of entry.labelsAdded ?? []) {
+      if (labelsAdded.message?.id) changed.add(labelsAdded.message.id);
+    }
+    for (const labelsRemoved of entry.labelsRemoved ?? []) {
+      if (labelsRemoved.message?.id) changed.add(labelsRemoved.message.id);
+    }
+    for (const deletedEntry of entry.messagesDeleted ?? []) {
+      if (deletedEntry.message?.id) deleted.add(deletedEntry.message.id);
+    }
+  }
+
+  for (const id of deleted) changed.delete(id);
+
+  return {
+    changedMessageIds: [...changed],
+    deletedMessageIds: [...deleted],
+  };
+}
+
+async function markMailboxSynced(db: Database, mailboxId: number) {
+  await db
+    .update(mailboxes)
+    .set({ lastSuccessfulSyncAt: Date.now(), updatedAt: Date.now() })
+    .where(eq(mailboxes.id, mailboxId));
+}
+
+function composeViewQuery(
+  baseQuery: string | null,
+  beforeMs: number | null,
+): string | undefined {
+  const parts: string[] = [];
+  if (baseQuery) parts.push(baseQuery);
+  if (beforeMs != null) {
+    const before = new Date(beforeMs);
+    const y = before.getUTCFullYear();
+    const m = String(before.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(before.getUTCDate()).padStart(2, "0");
+    parts.push(`before:${y}/${m}/${d}`);
+  }
+  return parts.length > 0 ? parts.join(" ") : undefined;
+}
 
 export function registerPullSync(api: Hono<AppRouteEnv>) {
   api.post(
@@ -105,9 +141,7 @@ export function registerPullSync(api: Hono<AppRouteEnv>) {
       const { mailboxId } = c.req.valid("json");
 
       const mailbox = await resolveMailbox(db, user.id, mailboxId);
-      if (!mailbox) {
-        return c.json({ error: "No mailbox found" }, 400);
-      }
+      if (!mailbox) return c.json({ error: "No mailbox found" }, 400);
 
       await resetMailboxSyncState(db, mailbox.id);
       return c.json({ status: "ok" });
@@ -123,8 +157,62 @@ export function registerPullSync(api: Hono<AppRouteEnv>) {
       const { mailboxId, cursor: cursorStr } = c.req.valid("json");
 
       const mailbox = await resolveMailbox(db, user.id, mailboxId);
-      if (!mailbox) {
-        return c.json({ error: "No mailbox found" }, 400);
+      if (!mailbox) return c.json({ error: "No mailbox found" }, 400);
+
+      const accessToken = await getGmailTokenForMailbox(db, mailbox.id, {
+        GOOGLE_CLIENT_ID: c.env.GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET: c.env.GOOGLE_CLIENT_SECRET,
+      });
+
+      if (cursorStr) {
+        const cursor = decodeCursor<PullCursor>(cursorStr);
+        return cursor.mode === "full"
+          ? handleFullSyncPage(c, accessToken, mailbox.id, cursor)
+          : handleIncrementalPage(c, accessToken, db, mailbox.id, cursor);
+      }
+
+      const mbRow = await db.query.mailboxes.findFirst({
+        where: eq(mailboxes.id, mailbox.id),
+      });
+
+      if (mbRow?.historyId) {
+        return startIncremental(c, accessToken, db, mailbox.id, mbRow.historyId);
+      }
+
+      return startFullSync(c, accessToken, db, mailbox.id);
+    },
+  );
+
+  api.post(
+    "/pull-view",
+    zValidator("json", pullViewRequestSchema),
+    async (c) => {
+      const db = c.get("db");
+      const user = c.get("user")!;
+      const body = c.req.valid("json");
+
+      const mailbox = await resolveMailbox(db, user.id, body.mailboxId);
+      if (!mailbox) return c.json({ error: "No mailbox found" }, 400);
+
+      let query: string | null;
+      let labelIds: string[];
+      let beforeMs: number | null;
+      let threadIds: string[];
+      let gmailPageToken: string | null;
+
+      if (body.cursor) {
+        const cursor = decodeCursor<ViewCursor>(body.cursor);
+        query = cursor.query;
+        labelIds = cursor.labelIds;
+        beforeMs = cursor.beforeMs;
+        threadIds = cursor.threadIds;
+        gmailPageToken = cursor.gmailPageToken;
+      } else {
+        query = body.query?.trim() || null;
+        labelIds = body.labelIds ?? [];
+        beforeMs = body.beforeMs ?? null;
+        threadIds = [];
+        gmailPageToken = null;
       }
 
       const accessToken = await getGmailTokenForMailbox(db, mailbox.id, {
@@ -132,109 +220,129 @@ export function registerPullSync(api: Hono<AppRouteEnv>) {
         GOOGLE_CLIENT_SECRET: c.env.GOOGLE_CLIENT_SECRET,
       });
 
-      // Resume from cursor or start fresh
-      if (cursorStr) {
-        const cursor = decodeCursor(cursorStr);
-
-        if (cursor.mode === "full") {
-          return await handleFullSyncPage(c, accessToken, mailbox.id, cursor);
-        }
-        return await handleIncrementalPage(c, accessToken, db, mailbox.id, cursor);
+      if (threadIds.length === 0 && (!body.cursor || gmailPageToken)) {
+        const page = await listThreadsPage(accessToken, {
+          pageToken: gmailPageToken ?? undefined,
+          query: composeViewQuery(query, beforeMs),
+          labelIds: labelIds.length > 0 ? labelIds : undefined,
+        });
+        threadIds = (page.threads ?? []).map((t) => t.id);
+        gmailPageToken = page.nextPageToken ?? null;
       }
 
-      // No cursor — determine mode based on mailbox state
-      const mbRow = await db.query.mailboxes.findFirst({
-        where: eq(mailboxes.id, mailbox.id),
-      });
+      const batch = threadIds.slice(0, THREAD_BATCH_SIZE);
+      const remaining = threadIds.slice(THREAD_BATCH_SIZE);
+      const emails = await fetchThreadsAndParse(accessToken, batch, null);
+      const hasMore = remaining.length > 0 || !!gmailPageToken;
 
-      if (mbRow?.historyId) {
-        // Has history — try incremental
-        return await startIncremental(c, accessToken, db, mailbox.id, mbRow.historyId);
-      }
-
-      // No history — full sync
-      const { syncCutoffAt } = await getMailboxSyncPreferences(db, mailbox.id);
-      const gmailQuery = buildGmailQueryFromCutoff(syncCutoffAt);
-      const baseHistoryId = await getCurrentHistoryId(accessToken);
-
-      const page = await listMessagesPage(accessToken, undefined, gmailQuery);
-      const allIds = (page.messages ?? []).map((m) => m.id);
-
-      // Take first batch, queue the rest
-      const batch = allIds.slice(0, PULL_BATCH_SIZE);
-      const remaining = allIds.slice(PULL_BATCH_SIZE);
-
-      const emails = await fetchAndParse(accessToken, batch, syncCutoffAt);
-
-      const nextCursor: PullCursor = {
-        mode: "full",
-        messageIds: remaining,
-        gmailPageToken: page.nextPageToken ?? null,
-        baseHistoryId,
-        cutoffAt: syncCutoffAt,
-      };
-
-      const hasMore = remaining.length > 0 || !!page.nextPageToken;
+      const nextCursor: ViewCursor | null = hasMore
+        ? { query, labelIds, beforeMs, threadIds: remaining, gmailPageToken }
+        : null;
 
       return c.json({
         emails,
         deleted: [] as string[],
-        cursor: hasMore ? encodeCursor(nextCursor) : null,
-        total: allIds.length + (page.nextPageToken ? 500 : 0), // estimate
+        cursor: nextCursor ? encodeCursor(nextCursor) : null,
       });
     },
   );
 }
 
-async function handleFullSyncPage(
-  c: any,
+async function startFullSync(
+  c: AppContext,
   accessToken: string,
+  db: Database,
   mailboxId: number,
-  cursor: Extract<PullCursor, { mode: "full" }>,
 ) {
-  const db = c.get("db");
-  let { messageIds, gmailPageToken, baseHistoryId, cutoffAt } = cursor;
+  const baseHistoryId = await getCurrentHistoryId(accessToken);
 
-  // If we've exhausted current IDs but have more Gmail pages, fetch next page
-  if (messageIds.length === 0 && gmailPageToken) {
-    const gmailQuery = buildGmailQueryFromCutoff(cutoffAt);
-    const page = await listMessagesPage(accessToken, gmailPageToken, gmailQuery);
-    messageIds = (page.messages ?? []).map((m) => m.id);
-    gmailPageToken = page.nextPageToken ?? null;
-  }
+  const page = await listThreadsPage(accessToken, {});
+  const allIds = (page.threads ?? []).map((t) => t.id);
 
-  const batch = messageIds.slice(0, PULL_BATCH_SIZE);
-  const remaining = messageIds.slice(PULL_BATCH_SIZE);
+  const batch = allIds.slice(0, THREAD_BATCH_SIZE);
+  const remaining = allIds.slice(THREAD_BATCH_SIZE);
+  const emails = await fetchThreadsAndParse(accessToken, batch, null);
 
-  const emails = await fetchAndParse(accessToken, batch, cutoffAt);
-  const hasMore = remaining.length > 0 || !!gmailPageToken;
+  const messagesPulled = emails.length;
+  const reachedTarget = messagesPulled >= INITIAL_SYNC_MESSAGE_TARGET;
+  const hasMore =
+    !reachedTarget && (remaining.length > 0 || !!page.nextPageToken);
 
-  // When done, persist historyId and run a quick incremental to catch changes during sync
   if (!hasMore && baseHistoryId) {
     await persistMailboxHistoryState(db, mailboxId, baseHistoryId);
-    // Mark last successful sync
-    await db
-      .update(mailboxes)
-      .set({ lastSuccessfulSyncAt: Date.now(), updatedAt: Date.now() })
-      .where(eq(mailboxes.id, mailboxId));
+    await markMailboxSynced(db, mailboxId);
   }
 
-  const nextCursor: PullCursor | null = hasMore
-    ? { mode: "full", messageIds: remaining, gmailPageToken, baseHistoryId, cutoffAt }
+  const nextCursor: FullCursor | null = hasMore
+    ? {
+        mode: "full",
+        threadIds: remaining,
+        gmailPageToken: page.nextPageToken ?? null,
+        baseHistoryId,
+        messagesPulled,
+      }
     : null;
 
   return c.json({
     emails,
     deleted: [] as string[],
     cursor: nextCursor ? encodeCursor(nextCursor) : null,
-    total: remaining.length + batch.length,
+  });
+}
+
+async function handleFullSyncPage(
+  c: AppContext,
+  accessToken: string,
+  mailboxId: number,
+  cursor: FullCursor,
+) {
+  const db = c.get("db");
+  let { threadIds, gmailPageToken } = cursor;
+  const { baseHistoryId } = cursor;
+
+  if (threadIds.length === 0 && gmailPageToken) {
+    const page = await listThreadsPage(accessToken, {
+      pageToken: gmailPageToken,
+    });
+    threadIds = (page.threads ?? []).map((t) => t.id);
+    gmailPageToken = page.nextPageToken ?? null;
+  }
+
+  const batch = threadIds.slice(0, THREAD_BATCH_SIZE);
+  const remaining = threadIds.slice(THREAD_BATCH_SIZE);
+  const emails = await fetchThreadsAndParse(accessToken, batch, null);
+
+  const messagesPulled = cursor.messagesPulled + emails.length;
+  const reachedTarget = messagesPulled >= INITIAL_SYNC_MESSAGE_TARGET;
+  const hasMore =
+    !reachedTarget && (remaining.length > 0 || !!gmailPageToken);
+
+  if (!hasMore && baseHistoryId) {
+    await persistMailboxHistoryState(db, mailboxId, baseHistoryId);
+    await markMailboxSynced(db, mailboxId);
+  }
+
+  const nextCursor: FullCursor | null = hasMore
+    ? {
+        mode: "full",
+        threadIds: remaining,
+        gmailPageToken,
+        baseHistoryId,
+        messagesPulled,
+      }
+    : null;
+
+  return c.json({
+    emails,
+    deleted: [] as string[],
+    cursor: nextCursor ? encodeCursor(nextCursor) : null,
   });
 }
 
 async function startIncremental(
-  c: any,
+  c: AppContext,
   accessToken: string,
-  db: any,
+  db: Database,
   mailboxId: number,
   startHistoryId: string,
 ) {
@@ -244,7 +352,6 @@ async function startIncremental(
     let latestHistoryId: string | null = startHistoryId;
     let pageToken: string | undefined;
 
-    // Collect all history delta (usually small)
     do {
       const page = await listHistoryPage(accessToken, startHistoryId, pageToken);
       latestHistoryId = page.historyId ?? latestHistoryId;
@@ -254,39 +361,33 @@ async function startIncremental(
       pageToken = page.nextPageToken;
     } while (pageToken);
 
-    // Deduplicate
     const deletedSet = new Set(deletedIds);
-    const uniqueChanged = [...new Set(changedIds)].filter((id) => !deletedSet.has(id));
+    const uniqueChanged = [...new Set(changedIds)].filter(
+      (id) => !deletedSet.has(id),
+    );
 
-    const batch = uniqueChanged.slice(0, PULL_BATCH_SIZE);
-    const remaining = uniqueChanged.slice(PULL_BATCH_SIZE);
+    const batch = uniqueChanged.slice(0, MESSAGE_BATCH_SIZE);
+    const remaining = uniqueChanged.slice(MESSAGE_BATCH_SIZE);
 
-    const { syncCutoffAt } = await getMailboxSyncPreferences(db, mailboxId);
-    const emails = await fetchAndParse(accessToken, batch, syncCutoffAt);
-
+    const emails = await fetchAndParse(accessToken, batch);
     const hasMore = remaining.length > 0;
 
     if (!hasMore) {
       await persistMailboxHistoryState(db, mailboxId, latestHistoryId);
-      await db
-        .update(mailboxes)
-        .set({ lastSuccessfulSyncAt: Date.now(), updatedAt: Date.now() })
-        .where(eq(mailboxes.id, mailboxId));
+      await markMailboxSynced(db, mailboxId);
     }
 
-    const nextCursor: PullCursor | null = hasMore
-      ? { mode: "incremental", messageIds: remaining, deletedIds: [], historyId: latestHistoryId }
+    const nextCursor: IncrementalCursor | null = hasMore
+      ? { mode: "incremental", messageIds: remaining, historyId: latestHistoryId }
       : null;
 
     return c.json({
       emails,
       deleted: [...deletedSet],
       cursor: nextCursor ? encodeCursor(nextCursor) : null,
-      total: uniqueChanged.length,
     });
   } catch (error) {
     if (isGmailHistoryExpiredError(error)) {
-      // History expired — need full sync. Clear historyId and let client retry.
       await db
         .update(mailboxes)
         .set({ historyId: null, updatedAt: Date.now() })
@@ -298,46 +399,39 @@ async function startIncremental(
 }
 
 async function handleIncrementalPage(
-  c: any,
+  c: AppContext,
   accessToken: string,
-  db: any,
+  db: Database,
   mailboxId: number,
-  cursor: Extract<PullCursor, { mode: "incremental" }>,
+  cursor: IncrementalCursor,
 ) {
   const { messageIds, historyId } = cursor;
 
-  const batch = messageIds.slice(0, PULL_BATCH_SIZE);
-  const remaining = messageIds.slice(PULL_BATCH_SIZE);
+  const batch = messageIds.slice(0, MESSAGE_BATCH_SIZE);
+  const remaining = messageIds.slice(MESSAGE_BATCH_SIZE);
 
-  const { syncCutoffAt } = await getMailboxSyncPreferences(db, mailboxId);
-  const emails = await fetchAndParse(accessToken, batch, syncCutoffAt);
-
+  const emails = await fetchAndParse(accessToken, batch);
   const hasMore = remaining.length > 0;
 
   if (!hasMore && historyId) {
     await persistMailboxHistoryState(db, mailboxId, historyId);
-    await db
-      .update(mailboxes)
-      .set({ lastSuccessfulSyncAt: Date.now(), updatedAt: Date.now() })
-      .where(eq(mailboxes.id, mailboxId));
+    await markMailboxSynced(db, mailboxId);
   }
 
-  const nextCursor: PullCursor | null = hasMore
-    ? { mode: "incremental", messageIds: remaining, deletedIds: [], historyId }
+  const nextCursor: IncrementalCursor | null = hasMore
+    ? { mode: "incremental", messageIds: remaining, historyId }
     : null;
 
   return c.json({
     emails,
     deleted: [] as string[],
     cursor: nextCursor ? encodeCursor(nextCursor) : null,
-    total: messageIds.length,
   });
 }
 
 async function fetchAndParse(
   accessToken: string,
   messageIds: string[],
-  cutoffAt: number | null,
 ): Promise<ParsedEmail[]> {
   if (messageIds.length === 0) return [];
 
@@ -348,7 +442,6 @@ async function fetchAndParse(
     let message = batchResults.get(messageId) ?? null;
     if (!message) continue;
 
-    // If no payload (minimal response), fetch full
     if (!message.payload && message.id) {
       try {
         message = await fetchMessage(accessToken, message.id, "full");
@@ -357,7 +450,7 @@ async function fetchAndParse(
       }
     }
 
-    const email = parseGmailMessage(message, { minDateMs: cutoffAt });
+    const email = parseGmailMessage(message, { minDateMs: null });
     if (email) parsed.push(email);
   }
 

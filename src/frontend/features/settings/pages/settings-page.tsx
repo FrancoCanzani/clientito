@@ -134,8 +134,8 @@ export default function SettingsPage() {
               isRemoving={removingAccountId === account.accountId}
               onRemove={() => removeAccountMutation.mutate(account.accountId)}
               onReimport={async (mailboxId) => {
-                const { drafts, pending } = await countLocalAtRisk();
-                if (!confirmReimport(drafts, pending)) return;
+                const drafts = await countLocalDrafts();
+                if (!confirmReimport(drafts)) return;
                 fullReimportMutation.mutate(mailboxId);
               }}
               onSaveSignature={(mailboxId, signature) =>
@@ -367,40 +367,25 @@ function AccountRow({
   );
 }
 
-async function countLocalAtRisk(): Promise<{
-  drafts: number;
-  pending: number;
-}> {
+async function countLocalDrafts(): Promise<number> {
   const userId = await getCurrentUserId();
-  if (!userId) return { drafts: 0, pending: 0 };
+  if (!userId) return 0;
   try {
     await localDb.ensureReady();
-    const [draftRows, pendingRows] = await Promise.all([
-      localDb.getDrafts(userId),
-      localDb.listPendingMutations(userId),
-    ]);
-    return { drafts: draftRows.length, pending: pendingRows.length };
+    const drafts = await localDb.getDrafts(userId);
+    return drafts.length;
   } catch {
-    return { drafts: 0, pending: 0 };
+    return 0;
   }
 }
 
-function confirmReimport(drafts: number, pending: number): boolean {
-  if (drafts === 0 && pending === 0) {
+function confirmReimport(drafts: number): boolean {
+  if (drafts === 0) {
     return window.confirm(
       "Re-import will clear the local cache and re-sync your mailbox from Gmail. Continue?",
     );
   }
-  const parts: string[] = [];
-  if (drafts > 0)
-    parts.push(
-      `${drafts} unsent ${drafts === 1 ? "draft" : "drafts"} stored only in this browser`,
-    );
-  if (pending > 0)
-    parts.push(
-      `${pending} unsent ${pending === 1 ? "change" : "changes"} queued to sync to Gmail`,
-    );
-  const warning = `You have ${parts.join(" and ")}. They will be lost if you re-import now. Continue?`;
+  const warning = `You have ${drafts} unsent ${drafts === 1 ? "draft" : "drafts"} stored only in this browser. They will be lost if you re-import now. Continue?`;
   toast.warning(warning);
   return window.confirm(warning);
 }

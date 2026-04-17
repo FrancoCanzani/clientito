@@ -1,4 +1,14 @@
-export type SyncWindowMonths = 6 | 12;
+export type SyncWindowMonths = 3 | 6 | 12;
+
+export const DEFAULT_SYNC_WINDOW_MONTHS: SyncWindowMonths = 3;
+
+function formatGmailDate(ts: number): string {
+  const d = new Date(ts);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}/${m}/${day}`;
+}
 
 export function buildGmailQueryFromCutoff(
   cutoffAt: number | null | undefined,
@@ -6,18 +16,13 @@ export function buildGmailQueryFromCutoff(
   if (typeof cutoffAt !== "number" || !Number.isFinite(cutoffAt)) {
     return undefined;
   }
-
-  const after = new Date(cutoffAt);
-  const y = after.getFullYear();
-  const m = String(after.getMonth() + 1).padStart(2, "0");
-  const d = String(after.getDate()).padStart(2, "0");
-  return `after:${y}/${m}/${d}`;
+  return `after:${formatGmailDate(cutoffAt)}`;
 }
 
 export function normalizeSyncWindowMonths(
   months: number | null | undefined,
 ): SyncWindowMonths | null {
-  if (months === 6 || months === 12) return months;
+  if (months === 3 || months === 6 || months === 12) return months;
   return null;
 }
 
@@ -31,13 +36,4 @@ export function resolveSyncCutoffAt(
   const cutoff = new Date(now);
   cutoff.setMonth(cutoff.getMonth() - normalized);
   return cutoff.getTime();
-}
-
-export function requiresBackfillForCutoffChange(
-  previousCutoffAt: number | null | undefined,
-  nextCutoffAt: number | null | undefined,
-): boolean {
-  if (previousCutoffAt == null) return false;
-  if (nextCutoffAt == null) return true;
-  return nextCutoffAt < previousCutoffAt;
 }

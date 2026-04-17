@@ -87,24 +87,6 @@ CREATE TABLE IF NOT EXISTS _meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
-
-CREATE TABLE IF NOT EXISTS pending_mutations (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  mailbox_id INTEGER NOT NULL,
-  kind TEXT NOT NULL,
-  provider_message_ids TEXT NOT NULL,
-  email_ids TEXT NOT NULL,
-  payload TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending',
-  attempts INTEGER NOT NULL DEFAULT 0,
-  last_error TEXT,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS pending_mutations_user_status ON pending_mutations(user_id, status, created_at);
-CREATE INDEX IF NOT EXISTS pending_mutations_created ON pending_mutations(created_at);
 `;
 
 const PRAGMAS = `

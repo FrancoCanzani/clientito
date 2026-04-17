@@ -1,18 +1,17 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { getMailboxSyncPreferences, setMailboxSyncPreferences } from "../../lib/gmail/sync/state";
+import { setMailboxSyncPreferences } from "../../lib/gmail/sync/state";
 import { resolveMailbox } from "../../lib/gmail/mailboxes";
 import {
   normalizeSyncWindowMonths,
-  requiresBackfillForCutoffChange,
   resolveSyncCutoffAt,
 } from "../../lib/gmail/sync/preferences";
 import type { AppRouteEnv } from "../types";
 
 const syncSettingsBodySchema = z.object({
   mailboxId: z.number().int().positive().optional(),
-  months: z.union([z.literal(6), z.literal(12), z.null()]),
+  months: z.union([z.literal(3), z.literal(6), z.literal(12), z.null()]),
 });
 
 export function registerPutSyncSettings(settingsRoutes: Hono<AppRouteEnv>) {
@@ -29,7 +28,6 @@ export function registerPutSyncSettings(settingsRoutes: Hono<AppRouteEnv>) {
         return c.json({ error: "No mailbox found" }, 400);
       }
 
-      const previous = await getMailboxSyncPreferences(db, mailbox.id);
       const nextMonths = normalizeSyncWindowMonths(body.months);
       const nextCutoffAt = resolveSyncCutoffAt(nextMonths);
 
@@ -43,10 +41,6 @@ export function registerPutSyncSettings(settingsRoutes: Hono<AppRouteEnv>) {
           mailboxId: mailbox.id,
           months: nextMonths,
           cutoffAt: nextCutoffAt,
-          requiresBackfill: requiresBackfillForCutoffChange(
-            previous.syncCutoffAt,
-            nextCutoffAt,
-          ),
         },
       });
     },

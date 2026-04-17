@@ -1,7 +1,14 @@
 import { localDb } from "@/db/client";
-import { enqueueMutation } from "@/db/mutation-queue";
-import type { PendingMutationPayload, PendingMutationRow } from "@/db/schema";
+import { clearPending, markPending } from "@/db/pending-lock";
 import { getCurrentUserId } from "@/db/user";
+import { queryClient } from "@/lib/query-client";
+import { queryKeys } from "@/lib/query-keys";
+import type {
+  EmailDetailItem,
+  EmailListItem,
+  EmailListResponse,
+} from "./types";
+import type { InfiniteData } from "@tanstack/react-query";
 
 function getErrorMessage(payload: unknown): string | null {
   if (typeof payload !== "object" || payload === null) return null;
@@ -11,6 +18,16 @@ function getErrorMessage(payload: unknown): string | null {
 
 function throwApiError(payload: unknown, fallback: string): never {
   throw new Error(getErrorMessage(payload) ?? fallback);
+}
+
+async function responseError(
+  response: Response,
+  fallback: string,
+): Promise<Error> {
+  const json = await response.json().catch(() => null);
+  const err = new Error(getErrorMessage(json) ?? fallback);
+  (err as Error & { status?: number }).status = response.status;
+  return err;
 }
 
 type EmailPatchPayload = {
@@ -29,9 +46,11 @@ export type EmailIdentifier = {
   labelIds?: string[];
 };
 
-function makeMutationId(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `mut_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-}
+const LABEL_UNREAD = "UNREAD";
+const LABEL_INBOX = "INBOX";
+const LABEL_TRASH = "TRASH";
+const LABEL_SPAM = "SPAM";
+const LABEL_STARRED = "STARRED";
 
 function toNumericIds(ids: string[]): number[] {
   return ids
@@ -39,8 +58,95 @@ function toNumericIds(ids: string[]): number[] {
     .filter((value) => Number.isFinite(value));
 }
 
+function applyPatchToItem<
+  T extends Pick<EmailListItem, "isRead" | "labelIds" | "snoozedUntil">,
+>(item: T, patch: EmailPatchPayload): T {
+  const labels = new Set(item.labelIds);
+
+  if (patch.isRead !== undefined) {
+    if (patch.isRead) labels.delete(LABEL_UNREAD);
+    else labels.add(LABEL_UNREAD);
+  }
+
+  if (patch.archived !== undefined) {
+    if (patch.archived) labels.delete(LABEL_INBOX);
+    else if (!labels.has(LABEL_TRASH) && !labels.has(LABEL_SPAM)) labels.add(LABEL_INBOX);
+  }
+
+  if (patch.trashed !== undefined) {
+    if (patch.trashed) {
+      labels.add(LABEL_TRASH);
+      labels.delete(LABEL_INBOX);
+      labels.delete(LABEL_SPAM);
+    } else {
+      labels.delete(LABEL_TRASH);
+      if (!labels.has(LABEL_SPAM)) labels.add(LABEL_INBOX);
+    }
+  }
+
+  if (patch.spam !== undefined) {
+    if (patch.spam) {
+      labels.add(LABEL_SPAM);
+      labels.delete(LABEL_INBOX);
+      labels.delete(LABEL_TRASH);
+    } else {
+      labels.delete(LABEL_SPAM);
+      if (!labels.has(LABEL_TRASH)) labels.add(LABEL_INBOX);
+    }
+  }
+
+  if (patch.starred !== undefined) {
+    if (patch.starred) labels.add(LABEL_STARRED);
+    else labels.delete(LABEL_STARRED);
+  }
+
+  return {
+    ...item,
+    isRead: patch.isRead ?? !labels.has(LABEL_UNREAD),
+    labelIds: Array.from(labels),
+    snoozedUntil:
+      patch.snoozedUntil !== undefined ? patch.snoozedUntil : item.snoozedUntil,
+  };
+}
+
+function applyOptimisticCachePatch(
+  emailIds: Set<string>,
+  patch: EmailPatchPayload,
+) {
+  queryClient.setQueriesData<InfiniteData<EmailListResponse>>(
+    { queryKey: queryKeys.emails.all() },
+    (current) => {
+      if (!current) return current;
+      let changed = false;
+      const pages = current.pages.map((page) => {
+        let pageChanged = false;
+        const data = page.data.map((entry) => {
+          if (!emailIds.has(entry.id)) return entry;
+          const next = applyPatchToItem(entry, patch);
+          pageChanged = true;
+          changed = true;
+          return next;
+        });
+        return pageChanged ? { ...page, data } : page;
+      });
+      return changed ? { ...current, pages } : current;
+    },
+  );
+
+  for (const emailId of emailIds) {
+    queryClient.setQueryData<EmailDetailItem | undefined>(
+      queryKeys.emails.detail(emailId),
+      (current) => {
+        if (!current) return current;
+        return applyPatchToItem(current, patch);
+      },
+    );
+  }
+}
+
 async function applyLocalPatch(
   userId: string,
+  emailIds: string[],
   numericIds: number[],
   patch: EmailPatchPayload,
 ) {
@@ -54,9 +160,15 @@ async function applyLocalPatch(
   } catch (error) {
     console.warn("Failed to apply local email patch", error);
   }
+  void queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+  for (const emailId of emailIds) {
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.emails.detail(emailId),
+    });
+  }
 }
 
-async function enqueuePatch(
+export async function patchEmails(
   emails: EmailIdentifier[],
   data: EmailPatchPayload,
 ): Promise<void> {
@@ -65,49 +177,71 @@ async function enqueuePatch(
   if (!userId) throw new Error("Not authenticated");
 
   const mailboxId = emails[0]!.mailboxId;
-  const numericIds = toNumericIds(emails.map((e) => e.id));
-  await applyLocalPatch(userId, numericIds, data);
+  const providerIds = emails.map((e) => e.providerMessageId);
+  const emailIds = emails.map((e) => e.id);
+  const emailIdSet = new Set(emailIds);
+  applyOptimisticCachePatch(emailIdSet, data);
+  const localPatchTask = applyLocalPatch(
+    userId,
+    emailIds,
+    toNumericIds(emailIds),
+    data,
+  );
+  markPending(providerIds);
 
-  // Group by snapshot of labelIds so the server computes the correct
-  // add/remove set for each message. Most bulk actions come from a single
-  // view so this usually collapses to one enqueue.
-  const groups = new Map<string, EmailIdentifier[]>();
-  for (const email of emails) {
-    const key = JSON.stringify(email.labelIds ?? []);
-    const bucket = groups.get(key);
-    if (bucket) bucket.push(email);
-    else groups.set(key, [email]);
-  }
+  try {
+    if (emails.length === 1) {
+      const email = emails[0]!;
+      const response = await fetch(`/api/inbox/emails/${email.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerMessageId: email.providerMessageId,
+          mailboxId: email.mailboxId,
+          labelIds: email.labelIds ?? [],
+          ...data,
+        }),
+      });
+      if (!response.ok) throw await responseError(response, "Failed to update email");
+      return;
+    }
 
-  const now = Date.now();
-  for (const [key, bucket] of groups) {
-    const payload: PendingMutationPayload = {
-      ...data,
-      labelIds: JSON.parse(key) as string[],
-    };
-    const row: PendingMutationRow = {
-      id: makeMutationId(),
-      userId,
-      mailboxId,
-      kind: "patch",
-      providerMessageIds: bucket.map((e) => e.providerMessageId),
-      emailIds: toNumericIds(bucket.map((e) => e.id)),
-      payload,
-      status: "pending",
-      attempts: 0,
-      lastError: null,
-      createdAt: now,
-      updatedAt: now,
-    };
-    await enqueueMutation(row);
+    // Group by labelIds snapshot so the server computes the correct
+    // add/remove set for each message. Most bulk actions share a view so
+    // this usually collapses to one request.
+    const groups = new Map<string, EmailIdentifier[]>();
+    for (const email of emails) {
+      const key = JSON.stringify(email.labelIds ?? []);
+      const bucket = groups.get(key);
+      if (bucket) bucket.push(email);
+      else groups.set(key, [email]);
+    }
+
+    for (const [key, bucket] of groups) {
+      const items = bucket.map((e) => ({
+        providerMessageId: e.providerMessageId,
+        mailboxId,
+        labelIds: JSON.parse(key) as string[],
+      }));
+      const response = await fetch("/api/inbox/emails/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, ...data }),
+      });
+      if (!response.ok) throw await responseError(response, "Failed to update emails");
+    }
+    await localPatchTask;
+  } finally {
+    await localPatchTask;
+    clearPending(providerIds);
   }
 }
 
-export async function patchEmail(
+export function patchEmail(
   email: EmailIdentifier,
   data: EmailPatchPayload,
 ): Promise<void> {
-  await enqueuePatch([email], data);
+  return patchEmails([email], data);
 }
 
 export async function deleteEmailForever(
@@ -122,22 +256,31 @@ export async function deleteEmailForever(
     console.warn("Failed to remove email locally", error);
   }
 
-  const now = Date.now();
-  const row: PendingMutationRow = {
-    id: makeMutationId(),
-    userId,
-    mailboxId: email.mailboxId,
-    kind: "delete",
-    providerMessageIds: [email.providerMessageId],
-    emailIds: toNumericIds([email.id]),
-    payload: {},
-    status: "pending",
-    attempts: 0,
-    lastError: null,
-    createdAt: now,
-    updatedAt: now,
-  };
-  await enqueueMutation(row);
+  markPending([email.providerMessageId]);
+  try {
+    const response = await fetch(`/api/inbox/emails/${email.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        providerMessageId: email.providerMessageId,
+        mailboxId: email.mailboxId,
+      }),
+    });
+    if (!response.ok) throw await responseError(response, "Failed to delete email");
+  } finally {
+    clearPending([email.providerMessageId]);
+  }
+}
+
+export function batchPatchEmails(
+  emails: EmailIdentifier[],
+  data: EmailPatchPayload,
+): Promise<void> {
+  return patchEmails(emails, data);
+}
+
+export function markEmailRead(email: EmailIdentifier): Promise<void> {
+  return patchEmail(email, { isRead: true });
 }
 
 export type BlockSenderResult = {
@@ -169,17 +312,6 @@ export async function blockSender(params: {
   }
 
   return json.data;
-}
-
-export async function batchPatchEmails(
-  emails: EmailIdentifier[],
-  data: EmailPatchPayload,
-): Promise<void> {
-  await enqueuePatch(emails, data);
-}
-
-export async function markEmailRead(email: EmailIdentifier): Promise<void> {
-  await patchEmail(email, { isRead: true });
 }
 
 type SendEmailInput = {
@@ -217,8 +349,7 @@ export async function sendEmail(
     throwApiError(json, "Failed to send email");
   }
 
-  const json: SendEmailResult = await response.json();
-  return json;
+  return response.json();
 }
 
 export type ScheduledEmail = {
@@ -234,8 +365,7 @@ export type ScheduledEmail = {
 export async function fetchScheduledEmails(): Promise<ScheduledEmail[]> {
   const response = await fetch("/api/inbox/emails/scheduled");
   if (!response.ok) throw new Error("Failed to fetch scheduled emails");
-  const json: ScheduledEmail[] = await response.json();
-  return json;
+  return response.json();
 }
 
 export async function cancelScheduledEmail(id: number): Promise<void> {
@@ -254,9 +384,7 @@ export async function uploadAttachments(
   Array<{ key: string; filename: string; mimeType: string; size: number }>
 > {
   const formData = new FormData();
-  for (const file of files) {
-    formData.append("file", file);
-  }
+  for (const file of files) formData.append("file", file);
 
   const response = await fetch("/api/inbox/emails/attachments", {
     method: "POST",
@@ -268,11 +396,5 @@ export async function uploadAttachments(
     throwApiError(json, "Failed to upload attachments");
   }
 
-  const json: Array<{
-    key: string;
-    filename: string;
-    mimeType: string;
-    size: number;
-  }> = await response.json();
-  return json;
+  return response.json();
 }

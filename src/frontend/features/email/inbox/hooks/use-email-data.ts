@@ -1,14 +1,17 @@
+import { pullViewMore } from "@/db/sync";
 import { useLocalSyncSnapshot } from "@/hooks/use-local-sync";
 import { EMAIL_LIST_PAGE_SIZE, fetchEmails } from "@/features/email/inbox/queries";
 import type { EmailListResponse } from "@/features/email/inbox/types";
 import { groupEmailsByThread } from "@/features/email/inbox/utils/group-emails-by-thread";
+import { viewToGmailFilter } from "@/features/email/inbox/utils/view-gmail-filter";
 import { useAuth } from "@/hooks/use-auth";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { queryKeys } from "@/lib/query-keys";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const LOAD_MORE_ROOT_MARGIN = "800px 0px";
+const GMAIL_PULL_MAX_PAGES_PER_TRIGGER = 5;
 
 export function useEmailData({
   view,
@@ -64,15 +67,52 @@ export function useEmailData({
 
   const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } = emailsQuery;
 
+  const [gmailExhausted, setGmailExhausted] = useState(false);
+  const [isPullingFromGmail, setIsPullingFromGmail] = useState(false);
+
+  useEffect(() => {
+    setGmailExhausted(false);
+  }, [view, mailboxId]);
+
+  const canPullFromGmail =
+    !!user?.id && viewToGmailFilter(view) !== null && !gmailExhausted;
+
+  const pullMoreFromGmail = useCallback(async () => {
+    if (!user?.id) return;
+    setIsPullingFromGmail(true);
+    try {
+      for (let i = 0; i < GMAIL_PULL_MAX_PAGES_PER_TRIGGER; i++) {
+        const { inserted, hasMore } = await pullViewMore(
+          user.id,
+          mailboxId,
+          view,
+        );
+        if (!hasMore) {
+          setGmailExhausted(true);
+          return;
+        }
+        if (inserted > 0) return;
+      }
+    } catch {
+      // Surfaced via existing sync/query error states.
+    } finally {
+      setIsPullingFromGmail(false);
+    }
+  }, [user?.id, mailboxId, view]);
+
   const loadMoreRef = useIntersectionObserver<HTMLDivElement>({
     root: null,
     rootMargin: LOAD_MORE_ROOT_MARGIN,
     threshold: 0.01,
     onChange: (isIntersecting) => {
-      if (!isIntersecting || !hasNextPage || isFetchingNextPage || isFetching) {
+      if (!isIntersecting || isFetching) return;
+      if (hasNextPage) {
+        if (!isFetchingNextPage) fetchNextPage();
         return;
       }
-      fetchNextPage();
+      if (canPullFromGmail && !isPullingFromGmail) {
+        void pullMoreFromGmail();
+      }
     },
   });
 
@@ -87,8 +127,8 @@ export function useEmailData({
     isFetchingNextPage,
     isSyncing,
     isInitialSync,
-    syncPulled: localSync.pulled,
-    syncTotal: localSync.total,
     loadMoreRef,
+    canPullFromGmail,
+    isPullingFromGmail,
   };
 }

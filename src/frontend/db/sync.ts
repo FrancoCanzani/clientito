@@ -1,50 +1,50 @@
 import { syncLabelsFromServer } from "@/features/email/labels/queries";
+import { viewToGmailFilter } from "@/features/email/inbox/utils/view-gmail-filter";
 import { queryClient } from "@/lib/query-client";
 import { queryKeys } from "@/lib/query-keys";
 import { localDb } from "./client";
-import { replayPendingMutations, resetMutationQueue } from "./mutation-queue";
 import type { EmailInsert } from "./schema";
 
-const SYNCED_MAILBOX_KEY_PREFIX = "synced-mailbox";
-const SYNCED_ANY_KEY_PREFIX = "synced-any";
-const ACTIVE_USER_META_KEY = "active-user-id";
+const SYNCED_KEY_PREFIX = "synced-mailbox";
+const ACTIVE_USER_KEY = "active-user-id";
 
 const syncInFlight = new Map<string, Promise<void>>();
+const backfillInFlight = new Map<
+  string,
+  Promise<{ inserted: number; hasMore: boolean }>
+>();
+const searchInFlight = new Map<string, Promise<number>>();
 
 export type LocalSyncStatus = "idle" | "initial" | "refresh";
 
 export type LocalSyncSnapshot = {
   status: LocalSyncStatus;
   pulled: number;
-  total: number | null;
 };
 
-const IDLE_SNAPSHOT: LocalSyncSnapshot = {
-  status: "idle",
-  pulled: 0,
-  total: null,
-};
+const IDLE: LocalSyncSnapshot = { status: "idle", pulled: 0 };
 
 const progress = new Map<string, LocalSyncSnapshot>();
-const progressListeners = new Set<() => void>();
+const listeners = new Set<() => void>();
 
-function notifyProgress() {
-  for (const listener of progressListeners) listener();
+function taskKey(userId: string, mailboxId: number) {
+  return `${userId}:${mailboxId}`;
 }
 
-function setProgress(key: string, snapshot: LocalSyncSnapshot) {
-  if (snapshot.status === "idle") {
-    progress.delete(key);
-  } else {
-    progress.set(key, snapshot);
-  }
-  notifyProgress();
+function syncedKey(userId: string, mailboxId: number) {
+  return `${SYNCED_KEY_PREFIX}:${userId}:${mailboxId}`;
+}
+
+function setProgress(key: string, snap: LocalSyncSnapshot) {
+  if (snap.status === "idle") progress.delete(key);
+  else progress.set(key, snap);
+  for (const l of listeners) l();
 }
 
 export function subscribeLocalSync(listener: () => void) {
-  progressListeners.add(listener);
+  listeners.add(listener);
   return () => {
-    progressListeners.delete(listener);
+    listeners.delete(listener);
   };
 }
 
@@ -52,29 +52,14 @@ export function getLocalSyncSnapshot(
   userId: string | null | undefined,
   mailboxId: number | null | undefined,
 ): LocalSyncSnapshot {
-  if (!userId || mailboxId == null) return IDLE_SNAPSHOT;
-  return progress.get(syncTaskKey(userId, mailboxId)) ?? IDLE_SNAPSHOT;
+  if (!userId || mailboxId == null) return IDLE;
+  return progress.get(taskKey(userId, mailboxId)) ?? IDLE;
 }
 
-function mailboxSyncKey(userId: string, mailboxId: number) {
-  return `${SYNCED_MAILBOX_KEY_PREFIX}:${userId}:${mailboxId}`;
-}
-
-function userSyncKey(userId: string) {
-  return `${SYNCED_ANY_KEY_PREFIX}:${userId}`;
-}
-
-function syncTaskKey(userId: string, mailboxId: number) {
-  return `${userId}:${mailboxId}`;
-}
-
-/** Shape returned by POST /api/inbox/sync/pull */
 type PullResponse = {
   emails: PulledEmail[];
   deleted: string[];
   cursor: string | null;
-  total: number;
-  error?: string;
   requiresFullSync?: boolean;
 };
 
@@ -117,7 +102,11 @@ type PulledEmail = {
   attachments?: PulledAttachment[];
 };
 
-function pulledEmailToRow(email: PulledEmail, userId: string, mailboxId: number): EmailInsert {
+function pulledEmailToRow(
+  email: PulledEmail,
+  userId: string,
+  mailboxId: number,
+): EmailInsert {
   const labels = new Set(email.labelIds);
   return {
     userId,
@@ -156,168 +145,100 @@ function pulledEmailToRow(email: PulledEmail, userId: string, mailboxId: number)
   };
 }
 
-async function pullPage(
-  mailboxId: number,
-  cursor?: string,
-): Promise<PullResponse> {
-  const response = await fetch("/api/inbox/sync/pull", {
+async function postPull(url: string, body: object): Promise<PullResponse> {
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mailboxId, cursor }),
+    body: JSON.stringify(body),
   });
-
-  if (response.status === 409) {
-    const data = await response.json();
-    return { emails: [], deleted: [], cursor: null, total: 0, ...data };
+  if (res.status === 409) {
+    return { emails: [], deleted: [], cursor: null, ...(await res.json()) };
   }
-
-  if (!response.ok) {
-    throw new Error(`Sync pull failed: ${response.status}`);
-  }
-
-  return response.json();
+  if (!res.ok) throw new Error(`Sync failed: ${res.status}`);
+  return res.json();
 }
 
-/**
- * Pull all emails from Gmail via the worker proxy.
- * Inserts each batch into OPFS progressively, invalidating queries so
- * emails appear in the UI as they arrive.
- */
-async function pullAll(
+async function applyPage(
   userId: string,
   mailboxId: number,
-  status: Exclude<LocalSyncStatus, "idle">,
-): Promise<number> {
-  const key = syncTaskKey(userId, mailboxId);
-  let cursor: string | undefined;
-  let totalInserted = 0;
-
-  setProgress(key, { status, pulled: 0, total: null });
-
-  try {
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const page = await pullPage(mailboxId, cursor);
-
-      if (page.requiresFullSync) {
-        cursor = undefined;
-        totalInserted = 0;
-        setProgress(key, { status, pulled: 0, total: null });
-        continue;
-      }
-
-      if (page.deleted.length > 0) {
-        await localDb.deleteEmailsByProviderMessageId(page.deleted);
-      }
-
-      if (page.emails.length > 0) {
-        const rows = page.emails.map((e) => pulledEmailToRow(e, userId, mailboxId));
-        await localDb.insertEmails(rows);
-        totalInserted += rows.length;
-
-        setProgress(key, { status, pulled: totalInserted, total: null });
-        queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
-      }
-
-      if (!page.cursor) break;
-      cursor = page.cursor;
-    }
-  } finally {
-    setProgress(key, IDLE_SNAPSHOT);
+  page: PullResponse,
+) {
+  if (page.deleted.length > 0) {
+    await localDb.deleteEmailsByProviderMessageId(page.deleted);
   }
-
-  return totalInserted;
-}
-
-/**
- * Pull new/changed emails via incremental sync (History API).
- * Called on each poll tick after initial sync is complete.
- */
-export async function pullNewEmails(userId: string, mailboxId: number) {
-  await localDb.ensureReady();
-  await replayPendingMutations(userId);
-
-  const key = syncTaskKey(userId, mailboxId);
-  let cursor: string | undefined;
-  let totalInserted = 0;
-  let announced = false;
-
-  try {
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const page = await pullPage(mailboxId, cursor);
-
-      if (page.requiresFullSync) {
-        await localDb.setMeta(mailboxSyncKey(userId, mailboxId), "");
-        await localDb.setMeta(userSyncKey(userId), "");
-        return;
-      }
-
-      if (page.deleted.length > 0) {
-        await localDb.deleteEmailsByProviderMessageId(page.deleted);
-      }
-
-      if (page.emails.length > 0) {
-        const rows = page.emails.map((e) => pulledEmailToRow(e, userId, mailboxId));
-        await localDb.insertEmails(rows);
-        totalInserted += rows.length;
-        announced = true;
-        setProgress(key, { status: "refresh", pulled: totalInserted, total: null });
-      }
-
-      if (!page.cursor) break;
-      cursor = page.cursor;
-    }
-  } finally {
-    if (announced) setProgress(key, IDLE_SNAPSHOT);
+  if (page.emails.length > 0) {
+    const rows = page.emails.map((e) => pulledEmailToRow(e, userId, mailboxId));
+    await localDb.insertEmails(rows);
+    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
   }
 }
 
 async function alignActiveUser(userId: string) {
-  const activeUser = await localDb.getMeta(ACTIVE_USER_META_KEY);
-  if (activeUser && activeUser !== userId) {
-    resetMutationQueue();
+  const active = await localDb.getMeta(ACTIVE_USER_KEY);
+  if (active && active !== userId) {
     await localDb.clear();
   }
-  await localDb.setMeta(ACTIVE_USER_META_KEY, userId);
-  await replayPendingMutations(userId);
+  await localDb.setMeta(ACTIVE_USER_KEY, userId);
 }
 
-async function runInitialSync(
-  userId: string,
-  mailboxId: number,
-) {
-  await localDb.ensureReady();
-  await alignActiveUser(userId);
+/**
+ * Drives sync for a mailbox. The server's /pull endpoint auto-routes between
+ * full sync (no historyId yet) and incremental (history delta), so this same
+ * loop handles both initial import and ongoing refreshes.
+ */
+async function runSync(userId: string, mailboxId: number) {
+  const key = taskKey(userId, mailboxId);
+  const wasSynced =
+    (await localDb.getMeta(syncedKey(userId, mailboxId))) === "true";
+  const status: LocalSyncStatus = wasSynced ? "refresh" : "initial";
 
-  const mailboxKey = mailboxSyncKey(userId, mailboxId);
-  if ((await localDb.getMeta(mailboxKey)) === "true") return;
+  let pulled = 0;
+  setProgress(key, { status, pulled });
 
-  await Promise.all([
-    pullAll(userId, mailboxId, "initial"),
-    syncLabelsFromServer(mailboxId).catch((err) => {
-      console.warn("Label sync failed during initial sync", err);
-    }),
-  ]);
+  // Fire labels in parallel with email pulls so the sidebar lights up early
+  // instead of waiting for the whole pull loop to finish.
+  const labelsTask = wasSynced
+    ? Promise.resolve()
+    : syncLabelsFromServer(mailboxId).catch((err) => {
+        console.warn("Label sync failed", err);
+      });
 
-  await localDb.setMeta(mailboxKey, "true");
-  await localDb.setMeta(userSyncKey(userId), "true");
-}
+  try {
+    let cursor: string | undefined;
+    while (true) {
+      const page = await postPull("/api/inbox/sync/pull", { mailboxId, cursor });
 
-export async function ensureLocalSync(
-  userId: string,
-  mailboxId: number,
-) {
-  const key = syncTaskKey(userId, mailboxId);
-  const running = syncInFlight.get(key);
-  if (running) {
-    await running;
-    if (await isSynced(userId, mailboxId)) {
-      return;
+      if (page.requiresFullSync) {
+        await localDb.setMeta(syncedKey(userId, mailboxId), "");
+        cursor = undefined;
+        continue;
+      }
+
+      await applyPage(userId, mailboxId, page);
+      pulled += page.emails.length;
+      setProgress(key, { status, pulled });
+
+      if (!page.cursor) break;
+      cursor = page.cursor;
     }
-  }
 
-  const task = runInitialSync(userId, mailboxId).finally(() => {
+    await localDb.setMeta(syncedKey(userId, mailboxId), "true");
+    await labelsTask;
+  } finally {
+    setProgress(key, IDLE);
+  }
+}
+
+export function ensureLocalSync(userId: string, mailboxId: number) {
+  const key = taskKey(userId, mailboxId);
+  const existing = syncInFlight.get(key);
+  if (existing) return existing;
+
+  const task = (async () => {
+    await localDb.ensureReady();
+    await alignActiveUser(userId);
+    await runSync(userId, mailboxId);
+  })().finally(() => {
     syncInFlight.delete(key);
   });
 
@@ -325,23 +246,88 @@ export async function ensureLocalSync(
   return task;
 }
 
-export async function isSynced(
-  userId: string,
-  mailboxId?: number,
-): Promise<boolean> {
+export const pullNewEmails = ensureLocalSync;
+
+export async function isSynced(userId: string, mailboxId: number) {
   await localDb.ensureReady();
+  return (await localDb.getMeta(syncedKey(userId, mailboxId))) === "true";
+}
 
-  if (mailboxId != null) {
-    return (await localDb.getMeta(mailboxSyncKey(userId, mailboxId))) === "true";
-  }
+/**
+ * Pull the next page of older messages for a specific view from Gmail.
+ * Anchored to the oldest local message in that view so we walk strictly
+ * backwards. One call = one page; click again for more.
+ */
+export function pullViewMore(
+  userId: string,
+  mailboxId: number,
+  view: string,
+): Promise<{ inserted: number; hasMore: boolean }> {
+  const filter = viewToGmailFilter(view);
+  if (!filter) return Promise.resolve({ inserted: 0, hasMore: false });
 
-  return (await localDb.getMeta(userSyncKey(userId))) === "true";
+  const key = `${userId}:${mailboxId}:${view}`;
+  const existing = backfillInFlight.get(key);
+  if (existing) return existing;
+
+  const task = (async () => {
+    await localDb.ensureReady();
+    const meta = await localDb.getViewMeta({ userId, mailboxId, view });
+    const page = await postPull("/api/inbox/sync/pull-view", {
+      mailboxId,
+      query: filter.query,
+      labelIds: filter.labelIds,
+      beforeMs: meta.oldestDateMs ?? undefined,
+    });
+    await applyPage(userId, mailboxId, page);
+    return { inserted: page.emails.length, hasMore: !!page.cursor };
+  })().finally(() => {
+    backfillInFlight.delete(key);
+  });
+
+  backfillInFlight.set(key, task);
+  return task;
+}
+
+export async function remoteSearch(
+  userId: string,
+  mailboxId: number,
+  query: string,
+): Promise<number> {
+  const key = `${userId}:${mailboxId}:${query}`;
+  const existing = searchInFlight.get(key);
+  if (existing) return existing;
+
+  const task = (async () => {
+    try {
+      const res = await fetch("/api/inbox/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mailboxId, q: query }),
+      });
+      if (!res.ok) return 0;
+      const page = (await res.json()) as PullResponse;
+      if (page.emails.length === 0) return 0;
+      const rows = page.emails.map((e) =>
+        pulledEmailToRow(e, userId, mailboxId),
+      );
+      await localDb.insertEmails(rows);
+      return rows.length;
+    } catch {
+      return 0;
+    }
+  })().finally(() => {
+    searchInFlight.delete(key);
+  });
+
+  searchInFlight.set(key, task);
+  return task;
 }
 
 export async function clearLocalData() {
   syncInFlight.clear();
-  resetMutationQueue();
-
+  backfillInFlight.clear();
+  searchInFlight.clear();
   try {
     await localDb.ensureReady();
     await localDb.deleteDatabase();

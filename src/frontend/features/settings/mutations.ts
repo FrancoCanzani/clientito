@@ -1,16 +1,14 @@
 export type SyncPreference = {
   mailboxId: number | null;
-  months: 6 | 12 | null;
+  months: 3 | 6 | 12 | null;
   cutoffAt: number | null;
 };
 
-export type UpdateSyncPreferenceResult = SyncPreference & {
-  requiresBackfill: boolean;
-};
+export type UpdateSyncPreferenceResult = SyncPreference;
 
 export type UpdateSyncPreferenceInput = {
   mailboxId: number;
-  months: 6 | 12 | null;
+  months: 3 | 6 | 12 | null;
 };
 
 function getErrorMessage(payload: unknown): string | null {

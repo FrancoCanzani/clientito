@@ -32,6 +32,15 @@ export function formatQuotedDate(timestamp: number): string {
   });
 }
 
+export function formatEmailSnippet(raw: string | null | undefined): string {
+  if (!raw) return "";
+  // Use the browser to decode HTML entities and strip tags, then collapse
+  // whitespace. CSS truncate handles overflow.
+  const el = document.createElement("div");
+  el.innerHTML = raw;
+  return (el.textContent ?? "").replace(/\s+/g, " ").trim();
+}
+
 export function formatBytes(size: number | null): string {
   if (!size || size <= 0) {
     return "Unknown size";

@@ -56,7 +56,7 @@ export function registerGetSettings(api: Hono<AppRouteEnv>) {
         hasValidCredentials:
           Boolean(ga.refreshToken) || hasUsableAccessToken(ga),
         syncWindowMonths:
-          (mailbox?.syncWindowMonths as 6 | 12 | null | undefined) ?? null,
+          (mailbox?.syncWindowMonths as 3 | 6 | 12 | null | undefined) ?? null,
         syncCutoffAt: mailbox?.syncCutoffAt ?? null,
         syncState,
         error: mailbox?.lastErrorMessage ?? null,

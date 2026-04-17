@@ -50,17 +50,36 @@ export function EmailDetailView({
   const { openCompose } = useInboxCompose();
   const contentRef = useRef<EmailDetailContentHandle>(null);
 
+  const emailQuery = useQuery({
+    queryKey: queryKeys.emails.detail(emailId),
+    queryFn: () =>
+      fetchEmailDetail(emailId, {
+        mailboxId,
+        view,
+      }),
+    initialData: email,
+    staleTime: 60_000,
+  });
+  const currentEmail = emailQuery.data ?? email;
+
   useEffect(() => {
     setFocusedEmail({
-      id: email.id,
-      fromAddr: email.fromAddr,
-      fromName: email.fromName,
-      subject: email.subject,
-      threadId: email.threadId,
-      mailboxId: email.mailboxId,
+      id: currentEmail.id,
+      fromAddr: currentEmail.fromAddr,
+      fromName: currentEmail.fromName,
+      subject: currentEmail.subject,
+      threadId: currentEmail.threadId,
+      mailboxId: currentEmail.mailboxId,
     });
     return () => clearFocusedEmail();
-  }, [email.id, email.fromAddr, email.fromName, email.subject, email.threadId, email.mailboxId]);
+  }, [
+    currentEmail.id,
+    currentEmail.fromAddr,
+    currentEmail.fromName,
+    currentEmail.subject,
+    currentEmail.threadId,
+    currentEmail.mailboxId,
+  ]);
 
   const orderedEmails = useMemo(() => {
     const cached = queryClient.getQueryData<InfiniteData<EmailListResponse>>([
@@ -138,17 +157,17 @@ export function EmailDetailView({
   }, [currentIndex, orderedIds, queryClient, mailboxId, view]);
 
   const threadQuery = useQuery({
-    queryKey: queryKeys.emails.thread(email.threadId!),
-    queryFn: () => fetchEmailThread(email.threadId!),
-    enabled: Boolean(email.threadId),
+    queryKey: queryKeys.emails.thread(currentEmail.threadId!),
+    queryFn: () => fetchEmailThread(currentEmail.threadId!),
+    enabled: Boolean(currentEmail.threadId),
     staleTime: 60_000,
   });
 
   const emailIdentifier = {
-    id: email.id,
-    providerMessageId: email.providerMessageId,
-    mailboxId: email.mailboxId!,
-    labelIds: email.labelIds,
+    id: currentEmail.id,
+    providerMessageId: currentEmail.providerMessageId,
+    mailboxId: currentEmail.mailboxId!,
+    labelIds: currentEmail.labelIds,
   };
 
   const emailPatchMutation = useMutation({
@@ -156,18 +175,18 @@ export function EmailDetailView({
       patchEmail(emailIdentifier, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.emails.detail(email.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.emails.detail(currentEmail.id) });
       void router.invalidate();
     },
   });
 
-  const isInInbox = email.labelIds.includes("INBOX");
-  const isStarred = email.labelIds.includes("STARRED");
+  const isInInbox = currentEmail.labelIds.includes("INBOX");
+  const isStarred = currentEmail.labelIds.includes("STARRED");
 
   const threadMessages = useMemo(() => {
-    if (!email.threadId) return [email];
-    return threadQuery.data?.length ? threadQuery.data : [email];
-  }, [email, threadQuery.data]);
+    if (!currentEmail.threadId) return [currentEmail];
+    return threadQuery.data?.length ? threadQuery.data : [currentEmail];
+  }, [currentEmail, threadQuery.data]);
 
   const handleForward = useCallback(
     (initial?: ComposeInitial) => {
@@ -175,15 +194,15 @@ export function EmailDetailView({
         openCompose(initial);
         return;
       }
-      const subject = email.subject
-        ? email.subject.startsWith("Fwd:")
-          ? email.subject
-          : `Fwd: ${email.subject}`
+      const subject = currentEmail.subject
+        ? currentEmail.subject.startsWith("Fwd:")
+          ? currentEmail.subject
+          : `Fwd: ${currentEmail.subject}`
         : "Fwd:";
-      const bodyHtml = buildForwardedEmailHtml(email);
+      const bodyHtml = buildForwardedEmailHtml(currentEmail);
       openCompose({ subject, bodyHtml });
     },
-    [email, openCompose],
+    [currentEmail, openCompose],
   );
 
   useHotkeys({
@@ -224,7 +243,7 @@ export function EmailDetailView({
       emailPatchMutation.mutate({ starred: !isStarred });
     },
     u: () => {
-      emailPatchMutation.mutate({ isRead: !email.isRead });
+      emailPatchMutation.mutate({ isRead: !currentEmail.isRead });
     },
     Escape: () => router.history.back(),
   });
@@ -234,7 +253,7 @@ export function EmailDetailView({
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <EmailDetailContent
           ref={contentRef}
-          email={email}
+          email={currentEmail}
           threadMessages={threadMessages}
           threadError={threadQuery.isError}
           onClose={goBack}

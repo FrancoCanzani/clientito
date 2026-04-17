@@ -20,9 +20,6 @@ import {
   CaretDownIcon,
   CheckIcon,
   ClockIcon,
-  GearIcon,
-  MagnifyingGlassIcon,
-  NotePencilIcon,
   PaperPlaneTiltIcon,
   PencilSimpleLineIcon,
   StarIcon,
@@ -162,7 +159,7 @@ const NAV_ITEMS = [
   { view: "archived", icon: CheckIcon, label: "Done" },
   { view: "spam", icon: WarningIcon, label: "Spam" },
   { view: "trash", icon: TrashIcon, label: "Trash" },
-] as const;
+];
 
 function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   const activeView = useActiveView();
@@ -208,8 +205,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
             params={nav.params}
             preload={item.view === "inbox" ? undefined : "intent"}
           >
-            <Icon className="size-3 shrink-0" />
-            <span>{item.label}</span>
+            {item.label}
             <Kbd className="ml-auto opacity-0 transition-opacity group-hover/nav:opacity-100">
               ⌘{navIndex + 1}
             </Kbd>
@@ -220,17 +216,13 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   };
 
   return (
-    <Sidebar className="*:bg-sidebar/30 border-border/40">
+    <Sidebar className="*:bg-background border-border/40">
       <SidebarHeader className="space-y-2">
         <AccountHeader mailboxId={mailboxId} />
-        <SidebarMenu className="gap-1">
+        <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={() => openCompose()}
-              className="bg-background px-2 box-border py-2 shadow-xs"
-            >
-              <NotePencilIcon />
-              <span>Compose</span>
+            <SidebarMenuButton onClick={() => openCompose()}>
+              Compose
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
@@ -242,8 +234,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
                 })
               }
             >
-              <MagnifyingGlassIcon />
-              <span>Search</span>
+              Search
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
@@ -252,8 +243,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
                 navigate({ to: "/$mailboxId/settings", params: { mailboxId } })
               }
             >
-              <GearIcon />
-              <span>Settings</span>
+              Settings
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -263,7 +253,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
         <SidebarGroup>
           <SidebarGroupLabel>MAIL</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
+            <SidebarMenu>
               {primaryItems.map((item, i) => renderNavItem(item, i))}
               {showSecondary &&
                 secondaryItems.map((item, i) =>
@@ -279,7 +269,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
                     className="justify-center"
                   >
                     <CaretDownIcon
-                      className={`size-3 shrink-0 text-foreground transition-transform ${
+                      className={`size-2.5 shrink-0 text-foreground transition-transform ${
                         moreOpen ? "rotate-180" : ""
                       }`}
                     />

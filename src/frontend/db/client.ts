@@ -1,12 +1,10 @@
+import { pendingSubset } from "./pending-lock";
 import { dbClient, type ExecResult } from "./worker-client";
 import type {
   DraftAttachmentKey,
   DraftRow,
   EmailInsert,
   LabelInsert,
-  PendingMutationKind,
-  PendingMutationPayload,
-  PendingMutationRow,
 } from "./schema";
 
 type LocalEmailPatch = {
@@ -549,6 +547,30 @@ export const localDb = {
     };
   },
 
+  async getViewMeta(params: {
+    userId: string;
+    mailboxId: number;
+    view: string;
+  }): Promise<{ count: number; oldestDateMs: number | null }> {
+    const { userId, mailboxId, view } = params;
+    const fragments: SqlFragment[] = [
+      { sql: "user_id = ?", params: [userId] },
+      { sql: "mailbox_id = ?", params: [mailboxId] },
+    ];
+    fragments.push(...buildViewConditions(view as ViewFilter, Date.now()));
+    const { where, params: whereParams } = composeWhere(fragments);
+    const res = await dbClient.exec(
+      `SELECT COUNT(*) AS count, MIN(date) AS oldest FROM emails ${where}`,
+      whereParams,
+      "get",
+    );
+    const row = firstRow<{ count: number; oldest: number | null }>(res);
+    return {
+      count: row?.count ?? 0,
+      oldestDateMs: row?.oldest ?? null,
+    };
+  },
+
   async getEmailDetail(userId: string, emailId: number) {
     const res = await dbClient.exec(
       `SELECT ${EMAIL_SUMMARY_SELECT}, body_text, body_html, inline_attachments, attachments FROM emails WHERE user_id = ? AND id = ? LIMIT 1`,
@@ -808,8 +830,7 @@ export const localDb = {
 
     for (let i = 0; i < rows.length; i += CHUNK) {
       const chunk = rows.slice(i, i + CHUNK);
-      const pmids = chunk.map((r) => r.providerMessageId);
-      const locked = await localDb.getPendingProviderMessageIds(pmids);
+      const locked = pendingSubset(chunk.map((r) => r.providerMessageId));
 
       if (locked.size === 0) {
         await insertBatch(chunk, true);
@@ -1072,128 +1093,8 @@ export const localDb = {
       { sql: "DELETE FROM labels" },
       { sql: "DELETE FROM drafts" },
       { sql: "DELETE FROM emails" },
-      { sql: "DELETE FROM pending_mutations" },
       { sql: "DELETE FROM _meta" },
     ]);
-  },
-
-  async insertPendingMutation(row: PendingMutationRow): Promise<void> {
-    await dbClient.exec(
-      `INSERT INTO pending_mutations (
-        id, user_id, mailbox_id, kind, provider_message_ids, email_ids, payload,
-        status, attempts, last_error, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        row.id,
-        row.userId,
-        row.mailboxId,
-        row.kind,
-        JSON.stringify(row.providerMessageIds),
-        JSON.stringify(row.emailIds),
-        JSON.stringify(row.payload),
-        row.status,
-        row.attempts,
-        row.lastError,
-        row.createdAt,
-        row.updatedAt,
-      ],
-      "run",
-    );
-  },
-
-  async deletePendingMutation(id: string): Promise<void> {
-    await dbClient.exec(
-      `DELETE FROM pending_mutations WHERE id = ?`,
-      [id],
-      "run",
-    );
-  },
-
-  async markPendingMutationFailed(
-    id: string,
-    attempts: number,
-    lastError: string,
-  ): Promise<void> {
-    await dbClient.exec(
-      `UPDATE pending_mutations
-         SET status = 'failed', attempts = ?, last_error = ?, updated_at = ?
-       WHERE id = ?`,
-      [attempts, lastError, Date.now(), id],
-      "run",
-    );
-  },
-
-  async touchPendingMutationAttempt(
-    id: string,
-    attempts: number,
-    lastError: string | null,
-  ): Promise<void> {
-    await dbClient.exec(
-      `UPDATE pending_mutations
-         SET attempts = ?, last_error = ?, updated_at = ?
-       WHERE id = ?`,
-      [attempts, lastError, Date.now(), id],
-      "run",
-    );
-  },
-
-  async listPendingMutations(userId: string): Promise<PendingMutationRow[]> {
-    const res = await dbClient.exec(
-      `SELECT id, user_id, mailbox_id, kind, provider_message_ids, email_ids,
-              payload, status, attempts, last_error, created_at, updated_at
-       FROM pending_mutations
-       WHERE user_id = ? AND status = 'pending'
-       ORDER BY created_at ASC`,
-      [userId],
-      "rows",
-    );
-    const rows = rowsToObjects<{
-      id: string;
-      userId: string;
-      mailboxId: number;
-      kind: string;
-      providerMessageIds: string;
-      emailIds: string;
-      payload: string;
-      status: string;
-      attempts: number;
-      lastError: string | null;
-      createdAt: number;
-      updatedAt: number;
-    }>(res);
-    return rows.map((r) => ({
-      id: r.id,
-      userId: r.userId,
-      mailboxId: r.mailboxId,
-      kind: r.kind as PendingMutationKind,
-      providerMessageIds: JSON.parse(r.providerMessageIds) as string[],
-      emailIds: JSON.parse(r.emailIds) as number[],
-      payload: JSON.parse(r.payload) as PendingMutationPayload,
-      status: r.status as "pending" | "failed",
-      attempts: Number(r.attempts),
-      lastError: r.lastError,
-      createdAt: Number(r.createdAt),
-      updatedAt: Number(r.updatedAt),
-    }));
-  },
-
-  async getPendingProviderMessageIds(
-    providerMessageIds: string[],
-  ): Promise<Set<string>> {
-    if (providerMessageIds.length === 0) return new Set();
-    const placeholders = providerMessageIds.map(() => "?").join(", ");
-    const res = await dbClient.exec(
-      `SELECT DISTINCT je.value AS pmid
-       FROM pending_mutations, json_each(pending_mutations.provider_message_ids) je
-       WHERE pending_mutations.status = 'pending'
-         AND je.value IN (${placeholders})`,
-      providerMessageIds,
-      "rows",
-    );
-    const rows = rowsToObjects<{ pmid: string }>(res);
-    const pending = new Set<string>();
-    for (const row of rows) pending.add(row.pmid);
-    return pending;
   },
 
   async deleteEmailsByProviderMessageId(providerMessageIds: string[]): Promise<void> {

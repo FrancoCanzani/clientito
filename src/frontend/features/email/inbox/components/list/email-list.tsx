@@ -43,6 +43,8 @@ export function EmailList({
     isSyncing,
     isInitialSync,
     loadMoreRef,
+    canPullFromGmail,
+    isPullingFromGmail,
   } = emailData;
   const { openCompose } = useInboxCompose();
   const { mailboxId } = mailboxRoute.useParams();
@@ -79,6 +81,14 @@ export function EmailList({
   }, [focusedIndex, threadGroups.length, virtualizer]);
 
   const virtualItems = virtualizer.getVirtualItems();
+
+  const showLoadMoreSentinel =
+    hasNextPage || isFetchingNextPage || canPullFromGmail || isPullingFromGmail;
+  const loadMoreLabel = isFetchingNextPage
+    ? "Loading more..."
+    : isPullingFromGmail
+      ? "Loading more from Gmail..."
+      : "Scroll for more";
 
   return (
     <div className="flex w-full min-w-0 flex-1 flex-col">
@@ -121,12 +131,12 @@ export function EmailList({
             })}
           </div>
 
-          {(hasNextPage || isFetchingNextPage) && (
+          {showLoadMoreSentinel && (
             <div
               ref={loadMoreRef}
               className="pt-2 text-center text-xs text-muted-foreground"
             >
-              {isFetchingNextPage ? "Loading more..." : "Scroll for more"}
+              {loadMoreLabel}
             </div>
           )}
         </div>

@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { requireAuth } from "../../../middleware/auth";
 import type { AppRouteEnv } from "../../types";
 import { registerGetLabels } from "./get";
 import { registerCreateLabel } from "./post";
@@ -11,7 +10,6 @@ import { registerSyncLabels } from "./sync";
 
 const labelsRoutes = new Hono<AppRouteEnv>();
 
-labelsRoutes.use("*", requireAuth);
 registerGetLabels(labelsRoutes);
 registerCreateLabel(labelsRoutes);
 registerUpdateLabel(labelsRoutes);

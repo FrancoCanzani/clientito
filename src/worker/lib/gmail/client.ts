@@ -12,10 +12,11 @@ import {
 import type {
   GmailErrorResponse,
   GmailHistoryResponse,
-  GmailListResponse,
   GmailMessage,
   GmailMessageFormat,
   GmailProfileResponse,
+  GmailThreadResponse,
+  GmailThreadsListResponse,
   GoogleOAuthConfig,
   GoogleTokenResponse,
 } from "./types";
@@ -83,15 +84,22 @@ async function isRateLimitedResponse(response: Response): Promise<boolean> {
   return errorMessage.includes("rate limit") || errorMessage.includes("quota");
 }
 
+type GmailQueryValue = string | string[] | undefined;
+
 async function gmailRequestRaw(
   accessToken: string,
   path: string,
-  query?: Record<string, string | undefined>,
+  query?: Record<string, GmailQueryValue>,
 ): Promise<Response> {
   const url = new URL(`${GMAIL_API_BASE}${path}`);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== "") {
+      if (value === undefined) continue;
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (item !== "") url.searchParams.append(key, item);
+        }
+      } else if (value !== "") {
         url.searchParams.set(key, value);
       }
     }
@@ -152,7 +160,7 @@ async function gmailRequestRaw(
 export async function gmailRequest<T>(
   accessToken: string,
   path: string,
-  query?: Record<string, string | undefined>,
+  query?: Record<string, GmailQueryValue>,
 ): Promise<T> {
   const response = await gmailRequestRaw(accessToken, path, query);
 
@@ -166,7 +174,11 @@ export async function gmailRequest<T>(
     );
   }
 
-  return (await response.json()) as T;
+  // Gmail occasionally returns 200 with an empty body (e.g. list endpoints with
+  // zero results). Treat that as an empty object rather than letting JSON.parse throw.
+  const text = await response.text();
+  if (!text) return {} as T;
+  return JSON.parse(text) as T;
 }
 
 export async function getCurrentHistoryId(
@@ -177,20 +189,6 @@ export async function getCurrentHistoryId(
     "/profile",
   );
   return profile.historyId ?? null;
-}
-
-export async function listMessagesPage(
-  accessToken: string,
-  pageToken?: string,
-  query?: string,
-): Promise<GmailListResponse> {
-  return gmailRequest<GmailListResponse>(accessToken, "/messages", {
-    maxResults: String(GMAIL_PAGE_SIZE),
-    includeSpamTrash: "true",
-    pageToken,
-    q: query,
-    fields: "messages/id,nextPageToken",
-  });
 }
 
 export async function listHistoryPage(
@@ -224,6 +222,79 @@ export async function listHistoryPage(
   }
 
   return (await response.json()) as GmailHistoryResponse;
+}
+
+export async function listThreadsPage(
+  accessToken: string,
+  options: {
+    pageToken?: string;
+    query?: string;
+    labelIds?: string[];
+  } = {},
+): Promise<GmailThreadsListResponse> {
+  return gmailRequest<GmailThreadsListResponse>(accessToken, "/threads", {
+    maxResults: "100",
+    includeSpamTrash: "true",
+    pageToken: options.pageToken,
+    q: options.query,
+    labelIds: options.labelIds,
+    fields: "threads(id,historyId),nextPageToken",
+  });
+}
+
+export async function fetchThread(
+  accessToken: string,
+  threadId: string,
+  format: GmailMessageFormat = "full",
+): Promise<GmailThreadResponse> {
+  return gmailRequest<GmailThreadResponse>(accessToken, `/threads/${threadId}`, {
+    format,
+    fields:
+      "id,historyId,messages(id,threadId,historyId,internalDate,snippet,labelIds,payload(mimeType,headers,body/data,parts(mimeType,headers,body/data,parts)))",
+  });
+}
+
+function isGmailNotFoundError(error: unknown): boolean {
+  return error instanceof Error && /\(404\)/.test(error.message);
+}
+
+export async function fetchThreadsBatch(
+  accessToken: string,
+  threadIds: string[],
+  format: GmailMessageFormat = "full",
+  concurrency = 5,
+): Promise<Map<string, GmailThreadResponse | null>> {
+  const results = new Map<string, GmailThreadResponse | null>();
+  if (threadIds.length === 0) return results;
+
+  let index = 0;
+  let firstError: unknown = null;
+
+  async function worker() {
+    while (index < threadIds.length && !firstError) {
+      const id = threadIds[index++];
+      try {
+        results.set(id, await fetchThread(accessToken, id, format));
+      } catch (error) {
+        if (isGmailNotFoundError(error)) {
+          // Thread was deleted between list and fetch — skip.
+          results.set(id, null);
+          continue;
+        }
+        if (!firstError) firstError = error;
+        return;
+      }
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, threadIds.length) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+
+  if (firstError) throw firstError;
+  return results;
 }
 
 export async function fetchMessage(

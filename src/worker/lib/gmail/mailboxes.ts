@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { account } from "../../db/auth-schema";
 import type { Database } from "../../db/client";
 import { mailboxes } from "../../db/schema";
+import { DEFAULT_SYNC_WINDOW_MONTHS, resolveSyncCutoffAt } from "./sync/preferences";
 
 async function getCurrentGoogleAccounts(db: Database, userId: string) {
   const allGoogleAccounts = await db
@@ -118,6 +119,8 @@ export async function ensureMailbox(
         accountId,
         email: email ?? null,
         authState: "unknown",
+        syncWindowMonths: DEFAULT_SYNC_WINDOW_MONTHS,
+        syncCutoffAt: resolveSyncCutoffAt(DEFAULT_SYNC_WINDOW_MONTHS),
         updatedAt: now,
       })
       .onConflictDoNothing()
@@ -153,6 +156,8 @@ export async function ensureMailbox(
       userId,
       email: email ?? null,
       authState: "unknown",
+      syncWindowMonths: DEFAULT_SYNC_WINDOW_MONTHS,
+      syncCutoffAt: resolveSyncCutoffAt(DEFAULT_SYNC_WINDOW_MONTHS),
       updatedAt: now,
     })
     .onConflictDoNothing()

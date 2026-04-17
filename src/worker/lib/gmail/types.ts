@@ -68,9 +68,15 @@ export type GoogleTokenResponse = {
   error_description?: string;
 };
 
-export type GmailListResponse = {
-  messages?: Array<{ id: string; threadId?: string }>;
+export type GmailThreadsListResponse = {
+  threads?: Array<{ id: string; historyId?: string }>;
   nextPageToken?: string;
+};
+
+export type GmailThreadResponse = {
+  id: string;
+  historyId?: string;
+  messages?: GmailMessage[];
 };
 
 export type GmailMessagePart = {

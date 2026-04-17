@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { requireAuth } from "../../../middleware/auth";
 import type { AppRouteEnv } from "../../types";
 import { registerDeleteEmail } from "./delete";
 import { registerGetAttachment } from "./get-attachment";
@@ -11,7 +10,6 @@ import { registerUploadAttachments } from "./post-attachments";
 
 const emailsRoutes = new Hono<AppRouteEnv>();
 
-emailsRoutes.use("*", requireAuth);
 registerBatchPatchEmails(emailsRoutes);
 registerGetAttachment(emailsRoutes);
 registerUploadAttachments(emailsRoutes);

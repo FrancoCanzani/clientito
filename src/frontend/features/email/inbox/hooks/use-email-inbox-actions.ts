@@ -101,9 +101,8 @@ export function useEmailInboxActions({
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Action failed");
-      // Local DB was patched before the mutation threw; a refetch here
-      // re-reads the (possibly-updated) local state. The mutation queue
-      // will keep retrying the server side in the background.
+      // Optimistic local write already landed; re-sync to reconcile with
+      // whatever the server actually has (post-retries).
       void queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
     },
     onSuccess: (_data, { ids }) => {

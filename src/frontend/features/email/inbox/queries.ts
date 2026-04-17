@@ -1,6 +1,8 @@
 import { localDb } from "@/db/client";
-import { ensureLocalSync, isSynced, pullNewEmails } from "@/db/sync";
+import { ensureLocalSync, isSynced, pullNewEmails, remoteSearch } from "@/db/sync";
 import { getCurrentUserId } from "@/db/user";
+import { queryClient } from "@/lib/query-client";
+import { queryKeys } from "@/lib/query-keys";
 import type {
   ContactSuggestion,
   DraftItem,
@@ -57,7 +59,7 @@ export async function fetchEmails(
       void ensureLocalSync(userId, mailboxId);
     } else {
       // Already synced — incremental pull from Gmail for new/changed emails
-      await pullNewEmails(userId, mailboxId).catch(() => {});
+      void pullNewEmails(userId, mailboxId).catch(() => {});
     }
   }
 
@@ -95,6 +97,23 @@ export async function fetchSearchEmails(
     !(await isSynced(userId, params.mailboxId))
   ) {
     await ensureLocalSync(userId, params.mailboxId);
+  }
+
+  const offset = params.offset ?? 0;
+  if (
+    offset === 0 &&
+    params.mailboxId != null &&
+    normalizedQuery.length >= 2
+  ) {
+    void remoteSearch(userId, params.mailboxId, normalizedQuery).then(
+      (inserted) => {
+        if (inserted > 0) {
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.emails.all(),
+          });
+        }
+      },
+    );
   }
 
   return localDb.searchEmails({

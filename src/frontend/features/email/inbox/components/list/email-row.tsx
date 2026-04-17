@@ -9,8 +9,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { IconButton } from "@/components/ui/icon-button";
-import { patchEmail } from "@/features/email/inbox/mutations";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
+import { patchEmail } from "@/features/email/inbox/mutations";
 import { fetchEmailDetail } from "@/features/email/inbox/queries";
 import {
   getRowActions,
@@ -26,12 +26,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { memo, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { EmailListItem } from "../../types";
-import { formatInboxRowDate } from "../../utils/formatters";
+import { formatEmailSnippet, formatInboxRowDate } from "../../utils/formatters";
 import type { ThreadGroup } from "../../utils/group-emails-by-thread";
 import { SnoozePicker } from "../shell/snooze-picker";
 
 const MAX_VISIBLE_CHIPS = 2;
-const MAX_SNIPPET_LENGTH = 180;
 
 export const EmailRow = memo(function EmailRow({
   group,
@@ -82,14 +81,10 @@ export const EmailRow = memo(function EmailRow({
         : "To: (unknown recipient)"
       : email.fromName || email.fromAddr;
 
-  const snippet = email.snippet
-    ? email.snippet
-        .replace(/[\u200B-\u200F\u202A-\u202E\uFEFF\u00AD]/g, "")
-        .replace(/[\u0000-\u001F\u007F]/g, "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, MAX_SNIPPET_LENGTH)
-    : "";
+  const snippet = useMemo(
+    () => formatEmailSnippet(email.snippet),
+    [email.snippet],
+  );
 
   const prefetchEmailData = () => {
     if (prefetchedRef.current) return;
@@ -132,8 +127,7 @@ export const EmailRow = memo(function EmailRow({
       toast.success(timestamp ? "Snoozed" : "Unsnoozed");
       void queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
     },
-    onError: (error: Error) =>
-      toast.error(error.message || "Failed to snooze"),
+    onError: (error: Error) => toast.error(error.message || "Failed to snooze"),
   });
 
   const visibleChips = userLabels.slice(0, MAX_VISIBLE_CHIPS);
@@ -180,9 +174,7 @@ export const EmailRow = memo(function EmailRow({
         </div>
 
         <div className="min-w-0 flex-1 truncate text-sm">
-          <span
-            className={cn(!email.isRead && "font-medium text-foreground")}
-          >
+          <span className={cn(!email.isRead && "font-medium text-foreground")}>
             {email.subject?.trim() || "(no subject)"}
           </span>
           {snippet && (
