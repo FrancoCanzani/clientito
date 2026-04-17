@@ -60,4 +60,11 @@ export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(handleScheduled(event, env));
   },
+  async queue(batch: MessageBatch<unknown>) {
+    // Keep a queue handler so deploys succeed while stale remote queue consumers
+    // are detached from this Worker.
+    throw new Error(
+      `Queue consumer is still attached to this Worker, but queue processing is not configured. Pending messages: ${batch.messages.length}.`,
+    );
+  },
 };

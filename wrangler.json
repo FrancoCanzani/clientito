@@ -10,6 +10,36 @@
 		"enabled": true
 	},
 	"upload_source_maps": true,
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"EmailAgent"
+			]
+		},
+		{
+			"tag": "v2",
+			"renamed_classes": [
+				{
+					"from": "EmailAgent",
+					"to": "Agent"
+				}
+			]
+		},
+		{
+			"tag": "v3",
+			"new_sqlite_classes": [
+				"AgentSQLite"
+			]
+		},
+		{
+			"tag": "v4",
+			"deleted_classes": [
+				"Agent",
+				"AgentSQLite"
+			]
+		}
+	],
 	"assets": {
 		"directory": "./dist/client",
 		"not_found_handling": "single-page-application",
