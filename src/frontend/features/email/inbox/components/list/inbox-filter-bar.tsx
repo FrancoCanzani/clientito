@@ -50,7 +50,7 @@ export function InboxFilterBar({
               "inline-flex h-6 items-center gap-1 rounded-full border px-2 transition-colors",
               active
                 ? "border-primary/50 bg-primary/10 text-foreground"
-                : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-foreground/30",
+                : "border-white/30 bg-background/50 text-muted-foreground backdrop-blur-md hover:text-foreground hover:border-foreground/30 dark:border-white/10 dark:bg-background/40",
             )}
           >
             <Icon

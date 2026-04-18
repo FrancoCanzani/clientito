@@ -215,7 +215,7 @@ export function EmailThread({
           })}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-md border border-border/50 bg-background shadow-xs">
+        <div className="overflow-hidden rounded-md border border-white/30 bg-background/75 shadow-xs backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-background/60">
           <div className="p-5">
             <MessageBody detail={email} readingMode={readingMode} />
           </div>
@@ -248,7 +248,7 @@ function ThreadMessage({
   const hasAttachments = attachments.length > 0;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-background shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-white/30 bg-background/75 shadow-sm backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-background/60">
       <button
         type="button"
         onClick={onToggle}
