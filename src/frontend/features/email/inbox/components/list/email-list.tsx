@@ -15,6 +15,7 @@ import {
 import { IconButton } from "@/components/ui/icon-button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
+import { useIsScrolled } from "@/hooks/use-is-scrolled";
 import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import { useInboxHotkeys } from "@/features/email/inbox/hooks/use-inbox-hotkeys";
@@ -106,6 +107,7 @@ export function EmailList({
   });
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isScrolled = useIsScrolled(scrollRef);
 
   const virtualizer = useVirtualizer({
     count: threadGroups.length,
@@ -207,8 +209,12 @@ export function EmailList({
   );
 
   return (
-    <div className="flex w-full min-w-0 flex-1 flex-col">
-      <PageHeader title={headerTitle} actions={headerActions} />
+    <div className="flex w-full min-h-0 min-w-0 flex-1 flex-col">
+      <PageHeader
+        title={headerTitle}
+        actions={headerActions}
+        isScrolled={isScrolled}
+      />
 
       {(hasEmails || hasActiveFilters) && filterBarVisible && (
         <InboxFilterBar filters={filters} onChange={setFilters} view={view} />

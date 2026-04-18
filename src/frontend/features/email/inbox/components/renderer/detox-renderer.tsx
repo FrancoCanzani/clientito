@@ -3,13 +3,13 @@ import { cn } from "@/lib/utils";
 import Defuddle from "defuddle";
 import DOMPurify from "dompurify";
 import { useMemo, useState } from "react";
-import { parseMailtoComposeInitial } from "../../utils/parse-mailto-compose";
-import { prepareEmailHtml } from "../../utils/prepare-email-html";
 import {
   rewriteCidImages,
   rewriteInsecureImageUrls,
   type InlineImageContext,
 } from "../../utils/cid-images";
+import { parseMailtoComposeInitial } from "../../utils/parse-mailto-compose";
+import { prepareEmailHtml } from "../../utils/prepare-email-html";
 import { EmailHtmlRenderer } from "./email-html-renderer";
 
 const MIN_READABLE_CHARS = 40;
@@ -113,26 +113,24 @@ function handleTransactionalMail(doc: Document): void {
     }
 
     const cellPadding = parseNumericAttr(tableNode.getAttribute("cellpadding"));
-    tableNode
-      .querySelectorAll("td,th")
-      .forEach((cellNode) => {
-        if (
-          !(cellNode instanceof HTMLTableCellElement) &&
-          !(cellNode instanceof HTMLElement)
-        ) {
-          return;
-        }
+    tableNode.querySelectorAll("td,th").forEach((cellNode) => {
+      if (
+        !(cellNode instanceof HTMLTableCellElement) &&
+        !(cellNode instanceof HTMLElement)
+      ) {
+        return;
+      }
 
-        cellNode.setAttribute("data-transactional-cell", "true");
-        const cellWidth = parseNumericAttr(cellNode.getAttribute("width"));
-        if (cellWidth != null && cellWidth > 340) {
-          cellNode.removeAttribute("width");
-        }
+      cellNode.setAttribute("data-transactional-cell", "true");
+      const cellWidth = parseNumericAttr(cellNode.getAttribute("width"));
+      if (cellWidth != null && cellWidth > 340) {
+        cellNode.removeAttribute("width");
+      }
 
-        if ((cellPadding ?? 0) >= 16) {
-          cellNode.setAttribute("data-transactional-tight", "true");
-        }
-      });
+      if ((cellPadding ?? 0) >= 16) {
+        cellNode.setAttribute("data-transactional-tight", "true");
+      }
+    });
 
     tableNode.querySelectorAll("img").forEach((img) => {
       img.setAttribute("data-transactional-image", "true");
@@ -213,7 +211,10 @@ function lightenDarkText(doc: Document): void {
   });
 }
 
-function processImages(doc: Document, showImages: boolean): {
+function processImages(
+  doc: Document,
+  showImages: boolean,
+): {
   hasImages: boolean;
   blockedTrackers: number;
 } {
@@ -386,7 +387,7 @@ export function DetoxRenderer({
       <article
         style={{ fontFamily: "var(--reading-font)" }}
         className={cn(
-          "prose prose-neutral dark:prose-invert max-w-none",
+          "prose prose-neutral prose-sm dark:prose-invert max-w-none",
           PROSE_SIZE_CLASS[fontSize],
           "prose-headings:font-semibold prose-a:text-foreground prose-a:underline-offset-2",
           "prose-img:rounded-md",

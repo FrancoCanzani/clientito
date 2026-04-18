@@ -261,10 +261,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   };
 
   return (
-    <Sidebar
-      variant="floating"
-      className="*:bg-sidebar/10 shadow-none border-border/20 ring-0"
-    >
+    <Sidebar className=" *:bg-white/25 *:dark:bg-white/5">
       <SidebarHeader className="space-y-2">
         <AccountHeader mailboxId={mailboxId} />
         <SidebarMenu>

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -6,7 +7,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { queryKeys } from "@/lib/query-keys";
-import { CheckIcon, PlusIcon, TagIcon } from "@phosphor-icons/react";
+import { PlusIcon, TagIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -146,14 +147,14 @@ export function LabelPicker({
                 key={label.gmailId}
                 type="button"
                 onClick={() => toggleLabel(label)}
-                className="flex w-full items-center gap-1 rounded-sm px-2 py-2 text-xs hover:bg-muted"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-xs hover:bg-muted"
               >
-                <span
-                  className="size-1.5 rounded-full"
-                  style={{ backgroundColor: label.backgroundColor ?? "#999" }}
+                <Checkbox
+                  checked={isApplied}
+                  tabIndex={-1}
+                  className="pointer-events-none"
                 />
                 <span className="flex-1 truncate text-left">{label.name}</span>
-                {isApplied && <CheckIcon className="size-3 text-primary" />}
               </button>
             );
           })}

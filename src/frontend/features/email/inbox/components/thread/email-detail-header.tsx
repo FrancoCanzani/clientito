@@ -1,6 +1,7 @@
 import { IconButton } from "@/components/ui/icon-button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import type { EmailDetailItem } from "@/features/email/inbox/types";
+import { cn } from "@/lib/utils";
 import {
   ArrowLeftIcon,
   CaretDownIcon,
@@ -21,6 +22,7 @@ export function EmailDetailHeader({
   onReply,
   readingMode,
   onReadingModeChange,
+  isScrolled = false,
 }: {
   email: EmailDetailItem;
   onClose?: () => void;
@@ -33,9 +35,15 @@ export function EmailDetailHeader({
   onReply: () => void;
   readingMode: "original" | "detox";
   onReadingModeChange: (mode: "original" | "detox") => void;
+  isScrolled?: boolean;
 }) {
   return (
-    <div className="sticky top-0 z-20 flex min-h-14 w-full shrink-0 items-center bg-background px-4 py-2 sm:px-6">
+    <div
+      className={cn(
+        "sticky top-0 z-20 flex min-h-14 shrink-0 items-center justify-between gap-3 border-b px-4 transition-colors duration-300 sm:px-6",
+        isScrolled ? "border-border/40 liquid-glass" : "border-transparent",
+      )}
+    >
       <div className="flex w-full items-center justify-between gap-2">
         <div className="flex items-center gap-0.5">
           <SidebarTrigger className="md:hidden" />

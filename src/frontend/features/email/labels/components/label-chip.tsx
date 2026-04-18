@@ -13,11 +13,12 @@ export function LabelChip({ label, onRemove, className }: LabelChipProps) {
 
   return (
     <div
-      style={{ backgroundColor: color }}
+      style={{
+        backgroundColor: `color-mix(in oklch, ${color} 20%, transparent)`,
+      }}
       className={cn(
         "inline-flex items-center gap-1.5 rounded px-1.5",
         className,
-        label.backgroundColor && `bg-[label.backgroundColor]`,
       )}
     >
       <span className="text-[13px]">{label.name}</span>

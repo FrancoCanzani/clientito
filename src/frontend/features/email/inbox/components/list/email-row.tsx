@@ -226,7 +226,7 @@ export const EmailRow = memo(function EmailRow({
         </div>
 
         <div className="relative flex h-8 w-28 shrink-0 items-center justify-end">
-          <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground group-hover:invisible">
+          <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground group-hover:invisible group-focus-within:invisible">
             {formatInboxRowDate(email.date)}
           </span>
 
@@ -305,7 +305,7 @@ function EmailRowActions({
 
   return (
     <div
-      className="absolute inset-y-0 right-0 hidden items-center gap-0.5 rounded-md bg-muted px-1 shadow ring-1 ring-border/40 group-hover:flex"
+      className="absolute inset-y-0 right-0 flex items-center gap-0.5 rounded-md bg-muted px-1 shadow ring-1 ring-border/40 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
       onClick={(event) => event.stopPropagation()}
     >
       {rowActions.map((rowAction) => {

@@ -16,31 +16,43 @@ type IconButtonProps = React.ComponentProps<"button"> &
     tooltipSide?: React.ComponentProps<typeof TooltipContent>["side"];
   };
 
-function IconButton({
-  label,
-  shortcut,
-  tooltipSide = "top",
-  variant = "ghost",
-  size,
-  children,
-  ...props
-}: IconButtonProps) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button variant={variant} size={size} aria-label={label} {...props}>
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent
-        side={tooltipSide}
-        className="flex items-center gap-2 text-xs"
-      >
-        {label}
-        {shortcut && <Kbd>{shortcut}</Kbd>}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
+const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
+  function IconButton(
+    {
+      label,
+      shortcut,
+      tooltipSide = "top",
+      variant = "ghost",
+      size,
+      children,
+      ...props
+    },
+    ref,
+  ) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            ref={ref}
+            variant={variant}
+            size={size}
+            aria-label={label}
+            {...props}
+          >
+            {children}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent
+          side={tooltipSide}
+          className="flex items-center gap-2 text-xs"
+        >
+          {label}
+          {shortcut && <Kbd>{shortcut}</Kbd>}
+        </TooltipContent>
+      </Tooltip>
+    );
+  },
+);
+IconButton.displayName = "IconButton";
 
 export { IconButton };

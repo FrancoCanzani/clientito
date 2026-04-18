@@ -4,16 +4,19 @@ import { type ReactNode } from "react";
 export function PageHeader({
   title,
   actions,
+  isScrolled = false,
   className,
 }: {
   title: ReactNode;
   actions?: ReactNode;
+  isScrolled?: boolean;
   className?: string;
 }) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-20 flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-white/20 bg-background/55 pt-3 px-4 backdrop-blur-xl backdrop-saturate-150 sm:px-6 dark:border-white/5 dark:bg-background/45",
+        "sticky top-0 z-20 flex min-h-14 shrink-0 items-center justify-between gap-3 border-b px-4 transition-colors duration-300 sm:px-6",
+        isScrolled ? "border-border/40 liquid-glass/10" : "border-transparent",
         className,
       )}
     >

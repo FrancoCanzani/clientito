@@ -158,6 +158,12 @@
   }
 }
 
+@utility liquid-glass {
+  @apply bg-background/96 dark:bg-background/95;
+  backdrop-filter: blur(48px) saturate(160%);
+  -webkit-backdrop-filter: blur(48px) saturate(160%);
+}
+
 .tiptap.ProseMirror {
   padding: 0 !important;
 }

@@ -1,4 +1,5 @@
 import type { EmailDetailItem, EmailThreadItem } from "@/features/email/inbox/types";
+import { useIsScrolled } from "@/hooks/use-is-scrolled";
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import type { ComposeInitial } from "../../types";
 import { EmailDetailHeader } from "./email-detail-header";
@@ -39,6 +40,8 @@ export const EmailDetailContent = forwardRef<
   ref,
 ) {
   const quickReplyRef = useRef<QuickReplyHandle>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isScrolled = useIsScrolled(scrollRef);
   const [readingMode, setReadingMode] = useState<"original" | "detox">("original");
 
   useImperativeHandle(ref, () => ({
@@ -48,7 +51,10 @@ export const EmailDetailContent = forwardRef<
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden">
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+      >
         <EmailDetailHeader
           email={email}
           onClose={onClose}
@@ -61,6 +67,7 @@ export const EmailDetailContent = forwardRef<
           onReply={() => quickReplyRef.current?.scrollIntoViewAndFocus()}
           readingMode={readingMode}
           onReadingModeChange={setReadingMode}
+          isScrolled={isScrolled}
         />
 
         <div className="mx-auto w-full max-w-4xl space-y-8 px-4 pt-4 pb-24 sm:px-6">
