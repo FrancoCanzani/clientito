@@ -6,7 +6,6 @@ import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox
 import {
   fetchEmailDetail,
   fetchEmailThread,
-  invalidateInboxQueries,
 } from "@/features/email/inbox/queries";
 import type {
   ComposeInitial,
@@ -175,11 +174,6 @@ export function EmailDetailView({
   const emailPatchMutation = useMutation({
     mutationFn: (payload: Parameters<typeof patchEmail>[1]) =>
       patchEmail(emailIdentifier, payload),
-    onSuccess: () => {
-      invalidateInboxQueries();
-      queryClient.invalidateQueries({ queryKey: queryKeys.emails.detail(currentEmail.id) });
-      void router.invalidate();
-    },
   });
 
   const isInInbox = currentEmail.labelIds.includes("INBOX");

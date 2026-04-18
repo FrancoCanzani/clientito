@@ -150,9 +150,24 @@ function decodeViewCursor(cursor: string | undefined): DecodedCursor | null {
 }
 
 const refreshInFlight = new Map<string, Promise<void>>();
+const refreshLastRunAt = new Map<string, number>();
+const VIEW_BACKGROUND_REFRESH_COOLDOWN_MS = 60_000;
 
 function refreshKey(mailboxId: number, view: string): string {
   return `${mailboxId}:${view}`;
+}
+
+function viewSyncedKey(mailboxId: number, view: string): string {
+  return `viewSynced:${mailboxId}:${view}`;
+}
+
+export async function isViewSynced(mailboxId: number, view: string): Promise<boolean> {
+  const val = await localDb.getMeta(viewSyncedKey(mailboxId, view));
+  return val !== null;
+}
+
+async function markViewSynced(mailboxId: number, view: string): Promise<void> {
+  await localDb.setMeta(viewSyncedKey(mailboxId, view), "1");
 }
 
 async function refreshViewFromServer(
@@ -163,6 +178,14 @@ async function refreshViewFromServer(
   const key = refreshKey(mailboxId, view);
   const existing = refreshInFlight.get(key);
   if (existing) return existing;
+
+  const now = Date.now();
+  const lastRunAt = refreshLastRunAt.get(key) ?? 0;
+  if (now - lastRunAt < VIEW_BACKGROUND_REFRESH_COOLDOWN_MS) {
+    return;
+  }
+  // Mark before starting to avoid immediate invalidate->refetch->refresh loops.
+  refreshLastRunAt.set(key, now);
 
   const task = (async () => {
     try {
@@ -176,6 +199,7 @@ async function refreshViewFromServer(
         emails: PulledEmail[];
         cursor: string | null;
       };
+      void markViewSynced(mailboxId, view);
       if (body.emails.length === 0) return;
       const rows = body.emails.map((e) => pulledToRow(e, userId, mailboxId));
       await localDb.insertEmails(rows);
@@ -217,6 +241,7 @@ async function fetchServerPage(
     cursor: string | null;
   };
   const emails = await persistEmails(body.emails, userId, mailboxId);
+  void markViewSynced(mailboxId, view);
   const nextCursor = body.cursor
     ? encodeViewCursor({
         type: "remote",

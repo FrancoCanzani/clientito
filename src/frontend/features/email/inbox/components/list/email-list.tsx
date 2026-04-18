@@ -64,6 +64,7 @@ export function EmailList({
     hasNextPage,
     isFetchingNextPage,
     isLoading,
+    isFirstSync,
     loadMoreRef,
     filters,
     setFilters,
@@ -247,9 +248,12 @@ export function EmailList({
               );
             })}
           </div>
-        ) : isLoading ? (
+        ) : isLoading || isFirstSync ? (
           <div className="flex min-h-56 flex-col items-center justify-center gap-3">
             <CircleNotchIcon className="size-5 animate-spin text-muted-foreground" />
+            {isFirstSync && !isLoading && (
+              <p className="text-muted-foreground text-sm">Syncing your Gmail&hellip;</p>
+            )}
           </div>
         ) : (
           <Empty className="min-h-56 justify-center">

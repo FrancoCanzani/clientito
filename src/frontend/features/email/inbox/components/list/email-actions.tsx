@@ -136,7 +136,6 @@ export function EmailActions({
     emailPatchMutation.mutate(payload, {
       onSuccess: () => {
         if (opts.successMessage) toast.success(opts.successMessage);
-        invalidateEmails();
         if (opts.closeAfter) onClose?.();
       },
       onError: () => {
@@ -150,7 +149,6 @@ export function EmailActions({
       patchEmail(emailIdentifier, { snoozedUntil: timestamp }),
     onSuccess: (_data, timestamp) => {
       toast.success(timestamp ? "Snoozed" : "Unsnoozed");
-      invalidateEmails();
     },
     onError: () => toast.error("Failed to snooze"),
   });

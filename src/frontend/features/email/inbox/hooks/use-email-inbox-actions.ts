@@ -4,7 +4,6 @@ import {
   patchEmail,
   type EmailIdentifier,
 } from "@/features/email/inbox/mutations";
-import { invalidateInboxQueries } from "@/features/email/inbox/queries";
 import type {
   EmailListItem,
   EmailListPage,
@@ -57,6 +56,16 @@ const actionPayloads: Partial<
   unstar: { starred: false },
 };
 
+// These mutations change which view an email belongs to.
+const LIST_CHANGING_ACTIONS = new Set<EmailInboxAction>([
+  "archive",
+  "move-to-inbox",
+  "trash",
+  "spam",
+  "not-spam",
+  "delete-forever",
+]);
+
 type EmailsCache = InfiniteData<EmailListPage> | undefined;
 
 type InboxMutationVars = {
@@ -64,6 +73,23 @@ type InboxMutationVars = {
   ids: string[];
   identifiers: EmailIdentifier[];
 };
+
+function removeIdsFromInfiniteData(
+  current: InfiniteData<EmailListPage> | undefined,
+  idSet: Set<string>,
+): InfiniteData<EmailListPage> | undefined {
+  if (!current) return current;
+  let changed = false;
+  const pages = current.pages.map((page) => {
+    const emails = page.emails.filter((entry) => !idSet.has(entry.id));
+    if (emails.length !== page.emails.length) {
+      changed = true;
+      return { ...page, emails };
+    }
+    return page;
+  });
+  return changed ? { ...current, pages } : current;
+}
 
 export function useEmailInboxActions({
   view,
@@ -100,19 +126,15 @@ export function useEmailInboxActions({
         await batchPatchEmails(identifiers, data);
       }
     },
-    onError: (error) => {
+    onError: (error, { ids }) => {
       toast.error(error instanceof Error ? error.message : "Action failed");
-      // Optimistic local write already landed; re-sync to reconcile with
-      // whatever the server actually has (post-retries).
-      invalidateInboxQueries();
-    },
-    onSuccess: (_data, { ids }) => {
+      // Re-sync to roll back optimistic cache and local DB state.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
       for (const id of ids) {
         void queryClient.invalidateQueries({
           queryKey: queryKeys.emails.detail(id),
         });
       }
-      invalidateInboxQueries();
     },
   });
 
@@ -149,13 +171,21 @@ export function useEmailInboxActions({
 
       if (identifiers.length === 0) return;
 
+      if (LIST_CHANGING_ACTIONS.has(action)) {
+        const idSet = new Set(ids);
+        queryClient.setQueryData<InfiniteData<EmailListPage> | undefined>(
+          queryKeys.emails.list(view, mailboxId),
+          (current) => removeIdsFromInfiniteData(current, idSet),
+        );
+      }
+
       try {
         await mutation.mutateAsync({ action, ids, identifiers });
       } catch (error) {
         console.warn("Inbox action failed", error);
       }
     },
-    [mutation, queryClient],
+    [mailboxId, mutation, queryClient, view],
   );
 
   return { openEmail, executeEmailAction };

@@ -30,6 +30,51 @@ type NavigateToEmail = (
       },
 ) => void;
 
+type EmailOpenState = Pick<
+  EmailListItem,
+  "id" | "isRead" | "providerMessageId" | "mailboxId" | "labelIds"
+>;
+
+function resolveLatestEmailState(
+  queryClient: QueryClient,
+  fallback: EmailOpenState,
+): EmailOpenState {
+  const detail = queryClient.getQueryData<EmailDetailItem | undefined>(
+    queryKeys.emails.detail(fallback.id),
+  );
+  if (detail) {
+    return {
+      id: detail.id,
+      isRead: detail.isRead,
+      providerMessageId: detail.providerMessageId,
+      mailboxId: detail.mailboxId,
+      labelIds: detail.labelIds,
+    };
+  }
+
+  const snapshots = queryClient.getQueriesData<
+    InfiniteData<EmailListPage> | undefined
+  >({
+    queryKey: queryKeys.emails.all(),
+  });
+
+  for (const [, cache] of snapshots) {
+    if (!isEmailListInfiniteData(cache)) continue;
+    for (const page of cache.pages) {
+      const found = page.emails.find((entry) => entry.id === fallback.id);
+      if (!found) continue;
+      return {
+        id: found.id,
+        isRead: found.isRead,
+        providerMessageId: found.providerMessageId,
+        mailboxId: found.mailboxId,
+        labelIds: found.labelIds,
+      };
+    }
+  }
+
+  return fallback;
+}
 
 export function openEmail(
   queryClient: QueryClient,
@@ -38,10 +83,13 @@ export function openEmail(
   email: Pick<EmailListItem, "id" | "isRead" | "providerMessageId" | "mailboxId" | "labelIds">,
   options?: { replace?: boolean; context?: string },
 ) {
+  const emailState = resolveLatestEmailState(queryClient, email);
+  const mutationMailboxId = emailState.mailboxId ?? routeMailboxId;
+
   void queryClient.prefetchQuery({
-    queryKey: queryKeys.emails.detail(email.id),
+    queryKey: queryKeys.emails.detail(emailState.id),
     queryFn: () =>
-      fetchEmailDetail(email.id, {
+      fetchEmailDetail(emailState.id, {
         mailboxId: routeMailboxId,
         view: options?.context,
       }),
@@ -51,24 +99,32 @@ export function openEmail(
   if (isInboxLabelView(context)) {
     navigate({
       to: "/$mailboxId/inbox/labels/$label/email/$emailId",
-      params: { mailboxId: routeMailboxId, label: context as InboxLabelView, emailId: email.id },
+      params: {
+        mailboxId: routeMailboxId,
+        label: context as InboxLabelView,
+        emailId: emailState.id,
+      },
       replace: options?.replace,
     });
   } else if (context !== "inbox") {
     navigate({
       to: "/$mailboxId/$folder/email/$emailId",
-      params: { mailboxId: routeMailboxId, folder: context as EmailFolderView, emailId: email.id },
+      params: {
+        mailboxId: routeMailboxId,
+        folder: context as EmailFolderView,
+        emailId: emailState.id,
+      },
       replace: options?.replace,
     });
   } else {
     navigate({
       to: "/$mailboxId/inbox/email/$emailId",
-      params: { mailboxId: routeMailboxId, emailId: email.id },
+      params: { mailboxId: routeMailboxId, emailId: emailState.id },
       replace: options?.replace,
     });
   }
 
-  markEmailOpened(queryClient, email, routeMailboxId);
+  markEmailOpened(queryClient, emailState, mutationMailboxId);
 }
 
 export function markEmailOpened(
@@ -111,6 +167,7 @@ export function markEmailOpened(
     mailboxId,
     labelIds: email.labelIds,
   }).catch(() => {
+    // Roll back the optimistic update if the server call fails.
     invalidateInboxQueries();
     queryClient.invalidateQueries({ queryKey: queryKeys.emails.detail(email.id) });
   });

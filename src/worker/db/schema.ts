@@ -103,5 +103,3 @@ export const drafts = sqliteTable(
     index("drafts_user_updated_idx").on(table.userId, table.updatedAt),
   ],
 );
-
-

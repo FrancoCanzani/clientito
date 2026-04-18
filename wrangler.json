@@ -70,5 +70,19 @@
 			"*/1 * * * *",
 			"0 * * * *"
 		]
+	},
+	"queues": {
+		"producers": [
+			{ "queue": "email-label-mutations", "binding": "EMAIL_MUTATIONS_QUEUE" }
+		],
+		"consumers": [
+			{
+				"queue": "email-label-mutations",
+				"max_batch_size": 50,
+				"max_batch_timeout": 5,
+				"max_retries": 5,
+				"dead_letter_queue": "email-label-mutations-dlq"
+			}
+		]
 	}
 }

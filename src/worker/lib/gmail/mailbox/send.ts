@@ -1,5 +1,6 @@
 import type { Database } from "../../../db/client";
 import { GMAIL_API_BASE, getGmailTokenForMailbox } from "../client";
+import { sleep } from "../../utils";
 import type { GoogleOAuthConfig } from "../types";
 
 function encodeBase64Url(input: string): string {
@@ -38,7 +39,27 @@ function encodeMimeHeader(value: string): string {
   return `=?UTF-8?B?${btoa(binary)}?=`;
 }
 
-function postGmailModify(
+const POST_MAX_RETRIES = 5;
+const POST_RETRY_BASE_MS = 1_000;
+const POST_RETRY_MAX_MS = 30_000;
+
+function postRetryDelayMs(attempt: number): number {
+  const exp = Math.min(POST_RETRY_MAX_MS, POST_RETRY_BASE_MS * 2 ** attempt);
+  return Math.min(POST_RETRY_MAX_MS, exp + Math.floor(Math.random() * POST_RETRY_BASE_MS));
+}
+
+async function isModifyRateLimited(response: Response): Promise<boolean> {
+  if (response.status === 429) return true;
+  if (response.status !== 403) return false;
+  const payload = await response.clone().json().catch(() => null) as
+    | { error?: { status?: string; message?: string } }
+    | null;
+  const status = payload?.error?.status?.toLowerCase() ?? "";
+  const msg = payload?.error?.message?.toLowerCase() ?? "";
+  return status === "resource_exhausted" || msg.includes("rate limit") || msg.includes("quota");
+}
+
+async function postGmailModify(
   accessToken: string,
   path: string,
   body: {
@@ -48,24 +69,47 @@ function postGmailModify(
   },
 ): Promise<void> {
   if (!body.addLabelIds?.length && !body.removeLabelIds?.length) {
-    return Promise.resolve();
+    return;
   }
 
-  return fetch(`${GMAIL_API_BASE}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  }).then(async (response) => {
+  const url = `${GMAIL_API_BASE}${path}`;
+  const serializedBody = JSON.stringify(body);
+  const headers = {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  };
+
+  for (let attempt = 0; attempt <= POST_MAX_RETRIES; attempt++) {
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: serializedBody,
+        signal: AbortSignal.timeout(60_000),
+      });
+    } catch (error) {
+      if (attempt === POST_MAX_RETRIES) throw error;
+      await sleep(postRetryDelayMs(attempt));
+      continue;
+    }
+
+    if (await isModifyRateLimited(response)) {
+      if (attempt === POST_MAX_RETRIES) {
+        throw new Error(`Gmail modify rate-limited on ${path} after ${POST_MAX_RETRIES} retries.`);
+      }
+      const delayMs = postRetryDelayMs(attempt);
+      console.warn("Gmail API rate-limited on modify, retrying", { path, attempt: attempt + 1, delayMs, status: response.status });
+      await sleep(delayMs);
+      continue;
+    }
+
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      throw new Error(
-        `Gmail modify failed (${response.status}): ${text || response.statusText}`,
-      );
+      throw new Error(`Gmail modify failed (${response.status}): ${text || response.statusText}`);
     }
-  });
+    return;
+  }
 }
 
 function buildMimeMessage(

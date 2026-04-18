@@ -21,7 +21,7 @@ import {
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { SidebarIcon } from "@phosphor-icons/react";
+import { ListIcon } from "@phosphor-icons/react";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -260,7 +260,7 @@ function SidebarTrigger({
       }}
       {...props}
     >
-      <SidebarIcon className="size-4" />
+      <ListIcon className="size-4" />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );

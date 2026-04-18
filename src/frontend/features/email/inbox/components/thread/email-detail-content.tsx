@@ -63,7 +63,7 @@ export const EmailDetailContent = forwardRef<
           onReadingModeChange={setReadingMode}
         />
 
-        <div className="mx-auto w-full max-w-4xl space-y-8 px-4 pt-4 pb-24">
+        <div className="mx-auto w-full max-w-4xl space-y-8 px-4 pt-4 pb-24 sm:px-6">
           <EmailThread
             email={email}
             threadMessages={threadMessages}

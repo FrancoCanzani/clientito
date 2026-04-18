@@ -199,10 +199,10 @@ function getNavTo(
 const NAV_ITEMS = [
   { view: "inbox", icon: TrayIcon, label: "Inbox" },
   { view: "starred", icon: StarIcon, label: "Starred" },
-  { view: "snoozed", icon: ClockIcon, label: "Snoozed" },
+  { view: "archived", icon: CheckIcon, label: "Done" },
   { view: "sent", icon: PaperPlaneTiltIcon, label: "Sent" },
   { view: "drafts", icon: PencilSimpleLineIcon, label: "Drafts" },
-  { view: "archived", icon: CheckIcon, label: "Done" },
+  { view: "snoozed", icon: ClockIcon, label: "Snoozed" },
   { view: "spam", icon: WarningIcon, label: "Spam" },
   { view: "trash", icon: TrashIcon, label: "Trash" },
 ];
@@ -249,7 +249,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
           tooltip={item.label}
           className="text-base"
         >
-          <Link to={nav.to as string} params={nav.params} preload="viewport">
+          <Link to={nav.to as string} params={nav.params}>
             {item.label}
             <Kbd className="ml-auto opacity-0 transition-opacity group-hover/nav:opacity-100">
               ⌘{navIndex + 1}
@@ -285,7 +285,6 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
               <Link
                 to="/$mailboxId/inbox/search"
                 params={{ mailboxId }}
-                preload="viewport"
               >
                 Search
               </Link>
@@ -300,7 +299,6 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
               <Link
                 to="/$mailboxId/settings"
                 params={{ mailboxId }}
-                preload="viewport"
               >
                 Settings
               </Link>

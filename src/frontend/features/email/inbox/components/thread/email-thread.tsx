@@ -19,6 +19,60 @@ import {
 import { AttachmentItem } from "../compose/attachment-item";
 import { MessageBody } from "../renderer/message-body";
 
+function normalizeCid(value: string): string {
+  return value.trim().replace(/^<|>$/g, "").toLowerCase();
+}
+
+function collectReferencedCids(bodyHtml: string | null | undefined): Set<string> {
+  const referenced = new Set<string>();
+  if (!bodyHtml) return referenced;
+
+  const cidRegex = /\bcid:([^"'>\s]+)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = cidRegex.exec(bodyHtml)) !== null) {
+    const cid = match[1];
+    if (!cid) continue;
+    referenced.add(normalizeCid(cid));
+  }
+
+  return referenced;
+}
+
+function shouldHideInlineImageAttachment(
+  attachment: EmailAttachment,
+  referencedCids: Set<string>,
+): boolean {
+  if (!(attachment.isInline && attachment.isImage)) return false;
+  if (!attachment.contentId) return false;
+  return referencedCids.has(normalizeCid(attachment.contentId));
+}
+
+function formatAttachmentLabel(count: number): string {
+  return count === 1 ? "1 attachment" : `${count} attachments`;
+}
+
+function AttachmentsSection({
+  attachments,
+}: {
+  attachments: EmailAttachment[];
+}) {
+  if (attachments.length === 0) return null;
+
+  return (
+    <section className="space-y-2.5 border-t border-border/60 px-5 py-3.5">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <PaperclipIcon className="size-3" />
+        <span>{formatAttachmentLabel(attachments.length)}</span>
+      </div>
+      <div className="divide-y divide-border/50">
+        {attachments.map((attachment) => (
+          <AttachmentItem key={attachment.attachmentId} attachment={attachment} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function buildRecipientRows(email: EmailDetailItem) {
   return [
     {
@@ -65,9 +119,17 @@ export function EmailThread({
   const subject = email.subject ?? "(no subject)";
   const recipientRows = buildRecipientRows(email);
   const showThread = Boolean(email.threadId && threadMessages.length > 1);
+  const selectedReferencedCids = useMemo(
+    () => collectReferencedCids(email.resolvedBodyHtml ?? email.bodyHtml),
+    [email.resolvedBodyHtml, email.bodyHtml],
+  );
   const visibleAttachments = useMemo(
-    () => email.attachments.filter((a) => !(a.isInline && a.isImage)),
-    [email.attachments],
+    () =>
+      email.attachments.filter(
+        (attachment) =>
+          !shouldHideInlineImageAttachment(attachment, selectedReferencedCids),
+      ),
+    [email.attachments, selectedReferencedCids],
   );
   const hasAttachments = visibleAttachments.length > 0;
 
@@ -126,6 +188,9 @@ export function EmailThread({
         <div className="space-y-3">
           {threadMessages.map((threadEmail) => {
             const isSelected = threadEmail.id === email.id;
+            const threadReferencedCids = collectReferencedCids(
+              threadEmail.resolvedBodyHtml ?? threadEmail.bodyHtml,
+            );
             return (
               <ThreadMessage
                 key={threadEmail.id}
@@ -137,7 +202,11 @@ export function EmailThread({
                   isSelected
                     ? visibleAttachments
                     : (threadEmail.attachments ?? []).filter(
-                        (a) => !(a.isInline && a.isImage),
+                        (attachment) =>
+                          !shouldHideInlineImageAttachment(
+                            attachment,
+                            threadReferencedCids,
+                          ),
                       )
                 }
                 readingMode={readingMode}
@@ -151,22 +220,7 @@ export function EmailThread({
             <MessageBody detail={email} readingMode={readingMode} />
           </div>
 
-          {hasAttachments && (
-            <section className="space-y-3 border-t border-border/70 px-5 py-4">
-              <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                <PaperclipIcon className="size-3" />
-                Attachments
-              </div>
-              <div className="divide-y divide-border/60">
-                {visibleAttachments.map((attachment) => (
-                  <AttachmentItem
-                    key={attachment.attachmentId}
-                    attachment={attachment}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
+          {hasAttachments && <AttachmentsSection attachments={visibleAttachments} />}
         </div>
       )}
     </div>
@@ -227,22 +281,7 @@ function ThreadMessage({
             <MessageBody detail={body ?? email} readingMode={readingMode} />
           </div>
 
-          {hasAttachments && (
-            <section className="space-y-3 border-t border-border/70 px-5 py-4">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <PaperclipIcon className="size-3" />
-                Attachments
-              </div>
-              <div className="divide-y divide-border/60">
-                {attachments.map((attachment) => (
-                  <AttachmentItem
-                    key={attachment.attachmentId}
-                    attachment={attachment}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
+          {hasAttachments && <AttachmentsSection attachments={attachments} />}
         </>
       )}
     </div>

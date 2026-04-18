@@ -1,7 +1,9 @@
 import { localDb } from "@/db/client";
-import { clearPending, markPending } from "@/db/pending-lock";
+import {
+  clearPending,
+  markPending,
+} from "@/db/pending-lock";
 import { getCurrentUserId } from "@/db/user";
-import { invalidateInboxQueries } from "@/features/email/inbox/queries";
 import { queryClient } from "@/lib/query-client";
 import { queryKeys } from "@/lib/query-keys";
 import { isEmailListInfiniteData } from "./utils/email-list-cache";
@@ -149,7 +151,6 @@ function applyOptimisticCachePatch(
 
 async function applyLocalPatch(
   userId: string,
-  emailIds: string[],
   numericIds: number[],
   patch: EmailPatchPayload,
 ) {
@@ -163,11 +164,28 @@ async function applyLocalPatch(
   } catch (error) {
     console.warn("Failed to apply local email patch", error);
   }
-  invalidateInboxQueries();
-  for (const emailId of emailIds) {
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.emails.detail(emailId),
-    });
+}
+
+async function rollbackLocalPatch(
+  userId: string,
+  snapshots: EmailListItem[],
+): Promise<void> {
+  for (const snapshot of snapshots) {
+    const numericId = Number(snapshot.id);
+    if (!Number.isFinite(numericId)) continue;
+    const labels = new Set(snapshot.labelIds);
+    try {
+      await localDb.updateEmail(userId, numericId, {
+        isRead: snapshot.isRead,
+        archived: !labels.has(LABEL_INBOX),
+        trashed: labels.has(LABEL_TRASH),
+        spam: labels.has(LABEL_SPAM),
+        starred: labels.has(LABEL_STARRED),
+        snoozedUntil: snapshot.snoozedUntil ?? null,
+      });
+    } catch (error) {
+      console.warn("Failed to rollback local email patch", error);
+    }
   }
 }
 
@@ -183,14 +201,21 @@ export async function patchEmails(
   const providerIds = emails.map((e) => e.providerMessageId);
   const emailIds = emails.map((e) => e.id);
   const emailIdSet = new Set(emailIds);
+  const beforeLocal = await localDb.getEmailsByProviderMessageIds(userId, providerIds);
+  await queryClient.cancelQueries({ queryKey: queryKeys.emails.all() });
+  await Promise.all(
+    emailIds.map((id) =>
+      queryClient.cancelQueries({ queryKey: queryKeys.emails.detail(id) }),
+    ),
+  );
   applyOptimisticCachePatch(emailIdSet, data);
   const localPatchTask = applyLocalPatch(
     userId,
-    emailIds,
     toNumericIds(emailIds),
     data,
   );
   markPending(providerIds);
+  let requestSucceeded = false;
 
   try {
     if (emails.length === 1) {
@@ -206,36 +231,39 @@ export async function patchEmails(
         }),
       });
       if (!response.ok) throw await responseError(response, "Failed to update email");
-      return;
-    }
+    } else {
+      // Group by labelIds snapshot so the server computes the correct
+      // add/remove set for each message. Most bulk actions share a view so
+      // this usually collapses to one request.
+      const groups = new Map<string, EmailIdentifier[]>();
+      for (const email of emails) {
+        const key = JSON.stringify(email.labelIds ?? []);
+        const bucket = groups.get(key);
+        if (bucket) bucket.push(email);
+        else groups.set(key, [email]);
+      }
 
-    // Group by labelIds snapshot so the server computes the correct
-    // add/remove set for each message. Most bulk actions share a view so
-    // this usually collapses to one request.
-    const groups = new Map<string, EmailIdentifier[]>();
-    for (const email of emails) {
-      const key = JSON.stringify(email.labelIds ?? []);
-      const bucket = groups.get(key);
-      if (bucket) bucket.push(email);
-      else groups.set(key, [email]);
-    }
-
-    for (const [key, bucket] of groups) {
-      const items = bucket.map((e) => ({
-        providerMessageId: e.providerMessageId,
-        mailboxId,
-        labelIds: JSON.parse(key) as string[],
-      }));
-      const response = await fetch("/api/inbox/emails/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items, ...data }),
-      });
-      if (!response.ok) throw await responseError(response, "Failed to update emails");
+      for (const [key, bucket] of groups) {
+        const items = bucket.map((e) => ({
+          providerMessageId: e.providerMessageId,
+          mailboxId,
+          labelIds: JSON.parse(key) as string[],
+        }));
+        const response = await fetch("/api/inbox/emails/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items, ...data }),
+        });
+        if (!response.ok) throw await responseError(response, "Failed to update emails");
+      }
     }
     await localPatchTask;
+    requestSucceeded = true;
   } finally {
     await localPatchTask;
+    if (!requestSucceeded) {
+      await rollbackLocalPatch(userId, beforeLocal);
+    }
     clearPending(providerIds);
   }
 }

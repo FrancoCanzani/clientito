@@ -19,7 +19,7 @@ function DashboardLayout() {
   return (
     <AppProviders>
       <InboxComposeProvider>
-        <div className="flex h-dvh min-w-0 flex-col overflow-hidden bg-background text-foreground">
+        <div className="flex h-dvh min-w-0 flex-col overflow-hidden bg-background">
           <main className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
             <Outlet />
           </main>

@@ -15,7 +15,6 @@ import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-in
 import { patchEmail } from "@/features/email/inbox/mutations";
 import {
   fetchEmailDetail,
-  invalidateInboxQueries,
 } from "@/features/email/inbox/queries";
 import {
   getRowActions,
@@ -293,7 +292,6 @@ function EmailRowActions({
     },
     onSuccess: (_data, timestamp) => {
       toast.success(timestamp ? "Snoozed" : "Unsnoozed");
-      invalidateInboxQueries();
     },
     onError: (error: Error) => toast.error(error.message || "Failed to snooze"),
   });
