@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
+import { LabelChip } from "@/features/email/labels/components/label-chip";
 import { LabelPicker } from "@/features/email/labels/components/label-picker";
 import { removeLabel } from "@/features/email/labels/mutations";
 import { fetchLabels } from "@/features/email/labels/queries";
@@ -41,7 +42,6 @@ import {
   TagIcon,
   TrashIcon,
   WarningIcon,
-  XIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
@@ -347,24 +347,11 @@ export function EmailActions({
       )}
 
       {appliedLabels.map((label) => (
-        <button
+        <LabelChip
+          label={label}
           key={label.gmailId}
-          type="button"
-          disabled={removeLabelMutation.isPending}
-          onClick={() => removeLabelMutation.mutate(label.gmailId)}
-          className="group/label flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-colors hover:opacity-80"
-          style={{
-            backgroundColor: `${label.backgroundColor ?? "#999"}25`,
-            color: label.backgroundColor ?? "#999",
-          }}
-        >
-          <span
-            className="size-1.5 rounded-full"
-            style={{ backgroundColor: label.backgroundColor ?? "#999" }}
-          />
-          {label.name}
-          <XIcon className="size-2.5 opacity-0 transition-opacity group-hover/label:opacity-100" />
-        </button>
+          onRemove={() => removeLabelMutation.mutate(label.gmailId)}
+        />
       ))}
 
       <div className="hidden items-center gap-0.5 sm:flex">
@@ -400,7 +387,7 @@ export function EmailActions({
           <Button
             type="button"
             variant="ghost"
-            size="icon-lg"
+            size="icon"
             disabled={actionsPending}
             aria-label="More actions"
           >
@@ -408,7 +395,7 @@ export function EmailActions({
           </Button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="start" className="min-w-fit">
           <div className="sm:hidden">
             <DropdownMenuItem onSelect={() => onReply?.()}>
               <ArrowBendUpLeftIcon className="size-3.5" />

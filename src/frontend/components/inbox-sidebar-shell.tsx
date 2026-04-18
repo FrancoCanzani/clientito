@@ -261,7 +261,10 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   };
 
   return (
-    <Sidebar className="border-border/50">
+    <Sidebar
+      variant="floating"
+      className="*:bg-sidebar/10 shadow-none border-border/20 ring-0"
+    >
       <SidebarHeader className="space-y-2">
         <AccountHeader mailboxId={mailboxId} />
         <SidebarMenu>
@@ -282,10 +285,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
               asChild
               isActive={isSearchRoute}
             >
-              <Link
-                to="/$mailboxId/inbox/search"
-                params={{ mailboxId }}
-              >
+              <Link to="/$mailboxId/inbox/search" params={{ mailboxId }}>
                 Search
               </Link>
             </SidebarMenuButton>
@@ -296,10 +296,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
               asChild
               isActive={isSettingsRoute}
             >
-              <Link
-                to="/$mailboxId/settings"
-                params={{ mailboxId }}
-              >
+              <Link to="/$mailboxId/settings" params={{ mailboxId }}>
                 Settings
               </Link>
             </SidebarMenuButton>

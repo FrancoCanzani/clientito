@@ -1,13 +1,17 @@
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { CheckIcon, PlusIcon, TagIcon } from "@phosphor-icons/react";
-import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { queryKeys } from "@/lib/query-keys";
+import { CheckIcon, PlusIcon, TagIcon } from "@phosphor-icons/react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { toast } from "sonner";
+import { applyLabel, createLabel, removeLabel } from "../mutations";
 import { fetchLabels } from "../queries";
-import { createLabel, applyLabel, removeLabel } from "../mutations";
 import type { Label } from "../types";
 
 type LabelPickerProps = {
@@ -29,7 +33,9 @@ export function LabelPicker({
 }: LabelPickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [optimisticIds, setOptimisticIds] = useState<Set<string>>(new Set(appliedLabelIds));
+  const [optimisticIds, setOptimisticIds] = useState<Set<string>>(
+    new Set(appliedLabelIds),
+  );
 
   const labelsQuery = useQuery({
     queryKey: queryKeys.labels(mailboxId),
@@ -91,7 +97,9 @@ export function LabelPicker({
     createMutation.mutate(name);
   }
 
-  const exactMatch = labels.some((l) => l.name.toLowerCase() === search.toLowerCase());
+  const exactMatch = labels.some(
+    (l) => l.name.toLowerCase() === search.toLowerCase(),
+  );
 
   return (
     <Popover
@@ -114,8 +122,8 @@ export function LabelPicker({
           </Button>
         )}
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-0" align="start">
-        <div className="border-b p-2">
+      <PopoverContent className="w-48 p-0 gap-0" align="start">
+        <div className="border-b">
           <Input
             placeholder="Search or create label…"
             value={search}
@@ -126,11 +134,11 @@ export function LabelPicker({
                 handleCreate();
               }
             }}
-            className="h-8 text-sm"
+            className="h-7 text-xs border-none ring-0 focus-visible:outline-none"
             autoFocus
           />
         </div>
-        <div className="max-h-48 overflow-y-auto p-1">
+        <div className="max-h-48 overflow-y-auto">
           {filtered.map((label) => {
             const isApplied = optimisticIds.has(label.gmailId);
             return (
@@ -138,19 +146,14 @@ export function LabelPicker({
                 key={label.gmailId}
                 type="button"
                 onClick={() => toggleLabel(label)}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+                className="flex w-full items-center gap-1 rounded-sm px-2 py-2 text-xs hover:bg-muted"
               >
                 <span
-                  className="flex size-4 shrink-0 items-center justify-center rounded-full"
-                  style={{ backgroundColor: `${label.backgroundColor ?? "#999"}30` }}
-                >
-                  <span
-                    className="size-1.5 rounded-full"
-                    style={{ backgroundColor: label.backgroundColor ?? "#999" }}
-                  />
-                </span>
+                  className="size-1.5 rounded-full"
+                  style={{ backgroundColor: label.backgroundColor ?? "#999" }}
+                />
                 <span className="flex-1 truncate text-left">{label.name}</span>
-                {isApplied && <CheckIcon className="size-3.5 text-primary" />}
+                {isApplied && <CheckIcon className="size-3 text-primary" />}
               </button>
             );
           })}
@@ -159,9 +162,9 @@ export function LabelPicker({
               type="button"
               onClick={handleCreate}
               disabled={createMutation.isPending}
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+              className="flex w-full items-center gap-1 rounded-sm px-2 py-2 text-xs hover:bg-muted"
             >
-              <PlusIcon className="size-3.5" />
+              <PlusIcon className="size-3" />
               <span>Create "{search.trim()}"</span>
             </button>
           )}

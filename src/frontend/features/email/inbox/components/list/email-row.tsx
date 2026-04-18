@@ -13,9 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { IconButton } from "@/components/ui/icon-button";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import { patchEmail } from "@/features/email/inbox/mutations";
-import {
-  fetchEmailDetail,
-} from "@/features/email/inbox/queries";
+import { fetchEmailDetail } from "@/features/email/inbox/queries";
 import {
   getRowActions,
   type RowAction,
@@ -87,6 +85,7 @@ export const EmailRow = memo(function EmailRow({
         : "To: (unknown recipient)"
       : email.fromName || email.fromAddr;
 
+  const subject = email.subject?.trim() || "(no subject)";
   const snippet = useMemo(
     () => formatEmailSnippet(email.snippet),
     [email.snippet],
@@ -126,7 +125,7 @@ export const EmailRow = memo(function EmailRow({
         role="button"
         tabIndex={0}
         className={cn(
-          "group flex h-12 w-full cursor-default items-center gap-3 pr-6 pl-16 text-left text-sm transition-colors hover:bg-muted/40 md:px-6",
+          "group flex h-12 rounded-md w-full cursor-default items-center gap-3 pr-6 pl-16 text-left text-sm transition-colors hover:bg-muted md:px-6",
           isFocused && "bg-muted",
           isSelected && "bg-primary/5 hover:bg-primary/10",
         )}
@@ -156,7 +155,6 @@ export const EmailRow = memo(function EmailRow({
               onToggleSelect?.(email.id, index, event.shiftKey);
             }}
           />
-          <span className="size-5 shrink-0" aria-hidden />
         </div>
         <div className="flex w-36 shrink-0 items-center gap-2 lg:w-44 xl:w-52">
           <span
@@ -180,20 +178,29 @@ export const EmailRow = memo(function EmailRow({
           )}
         </div>
 
-        <div className="min-w-0 flex-1 truncate text-sm">
-          <span className={cn(!email.isRead && "font-medium text-foreground")}>
-            {email.subject?.trim() || "(no subject)"}
+        <div className="min-w-0 flex flex-1 items-center gap-1 text-sm">
+          <span
+            className={cn(
+              "min-w-0 shrink truncate",
+              !email.isRead && "font-medium text-foreground",
+            )}
+          >
+            {subject}
           </span>
           {snippet && (
-            <span className="text-muted-foreground">
-              {" — "}
-              {snippet}
-            </span>
+            <>
+              <span className="shrink-0 text-muted-foreground" aria-hidden>
+                —
+              </span>
+              <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                {snippet}
+              </span>
+            </>
           )}
         </div>
 
         {visibleChips.length > 0 && (
-          <div className="hidden shrink-0 items-center gap-1 md:flex">
+          <div className="shrink-0 items-center gap-1 flex">
             {visibleChips.map((label) => (
               <LabelChip key={label.gmailId} label={label} />
             ))}
@@ -298,7 +305,7 @@ function EmailRowActions({
 
   return (
     <div
-      className="absolute inset-y-0 right-0 hidden items-center gap-0.5 rounded-md bg-muted px-1 shadow-sm ring-1 ring-border/60 group-hover:flex"
+      className="absolute inset-y-0 right-0 hidden items-center gap-0.5 rounded-md bg-muted px-1 shadow ring-1 ring-border/40 group-hover:flex"
       onClick={(event) => event.stopPropagation()}
     >
       {rowActions.map((rowAction) => {

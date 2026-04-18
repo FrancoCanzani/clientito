@@ -1,5 +1,4 @@
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -147,11 +146,12 @@ export function EmailList({
         }}
       />
       <DropdownMenu>
-        <Button asChild variant={"ghost"} size={"icon-xs"}>
-          <DropdownMenuTrigger aria-label="Selection filter">
-            <CaretDownIcon className="size-3" />
-          </DropdownMenuTrigger>
-        </Button>
+        <DropdownMenuTrigger
+          aria-label="Selection filter"
+          className="flex size-5 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+        >
+          <CaretDownIcon className="size-3" />
+        </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           {selectOptions.map((opt) => (
             <DropdownMenuItem
@@ -252,7 +252,9 @@ export function EmailList({
           <div className="flex min-h-56 flex-col items-center justify-center gap-3">
             <CircleNotchIcon className="size-5 animate-spin text-muted-foreground" />
             {isFirstSync && !isLoading && (
-              <p className="text-muted-foreground text-sm">Syncing your Gmail&hellip;</p>
+              <p className="text-muted-foreground text-sm">
+                Syncing your Gmail&hellip;
+              </p>
             )}
           </div>
         ) : (

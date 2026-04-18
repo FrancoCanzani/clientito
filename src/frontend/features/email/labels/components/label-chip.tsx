@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { XIcon } from "@phosphor-icons/react";
 import type { Label } from "../types";
 
@@ -11,14 +12,15 @@ export function LabelChip({ label, onRemove, className }: LabelChipProps) {
   const color = label.backgroundColor ?? "#999";
 
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background px-2 py-0.5 text-[11px] font-medium leading-none text-foreground ${className ?? ""}`}
+    <div
+      style={{ backgroundColor: color }}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded px-1.5",
+        className,
+        label.backgroundColor && `bg-[label.backgroundColor]`,
+      )}
     >
-      <span
-        className="size-1.5 shrink-0 rounded-full"
-        style={{ backgroundColor: color }}
-      />
-      {label.name}
+      <span className="text-[13px]">{label.name}</span>
       {onRemove && (
         <button
           type="button"
@@ -26,11 +28,11 @@ export function LabelChip({ label, onRemove, className }: LabelChipProps) {
             e.stopPropagation();
             onRemove();
           }}
-          className="ml-0.5 rounded-sm opacity-60 hover:opacity-100"
+          className="pl-1 h-full border-l border-black rounded-r-md opacity-60 hover:opacity-100"
         >
           <XIcon className="size-3" />
         </button>
       )}
-    </span>
+    </div>
   );
 }

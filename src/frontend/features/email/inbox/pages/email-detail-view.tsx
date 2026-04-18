@@ -1,8 +1,9 @@
+import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import {
   EmailDetailContent,
   type EmailDetailContentHandle,
 } from "@/features/email/inbox/components/thread/email-detail-content";
-import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
+import { patchEmail } from "@/features/email/inbox/mutations";
 import {
   fetchEmailDetail,
   fetchEmailThread,
@@ -14,13 +15,9 @@ import type {
 } from "@/features/email/inbox/types";
 import { buildForwardedEmailHtml } from "@/features/email/inbox/utils/build-forwarded-html";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
-import {
-  setFocusedEmail,
-  clearFocusedEmail,
-} from "@/hooks/use-focused-email";
+import { clearFocusedEmail, setFocusedEmail } from "@/hooks/use-focused-email";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { queryKeys } from "@/lib/query-keys";
-import { patchEmail } from "@/features/email/inbox/mutations";
 import {
   useMutation,
   useQuery,
@@ -159,7 +156,9 @@ export function EmailDetailView({
   const threadQuery = useQuery({
     queryKey: queryKeys.emails.thread(currentEmail.threadId ?? "none"),
     queryFn: () =>
-      currentEmail.threadId ? fetchEmailThread(currentEmail.threadId) : Promise.resolve([]),
+      currentEmail.threadId
+        ? fetchEmailThread(currentEmail.threadId)
+        : Promise.resolve([]),
     enabled: Boolean(currentEmail.threadId),
     staleTime: 60_000,
   });

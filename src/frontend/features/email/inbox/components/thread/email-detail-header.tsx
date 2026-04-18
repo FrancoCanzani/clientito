@@ -35,7 +35,7 @@ export function EmailDetailHeader({
   onReadingModeChange: (mode: "original" | "detox") => void;
 }) {
   return (
-    <div className="sticky top-0 z-20 flex min-h-14 w-full shrink-0 items-center bg-transparent px-4 py-2 sm:px-6">
+    <div className="sticky top-0 z-20 flex min-h-14 w-full shrink-0 items-center bg-background px-4 py-2 sm:px-6">
       <div className="flex w-full items-center justify-between gap-2">
         <div className="flex items-center gap-0.5">
           <SidebarTrigger className="md:hidden" />
@@ -66,12 +66,12 @@ export function EmailDetailHeader({
         </div>
 
         <div className="flex items-center gap-1">
-          <div className="flex items-center rounded-md border border-border/60 bg-muted/50 p-0.5 text-xs">
+          <div className="flex items-center rounded-md border border-border/40 bg-muted/50 p-0.5 text-xs">
             <button
               type="button"
-              className={`rounded-sm px-2 py-0.5 font-medium transition-colors ${
+              className={`rounded-md px-2 py-0.5 transition-colors ${
                 readingMode === "original"
-                  ? "bg-background text-foreground shadow-sm"
+                  ? "bg-background text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
               }`}
               onClick={() => onReadingModeChange("original")}
@@ -80,9 +80,9 @@ export function EmailDetailHeader({
             </button>
             <button
               type="button"
-              className={`rounded-sm px-2 py-0.5 font-medium transition-colors ${
+              className={`rounded-md px-2 py-0.5 transition-colors ${
                 readingMode === "detox"
-                  ? "bg-background text-foreground shadow-sm"
+                  ? "bg-background text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
               }`}
               onClick={() => onReadingModeChange("detox")}
