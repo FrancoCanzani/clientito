@@ -1,3 +1,4 @@
+import { LoadingEmailsPending } from "@/components/loading-emails-pending";
 import { Error as RouteError } from "@/components/error";
 import LabelPage from "@/features/email/inbox/pages/label-page";
 import { fetchViewPage } from "@/features/email/inbox/queries";
@@ -26,6 +27,7 @@ export const Route = createFileRoute(
       getNextPageParam: (lastPage) => lastPage?.cursor ?? undefined,
     });
   },
+  pendingComponent: LoadingEmailsPending,
   errorComponent: RouteError,
   component: LabelPage,
 });

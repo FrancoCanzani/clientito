@@ -65,6 +65,10 @@ export const EmailDetailContent = forwardRef<
           hasNext={hasNext}
           onForward={onForward}
           onReply={() => quickReplyRef.current?.scrollIntoViewAndFocus()}
+          onDraftReply={() => {
+            const draft = email.aiDraftReply?.trim();
+            quickReplyRef.current?.scrollIntoViewAndFocus(draft || undefined);
+          }}
           readingMode={readingMode}
           onReadingModeChange={setReadingMode}
           isScrolled={isScrolled}

@@ -1,4 +1,11 @@
 export type EmailDirection = "sent" | "received";
+export type EmailAICategory =
+  | "action_required"
+  | "invoice"
+  | "notification"
+  | "newsletter"
+  | "fyi"
+  | "unknown";
 
 export type EmailRow = {
   id: number;
@@ -28,6 +35,14 @@ export type EmailRow = {
   snoozedUntil: number | null;
   inlineAttachments: string | null;
   attachments: string | null;
+  hasCalendar: boolean;
+  aiCategory: EmailAICategory | null;
+  aiConfidence: number | null;
+  aiReason: string | null;
+  aiSummary: string | null;
+  aiDraftReply: string | null;
+  aiClassifiedAt: number | null;
+  aiClassificationKey: string | null;
   createdAt: number;
 };
 

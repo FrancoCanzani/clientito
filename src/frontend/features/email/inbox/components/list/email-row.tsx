@@ -1,18 +1,11 @@
-import { SnoozePicker } from "@/components/snooze-picker";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Checkbox } from "@/components/ui/checkbox";
 import { IconButton } from "@/components/ui/icon-button";
+import { Button } from "@/components/ui/button";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
-import { patchEmail } from "@/features/email/inbox/mutations";
 import { fetchEmailDetail } from "@/features/email/inbox/queries";
 import {
   getRowActions,
@@ -22,15 +15,50 @@ import { LabelChip } from "@/features/email/labels/components/label-chip";
 import type { Label } from "@/features/email/labels/types";
 import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
-import { PaperclipIcon, StarIcon } from "@phosphor-icons/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { EmailAICategory } from "@/db/schema";
+import {
+  ArrowRightIcon,
+  CalendarIcon,
+  PaperclipIcon,
+  StarIcon,
+} from "@phosphor-icons/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { memo, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 import type { EmailListItem } from "../../types";
 import { formatEmailSnippet, formatInboxRowDate } from "../../utils/formatters";
 import type { ThreadGroup } from "../../utils/group-emails-by-thread";
 
 const MAX_VISIBLE_CHIPS = 2;
+
+const AI_CATEGORY_CHIP: Record<
+  EmailAICategory,
+  { label: string; backgroundColor: string }
+> = {
+  action_required: {
+    label: "Action Required",
+    backgroundColor: "#f6c5be",
+  },
+  invoice: {
+    label: "Invoice",
+    backgroundColor: "#ffe6c7",
+  },
+  notification: {
+    label: "Notification",
+    backgroundColor: "#c9daf8",
+  },
+  newsletter: {
+    label: "Newsletter",
+    backgroundColor: "#b9e4d0",
+  },
+  fyi: {
+    label: "FYI",
+    backgroundColor: "#efefef",
+  },
+  unknown: {
+    label: "Unknown",
+    backgroundColor: "#cccccc",
+  },
+};
 
 export const EmailRow = memo(function EmailRow({
   group,
@@ -38,10 +66,6 @@ export const EmailRow = memo(function EmailRow({
   onOpen,
   onAction,
   isFocused = false,
-  index,
-  isSelected = false,
-  onToggleSelect,
-  anySelected = false,
   allLabels,
 }: {
   group: ThreadGroup;
@@ -49,15 +73,10 @@ export const EmailRow = memo(function EmailRow({
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
   isFocused?: boolean;
-  index: number;
-  isSelected?: boolean;
-  onToggleSelect?: (id: string, index: number, shift: boolean) => void;
-  anySelected?: boolean;
   allLabels?: Label[];
 }) {
   const queryClient = useQueryClient();
   const prefetchedRef = useRef(false);
-  const [pendingConfirm, setPendingConfirm] = useState<RowAction | null>(null);
   const [actionsMounted, setActionsMounted] = useState(false);
   const email = group.representative;
   const isStarred = email.labelIds.includes("STARRED");
@@ -76,7 +95,6 @@ export const EmailRow = memo(function EmailRow({
 
   const threadCount = group.threadCount;
   const rowActions = getRowActions(view, email);
-  const showCheckbox = anySelected || isSelected;
 
   const participantLabel =
     view === "sent"
@@ -90,6 +108,19 @@ export const EmailRow = memo(function EmailRow({
     () => formatEmailSnippet(email.snippet),
     [email.snippet],
   );
+  const aiCategoryLabel = useMemo<Label | null>(() => {
+    if (!email.aiCategory) return null;
+    const config = AI_CATEGORY_CHIP[email.aiCategory];
+    return {
+      gmailId: `AI_${email.aiCategory}`,
+      name: config.label,
+      type: "system",
+      textColor: null,
+      backgroundColor: config.backgroundColor,
+      messagesTotal: 0,
+      messagesUnread: 0,
+    };
+  }, [email.aiCategory]);
 
   const handleMouseEnter = () => {
     if (!actionsMounted) setActionsMounted(true);
@@ -109,10 +140,6 @@ export const EmailRow = memo(function EmailRow({
   };
 
   const runAction = (rowAction: RowAction) => {
-    if (rowAction.confirm) {
-      setPendingConfirm(rowAction);
-      return;
-    }
     onAction(rowAction.action, [email.id]);
   };
 
@@ -120,42 +147,23 @@ export const EmailRow = memo(function EmailRow({
   const hiddenChipCount = userLabels.length - visibleChips.length;
 
   return (
-    <>
-      <div
-        role="button"
-        tabIndex={0}
-        className={cn(
-          "group flex h-12 rounded-md w-full cursor-default items-center gap-3 pr-6 pl-16 text-left text-sm transition-colors hover:bg-muted md:px-6",
-          isFocused && "bg-muted",
-          isSelected && "bg-primary/5 hover:bg-primary/10",
-        )}
-        onMouseEnter={handleMouseEnter}
-        onFocus={handleMouseEnter}
-        onClick={() => onOpen(email)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onOpen(email);
-          }
-        }}
-      >
-        <div
-          className={cn(
-            "flex w-10 shrink-0 items-center gap-1",
-            !showCheckbox &&
-              "pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100",
-          )}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <Checkbox
-            aria-label={isSelected ? "Deselect email" : "Select email"}
-            checked={isSelected}
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleSelect?.(email.id, index, event.shiftKey);
-            }}
-          />
-        </div>
+    <div
+      role="button"
+      tabIndex={0}
+      className={cn(
+        "group flex h-12 rounded-md w-full cursor-default items-center gap-3 pr-6 pl-16 text-left text-sm transition-colors hover:bg-muted md:px-6",
+        isFocused && "bg-muted",
+      )}
+      onMouseEnter={handleMouseEnter}
+      onFocus={handleMouseEnter}
+      onClick={() => onOpen(email)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(email);
+        }
+      }}
+    >
         <div className="flex w-36 shrink-0 items-center gap-2 lg:w-44 xl:w-52">
           <span
             className={cn(
@@ -199,8 +207,9 @@ export const EmailRow = memo(function EmailRow({
           )}
         </div>
 
-        {visibleChips.length > 0 && (
+        {(aiCategoryLabel || visibleChips.length > 0) && (
           <div className="shrink-0 items-center gap-1 flex">
+            {aiCategoryLabel && <LabelChip label={aiCategoryLabel} />}
             {visibleChips.map((label) => (
               <LabelChip key={label.gmailId} label={label} />
             ))}
@@ -220,88 +229,42 @@ export const EmailRow = memo(function EmailRow({
               aria-hidden
             />
           )}
+          {email.hasCalendar && <CalendarIcon className="size-3.5" aria-hidden />}
           {email.hasAttachment && (
             <PaperclipIcon className="size-3.5" aria-hidden />
           )}
         </div>
 
-        <div className="relative flex h-8 w-28 shrink-0 items-center justify-end">
+        <div className="relative flex h-8 w-32 shrink-0 items-center justify-end">
           <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground group-hover:invisible group-focus-within:invisible">
             {formatInboxRowDate(email.date)}
           </span>
 
           {actionsMounted && (
             <EmailRowActions
-              email={email}
               rowActions={rowActions}
               onRunAction={runAction}
+              onOpen={() => onOpen(email)}
+              summary={email.aiSummary}
             />
           )}
         </div>
-      </div>
-
-      {pendingConfirm !== null && (
-        <AlertDialog
-          open
-          onOpenChange={(open) => {
-            if (!open) setPendingConfirm(null);
-          }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                {pendingConfirm.confirm?.title ?? "Are you sure?"}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {pendingConfirm.confirm?.description}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                onClick={() => {
-                  onAction(pendingConfirm.action, [email.id]);
-                  setPendingConfirm(null);
-                }}
-              >
-                {pendingConfirm.confirm?.confirmLabel ?? "Confirm"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
-    </>
+    </div>
   );
 });
 
 function EmailRowActions({
-  email,
   rowActions,
   onRunAction,
+  onOpen,
+  summary,
 }: {
-  email: EmailListItem;
   rowActions: RowAction[];
   onRunAction: (rowAction: RowAction) => void;
+  onOpen: () => void;
+  summary: string | null;
 }) {
-  const snoozeMutation = useMutation({
-    mutationFn: (timestamp: number | null) => {
-      if (!email.mailboxId) throw new Error("Missing mailbox");
-      return patchEmail(
-        {
-          id: email.id,
-          providerMessageId: email.providerMessageId,
-          mailboxId: email.mailboxId,
-          labelIds: email.labelIds,
-        },
-        { snoozedUntil: timestamp },
-      );
-    },
-    onSuccess: (_data, timestamp) => {
-      toast.success(timestamp ? "Snoozed" : "Unsnoozed");
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to snooze"),
-  });
+  const summaryText = summary?.trim() || "Summary not ready yet.";
 
   return (
     <div
@@ -310,50 +273,6 @@ function EmailRowActions({
     >
       {rowActions.map((rowAction) => {
         const Icon = rowAction.icon;
-        const iconEl = (
-          <Icon
-            className={cn(
-              "size-3.5",
-              rowAction.key === "star" && "text-yellow-500",
-            )}
-            weight={rowAction.iconWeight}
-          />
-        );
-
-        if (rowAction.kind === "snooze") {
-          return (
-            <SnoozePicker
-              key={rowAction.key}
-              onSnooze={(timestamp) => snoozeMutation.mutate(timestamp)}
-            >
-              <IconButton
-                label={rowAction.label}
-                variant="ghost"
-                size="icon-sm"
-                onClick={(event) => event.stopPropagation()}
-              >
-                {iconEl}
-              </IconButton>
-            </SnoozePicker>
-          );
-        }
-
-        if (rowAction.kind === "unsnooze") {
-          return (
-            <IconButton
-              key={rowAction.key}
-              label={rowAction.label}
-              variant="ghost"
-              size="icon-sm"
-              onClick={(event) => {
-                event.stopPropagation();
-                snoozeMutation.mutate(null);
-              }}
-            >
-              {iconEl}
-            </IconButton>
-          );
-        }
 
         return (
           <IconButton
@@ -366,15 +285,45 @@ function EmailRowActions({
               event.stopPropagation();
               onRunAction(rowAction);
             }}
-            className={cn(
-              rowAction.destructive &&
-                "text-destructive hover:text-destructive",
-            )}
           >
-            {iconEl}
+            <Icon className="size-3.5" weight={rowAction.iconWeight} />
           </IconButton>
         );
       })}
+      <HoverCard openDelay={120}>
+        <HoverCardTrigger asChild>
+          <Button
+            type="button"
+            aria-label="Summary"
+            variant="ghost"
+            size="icon-sm"
+            className="font-semibold text-[10px]"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+          >
+            S
+          </Button>
+        </HoverCardTrigger>
+        <HoverCardContent
+          align="end"
+          className="w-80 text-xs leading-relaxed whitespace-pre-wrap"
+        >
+          {summaryText}
+        </HoverCardContent>
+      </HoverCard>
+      <IconButton
+        label="Open"
+        shortcut="Enter"
+        variant="ghost"
+        size="icon-sm"
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpen();
+        }}
+      >
+        <ArrowRightIcon className="size-3.5" />
+      </IconButton>
     </div>
   );
 }

@@ -20,6 +20,7 @@ export function EmailDetailHeader({
   hasNext = false,
   onForward,
   onReply,
+  onDraftReply,
   readingMode,
   onReadingModeChange,
   isScrolled = false,
@@ -33,6 +34,7 @@ export function EmailDetailHeader({
   hasNext?: boolean;
   onForward: (initial: ComposeInitial) => void;
   onReply: () => void;
+  onDraftReply?: () => void;
   readingMode: "original" | "detox";
   onReadingModeChange: (mode: "original" | "detox") => void;
   isScrolled?: boolean;
@@ -103,6 +105,7 @@ export function EmailDetailHeader({
             onClose={onClose}
             onForward={onForward}
             onReply={onReply}
+            onDraftReply={onDraftReply}
           />
         </div>
       </div>

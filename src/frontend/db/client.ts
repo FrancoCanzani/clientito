@@ -3,6 +3,7 @@ import { dbClient, type ExecResult } from "./worker-client";
 import type {
   DraftAttachmentKey,
   DraftRow,
+  EmailAICategory,
   EmailInsert,
   LabelInsert,
 } from "./schema";
@@ -57,6 +58,14 @@ type EmailRowDb = {
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
   snoozedUntil: number | null;
+  aiCategory: EmailAICategory | null;
+  aiConfidence: number | null;
+  aiReason: string | null;
+  aiSummary: string | null;
+  aiDraftReply: string | null;
+  aiClassifiedAt: number | null;
+  aiClassificationKey: string | null;
+  hasCalendar: number;
   bodyText?: string | null;
   bodyHtml?: string | null;
   inlineAttachments?: string | null;
@@ -383,10 +392,8 @@ function buildViewConditions(view: ViewFilter, now: number): SqlFragment[] {
       return [{ sql: "has_starred = 1", params: [] }];
     case "important":
       return [
-        {
-          sql: "EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value = 'IMPORTANT')",
-          params: [],
-        },
+        { sql: "has_inbox = 1", params: [] },
+        { sql: "(snoozed_until IS NULL OR snoozed_until <= ?)", params: [now] },
       ];
     default:
       if (typeof view === "string" && view.startsWith("Label_")) {
@@ -424,7 +431,15 @@ const EMAIL_SUMMARY_SELECT = `
   created_at,
   unsubscribe_url,
   unsubscribe_email,
-  snoozed_until
+  snoozed_until,
+  has_calendar,
+  ai_category,
+  ai_confidence,
+  ai_reason,
+  ai_summary,
+  ai_draft_reply,
+  ai_classified_at,
+  ai_classification_key
 `;
 
 function toEmailListItem(row: EmailRowDb) {
@@ -449,6 +464,18 @@ function toEmailListItem(row: EmailRowDb) {
     unsubscribeUrl: row.unsubscribeUrl,
     unsubscribeEmail: row.unsubscribeEmail,
     snoozedUntil: row.snoozedUntil,
+    hasCalendar: toBool(row.hasCalendar),
+    aiCategory: row.aiCategory ?? null,
+    aiConfidence:
+      typeof row.aiConfidence === "number"
+        ? row.aiConfidence
+        : row.aiConfidence == null
+          ? null
+          : Number(row.aiConfidence),
+    aiReason: row.aiReason ?? null,
+    aiSummary: row.aiSummary ?? null,
+    aiDraftReply: row.aiDraftReply ?? null,
+    aiClassifiedAt: row.aiClassifiedAt ?? null,
   };
 }
 
@@ -768,8 +795,8 @@ export const localDb = {
       id, user_id, mailbox_id, provider_message_id, thread_id, from_addr, from_name,
       to_addr, cc_addr, subject, snippet, body_text, body_html, date, direction,
       is_read, label_ids, has_inbox, has_sent, has_trash, has_spam, has_starred,
-      unsubscribe_url, unsubscribe_email, snoozed_until, inline_attachments, attachments, created_at`;
-    const TUPLE = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+      unsubscribe_url, unsubscribe_email, snoozed_until, inline_attachments, attachments, has_calendar, created_at`;
+    const TUPLE = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     // Fields that ARE safe to overwrite (immutable from the user's point of view).
     const CONFLICT_SAFE = `
@@ -782,7 +809,8 @@ export const localDb = {
       body_text = excluded.body_text,
       body_html = excluded.body_html,
       inline_attachments = excluded.inline_attachments,
-      attachments = excluded.attachments`;
+      attachments = excluded.attachments,
+      has_calendar = excluded.has_calendar`;
     // Fields we overwrite only when the row has no pending local mutation.
     const CONFLICT_MUTABLE = `
       is_read = excluded.is_read,
@@ -825,6 +853,7 @@ export const localDb = {
         row.snoozedUntil ?? null,
         row.inlineAttachments ?? null,
         row.attachments ?? null,
+        boolParam(row.hasCalendar ?? false),
         row.createdAt,
       ];
     }
@@ -1146,6 +1175,118 @@ export const localDb = {
       all.push(...rowsToObjects<EmailRowDb>(res));
     }
     return all.map(toEmailListItem);
+  },
+
+  async isThreadClassificationFresh(params: {
+    userId: string;
+    mailboxId: number;
+    threadId: string | null;
+    representativeProviderMessageId: string;
+    classificationKey: string;
+  }): Promise<boolean> {
+    const {
+      userId,
+      mailboxId,
+      threadId,
+      representativeProviderMessageId,
+      classificationKey,
+    } = params;
+
+    const query = threadId
+      ? {
+          sql: `SELECT ai_classification_key, ai_category FROM emails
+                WHERE user_id = ? AND mailbox_id = ? AND thread_id = ?
+                ORDER BY date DESC LIMIT 1`,
+          params: [userId, mailboxId, threadId] as BindParam[],
+        }
+      : {
+          sql: `SELECT ai_classification_key, ai_category FROM emails
+                WHERE user_id = ? AND mailbox_id = ? AND provider_message_id = ?
+                LIMIT 1`,
+          params: [userId, mailboxId, representativeProviderMessageId] as BindParam[],
+        };
+
+    const res = await dbClient.exec(query.sql, query.params, "get");
+    const row = firstRow<{
+      aiClassificationKey: string | null;
+      aiCategory: EmailAICategory | null;
+    }>(res);
+    return Boolean(
+      row &&
+      row.aiClassificationKey === classificationKey &&
+      row.aiCategory !== null,
+    );
+  },
+
+  async updateThreadClassification(params: {
+    userId: string;
+    mailboxId: number;
+    threadId: string | null;
+    representativeProviderMessageId: string;
+    classificationKey: string;
+    category: EmailAICategory;
+    confidence: number;
+    reason: string;
+    summary: string;
+    draftReply: string;
+    classifiedAt: number;
+  }): Promise<void> {
+    const {
+      userId,
+      mailboxId,
+      threadId,
+      representativeProviderMessageId,
+      classificationKey,
+      category,
+      confidence,
+      reason,
+      summary,
+      draftReply,
+      classifiedAt,
+    } = params;
+
+    if (threadId) {
+      await dbClient.exec(
+        `UPDATE emails
+         SET ai_category = ?, ai_confidence = ?, ai_reason = ?, ai_summary = ?,
+             ai_draft_reply = ?, ai_classified_at = ?, ai_classification_key = ?
+         WHERE user_id = ? AND mailbox_id = ? AND thread_id = ?`,
+        [
+          category,
+          confidence,
+          reason,
+          summary,
+          draftReply,
+          classifiedAt,
+          classificationKey,
+          userId,
+          mailboxId,
+          threadId,
+        ],
+        "run",
+      );
+      return;
+    }
+
+    await dbClient.exec(
+      `UPDATE emails
+       SET ai_category = ?, ai_confidence = ?, ai_reason = ?, ai_summary = ?,
+           ai_draft_reply = ?, ai_classified_at = ?, ai_classification_key = ?
+       WHERE user_id = ? AND mailbox_id = ? AND provider_message_id = ?`,
+      [
+        category,
+        confidence,
+        reason,
+        summary,
+        draftReply,
+        classifiedAt,
+        classificationKey,
+        userId,
+        mailboxId,
+        representativeProviderMessageId,
+      ],
+      "run",
+    );
   },
 
   async deleteEmailsByProviderMessageId(providerMessageIds: string[]): Promise<void> {

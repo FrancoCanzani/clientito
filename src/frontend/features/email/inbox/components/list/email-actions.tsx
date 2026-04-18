@@ -38,6 +38,7 @@ import {
   EnvelopeSimpleIcon,
   EnvelopeSimpleOpenIcon,
   ProhibitIcon,
+  SparkleIcon,
   StarIcon,
   TagIcon,
   TrashIcon,
@@ -60,6 +61,7 @@ type EmailActionsProps = {
   onClose?: () => void;
   onForward?: (initial: ComposeInitial) => void;
   onReply?: () => void;
+  onDraftReply?: () => void;
 };
 
 type EmailPatchPayload = Parameters<typeof patchEmail>[1];
@@ -75,6 +77,7 @@ export function EmailActions({
   onClose,
   onForward,
   onReply,
+  onDraftReply,
 }: EmailActionsProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -93,6 +96,7 @@ export function EmailActions({
   const hasUnsubscribe = Boolean(
     email.unsubscribeUrl || email.unsubscribeEmail,
   );
+  const hasAiDraftReply = Boolean(email.aiDraftReply?.trim());
   const mailboxId = email.mailboxId;
 
   if (mailboxId == null) return null;
@@ -363,6 +367,15 @@ export function EmailActions({
         >
           <ArrowBendUpLeftIcon className="size-3.5" />
         </IconButton>
+        {hasAiDraftReply && (
+          <IconButton
+            label="Draft reply"
+            variant="ghost"
+            onClick={() => onDraftReply?.()}
+          >
+            <SparkleIcon className="size-3.5" />
+          </IconButton>
+        )}
         {showReplyAll && (
           <IconButton
             label="Reply all"
@@ -402,6 +415,12 @@ export function EmailActions({
               <span className="flex-1">Reply</span>
               <Kbd>R</Kbd>
             </DropdownMenuItem>
+            {hasAiDraftReply && (
+              <DropdownMenuItem onSelect={() => onDraftReply?.()}>
+                <SparkleIcon className="size-3.5" />
+                <span className="flex-1">Draft reply</span>
+              </DropdownMenuItem>
+            )}
             {showReplyAll && (
               <DropdownMenuItem onSelect={handleReplyAll}>
                 <ArrowBendDoubleUpLeftIcon className="size-3.5" />

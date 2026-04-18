@@ -1,3 +1,4 @@
+import { LoadingEmailsPending } from "@/components/loading-emails-pending";
 import { Error as RouteError } from "@/components/error";
 import InboxPage from "@/features/email/inbox/pages/inbox-page";
 import { fetchViewPage } from "@/features/email/inbox/queries";
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/")({
       getNextPageParam: (lastPage) => lastPage?.cursor ?? undefined,
     });
   },
+  pendingComponent: LoadingEmailsPending,
   errorComponent: RouteError,
   component: InboxPage,
 });

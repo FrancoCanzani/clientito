@@ -84,26 +84,6 @@ export function useInboxHotkeys({
         }
       },
     },
-    s: {
-      enabled: Boolean(focusedEmail),
-      onKeyDown: () => {
-        if (focusedEmail) {
-          const isStarred = focusedEmail.labelIds.includes("STARRED");
-          onAction(isStarred ? "unstar" : "star", [focusedEmail.id]);
-        }
-      },
-    },
-    "#": {
-      enabled: Boolean(focusedEmail),
-      onKeyDown: () => {
-        if (focusedEmail) {
-          onAction(
-            view === "trash" ? "delete-forever" : "trash",
-            [focusedEmail.id],
-          );
-        }
-      },
-    },
     u: {
       enabled: Boolean(focusedEmail),
       onKeyDown: () => {

@@ -37,6 +37,14 @@ CREATE TABLE IF NOT EXISTS emails (
   snoozed_until INTEGER,
   inline_attachments TEXT,
   attachments TEXT,
+  has_calendar INTEGER NOT NULL DEFAULT 0,
+  ai_category TEXT,
+  ai_confidence REAL,
+  ai_reason TEXT,
+  ai_summary TEXT,
+  ai_draft_reply TEXT,
+  ai_classified_at INTEGER,
+  ai_classification_key TEXT,
   created_at INTEGER NOT NULL
 );
 
@@ -141,6 +149,14 @@ async function initDb(): Promise<void> {
   db.exec(SCHEMA_SQL);
   ensureEmailColumn(db, "inline_attachments", "TEXT");
   ensureEmailColumn(db, "attachments", "TEXT");
+  ensureEmailColumn(db, "has_calendar", "INTEGER");
+  ensureEmailColumn(db, "ai_category", "TEXT");
+  ensureEmailColumn(db, "ai_confidence", "REAL");
+  ensureEmailColumn(db, "ai_reason", "TEXT");
+  ensureEmailColumn(db, "ai_summary", "TEXT");
+  ensureEmailColumn(db, "ai_draft_reply", "TEXT");
+  ensureEmailColumn(db, "ai_classified_at", "INTEGER");
+  ensureEmailColumn(db, "ai_classification_key", "TEXT");
 }
 
 function ensureEmailColumn(

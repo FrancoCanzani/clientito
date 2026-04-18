@@ -13,6 +13,20 @@ import {
 } from "../subscriptions/service";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
+const CALENDAR_MIME_PREFIXES = [
+  "text/calendar",
+  "application/ics",
+  "application/icalendar",
+  "application/x-ical",
+  "application/vnd.ms-outlook",
+] as const;
+const CALENDAR_BODY_MARKERS = [
+  "begin:vcalendar",
+  "begin:vevent",
+  "method:request",
+  "method:cancel",
+  "method:reply",
+] as const;
 
 function extractAddress(headerValue: string | null): string {
   if (!headerValue) return "";
@@ -55,9 +69,38 @@ export type ParsedEmail = {
   labelIds: string[];
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
+  hasCalendar: boolean;
   inlineAttachments: ParsedInlineAttachment[];
   attachments: ParsedAttachment[];
 };
+
+function isCalendarMimeType(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return CALENDAR_MIME_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
+
+function isCalendarFilename(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return value.trim().toLowerCase().endsWith(".ics");
+}
+
+function partHasCalendarSignal(part: GmailMessage["payload"]): boolean {
+  if (!part) return false;
+  if (isCalendarMimeType(part.mimeType) || isCalendarFilename(part.filename)) {
+    return true;
+  }
+  for (const child of part.parts ?? []) {
+    if (partHasCalendarSignal(child)) return true;
+  }
+  return false;
+}
+
+function bodyHasCalendarSignal(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.toLowerCase();
+  return CALENDAR_BODY_MARKERS.some((marker) => normalized.includes(marker));
+}
 
 /**
  * Parse a Gmail API message into a flat email object ready for local storage.
@@ -119,6 +162,15 @@ export function parseGmailMessage(
     isInline: a.isInline,
     isImage: a.isImage,
   }));
+  const hasCalendar =
+    partHasCalendarSignal(message.payload) ||
+    parsedAttachments.some(
+      (attachment) =>
+        isCalendarMimeType(attachment.mimeType) ||
+        isCalendarFilename(attachment.filename),
+    ) ||
+    bodyHasCalendarSignal(bodyText) ||
+    bodyHasCalendarSignal(bodyHtml);
   const isRead = !labelIds.includes(STANDARD_LABELS.UNREAD);
   const date = normalizedDate ?? Date.now();
 
@@ -168,6 +220,7 @@ export function parseGmailMessage(
     labelIds,
     unsubscribeUrl,
     unsubscribeEmail,
+    hasCalendar,
     inlineAttachments,
     attachments: parsedAttachments,
   };

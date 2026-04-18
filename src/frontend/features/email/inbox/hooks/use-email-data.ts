@@ -1,10 +1,10 @@
-import { fetchViewPage, isViewSynced } from "@/features/email/inbox/queries";
+import { fetchViewPage } from "@/features/email/inbox/queries";
 import type { EmailListPage } from "@/features/email/inbox/types";
 import { groupEmailsByThread } from "@/features/email/inbox/utils/group-emails-by-thread";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { queryKeys } from "@/lib/query-keys";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const LOAD_MORE_ROOT_MARGIN = "800px 0px";
 
@@ -24,6 +24,21 @@ function matchesFilters(
   return true;
 }
 
+function isImportantEmail(email: {
+  hasCalendar: boolean;
+  aiCategory: string | null;
+  isRead: boolean;
+}): boolean {
+  if (email.hasCalendar) return true;
+  if (email.aiCategory === "action_required" || email.aiCategory === "invoice") {
+    return true;
+  }
+  if (email.aiCategory === "notification" && !email.isRead) {
+    return true;
+  }
+  return false;
+}
+
 export function useEmailData({
   view,
   mailboxId,
@@ -34,25 +49,10 @@ export function useEmailData({
   initialPage?: EmailListPage;
 }) {
   const [filters, setFilters] = useState<InboxListFilters>({});
+  const autoPaginationEnabled = view !== "important";
   useEffect(() => {
     setFilters({});
   }, [view, mailboxId]);
-
-  // null = unknown (check in flight), false = never synced, true = synced before
-  const [viewPreviouslySynced, setViewPreviouslySynced] = useState<boolean | null>(null);
-  const syncCheckKey = `${mailboxId}:${view}`;
-  const lastSyncCheckKey = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (lastSyncCheckKey.current === syncCheckKey) return;
-    lastSyncCheckKey.current = syncCheckKey;
-    setViewPreviouslySynced(null);
-    let cancelled = false;
-    isViewSynced(mailboxId, view).then((synced) => {
-      if (!cancelled) setViewPreviouslySynced(synced);
-    });
-    return () => { cancelled = true; };
-  }, [mailboxId, view, syncCheckKey]);
 
   const hasActiveFilters = Boolean(
     filters.unread || filters.starred || filters.hasAttachment,
@@ -80,28 +80,23 @@ export function useEmailData({
     () => emailsQuery.data?.pages.flatMap((page) => page.emails) ?? [],
     [emailsQuery.data],
   );
+  const scopedByView = useMemo(
+    () =>
+      view === "important" ? allEmails.filter((email) => isImportantEmail(email)) : allEmails,
+    [allEmails, view],
+  );
   const displayEmails = useMemo(
     () =>
       hasActiveFilters
-        ? allEmails.filter((e) => matchesFilters(e, filters))
-        : allEmails,
-    [allEmails, filters, hasActiveFilters],
+        ? scopedByView.filter((email) => matchesFilters(email, filters))
+        : scopedByView,
+    [filters, hasActiveFilters, scopedByView],
   );
   const threadGroups = useMemo(
     () => groupEmailsByThread(displayEmails),
     [displayEmails],
   );
   const hasEmails = threadGroups.length > 0;
-
-  // Once the query succeeds for the first time this session, mark synced
-  useEffect(() => {
-    if (emailsQuery.isSuccess && viewPreviouslySynced === false) {
-      setViewPreviouslySynced(true);
-    }
-  }, [emailsQuery.isSuccess, viewPreviouslySynced]);
-
-  // isFirstSync: no previous sync recorded AND query hasn't succeeded yet
-  const isFirstSync = viewPreviouslySynced !== true && !emailsQuery.isSuccess;
 
   const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } =
     emailsQuery;
@@ -111,6 +106,7 @@ export function useEmailData({
     rootMargin: LOAD_MORE_ROOT_MARGIN,
     threshold: 0.01,
     onChange: (isIntersecting) => {
+      if (!autoPaginationEnabled) return;
       if (!isIntersecting || isFetching || isFetchingNextPage) return;
       if (hasNextPage) fetchNextPage();
     },
@@ -123,8 +119,7 @@ export function useEmailData({
     threadGroups,
     isLoading: emailsQuery.isLoading,
     isError: emailsQuery.isError,
-    isFirstSync,
-    hasNextPage: hasNextPage ?? false,
+    hasNextPage: autoPaginationEnabled ? (hasNextPage ?? false) : false,
     isFetchingNextPage,
     loadMoreRef,
     filters,

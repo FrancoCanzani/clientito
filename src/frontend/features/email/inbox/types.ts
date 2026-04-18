@@ -1,4 +1,5 @@
 import type { EmailView } from "./utils/inbox-filters";
+import type { EmailAICategory } from "@/db/schema";
 
 export type DraftState = {
   mailboxId: number | null;
@@ -73,10 +74,17 @@ export type EmailListItem = {
   isRead: boolean;
   labelIds: string[];
   hasAttachment: boolean;
+  hasCalendar: boolean;
   createdAt: number;
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
   snoozedUntil: number | null;
+  aiCategory: EmailAICategory | null;
+  aiConfidence: number | null;
+  aiReason: string | null;
+  aiSummary: string | null;
+  aiDraftReply: string | null;
+  aiClassifiedAt: number | null;
 };
 
 export type EmailInlineAttachment = {

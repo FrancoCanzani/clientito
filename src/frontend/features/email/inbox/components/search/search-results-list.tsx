@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/empty";
 import type { EmailListItem } from "@/features/email/inbox/types";
 import { cn } from "@/lib/utils";
-import { PaperclipIcon, StarIcon } from "@phosphor-icons/react";
+import { CalendarIcon, PaperclipIcon, StarIcon } from "@phosphor-icons/react";
 import { format, isThisYear, isToday } from "date-fns";
 import type { RefCallback } from "react";
 
@@ -71,6 +71,7 @@ function SearchResultRow({
                 aria-hidden
               />
             )}
+            {email.hasCalendar && <CalendarIcon className="size-3" aria-hidden />}
             {email.hasAttachment && (
               <PaperclipIcon className="size-3" aria-hidden />
             )}

@@ -74,7 +74,7 @@ export function LabelSidebarSection({
                     asChild
                     isActive={activeLabelId === label.gmailId}
                     tooltip={label.name}
-                    className="text-base"
+                    className="text-sm"
                   >
                     <Link
                       to="/$mailboxId/inbox/labels/$label"
@@ -82,13 +82,13 @@ export function LabelSidebarSection({
                       preload="intent"
                     >
                       <span
-                        className="flex size-3 shrink-0 items-center justify-center rounded-full"
+                        className="flex size-2.5 shrink-0 items-center justify-center rounded-full"
                         style={{
                           backgroundColor: `${label.backgroundColor ?? "#999"}30`,
                         }}
                       >
                         <span
-                          className="size-2 rounded-full"
+                          className="size-1.5 rounded-full"
                           style={{
                             backgroundColor: label.backgroundColor ?? "#999",
                           }}

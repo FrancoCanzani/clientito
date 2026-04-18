@@ -198,6 +198,7 @@ function getNavTo(
 
 const NAV_ITEMS = [
   { view: "inbox", icon: TrayIcon, label: "Inbox" },
+  { view: "important", icon: TrayIcon, label: "Important" },
   { view: "starred", icon: StarIcon, label: "Starred" },
   { view: "archived", icon: CheckIcon, label: "Done" },
   { view: "sent", icon: PaperPlaneTiltIcon, label: "Sent" },
@@ -214,7 +215,9 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   const { openCompose } = useInboxCompose();
   const [moreOpen, setMoreOpen] = useState(false);
   const hasStandaloneRouteSelection =
-    isSearchRoute || isSettingsRoute || Boolean(activeLabelId);
+    isSearchRoute ||
+    isSettingsRoute ||
+    Boolean(activeLabelId && activeLabelId !== "important");
 
   const sentIndex = NAV_ITEMS.findIndex((item) => item.view === "sent");
   const primaryItems = NAV_ITEMS.slice(0, sentIndex + 1);
@@ -247,7 +250,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
           asChild
           isActive={!hasStandaloneRouteSelection && activeView === item.view}
           tooltip={item.label}
-          className="text-base"
+          className="text-sm"
         >
           <Link to={nav.to as string} params={nav.params}>
             {item.label}
@@ -267,7 +270,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              className="text-base group"
+              className="text-sm group"
               onClick={() => openCompose()}
             >
               Compose
@@ -278,7 +281,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
-              className="text-base"
+              className="text-sm"
               asChild
               isActive={isSearchRoute}
             >
@@ -289,7 +292,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
-              className="text-base"
+              className="text-sm"
               asChild
               isActive={isSettingsRoute}
             >
