@@ -6,6 +6,7 @@ import type {
   EmailInsert,
   LabelInsert,
 } from "./schema";
+export type { EmailInsert } from "./schema";
 
 type LocalEmailPatch = {
   isRead?: boolean;
@@ -1127,6 +1128,26 @@ export const localDb = {
     ]);
   },
 
+  async getEmailsByProviderMessageIds(
+    userId: string,
+    providerMessageIds: string[],
+  ) {
+    if (providerMessageIds.length === 0) return [];
+    const CHUNK = 100;
+    const all: EmailRowDb[] = [];
+    for (let i = 0; i < providerMessageIds.length; i += CHUNK) {
+      const chunk = providerMessageIds.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => "?").join(", ");
+      const res = await dbClient.exec(
+        `SELECT ${EMAIL_SUMMARY_SELECT} FROM emails WHERE user_id = ? AND provider_message_id IN (${placeholders})`,
+        [userId, ...chunk],
+        "rows",
+      );
+      all.push(...rowsToObjects<EmailRowDb>(res));
+    }
+    return all.map(toEmailListItem);
+  },
+
   async deleteEmailsByProviderMessageId(providerMessageIds: string[]): Promise<void> {
     if (!providerMessageIds.length) return;
     const CHUNK = 50;
@@ -1202,3 +1223,12 @@ export const localDb = {
     await dbClient.deleteDb();
   },
 };
+
+export async function clearLocalData(): Promise<void> {
+  try {
+    await localDb.ensureReady();
+    await localDb.deleteDatabase();
+  } catch {
+    // Ignore worker shutdown/initialization races during logout.
+  }
+}

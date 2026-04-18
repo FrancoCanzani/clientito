@@ -15,6 +15,7 @@ const searchRequestSchema = z.object({
   mailboxId: z.number().int().positive(),
   q: z.string().min(1).max(500),
   pageToken: z.string().optional(),
+  includeJunk: z.boolean().optional(),
 });
 
 export function registerInboxSearch(api: Hono<AppRouteEnv>) {
@@ -24,7 +25,7 @@ export function registerInboxSearch(api: Hono<AppRouteEnv>) {
     async (c) => {
       const db = c.get("db");
       const user = c.get("user")!;
-      const { mailboxId, q, pageToken } = c.req.valid("json");
+      const { mailboxId, q, pageToken, includeJunk } = c.req.valid("json");
 
       const mailbox = await resolveMailbox(db, user.id, mailboxId);
       if (!mailbox) {
@@ -39,10 +40,10 @@ export function registerInboxSearch(api: Hono<AppRouteEnv>) {
       const page = await listThreadsPage(accessToken, {
         pageToken,
         query: q,
+        maxResults: SEARCH_BATCH_SIZE,
+        includeSpamTrash: includeJunk ?? false,
       });
-      const threadIds = (page.threads ?? [])
-        .map((t) => t.id)
-        .slice(0, SEARCH_BATCH_SIZE);
+      const threadIds = (page.threads ?? []).map((t) => t.id);
 
       const emails = await fetchThreadsAndParse(accessToken, threadIds, null);
 

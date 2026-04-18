@@ -6,11 +6,12 @@ import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox
 import {
   fetchEmailDetail,
   fetchEmailThread,
+  invalidateInboxQueries,
 } from "@/features/email/inbox/queries";
 import type {
   ComposeInitial,
   EmailDetailItem,
-  EmailListResponse,
+  EmailListPage,
 } from "@/features/email/inbox/types";
 import { buildForwardedEmailHtml } from "@/features/email/inbox/utils/build-forwarded-html";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
@@ -82,12 +83,12 @@ export function EmailDetailView({
   ]);
 
   const orderedEmails = useMemo(() => {
-    const cached = queryClient.getQueryData<InfiniteData<EmailListResponse>>([
+    const cached = queryClient.getQueryData<InfiniteData<EmailListPage>>([
       "emails",
       view,
       mailboxId,
     ]);
-    return cached?.pages.flatMap((page) => page.data) ?? [];
+    return cached?.pages.flatMap((page) => page.emails) ?? [];
   }, [queryClient, mailboxId, view]);
 
   const orderedIds = orderedEmails.map((item) => item.id);
@@ -157,8 +158,9 @@ export function EmailDetailView({
   }, [currentIndex, orderedIds, queryClient, mailboxId, view]);
 
   const threadQuery = useQuery({
-    queryKey: queryKeys.emails.thread(currentEmail.threadId!),
-    queryFn: () => fetchEmailThread(currentEmail.threadId!),
+    queryKey: queryKeys.emails.thread(currentEmail.threadId ?? "none"),
+    queryFn: () =>
+      currentEmail.threadId ? fetchEmailThread(currentEmail.threadId) : Promise.resolve([]),
     enabled: Boolean(currentEmail.threadId),
     staleTime: 60_000,
   });
@@ -166,7 +168,7 @@ export function EmailDetailView({
   const emailIdentifier = {
     id: currentEmail.id,
     providerMessageId: currentEmail.providerMessageId,
-    mailboxId: currentEmail.mailboxId!,
+    mailboxId: currentEmail.mailboxId ?? mailboxId,
     labelIds: currentEmail.labelIds,
   };
 
@@ -174,7 +176,7 @@ export function EmailDetailView({
     mutationFn: (payload: Parameters<typeof patchEmail>[1]) =>
       patchEmail(emailIdentifier, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+      invalidateInboxQueries();
       queryClient.invalidateQueries({ queryKey: queryKeys.emails.detail(currentEmail.id) });
       void router.invalidate();
     },

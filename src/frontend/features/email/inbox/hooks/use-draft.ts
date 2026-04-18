@@ -85,7 +85,8 @@ export async function loadDraft(composeKey: string): Promise<DraftState | null> 
       body: nextDraft.body,
       forwardedContent: nextDraft.forwardedContent ?? "",
     };
-  } catch {
+  } catch (error) {
+    console.warn("Failed to load draft", error);
     return null;
   }
 }

@@ -2,10 +2,33 @@ import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
 import type { Label } from "./types";
 
+const labelSyncInFlight = new Map<number, Promise<Label[]>>();
+
+async function syncLabelsOnce(mailboxId: number): Promise<Label[]> {
+  const existing = labelSyncInFlight.get(mailboxId);
+  if (existing) return existing;
+
+  const task = syncLabelsFromServer(mailboxId).finally(() => {
+    if (labelSyncInFlight.get(mailboxId) === task) {
+      labelSyncInFlight.delete(mailboxId);
+    }
+  });
+  labelSyncInFlight.set(mailboxId, task);
+  return task;
+}
+
 export async function fetchLabels(mailboxId: number): Promise<Label[]> {
   const userId = await getCurrentUserId();
   if (!userId) return [];
-  return localDb.getLabels(userId, mailboxId);
+
+  const localLabels = await localDb.getLabels(userId, mailboxId);
+  if (localLabels.length > 0) return localLabels;
+
+  try {
+    return await syncLabelsOnce(mailboxId);
+  } catch {
+    return localLabels;
+  }
 }
 
 export async function syncLabelsFromServer(mailboxId: number): Promise<Label[]> {

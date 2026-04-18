@@ -7,7 +7,6 @@ import CodeBlock from "@tiptap/extension-code-block";
 import Document from "@tiptap/extension-document";
 import HardBreak from "@tiptap/extension-hard-break";
 import Heading from "@tiptap/extension-heading";
-import Image from "@tiptap/extension-image";
 import Italic from "@tiptap/extension-italic";
 import Link from "@tiptap/extension-link";
 import { ListItem } from "@tiptap/extension-list";
@@ -18,6 +17,7 @@ import Text from "@tiptap/extension-text";
 import { Dropcursor, Gapcursor, Placeholder } from "@tiptap/extensions";
 import { useEditor } from "@tiptap/react";
 import DOMPurify from "dompurify";
+import ImageResize from "tiptap-extension-resize-image";
 
 function sanitizePastedHtml(html: string): string {
   return DOMPurify.sanitize(html, {
@@ -70,8 +70,9 @@ export function useComposeEditor({
           target: "_blank",
         },
       }),
-      Image.configure({
-        allowBase64: true,
+      ImageResize.configure({
+        minWidth: 80,
+        maxWidth: 1200,
       }),
       Placeholder.configure({
         placeholder: "Write your message...",

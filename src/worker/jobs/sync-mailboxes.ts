@@ -1,6 +1,6 @@
 /**
  * Labels are now fetched on-demand from Gmail via proxy endpoints.
- * Email sync is browser-driven via POST /api/inbox/sync/pull.
+ * Email list/search pages are fetched on-demand via inbox view/search endpoints.
  * This cron handler is a no-op placeholder.
  */
 import type { Database } from "../db/client";

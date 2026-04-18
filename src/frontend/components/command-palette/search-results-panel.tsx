@@ -103,7 +103,8 @@ export function SearchResultsPanel({
             })),
           );
         }
-      } catch {
+      } catch (error) {
+        console.warn("Command palette search failed", error);
       } finally {
         if (!cancelled) setLoading(false);
       }

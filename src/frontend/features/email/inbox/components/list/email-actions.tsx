@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { SnoozePicker } from "@/components/snooze-picker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,11 +49,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { unsubscribe } from "../../../subscriptions/queries";
 import { blockSender, patchEmail } from "../../mutations";
+import { invalidateInboxQueries } from "../../queries";
 import type { ComposeInitial, EmailDetailItem } from "../../types";
 import { buildForwardedEmailHtml } from "../../utils/build-forwarded-html";
 import { formatQuotedDate } from "../../utils/formatters";
 import { buildReplyAllRecipients } from "../../utils/reply-recipients";
-import { SnoozePicker } from "../shell/snooze-picker";
 
 type EmailActionsProps = {
   email: EmailDetailItem;
@@ -92,19 +93,24 @@ export function EmailActions({
   const hasUnsubscribe = Boolean(
     email.unsubscribeUrl || email.unsubscribeEmail,
   );
+  const mailboxId = email.mailboxId;
+
+  if (mailboxId == null) return null;
 
   const labelsQuery = useQuery({
-    queryKey: queryKeys.labels(email.mailboxId!),
-    queryFn: () => fetchLabels(email.mailboxId!),
+    queryKey: queryKeys.labels(mailboxId),
+    queryFn: () => fetchLabels(mailboxId),
     staleTime: 60_000,
-    enabled: email.mailboxId != null,
+    enabled: true,
   });
   const allLabels = labelsQuery.data ?? [];
   const userLabelIds = email.labelIds.filter((id) => id.startsWith("Label_"));
-  const appliedLabels = allLabels.filter((l) => userLabelIds.includes(l.gmailId));
+  const appliedLabels = allLabels.filter((l) =>
+    userLabelIds.includes(l.gmailId),
+  );
 
   const invalidateEmails = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+    invalidateInboxQueries();
     queryClient.invalidateQueries({
       queryKey: queryKeys.emails.detail(email.id),
     });
@@ -114,7 +120,7 @@ export function EmailActions({
   const emailIdentifier = {
     id: email.id,
     providerMessageId: email.providerMessageId,
-    mailboxId: email.mailboxId!,
+    mailboxId,
     labelIds: email.labelIds,
   };
 
@@ -151,7 +157,7 @@ export function EmailActions({
 
   const removeLabelMutation = useMutation({
     mutationFn: (labelId: string) =>
-      removeLabel([email.providerMessageId], labelId, email.mailboxId!),
+      removeLabel([email.providerMessageId], labelId, mailboxId),
     onSuccess: () => invalidateEmails(),
     onError: (error: Error) =>
       toast.error(error.message || "Failed to remove label"),
@@ -349,7 +355,10 @@ export function EmailActions({
           disabled={removeLabelMutation.isPending}
           onClick={() => removeLabelMutation.mutate(label.gmailId)}
           className="group/label flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-colors hover:opacity-80"
-          style={{ backgroundColor: `${label.backgroundColor ?? "#999"}25`, color: label.backgroundColor ?? "#999" }}
+          style={{
+            backgroundColor: `${label.backgroundColor ?? "#999"}25`,
+            color: label.backgroundColor ?? "#999",
+          }}
         >
           <span
             className="size-1.5 rounded-full"
@@ -488,9 +497,9 @@ export function EmailActions({
           <AlertDialogHeader>
             <AlertDialogTitle>Block {email.fromAddr}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Future emails from {email.fromAddr} will be sent to Trash. Existing
-              emails from this sender will also be moved to Trash. You can undo
-              this in Gmail Settings &rarr; Filters.
+              Future emails from {email.fromAddr} will be sent to Trash.
+              Existing emails from this sender will also be moved to Trash. You
+              can undo this in Gmail Settings &rarr; Filters.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

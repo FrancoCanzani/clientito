@@ -1,4 +1,4 @@
-import { clearLocalData } from "@/db/sync";
+import { clearLocalData } from "@/db/client";
 import { resetCurrentUserCache } from "@/db/user";
 import { signOut, useSession } from "@/lib/auth-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";

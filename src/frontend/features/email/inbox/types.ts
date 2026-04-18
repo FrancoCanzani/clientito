@@ -121,17 +121,9 @@ export type EmailThreadItem = EmailListItem & EmailBodySource & {
   attachments?: EmailAttachment[];
 };
 
-export type EmailListResponse = {
-  data: EmailListItem[];
-  pagination: {
-    limit: number;
-    offset: number;
-    hasMore: boolean;
-    cursor?: number;
-  };
-  searchMeta?: {
-    hiddenJunkCount: number;
-  };
+export type EmailListPage = {
+  emails: EmailListItem[];
+  cursor: string | null;
 };
 
 export type DraftItem = {

@@ -230,11 +230,13 @@ export async function listThreadsPage(
     pageToken?: string;
     query?: string;
     labelIds?: string[];
+    maxResults?: number;
+    includeSpamTrash?: boolean;
   } = {},
 ): Promise<GmailThreadsListResponse> {
   return gmailRequest<GmailThreadsListResponse>(accessToken, "/threads", {
-    maxResults: "100",
-    includeSpamTrash: "true",
+    maxResults: String(options.maxResults ?? 100),
+    includeSpamTrash: options.includeSpamTrash === false ? "false" : "true",
     pageToken: options.pageToken,
     q: options.query,
     labelIds: options.labelIds,

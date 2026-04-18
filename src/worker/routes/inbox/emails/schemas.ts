@@ -46,7 +46,7 @@ export const sendEmailBodySchema = z.object({
   cc: z.string().optional(),
   bcc: z.string().optional(),
   subject: z.string().trim().optional().default(""),
-  body: z.string().trim().min(1),
+  body: z.string().optional().default(""),
   inReplyTo: z.string().trim().optional(),
   references: z.string().trim().optional(),
   threadId: z.string().trim().optional(),

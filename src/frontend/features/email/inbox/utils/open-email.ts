@@ -1,11 +1,13 @@
 import { markEmailRead } from "@/features/email/inbox/mutations";
 import { fetchEmailDetail } from "@/features/email/inbox/queries";
-import type { EmailDetailItem, EmailListItem, EmailListResponse } from "@/features/email/inbox/types";
+import type { EmailDetailItem, EmailListItem, EmailListPage } from "@/features/email/inbox/types";
 import type {
   EmailFolderView,
   InboxLabelView,
 } from "@/features/email/inbox/utils/inbox-filters";
+import { isEmailListInfiniteData } from "@/features/email/inbox/utils/email-list-cache";
 import { isInboxLabelView } from "@/features/email/inbox/utils/inbox-filters";
+import { invalidateInboxQueries } from "@/features/email/inbox/queries";
 import { queryKeys } from "@/lib/query-keys";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 
@@ -66,30 +68,32 @@ export function openEmail(
     });
   }
 
-  markEmailOpened(queryClient, email);
+  markEmailOpened(queryClient, email, routeMailboxId);
 }
 
 export function markEmailOpened(
   queryClient: QueryClient,
   email: Pick<EmailListItem, "id" | "isRead" | "providerMessageId" | "mailboxId" | "labelIds">,
+  mailboxId: number,
 ) {
   if (email.isRead) return;
-  queryClient.setQueriesData<InfiniteData<EmailListResponse>>(
+  queryClient.setQueriesData(
     { queryKey: queryKeys.emails.all() },
     (current) => {
-      if (!current) return current;
+      if (!isEmailListInfiniteData(current)) return current;
       let changed = false;
       const pages = current.pages.map((page) => {
         let pageChanged = false;
-        const data = page.data.map((entry) => {
+        const emails = page.emails.map((entry) => {
           if (entry.id !== email.id || entry.isRead) return entry;
           pageChanged = true;
           changed = true;
           return { ...entry, isRead: true };
         });
-        return pageChanged ? { ...page, data } : page;
+        return pageChanged ? { ...page, emails } : page;
       });
-      return changed ? { ...current, pages } : current;
+      const next: InfiniteData<EmailListPage> = { ...current, pages };
+      return changed ? next : current;
     },
   );
 
@@ -104,10 +108,10 @@ export function markEmailOpened(
   void markEmailRead({
     id: email.id,
     providerMessageId: email.providerMessageId,
-    mailboxId: email.mailboxId!,
+    mailboxId,
     labelIds: email.labelIds,
   }).catch(() => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+    invalidateInboxQueries();
     queryClient.invalidateQueries({ queryKey: queryKeys.emails.detail(email.id) });
   });
 }

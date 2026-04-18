@@ -122,7 +122,8 @@ function buildMimeMessage(
   headers.push("");
   headers.push(input.body);
 
-  for (const attachment of input.attachments!) {
+  const attachments = input.attachments ?? [];
+  for (const attachment of attachments) {
     headers.push(`--${boundary}`);
     headers.push(
       `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"`,

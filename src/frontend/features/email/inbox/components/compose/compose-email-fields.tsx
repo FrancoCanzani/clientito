@@ -172,7 +172,9 @@ export function ComposeEmailFields({
         return;
       }
       setReviewState({ status: "reviewing", review });
-    } catch {
+    } catch (error) {
+      console.warn("Compose AI action failed", error);
+      toast.error("AI action failed");
       setReviewState({ status: "idle" });
     }
   };

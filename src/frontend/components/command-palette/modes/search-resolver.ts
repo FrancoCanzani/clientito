@@ -14,9 +14,9 @@ export async function resolveSearch(
 ): Promise<SearchResult[]> {
   if (query.length < 2) return [];
 
-  const response = await fetchSearchEmails({ q: query, limit: 10, mailboxId });
+  const response = await fetchSearchEmails({ q: query, mailboxId });
 
-  return response.data.map((email) => ({
+  return response.emails.slice(0, 10).map((email) => ({
     id: String(email.id),
     label: email.subject || "(no subject)",
     description: email.fromName ?? email.fromAddr ?? null,

@@ -1,8 +1,5 @@
-import { clearLocalData } from "@/db/sync";
-import {
-  beginGmailConnection,
-  resetMailboxSyncState,
-} from "@/features/onboarding/mutations";
+import { clearLocalData } from "@/db/client";
+import { beginGmailConnection } from "@/features/onboarding/mutations";
 import {
   deleteAccount,
   updateMailboxSignature,
@@ -46,8 +43,7 @@ export function useSettingsMutations({
     number[]
   >([]);
   const fullReimportMutation = useMutation({
-    mutationFn: async (mailboxId: number) => {
-      await resetMailboxSyncState(mailboxId);
+    mutationFn: async (_mailboxId: number) => {
       await clearLocalData();
       queryClient.clear();
     },

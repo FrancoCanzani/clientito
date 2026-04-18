@@ -3,9 +3,8 @@ import InboxSearchPage from "@/features/email/inbox/pages/inbox-search-page";
 import {
   fetchSearchEmails,
   fetchSearchSuggestions,
-  INBOX_SEARCH_PAGE_SIZE,
 } from "@/features/email/inbox/queries";
-import type { EmailListResponse } from "@/features/email/inbox/types";
+import type { EmailListPage } from "@/features/email/inbox/types";
 import { queryKeys } from "@/lib/query-keys";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
@@ -61,14 +60,11 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/search")({
                 fetchSearchEmails({
                   ...scope,
                   q: normalizedQuery,
-                  limit: INBOX_SEARCH_PAGE_SIZE,
-                  offset: pageParam,
+                  cursor: pageParam || undefined,
                 }),
-              initialPageParam: 0,
-              getNextPageParam: (lastPage: EmailListResponse) =>
-                lastPage.pagination.hasMore
-                  ? lastPage.pagination.offset + lastPage.pagination.limit
-                  : undefined,
+              initialPageParam: "",
+              getNextPageParam: (lastPage: EmailListPage) =>
+                lastPage.cursor ?? undefined,
             })
           ).pages[0]
         : null;

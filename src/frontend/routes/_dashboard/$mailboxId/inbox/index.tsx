@@ -1,30 +1,22 @@
 import { Error as RouteError } from "@/components/error";
 import InboxPage from "@/features/email/inbox/pages/inbox-page";
-import {
-  EMAIL_LIST_PAGE_SIZE,
-  fetchEmails,
-} from "@/features/email/inbox/queries";
-import type { EmailListResponse } from "@/features/email/inbox/types";
+import { fetchViewPage } from "@/features/email/inbox/queries";
 import { queryKeys } from "@/lib/query-keys";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/")({
-  loader: ({ context, params }) => {
-    context.queryClient.prefetchInfiniteQuery({
+  loader: async ({ context, params }) => {
+    await context.queryClient.prefetchInfiniteQuery({
       queryKey: queryKeys.emails.list("inbox", params.mailboxId),
       queryFn: ({ pageParam }) =>
-        fetchEmails({
+        fetchViewPage({
           view: "inbox",
           mailboxId: params.mailboxId,
-          limit: EMAIL_LIST_PAGE_SIZE,
-          cursor: pageParam === 0 ? undefined : pageParam,
+          cursor: pageParam || undefined,
         }),
-      initialPageParam: 0,
-      pages: 2,
-      getNextPageParam: (lastPage: EmailListResponse) =>
-        lastPage.pagination.hasMore && lastPage.pagination.cursor
-          ? lastPage.pagination.cursor
-          : undefined,
+      initialPageParam: "",
+      pages: 1,
+      getNextPageParam: (lastPage) => lastPage?.cursor ?? undefined,
     });
   },
   errorComponent: RouteError,

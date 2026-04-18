@@ -1,10 +1,7 @@
 export const queryKeys = {
   emails: {
     all: () => ["emails"] as const,
-    list: (view: string, mailboxId: number, filterKey?: string) =>
-      filterKey
-        ? (["emails", view, mailboxId, filterKey] as const)
-        : (["emails", view, mailboxId] as const),
+    list: (view: string, mailboxId: number) => ["emails", view, mailboxId] as const,
     detail: (emailId: string) => ["email-detail", emailId] as const,
     thread: (threadId: string) => ["email-thread", threadId] as const,
     search: {

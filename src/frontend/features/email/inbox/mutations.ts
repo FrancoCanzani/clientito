@@ -1,12 +1,14 @@
 import { localDb } from "@/db/client";
 import { clearPending, markPending } from "@/db/pending-lock";
 import { getCurrentUserId } from "@/db/user";
+import { invalidateInboxQueries } from "@/features/email/inbox/queries";
 import { queryClient } from "@/lib/query-client";
 import { queryKeys } from "@/lib/query-keys";
+import { isEmailListInfiniteData } from "./utils/email-list-cache";
 import type {
   EmailDetailItem,
   EmailListItem,
-  EmailListResponse,
+  EmailListPage,
 } from "./types";
 import type { InfiniteData } from "@tanstack/react-query";
 
@@ -113,23 +115,24 @@ function applyOptimisticCachePatch(
   emailIds: Set<string>,
   patch: EmailPatchPayload,
 ) {
-  queryClient.setQueriesData<InfiniteData<EmailListResponse>>(
+  queryClient.setQueriesData(
     { queryKey: queryKeys.emails.all() },
     (current) => {
-      if (!current) return current;
+      if (!isEmailListInfiniteData(current)) return current;
       let changed = false;
       const pages = current.pages.map((page) => {
         let pageChanged = false;
-        const data = page.data.map((entry) => {
+        const emails = page.emails.map((entry) => {
           if (!emailIds.has(entry.id)) return entry;
           const next = applyPatchToItem(entry, patch);
           pageChanged = true;
           changed = true;
           return next;
         });
-        return pageChanged ? { ...page, data } : page;
+        return pageChanged ? { ...page, emails } : page;
       });
-      return changed ? { ...current, pages } : current;
+      const next: InfiniteData<EmailListPage> = { ...current, pages };
+      return changed ? next : current;
     },
   );
 
@@ -160,7 +163,7 @@ async function applyLocalPatch(
   } catch (error) {
     console.warn("Failed to apply local email patch", error);
   }
-  void queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+  invalidateInboxQueries();
   for (const emailId of emailIds) {
     void queryClient.invalidateQueries({
       queryKey: queryKeys.emails.detail(emailId),

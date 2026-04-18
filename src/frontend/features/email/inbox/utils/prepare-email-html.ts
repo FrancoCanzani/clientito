@@ -1,6 +1,22 @@
 import DOMPurify from "dompurify";
 import { EMAIL_CONTENT_SHADOW_STYLE } from "./email-content-shadow-style";
-import { rewriteCidImages, type InlineImageContext } from "./cid-images";
+import {
+  rewriteCidImages,
+  rewriteInsecureImageUrls,
+  type InlineImageContext,
+} from "./cid-images";
+
+function isTrackingPixel(img: HTMLImageElement): boolean {
+  const width = Number(img.getAttribute("width") ?? "0");
+  const height = Number(img.getAttribute("height") ?? "0");
+  return (width > 0 && width <= 2) || (height > 0 && height <= 2);
+}
+
+function stripTrackingPixels(root: ParentNode): void {
+  root.querySelectorAll("img").forEach((img) => {
+    if (isTrackingPixel(img)) img.remove();
+  });
+}
 
 export function prepareEmailHtml(
   html: string,
@@ -24,6 +40,8 @@ export function prepareEmailHtml(
   }
 
   rewriteCidImages(parsedDocument, inlineContext);
+  rewriteInsecureImageUrls(parsedDocument);
+  stripTrackingPixels(parsedDocument);
 
   const styleTag = parsedDocument.createElement("style");
   styleTag.textContent = EMAIL_CONTENT_SHADOW_STYLE;

@@ -64,11 +64,7 @@ export function EmailList({
     hasNextPage,
     isFetchingNextPage,
     isLoading,
-    isSyncing,
-    isInitialSync,
     loadMoreRef,
-    canPullFromGmail,
-    isPullingFromGmail,
     filters,
     setFilters,
     hasActiveFilters,
@@ -127,13 +123,10 @@ export function EmailList({
 
   const virtualItems = virtualizer.getVirtualItems();
 
-  const showLoadMoreSentinel =
-    hasNextPage || isFetchingNextPage || canPullFromGmail || isPullingFromGmail;
+  const showLoadMoreSentinel = hasNextPage || isFetchingNextPage;
   const loadMoreLabel = isFetchingNextPage
     ? "Loading more..."
-    : isPullingFromGmail
-      ? "Loading more from Gmail..."
-      : "Scroll for more";
+    : "Scroll for more";
 
   const selectOptions: { key: SelectFilter; label: string }[] = [
     { key: "all", label: "All" },
@@ -220,8 +213,8 @@ export function EmailList({
         <InboxFilterBar filters={filters} onChange={setFilters} view={view} />
       )}
 
-      {hasEmails ? (
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        {hasEmails ? (
           <div
             className="relative w-full"
             style={{ height: virtualizer.getTotalSize() }}
@@ -254,44 +247,30 @@ export function EmailList({
               );
             })}
           </div>
-
-          {showLoadMoreSentinel && (
-            <div
-              ref={loadMoreRef}
-              className="pt-2 text-center text-xs text-muted-foreground"
-            >
-              {loadMoreLabel}
-            </div>
-          )}
-        </div>
-      ) : isInitialSync ? (
-        <div className="flex min-h-56 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-          <CircleNotchIcon className="size-5 animate-spin text-muted-foreground" />
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Setting up your inbox</p>
-            <p className="text-xs text-muted-foreground">
-              This runs once. You can keep using the app — messages will appear
-              as they arrive.
-            </p>
+        ) : isLoading ? (
+          <div className="flex min-h-56 flex-col items-center justify-center gap-3">
+            <CircleNotchIcon className="size-5 animate-spin text-muted-foreground" />
           </div>
-        </div>
-      ) : isSyncing || isLoading ? (
-        <div className="flex min-h-56 flex-1 flex-col items-center justify-center gap-3">
-          <CircleNotchIcon className="size-5 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            Checking for new mail…
-          </p>
-        </div>
-      ) : (
-        <Empty className="min-h-56 flex-1 justify-center">
-          <EmptyHeader>
-            <EmptyTitle>No emails in {pageTitle.toLowerCase()}</EmptyTitle>
-            <EmptyDescription>
-              Messages that belong to this view will show up here.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      )}
+        ) : (
+          <Empty className="min-h-56 justify-center">
+            <EmptyHeader>
+              <EmptyTitle>No emails in {pageTitle.toLowerCase()}</EmptyTitle>
+              <EmptyDescription>
+                Messages that belong to this view will show up here.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
+
+        {showLoadMoreSentinel && (
+          <div
+            ref={loadMoreRef}
+            className="p-6 text-center text-xs text-muted-foreground"
+          >
+            {loadMoreLabel}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

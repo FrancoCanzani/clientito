@@ -1,3 +1,4 @@
+import { SnoozePicker } from "@/components/snooze-picker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,7 +13,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { IconButton } from "@/components/ui/icon-button";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import { patchEmail } from "@/features/email/inbox/mutations";
-import { fetchEmailDetail } from "@/features/email/inbox/queries";
+import {
+  fetchEmailDetail,
+  invalidateInboxQueries,
+} from "@/features/email/inbox/queries";
 import {
   getRowActions,
   type RowAction,
@@ -28,7 +32,6 @@ import { toast } from "sonner";
 import type { EmailListItem } from "../../types";
 import { formatEmailSnippet, formatInboxRowDate } from "../../utils/formatters";
 import type { ThreadGroup } from "../../utils/group-emails-by-thread";
-import { SnoozePicker } from "../shell/snooze-picker";
 
 const MAX_VISIBLE_CHIPS = 2;
 
@@ -96,7 +99,7 @@ export const EmailRow = memo(function EmailRow({
     prefetchedRef.current = true;
 
     void queryClient.prefetchQuery({
-      queryKey: ["email-detail", email.id],
+      queryKey: queryKeys.emails.detail(email.id),
       queryFn: () =>
         fetchEmailDetail(email.id, {
           mailboxId: email.mailboxId ?? undefined,
@@ -275,8 +278,6 @@ function EmailRowActions({
   rowActions: RowAction[];
   onRunAction: (rowAction: RowAction) => void;
 }) {
-  const queryClient = useQueryClient();
-
   const snoozeMutation = useMutation({
     mutationFn: (timestamp: number | null) => {
       if (!email.mailboxId) throw new Error("Missing mailbox");
@@ -292,7 +293,7 @@ function EmailRowActions({
     },
     onSuccess: (_data, timestamp) => {
       toast.success(timestamp ? "Snoozed" : "Unsnoozed");
-      void queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+      invalidateInboxQueries();
     },
     onError: (error: Error) => toast.error(error.message || "Failed to snooze"),
   });

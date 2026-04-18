@@ -6,6 +6,7 @@ import { useAttachmentUpload } from "../../hooks/use-attachment-upload";
 import { loadDraft, persistDraftNow, useDraft } from "../../hooks/use-draft";
 import { useUndoSend } from "../../hooks/use-undo-send";
 import { sendEmail } from "../../mutations";
+import { invalidateInboxQueries } from "../../queries";
 import { queryKeys } from "@/lib/query-keys";
 import type { ComposeInitial, DraftState } from "../../types";
 import { buildPlainForwardedHtml } from "../../utils/build-forwarded-html";
@@ -277,7 +278,7 @@ export function useComposeEmail(
     onSuccess: () => {
       clearDraft();
       toast.success("Email sent");
-      queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+      invalidateInboxQueries();
       queryClient.invalidateQueries({
         queryKey: queryKeys.drafts(draftSnapshotRef.current.mailboxId),
       });
@@ -340,11 +341,8 @@ export function useComposeEmail(
   );
 
   const canSend = useMemo(() => {
-    const hasDraftBody =
-      body.trim().length > 0 && body !== "<p></p>" && body !== "<p><br></p>";
-    const hasBody = hasDraftBody || forwardedContent.trim().length > 0;
-    return mailboxId != null && to.trim().length > 0 && hasBody && !sendPending;
-  }, [body, forwardedContent, mailboxId, sendPending, subject, to]);
+    return mailboxId != null && to.trim().length > 0 && !sendPending;
+  }, [mailboxId, sendPending, to]);
 
   return {
     mailboxId,

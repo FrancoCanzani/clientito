@@ -1,5 +1,7 @@
+import { invalidateInboxQueries } from "@/features/email/inbox/queries";
 import { patchEmail, type EmailIdentifier } from "@/features/email/inbox/mutations";
-import type { EmailListItem, EmailListResponse } from "@/features/email/inbox/types";
+import type { EmailListItem, EmailListPage } from "@/features/email/inbox/types";
+import { isEmailListInfiniteData } from "@/features/email/inbox/utils/email-list-cache";
 import { queryKeys } from "@/lib/query-keys";
 import {
   CheckIcon,
@@ -30,15 +32,15 @@ function removesFromList(data: PatchData): boolean {
 }
 
 function optimisticRemove(
-  old: InfiniteData<EmailListResponse> | undefined,
+  old: unknown,
   emailId: string,
-): InfiniteData<EmailListResponse> | undefined {
-  if (!old) return old;
+): unknown {
+  if (!isEmailListInfiniteData(old)) return old;
   return {
     ...old,
     pages: old.pages.map((page) => ({
       ...page,
-      data: page.data.filter((e) => e.id !== emailId),
+      emails: page.emails.filter((e) => e.id !== emailId),
     })),
   };
 }
@@ -57,11 +59,11 @@ async function performEmailAction(
   // Resolve full email from cache
   let emailItem: EmailListItem | undefined;
   const caches = services.queryClient.getQueriesData<
-    InfiniteData<EmailListResponse>
+    InfiniteData<EmailListPage>
   >({ queryKey: queryKeys.emails.all() });
   for (const [, cache] of caches) {
     for (const page of cache?.pages ?? []) {
-      const found = page.data.find((e) => e.id === emailId);
+      const found = page.emails.find((e) => e.id === emailId);
       if (found) { emailItem = found; break; }
     }
     if (emailItem) break;
@@ -78,7 +80,7 @@ async function performEmailAction(
 
   // Optimistically remove from all list caches if this action hides the email.
   if (removesFromList(data)) {
-    services.queryClient.setQueriesData<InfiniteData<EmailListResponse>>(
+    services.queryClient.setQueriesData(
       { queryKey: queryKeys.emails.all() },
       (old) => optimisticRemove(old, emailId),
     );
@@ -90,9 +92,7 @@ async function performEmailAction(
     toast.error(error instanceof Error ? error.message : "Action failed");
   }
 
-  void services.queryClient.invalidateQueries({
-    queryKey: queryKeys.emails.all(),
-  });
+  invalidateInboxQueries();
   void services.queryClient.invalidateQueries({
     queryKey: queryKeys.emails.detail(emailId),
   });

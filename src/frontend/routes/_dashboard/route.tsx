@@ -1,7 +1,7 @@
 import { CommandPalette } from "@/components/command-palette/command-palette";
+import { KeyboardShortcutsDialog } from "@/components/keyboard-shortcuts-dialog";
 import { AppProviders } from "@/components/providers";
 import { InboxComposeProvider } from "@/features/email/inbox/components/compose/inbox-compose-provider";
-import { KeyboardShortcutsDialog } from "@/features/email/inbox/components/shell/keyboard-shortcuts-dialog";
 import { getDashboardGate } from "@/features/onboarding/dashboard-gate";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 

@@ -7,7 +7,6 @@ import { SearchSuggestionsList } from "@/features/email/inbox/components/search/
 import {
   fetchSearchEmails,
   fetchSearchSuggestions,
-  INBOX_SEARCH_PAGE_SIZE,
 } from "@/features/email/inbox/queries";
 import type { EmailListItem } from "@/features/email/inbox/types";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
@@ -68,25 +67,21 @@ export default function InboxSearchPage() {
       "inbox",
       scope.includeJunk ?? false,
     ),
-    initialPageParam: 0,
+    initialPageParam: "" as string,
     enabled: normalizeQuery(scope.q).length >= 2,
     initialData: initialResults
       ? {
           pages: [initialResults],
-          pageParams: [0],
+          pageParams: [""],
         }
       : undefined,
     queryFn: ({ pageParam }) =>
       fetchSearchEmails({
         ...scope,
         q: normalizeQuery(scope.q),
-        limit: INBOX_SEARCH_PAGE_SIZE,
-        offset: pageParam,
+        cursor: pageParam || undefined,
       }),
-    getNextPageParam: (lastPage) =>
-      lastPage.pagination.hasMore
-        ? lastPage.pagination.offset + lastPage.pagination.limit
-        : undefined,
+    getNextPageParam: (lastPage) => lastPage?.cursor ?? undefined,
     staleTime: 30_000,
   });
 
@@ -107,7 +102,7 @@ export default function InboxSearchPage() {
   });
 
   const results = useMemo(
-    () => resultsQuery.data?.pages.flatMap((page) => page.data) ?? [],
+    () => resultsQuery.data?.pages.flatMap((page) => page.emails) ?? [],
     [resultsQuery.data],
   );
 
@@ -152,9 +147,7 @@ export default function InboxSearchPage() {
     openInboxEmail(queryClient, navigate, routeMailboxId, email);
   }
 
-  const hiddenJunkCount =
-    resultsQuery.data?.pages[0]?.searchMeta?.hiddenJunkCount ?? 0;
-  const canToggleJunk = hiddenJunkCount > 0 || search.includeJunk === true;
+  const canToggleJunk = true;
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
@@ -219,7 +212,7 @@ export default function InboxSearchPage() {
               >
                 {search.includeJunk
                   ? "Hide spam and trash"
-                  : `Show spam and trash${hiddenJunkCount > 0 ? ` (${hiddenJunkCount})` : ""}`}
+                  : "Show spam and trash"}
               </Button>
             </div>
           )}

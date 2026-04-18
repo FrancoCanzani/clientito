@@ -9,7 +9,6 @@ import { SignatureField } from "@/features/settings/components/signature-field";
 import { useSettingsMutations } from "@/features/settings/hooks/use-settings-mutations";
 import { getMailboxStatusCopy } from "@/features/settings/utils/sync-formatting";
 import { useAuth } from "@/hooks/use-auth";
-import { useLocalSyncSnapshot } from "@/hooks/use-local-sync";
 import {
   getMailboxDisplayEmail,
   useMailboxes,
@@ -261,28 +260,11 @@ function AccountRow({
   onSaveSignature: (mailboxId: number, signature: string) => void;
   isSavingSignature: boolean;
 }) {
-  const { user } = useAuth();
-  const localSync = useLocalSyncSnapshot(user?.id, account.mailboxId ?? null);
-  const isLocallySyncing = localSync.status !== "idle";
   const statusCopy = getMailboxStatusCopy(account);
   const canReimport =
     account.mailboxId != null &&
     account.hasValidCredentials &&
-    account.syncState !== "needs_reconnect" &&
-    !isLocallySyncing;
-
-  const syncingLabel =
-    localSync.status === "initial" ? "Importing from Gmail" : "Syncing";
-  const syncingDetail =
-    localSync.pulled > 0
-      ? `${localSync.pulled.toLocaleString()} ${localSync.pulled === 1 ? "message" : "messages"} pulled so far.`
-      : "Fetching messages from Gmail…";
-
-  const badgeLabel = isLocallySyncing ? syncingLabel : statusCopy.badge;
-  const badgeTone = isLocallySyncing ? "bg-sky-500" : statusCopy.badgeTone;
-  const detail = isLocallySyncing ? syncingDetail : statusCopy.detail;
-
-  const showInProgress = isBusy || isLocallySyncing;
+    account.syncState !== "needs_reconnect";
 
   return (
     <div>
@@ -292,23 +274,19 @@ function AccountRow({
             {getMailboxDisplayEmail(account) ?? "Unknown account"}
           </p>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {isLocallySyncing ? (
-              <SpinnerGapIcon className="size-3 animate-spin text-sky-500" />
-            ) : (
-              <span
-                className={`inline-block size-1.5 rounded-full ${badgeTone}`}
-              />
-            )}
-            {badgeLabel}
+            <span
+              className={`inline-block size-1.5 rounded-full ${statusCopy.badgeTone}`}
+            />
+            {statusCopy.badge}
           </div>
-          <p className="text-xs text-muted-foreground">{detail}</p>
+          <p className="text-xs text-muted-foreground">{statusCopy.detail}</p>
         </div>
         {canRemove && (
           <Button
             variant="ghost"
             size="sm"
             onClick={onRemove}
-            disabled={isRemoving || isBusy || isLocallySyncing}
+            disabled={isRemoving || isBusy}
           >
             <TrashIcon className="size-3.5 text-muted-foreground" />
           </Button>
@@ -318,24 +296,16 @@ function AccountRow({
       <div className="border-t border-border/60">
         <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-0.5">
-            <p className="text-sm font-medium">Fresh full import</p>
+            <p className="text-sm font-medium">Clear local cache</p>
             <p className="text-xs text-muted-foreground">
-              {isLocallySyncing
-                ? "Import in progress. You can keep using Petit while it runs."
-                : statusCopy.reimportHint}
+              {statusCopy.reimportHint}
             </p>
           </div>
           <div className="min-w-0 sm:max-w-[60%]">
-            {showInProgress ? (
+            {isBusy ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <SpinnerGapIcon className="size-4 animate-spin" />
-                <span>
-                  {isLocallySyncing
-                    ? localSync.pulled > 0
-                      ? `Imported ${localSync.pulled.toLocaleString()}`
-                      : "Starting import…"
-                    : "In progress"}
-                </span>
+                <span>In progress</span>
               </div>
             ) : (
               <Button
@@ -348,7 +318,7 @@ function AccountRow({
                 disabled={!canReimport}
               >
                 <ArrowClockwiseIcon className="mr-1.5 size-3.5" />
-                Run full import
+                Clear cache
               </Button>
             )}
           </div>
@@ -374,7 +344,8 @@ async function countLocalDrafts(): Promise<number> {
     await localDb.ensureReady();
     const drafts = await localDb.getDrafts(userId);
     return drafts.length;
-  } catch {
+  } catch (error) {
+    console.warn("Failed to count local drafts", error);
     return 0;
   }
 }

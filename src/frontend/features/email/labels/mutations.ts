@@ -1,4 +1,5 @@
 import { localDb } from "@/db/client";
+import { invalidateInboxQueries } from "@/features/email/inbox/queries";
 import { queryClient } from "@/lib/query-client";
 import { queryKeys } from "@/lib/query-keys";
 import { syncLabelsFromServer } from "./queries";
@@ -55,7 +56,7 @@ export async function deleteLabel(labelId: string, mailboxId: number): Promise<v
 
 export async function applyLabel(providerMessageIds: string[], labelId: string, mailboxId: number): Promise<void> {
   await localDb.addLabelToEmails(providerMessageIds, labelId);
-  queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+  invalidateInboxQueries();
 
   const response = await fetch("/api/inbox/labels/apply", {
     method: "POST",
@@ -69,14 +70,14 @@ export async function applyLabel(providerMessageIds: string[], labelId: string, 
   if (!response.ok) {
     // Rollback local change
     await localDb.removeLabelFromEmails(providerMessageIds, labelId);
-    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+    invalidateInboxQueries();
     await throwOnError(response, "Failed to apply label");
   }
 }
 
 export async function removeLabel(providerMessageIds: string[], labelId: string, mailboxId: number): Promise<void> {
   await localDb.removeLabelFromEmails(providerMessageIds, labelId);
-  queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+  invalidateInboxQueries();
 
   const response = await fetch("/api/inbox/labels/remove", {
     method: "POST",
@@ -90,7 +91,7 @@ export async function removeLabel(providerMessageIds: string[], labelId: string,
   if (!response.ok) {
     // Rollback local change
     await localDb.addLabelToEmails(providerMessageIds, labelId);
-    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+    invalidateInboxQueries();
     await throwOnError(response, "Failed to remove label");
   }
 }

@@ -4,9 +4,10 @@ import {
   patchEmail,
   type EmailIdentifier,
 } from "@/features/email/inbox/mutations";
+import { invalidateInboxQueries } from "@/features/email/inbox/queries";
 import type {
   EmailListItem,
-  EmailListResponse,
+  EmailListPage,
 } from "@/features/email/inbox/types";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
 import { queryKeys } from "@/lib/query-keys";
@@ -56,7 +57,7 @@ const actionPayloads: Partial<
   unstar: { starred: false },
 };
 
-type EmailsCache = InfiniteData<EmailListResponse> | undefined;
+type EmailsCache = InfiniteData<EmailListPage> | undefined;
 
 type InboxMutationVars = {
   action: EmailInboxAction;
@@ -103,7 +104,7 @@ export function useEmailInboxActions({
       toast.error(error instanceof Error ? error.message : "Action failed");
       // Optimistic local write already landed; re-sync to reconcile with
       // whatever the server actually has (post-retries).
-      void queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+      invalidateInboxQueries();
     },
     onSuccess: (_data, { ids }) => {
       for (const id of ids) {
@@ -111,7 +112,7 @@ export function useEmailInboxActions({
           queryKey: queryKeys.emails.detail(id),
         });
       }
-      void queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+      invalidateInboxQueries();
     },
   });
 
@@ -127,7 +128,7 @@ export function useEmailInboxActions({
       const itemById = new Map<string, EmailListItem>();
       for (const [, cache] of snapshots) {
         for (const page of cache?.pages ?? []) {
-          for (const item of page.data) {
+          for (const item of page.emails) {
             if (idSet.has(item.id)) itemById.set(item.id, item);
           }
         }
@@ -148,7 +149,11 @@ export function useEmailInboxActions({
 
       if (identifiers.length === 0) return;
 
-      await mutation.mutateAsync({ action, ids, identifiers }).catch(() => {});
+      try {
+        await mutation.mutateAsync({ action, ids, identifiers });
+      } catch (error) {
+        console.warn("Inbox action failed", error);
+      }
     },
     [mutation, queryClient],
   );

@@ -7,6 +7,7 @@ import { parseMailtoComposeInitial } from "../../utils/parse-mailto-compose";
 import { prepareEmailHtml } from "../../utils/prepare-email-html";
 import {
   rewriteCidImages,
+  rewriteInsecureImageUrls,
   type InlineImageContext,
 } from "../../utils/cid-images";
 import { EmailHtmlRenderer } from "./email-html-renderer";
@@ -221,7 +222,7 @@ function processImages(doc: Document, showImages: boolean): {
   const images = doc.querySelectorAll("img");
   images.forEach((img) => {
     if (isTrackingPixel(img)) {
-      img.setAttribute("data-blocked", "true");
+      img.remove();
       blockedTrackers += 1;
       return;
     }
@@ -279,6 +280,7 @@ function detox(
   handleTransactionalMail(contentDoc);
   lightenDarkText(contentDoc);
   rewriteCidImages(contentDoc, inlineContext);
+  rewriteInsecureImageUrls(contentDoc);
   const { hasImages, blockedTrackers } = processImages(contentDoc, showImages);
 
   const cleaned = DOMPurify.sanitize(contentDoc.body.innerHTML, {

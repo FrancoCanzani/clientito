@@ -67,3 +67,47 @@ export function rewriteCidImages(
     }
   });
 }
+
+function upgradeHttpUrl(value: string): string {
+  return value.trim().replace(/^http:\/\//i, "https://");
+}
+
+function upgradeSrcset(value: string): string {
+  return value
+    .split(",")
+    .map((candidate) => {
+      const trimmed = candidate.trim();
+      if (!trimmed) return trimmed;
+      const [url, ...descriptor] = trimmed.split(/\s+/);
+      return [upgradeHttpUrl(url), ...descriptor].join(" ");
+    })
+    .join(", ");
+}
+
+/**
+ * Avoid mixed-content warnings/failures by upgrading insecure remote image
+ * URLs to HTTPS before rendering inside an HTTPS page.
+ */
+export function rewriteInsecureImageUrls(root: ParentNode): void {
+  root.querySelectorAll<HTMLImageElement | HTMLSourceElement>(
+    "img[src],source[src]",
+  ).forEach((el) => {
+    const src = el.getAttribute("src");
+    if (!src) return;
+    const next = upgradeHttpUrl(src);
+    if (next !== src) {
+      el.setAttribute("src", next);
+    }
+  });
+
+  root.querySelectorAll<HTMLImageElement | HTMLSourceElement>(
+    "img[srcset],source[srcset]",
+  ).forEach((el) => {
+    const srcset = el.getAttribute("srcset");
+    if (!srcset) return;
+    const next = upgradeSrcset(srcset);
+    if (next !== srcset) {
+      el.setAttribute("srcset", next);
+    }
+  });
+}

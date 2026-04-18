@@ -19,13 +19,3 @@ export async function beginGmailConnection(callbackURL = "/settings") {
   }
 }
 
-export async function resetMailboxSyncState(mailboxId: number): Promise<void> {
-  const response = await fetch("/api/inbox/sync/reset", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mailboxId }),
-  });
-  if (!response.ok) {
-    throw new Error("Failed to reset mailbox sync state.");
-  }
-}

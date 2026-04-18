@@ -1,8 +1,8 @@
 import { IconButton } from "@/components/ui/icon-button";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
+import { invalidateInboxQueries } from "@/features/email/inbox/queries";
 import type { ThreadGroup } from "@/features/email/inbox/utils/group-emails-by-thread";
 import { LabelPicker } from "@/features/email/labels/components/label-picker";
-import { queryKeys } from "@/lib/query-keys";
 import {
   ArchiveIcon,
   EnvelopeSimpleIcon,
@@ -12,7 +12,6 @@ import {
   TrashIcon,
   WarningIcon,
 } from "@phosphor-icons/react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 type Props = {
@@ -31,8 +30,6 @@ export function SelectionActions({
   mailboxId,
   onAction,
 }: Props) {
-  const queryClient = useQueryClient();
-
   const selectedEmails = useMemo(() => {
     const byId = new Map(groups.map((g) => [g.representative.id, g.representative]));
     return selectedIds
@@ -66,7 +63,7 @@ export function SelectionActions({
   }, [selectedEmails]);
 
   const invalidateEmails = () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+    invalidateInboxQueries();
   };
 
   return (
