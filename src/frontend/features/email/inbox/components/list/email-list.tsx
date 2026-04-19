@@ -37,11 +37,15 @@ export function EmailList({
   onOpen,
   onAction,
   pageTitle: pageTitleOverride,
+  headerSlot,
+  extraActions,
 }: {
   emailData: ReturnType<typeof useEmailData>;
   onOpen: (email: EmailListItem) => void;
   onAction: (action: EmailInboxAction, ids?: string[]) => void;
   pageTitle?: string;
+  headerSlot?: React.ReactNode;
+  extraActions?: React.ReactNode;
 }) {
   const {
     view,
@@ -129,7 +133,14 @@ export function EmailList({
       </IconButton>
     ) : null;
 
-  const headerActions = filterToggleButton ?? undefined;
+  const headerActions =
+    headerSlot || extraActions || filterToggleButton ? (
+      <>
+        {headerSlot}
+        {extraActions}
+        {filterToggleButton}
+      </>
+    ) : undefined;
 
   return (
     <div className="flex w-full min-h-0 min-w-0 flex-1 flex-col">

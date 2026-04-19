@@ -10,6 +10,7 @@ import aiRoutes from "./routes/ai/router";
 import healthRoutes from "./routes/health/router";
 import inboxRoutes from "./routes/inbox/router";
 import settingsRoutes from "./routes/settings/router";
+import splitViewsRoutes from "./routes/split-views/router";
 import draftsRoutes from "./routes/inbox/drafts/router";
 import type { AppRouteEnv } from "./routes/types";
 import { handleScheduled } from "./scheduled";
@@ -56,6 +57,7 @@ app.route("/api/ai", aiRoutes);
 
 app.route("/api/inbox/drafts", draftsRoutes);
 app.route("/api/settings", settingsRoutes);
+app.route("/api/split-views", splitViewsRoutes);
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {

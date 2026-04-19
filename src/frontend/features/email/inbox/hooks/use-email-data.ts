@@ -1,6 +1,7 @@
 import { fetchViewPage } from "@/features/email/inbox/queries";
 import type { EmailListPage } from "@/features/email/inbox/types";
 import { groupEmailsByThread } from "@/features/email/inbox/utils/group-emails-by-thread";
+import type { SplitViewRow } from "@/db/schema";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { queryKeys } from "@/lib/query-keys";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -24,32 +25,18 @@ function matchesFilters(
   return true;
 }
 
-function isImportantEmail(email: {
-  hasCalendar: boolean;
-  aiCategory: string | null;
-  isRead: boolean;
-}): boolean {
-  if (email.hasCalendar) return true;
-  if (email.aiCategory === "action_required" || email.aiCategory === "invoice") {
-    return true;
-  }
-  if (email.aiCategory === "notification" && !email.isRead) {
-    return true;
-  }
-  return false;
-}
-
 export function useEmailData({
   view,
   mailboxId,
   initialPage,
+  activeSplit,
 }: {
   view: string;
   mailboxId: number;
   initialPage?: EmailListPage;
+  activeSplit?: SplitViewRow | null;
 }) {
   const [filters, setFilters] = useState<InboxListFilters>({});
-  const autoPaginationEnabled = view !== "important";
   useEffect(() => {
     setFilters({});
   }, [view, mailboxId]);
@@ -57,14 +44,16 @@ export function useEmailData({
   const hasActiveFilters = Boolean(
     filters.unread || filters.starred || filters.hasAttachment,
   );
+  const splitScopeKey = activeSplit?.id ?? queryKeys.emails.baseScope;
 
   const emailsQuery = useInfiniteQuery({
-    queryKey: queryKeys.emails.list(view, mailboxId),
+    queryKey: queryKeys.emails.listScoped(view, mailboxId, splitScopeKey),
     queryFn: ({ pageParam }) =>
       fetchViewPage({
         view,
         mailboxId,
         cursor: pageParam || undefined,
+        splitRule: activeSplit?.rules ?? null,
       }),
     initialPageParam: "" as string,
     ...(initialPage
@@ -80,17 +69,12 @@ export function useEmailData({
     () => emailsQuery.data?.pages.flatMap((page) => page.emails) ?? [],
     [emailsQuery.data],
   );
-  const scopedByView = useMemo(
-    () =>
-      view === "important" ? allEmails.filter((email) => isImportantEmail(email)) : allEmails,
-    [allEmails, view],
-  );
   const displayEmails = useMemo(
     () =>
       hasActiveFilters
-        ? scopedByView.filter((email) => matchesFilters(email, filters))
-        : scopedByView,
-    [filters, hasActiveFilters, scopedByView],
+        ? allEmails.filter((email) => matchesFilters(email, filters))
+        : allEmails,
+    [filters, hasActiveFilters, allEmails],
   );
   const threadGroups = useMemo(
     () => groupEmailsByThread(displayEmails),
@@ -106,7 +90,6 @@ export function useEmailData({
     rootMargin: LOAD_MORE_ROOT_MARGIN,
     threshold: 0.01,
     onChange: (isIntersecting) => {
-      if (!autoPaginationEnabled) return;
       if (!isIntersecting || isFetching || isFetchingNextPage) return;
       if (hasNextPage) fetchNextPage();
     },
@@ -119,7 +102,7 @@ export function useEmailData({
     threadGroups,
     isLoading: emailsQuery.isLoading,
     isError: emailsQuery.isError,
-    hasNextPage: autoPaginationEnabled ? (hasNextPage ?? false) : false,
+    hasNextPage: hasNextPage ?? false,
     isFetchingNextPage,
     loadMoreRef,
     filters,

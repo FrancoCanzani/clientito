@@ -1,5 +1,5 @@
 import { localDb, type EmailInsert } from "@/db/client";
-import type { EmailAICategory } from "@/db/schema";
+import type { EmailAICategory, SplitRule } from "@/db/schema";
 import { getCurrentUserId } from "@/db/user";
 import { queryClient } from "@/lib/query-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -15,7 +15,7 @@ import type {
   InboxSearchSuggestionsResponse,
 } from "./types";
 
-export const VIEW_PAGE_SIZE = 100;
+const VIEW_PAGE_SIZE = 100;
 
 const ACTIVE_USER_KEY = "active-user-id";
 const CLASSIFICATION_MAX_CONCURRENCY = 2;
@@ -23,6 +23,7 @@ const CLASSIFICATION_MAX_MESSAGES = 6;
 const CLASSIFICATION_MAX_SUMMARY_TEXT = 1400;
 const CLASSIFICATION_MAX_BODY_TEXT = 2500;
 const CLASSIFICATION_REQUEST_MAX_RETRIES = 2;
+const CLASSIFICATION_DEFERRED_RETRY_DELAYS_MS = [45_000, 180_000] as const;
 const CLASSIFICATION_RETRYABLE_STATUS_CODES = new Set([
   408, 409, 425, 429, 500, 502, 503, 504,
 ]);
@@ -52,6 +53,8 @@ const CLASSIFICATION_CATEGORIES = [
 
 type ClassificationCategory = (typeof CLASSIFICATION_CATEGORIES)[number];
 const CLASSIFICATION_CATEGORY_SET = new Set<string>(CLASSIFICATION_CATEGORIES);
+
+const CLASSIFICATION_MIN_CONFIDENCE = 0.8;
 
 type PulledAttachment = {
   attachmentId: string;
@@ -131,6 +134,23 @@ type ThreadClassificationTask = {
 export type ViewPage = EmailListPage;
 
 const classificationQueuedKeys = new Set<string>();
+const classificationDeferredRetryAttempts = new Map<string, number>();
+const classificationDeferredRetryTimers = new Map<
+  string,
+  ReturnType<typeof setTimeout>
+>();
+
+function cancelClassificationDeferredRetry(classificationKey: string): void {
+  const existing = classificationDeferredRetryTimers.get(classificationKey);
+  if (!existing) return;
+  clearTimeout(existing);
+  classificationDeferredRetryTimers.delete(classificationKey);
+}
+
+function resetClassificationDeferredRetryState(classificationKey: string): void {
+  cancelClassificationDeferredRetry(classificationKey);
+  classificationDeferredRetryAttempts.delete(classificationKey);
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -315,7 +335,7 @@ async function requestThreadClassification(
 
 async function processThreadClassificationTask(
   task: ThreadClassificationTask,
-): Promise<void> {
+): Promise<"fresh" | "classified" | "failed"> {
   try {
     const isFresh = await localDb.isThreadClassificationFresh({
       userId: task.userId,
@@ -324,10 +344,17 @@ async function processThreadClassificationTask(
       representativeProviderMessageId: task.representativeProviderMessageId,
       classificationKey: task.classificationKey,
     });
-    if (isFresh) return;
+    if (isFresh) return "fresh";
 
     const classified = await requestThreadClassification(task.payload);
-    if (!classified) return;
+    if (!classified) return "failed";
+
+    const gatedCategory: EmailAICategory =
+      classified.confidence >= CLASSIFICATION_MIN_CONFIDENCE
+        ? (classified.category as EmailAICategory)
+        : "unknown";
+    const gatedDraftReply =
+      gatedCategory === "action_required" ? classified.draftReply : "";
 
     await localDb.updateThreadClassification({
       userId: task.userId,
@@ -335,24 +362,54 @@ async function processThreadClassificationTask(
       threadId: task.threadId,
       representativeProviderMessageId: task.representativeProviderMessageId,
       classificationKey: task.classificationKey,
-      category: classified.category as EmailAICategory,
+      category: gatedCategory,
       confidence: classified.confidence,
       reason: classified.reason,
       summary: classified.summary,
-      draftReply: classified.draftReply,
+      draftReply: gatedDraftReply,
       classifiedAt: Date.now(),
     });
 
     queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+    return "classified";
   } catch {
     // Classification is best-effort and must never block inbox rendering.
+    return "failed";
   }
+}
+
+function scheduleClassificationDeferredRetry(task: ThreadClassificationTask): void {
+  const { classificationKey } = task;
+  const attempt = classificationDeferredRetryAttempts.get(classificationKey) ?? 0;
+  if (attempt >= CLASSIFICATION_DEFERRED_RETRY_DELAYS_MS.length) {
+    return;
+  }
+  if (classificationDeferredRetryTimers.has(classificationKey)) {
+    return;
+  }
+
+  const delayMs = CLASSIFICATION_DEFERRED_RETRY_DELAYS_MS[attempt];
+  classificationDeferredRetryAttempts.set(classificationKey, attempt + 1);
+
+  const timer = setTimeout(() => {
+    classificationDeferredRetryTimers.delete(classificationKey);
+    if (classificationQueuedKeys.has(classificationKey)) return;
+    classificationQueuedKeys.add(classificationKey);
+    enqueueThreadClassification(task);
+  }, delayMs);
+
+  classificationDeferredRetryTimers.set(classificationKey, timer);
 }
 
 const enqueueThreadClassification = asyncQueue<ThreadClassificationTask>(
   async (task) => {
     try {
-      await processThreadClassificationTask(task);
+      const result = await processThreadClassificationTask(task);
+      if (result === "failed") {
+        scheduleClassificationDeferredRetry(task);
+      } else {
+        resetClassificationDeferredRetryState(task.classificationKey);
+      }
     } finally {
       classificationQueuedKeys.delete(task.classificationKey);
     }
@@ -375,6 +432,7 @@ function enqueueClassificationTasks(
   if (tasks.length === 0) return;
 
   for (const task of tasks) {
+    cancelClassificationDeferredRetry(task.classificationKey);
     if (classificationQueuedKeys.has(task.classificationKey)) continue;
     classificationQueuedKeys.add(task.classificationKey);
     enqueueThreadClassification(task);
@@ -428,6 +486,7 @@ function pulledToRow(
     aiDraftReply: null,
     aiClassifiedAt: null,
     aiClassificationKey: null,
+    aiSplitIds: null,
     createdAt: email.date,
   };
 }
@@ -491,11 +550,6 @@ function refreshKey(mailboxId: number, view: string): string {
 
 function viewSyncedKey(mailboxId: number, view: string): string {
   return `viewSynced:${mailboxId}:${view}`;
-}
-
-export async function isViewSynced(mailboxId: number, view: string): Promise<boolean> {
-  const val = await localDb.getMeta(viewSyncedKey(mailboxId, view));
-  return val !== null;
 }
 
 async function markViewSynced(mailboxId: number, view: string): Promise<void> {
@@ -587,15 +641,18 @@ export async function fetchViewPage(params: {
   mailboxId: number;
   view: string;
   cursor?: string;
+  splitRule?: SplitRule | null;
 }): Promise<ViewPage> {
   const userId = await getCurrentUserId();
   if (!userId) return { emails: [], cursor: null };
 
   await alignActiveUser(userId);
 
+  const splitRule = params.splitRule ?? null;
+  const splitScoped = splitRule !== null;
   const decoded = decodeViewCursor(params.cursor);
 
-  if (decoded?.type === "remote") {
+  if (decoded?.type === "remote" && !splitScoped) {
     return fetchServerPage(userId, params.mailboxId, params.view, decoded);
   }
 
@@ -606,6 +663,7 @@ export async function fetchViewPage(params: {
     view: params.view,
     limit: VIEW_PAGE_SIZE,
     cursor: beforeMs,
+    splitRule,
   });
 
   // On first page, refresh from server in background to catch new mail.
@@ -614,6 +672,29 @@ export async function fetchViewPage(params: {
   }
 
   if (local.data.length === 0) {
+    if (splitScoped) {
+      // Seed local cache from provider, then re-run the split-filtered local query.
+      await fetchServerPage(userId, params.mailboxId, params.view, {
+        type: "remote",
+        beforeMs,
+      });
+      const seeded = await localDb.getEmails({
+        userId,
+        mailboxId: params.mailboxId,
+        view: params.view,
+        limit: VIEW_PAGE_SIZE,
+        cursor: beforeMs,
+        splitRule,
+      });
+      const seededLastDate = seeded.data[seeded.data.length - 1]?.date;
+      if (seeded.pagination.hasMore && seededLastDate != null) {
+        return {
+          emails: seeded.data,
+          cursor: encodeViewCursor({ type: "local", beforeMs: seededLastDate }),
+        };
+      }
+      return { emails: seeded.data, cursor: null };
+    }
     // No local data for this view — fall through to server synchronously.
     return fetchServerPage(userId, params.mailboxId, params.view, {
       type: "remote",
@@ -628,6 +709,10 @@ export async function fetchViewPage(params: {
       emails: local.data,
       cursor: encodeViewCursor({ type: "local", beforeMs: lastDate }),
     };
+  }
+
+  if (splitScoped) {
+    return { emails: local.data, cursor: null };
   }
 
   // Local exhausted — next page switches to server, anchored at oldest local row.
@@ -709,12 +794,6 @@ export async function fetchSearchSuggestions(
     mailboxId: params.mailboxId,
     view: params.view,
   });
-}
-
-export function getDraftsQueryKey(
-  mailboxId: number | null,
-): ["drafts", number | "none"] {
-  return ["drafts", mailboxId ?? "none"];
 }
 
 export async function fetchDrafts(

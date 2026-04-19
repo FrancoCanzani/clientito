@@ -91,6 +91,29 @@ CREATE TABLE IF NOT EXISTS drafts (
 
 CREATE INDEX IF NOT EXISTS drafts_updated ON drafts(updated_at);
 
+CREATE TABLE IF NOT EXISTS split_views (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  icon TEXT,
+  color TEXT,
+  position INTEGER NOT NULL DEFAULT 0,
+  visible INTEGER NOT NULL DEFAULT 1,
+  pinned INTEGER NOT NULL DEFAULT 0,
+  is_system INTEGER NOT NULL DEFAULT 0,
+  system_key TEXT,
+  rules TEXT,
+  match_mode TEXT NOT NULL DEFAULT 'rules',
+  show_in_other INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS split_views_user_pos ON split_views(user_id, position);
+CREATE UNIQUE INDEX IF NOT EXISTS split_views_user_system
+  ON split_views(user_id, system_key) WHERE system_key IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS _meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -157,6 +180,7 @@ async function initDb(): Promise<void> {
   ensureEmailColumn(db, "ai_draft_reply", "TEXT");
   ensureEmailColumn(db, "ai_classified_at", "INTEGER");
   ensureEmailColumn(db, "ai_classification_key", "TEXT");
+  ensureEmailColumn(db, "ai_split_ids", "TEXT");
 }
 
 function ensureEmailColumn(

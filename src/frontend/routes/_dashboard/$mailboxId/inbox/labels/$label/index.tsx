@@ -15,7 +15,7 @@ export const Route = createFileRoute(
   skipRouteOnParseError: { params: true },
   loader: async ({ context, params }) => {
     await context.queryClient.prefetchInfiniteQuery({
-      queryKey: queryKeys.emails.list(params.label, params.mailboxId),
+      queryKey: queryKeys.emails.listBase(params.label, params.mailboxId),
       queryFn: ({ pageParam }) =>
         fetchViewPage({
           view: params.label,

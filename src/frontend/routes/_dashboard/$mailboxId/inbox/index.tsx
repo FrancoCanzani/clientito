@@ -8,7 +8,7 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/")({
   loader: async ({ context, params }) => {
     await context.queryClient.prefetchInfiniteQuery({
-      queryKey: queryKeys.emails.list("inbox", params.mailboxId),
+      queryKey: queryKeys.emails.listBase("inbox", params.mailboxId),
       queryFn: ({ pageParam }) =>
         fetchViewPage({
           view: "inbox",
@@ -21,6 +21,7 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/")({
     });
   },
   pendingComponent: LoadingEmailsPending,
+  pendingMs: 0,
   errorComponent: RouteError,
   component: InboxPage,
 });

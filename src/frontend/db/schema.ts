@@ -43,6 +43,7 @@ export type EmailRow = {
   aiDraftReply: string | null;
   aiClassifiedAt: number | null;
   aiClassificationKey: string | null;
+  aiSplitIds: string | null;
   createdAt: number;
 };
 
@@ -64,6 +65,38 @@ export type LabelRow = {
 };
 
 export type LabelInsert = LabelRow;
+
+export type SplitRule = {
+  domains?: string[];
+  senders?: string[];
+  recipients?: string[];
+  subjectContains?: string[];
+  hasAttachment?: boolean | null;
+  fromMailingList?: boolean | null;
+  hasCalendar?: boolean | null;
+  gmailLabels?: string[];
+};
+
+export type SplitViewRow = {
+  id: string;
+  userId: string;
+  name: string;
+  description: string;
+  icon: string | null;
+  color: string | null;
+  position: number;
+  visible: boolean;
+  pinned: boolean;
+  isSystem: boolean;
+  systemKey: string | null;
+  rules: SplitRule | null;
+  matchMode: "rules";
+  showInOther: boolean;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type SplitViewInsert = SplitViewRow;
 
 export type DraftAttachmentKey = {
   key: string;

@@ -1,7 +1,12 @@
 export const queryKeys = {
   emails: {
+    baseScope: "__base__",
     all: () => ["emails"] as const,
     list: (view: string, mailboxId: number) => ["emails", view, mailboxId] as const,
+    listScoped: (view: string, mailboxId: number, scope: string) =>
+      ["emails", view, mailboxId, scope] as const,
+    listBase: (view: string, mailboxId: number) =>
+      ["emails", view, mailboxId, "__base__"] as const,
     detail: (emailId: string) => ["email-detail", emailId] as const,
     thread: (threadId: string) => ["email-thread", threadId] as const,
     search: {
@@ -33,6 +38,7 @@ export const queryKeys = {
     mailboxId ?? "none",
   ],
   labels: (mailboxId: number) => ["labels", mailboxId] as const,
+  splitViews: () => ["split-views"] as const,
   accounts: () => ["accounts"] as const,
   contactSuggestions: (query: string) =>
     ["contact-suggestions", query] as const,

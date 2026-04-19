@@ -76,6 +76,50 @@ export const scheduledEmails = sqliteTable(
   ],
 );
 
+export type SplitRule = {
+  domains?: string[];
+  senders?: string[];
+  recipients?: string[];
+  subjectContains?: string[];
+  hasAttachment?: boolean | null;
+  fromMailingList?: boolean | null;
+  hasCalendar?: boolean | null;
+  gmailLabels?: string[];
+};
+
+export const splitViews = sqliteTable(
+  "split_views",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    icon: text("icon"),
+    color: text("color"),
+    position: integer("position").notNull().default(0),
+    visible: integer("visible", { mode: "boolean" }).notNull().default(true),
+    pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    isSystem: integer("is_system", { mode: "boolean" }).notNull().default(false),
+    systemKey: text("system_key"),
+    rules: text("rules", { mode: "json" }).$type<SplitRule>(),
+    matchMode: text("match_mode")
+      .$type<"rules">()
+      .notNull()
+      .default("rules"),
+    showInOther: integer("show_in_other", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("split_views_user_idx").on(table.userId, table.position),
+    uniqueIndex("split_views_user_system_idx").on(table.userId, table.systemKey),
+  ],
+);
+
 export const drafts = sqliteTable(
   "drafts",
   {

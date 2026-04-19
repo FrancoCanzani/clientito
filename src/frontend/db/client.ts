@@ -6,6 +6,8 @@ import type {
   EmailAICategory,
   EmailInsert,
   LabelInsert,
+  SplitRule,
+  SplitViewRow,
 } from "./schema";
 export type { EmailInsert } from "./schema";
 
@@ -30,6 +32,7 @@ type ViewFilter =
   | "archived"
   | "starred"
   | "important"
+  | "calendar"
   | (string & {});
 
 type BindParam = string | number | boolean | null | Uint8Array;
@@ -102,6 +105,14 @@ function firstRow<T>(res: ExecResult): T | null {
 
 function toBool(v: unknown): boolean {
   return v === 1 || v === true || v === "1";
+}
+
+function safeJsonParse<T>(raw: string): T | null {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
 }
 
 function parseLabelIds(raw: string | null): string[] {
@@ -394,6 +405,16 @@ function buildViewConditions(view: ViewFilter, now: number): SqlFragment[] {
       return [
         { sql: "has_inbox = 1", params: [] },
         { sql: "(snoozed_until IS NULL OR snoozed_until <= ?)", params: [now] },
+        {
+          sql: "EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value = ?)",
+          params: ["IMPORTANT"],
+        },
+      ];
+    case "calendar":
+      return [
+        { sql: "has_inbox = 1", params: [] },
+        { sql: "(snoozed_until IS NULL OR snoozed_until <= ?)", params: [now] },
+        { sql: "has_calendar = 1", params: [] },
       ];
     default:
       if (typeof view === "string" && view.startsWith("Label_")) {
@@ -406,6 +427,107 @@ function buildViewConditions(view: ViewFilter, now: number): SqlFragment[] {
       }
       return [];
   }
+}
+
+function buildSplitRuleConditions(rule: SplitRule): SqlFragment[] {
+  const fragments: SqlFragment[] = [];
+
+  if (rule.domains?.length) {
+    const cleaned = rule.domains
+      .map((d) => d.trim().toLowerCase())
+      .filter(Boolean);
+    if (cleaned.length) {
+      const clauses = cleaned.map(() => "LOWER(from_addr) LIKE ?");
+      fragments.push({
+        sql: `(${clauses.join(" OR ")})`,
+        params: cleaned.map((d) => `%@${d}`),
+      });
+    }
+  }
+
+  if (rule.senders?.length) {
+    const cleaned = rule.senders.map((s) => s.trim()).filter(Boolean);
+    if (cleaned.length) {
+      const clauses = cleaned
+        .map(() => "(LOWER(from_addr) LIKE ? OR LOWER(from_name) LIKE ?)")
+        .join(" OR ");
+      const params: BindParam[] = [];
+      for (const s of cleaned) {
+        const needle = `%${s.toLowerCase()}%`;
+        params.push(needle, needle);
+      }
+      fragments.push({ sql: `(${clauses})`, params });
+    }
+  }
+
+  if (rule.recipients?.length) {
+    const cleaned = rule.recipients
+      .map((r) => r.trim().toLowerCase())
+      .filter(Boolean);
+    if (cleaned.length) {
+      const clauses = cleaned.map(() => "LOWER(to_addr) LIKE ?").join(" OR ");
+      fragments.push({
+        sql: `(${clauses})`,
+        params: cleaned.map((r) => `%${r}%`),
+      });
+    }
+  }
+
+  if (rule.subjectContains?.length) {
+    const cleaned = rule.subjectContains
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    if (cleaned.length) {
+      const clauses = cleaned.map(() => "LOWER(subject) LIKE ?").join(" OR ");
+      fragments.push({
+        sql: `(${clauses})`,
+        params: cleaned.map((s) => `%${s}%`),
+      });
+    }
+  }
+
+  if (rule.hasAttachment === true) {
+    fragments.push({
+      sql: "EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value = ?)",
+      params: [HAS_ATTACHMENT_LABEL],
+    });
+  } else if (rule.hasAttachment === false) {
+    fragments.push({
+      sql: "NOT EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value = ?)",
+      params: [HAS_ATTACHMENT_LABEL],
+    });
+  }
+
+  if (rule.fromMailingList === true) {
+    fragments.push({
+      sql: "(unsubscribe_url IS NOT NULL OR unsubscribe_email IS NOT NULL)",
+      params: [],
+    });
+  } else if (rule.fromMailingList === false) {
+    fragments.push({
+      sql: "(unsubscribe_url IS NULL AND unsubscribe_email IS NULL)",
+      params: [],
+    });
+  }
+
+  if (rule.hasCalendar === true) {
+    fragments.push({ sql: "has_calendar = 1", params: [] });
+  } else if (rule.hasCalendar === false) {
+    fragments.push({ sql: "has_calendar = 0", params: [] });
+  }
+
+  if (rule.gmailLabels?.length) {
+    const labels = rule.gmailLabels.filter(Boolean);
+    if (labels.length) {
+      const placeholders = labels.map(() => "?").join(", ");
+      fragments.push({
+        sql: `EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value IN (${placeholders}))`,
+        params: labels,
+      });
+    }
+  }
+
+  return fragments;
 }
 
 const EMAIL_SUMMARY_SELECT = `
@@ -533,6 +655,7 @@ export const localDb = {
     isRead?: "true" | "false";
     starred?: boolean;
     hasAttachment?: boolean;
+    splitRule?: SplitRule | null;
   }) {
     const {
       userId,
@@ -545,6 +668,7 @@ export const localDb = {
       isRead,
       starred,
       hasAttachment,
+      splitRule,
     } = params;
     const now = Date.now();
     const fragments: SqlFragment[] = [{ sql: "user_id = ?", params: [userId] }];
@@ -568,6 +692,8 @@ export const localDb = {
     }
 
     fragments.push(...buildViewConditions(view, now));
+
+    if (splitRule) fragments.push(...buildSplitRuleConditions(splitRule));
 
     if (cursor != null) fragments.push({ sql: "date < ?", params: [cursor] });
 
@@ -1345,6 +1471,107 @@ export const localDb = {
         "run",
       );
     }
+  },
+
+  async listSplitViews(userId: string): Promise<SplitViewRow[]> {
+    const res = await dbClient.exec(
+      `SELECT id, user_id AS userId, name, description, icon, color,
+              position, visible, pinned, is_system AS isSystem,
+              system_key AS systemKey, rules,
+              match_mode AS matchMode, show_in_other AS showInOther,
+              created_at AS createdAt, updated_at AS updatedAt
+       FROM split_views
+       WHERE user_id = ?
+       ORDER BY position ASC, created_at ASC`,
+      [userId],
+      "rows",
+    );
+    type Raw = Omit<SplitViewRow, "rules" | "visible" | "pinned" | "isSystem" | "showInOther"> & {
+      rules: string | null;
+      visible: number;
+      pinned: number;
+      isSystem: number;
+      showInOther: number;
+    };
+    const rows = rowsToObjects<Raw>(res);
+    return rows.map((row) => ({
+      ...row,
+      visible: Boolean(row.visible),
+      pinned: Boolean(row.pinned),
+      isSystem: Boolean(row.isSystem),
+      showInOther: Boolean(row.showInOther),
+      rules: row.rules ? (safeJsonParse<SplitRule>(row.rules) ?? null) : null,
+    }));
+  },
+
+  async upsertSplitView(view: SplitViewRow): Promise<void> {
+    await dbClient.exec(
+      `INSERT INTO split_views (
+         id, user_id, name, description, icon, color, position, visible, pinned,
+         is_system, system_key, rules, match_mode, show_in_other,
+         created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name,
+         description = excluded.description,
+         icon = excluded.icon,
+         color = excluded.color,
+         position = excluded.position,
+         visible = excluded.visible,
+         pinned = excluded.pinned,
+         is_system = excluded.is_system,
+         system_key = excluded.system_key,
+         rules = excluded.rules,
+         match_mode = excluded.match_mode,
+         show_in_other = excluded.show_in_other,
+         updated_at = excluded.updated_at`,
+      [
+        view.id,
+        view.userId,
+        view.name,
+        view.description,
+        view.icon,
+        view.color,
+        view.position,
+        view.visible ? 1 : 0,
+        view.pinned ? 1 : 0,
+        view.isSystem ? 1 : 0,
+        view.systemKey,
+        view.rules ? JSON.stringify(view.rules) : null,
+        view.matchMode,
+        view.showInOther ? 1 : 0,
+        view.createdAt,
+        view.updatedAt,
+      ],
+      "run",
+    );
+  },
+
+  async replaceSplitViews(userId: string, views: SplitViewRow[]): Promise<void> {
+    await dbClient.exec(`DELETE FROM split_views WHERE user_id = ?`, [userId], "run");
+    for (const view of views) {
+      await this.upsertSplitView(view);
+    }
+  },
+
+  async deleteSplitView(id: string, userId: string): Promise<void> {
+    await dbClient.exec(
+      `DELETE FROM split_views WHERE id = ? AND user_id = ? AND is_system = 0`,
+      [id, userId],
+      "run",
+    );
+  },
+
+  async setSplitViewVisible(
+    id: string,
+    userId: string,
+    visible: boolean,
+  ): Promise<void> {
+    await dbClient.exec(
+      `UPDATE split_views SET visible = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+      [visible ? 1 : 0, Date.now(), id, userId],
+      "run",
+    );
   },
 
   async emailCount(userId: string, mailboxId?: number): Promise<number> {

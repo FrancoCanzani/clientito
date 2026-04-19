@@ -1,9 +1,3 @@
-/**
- * In-memory lock for provider message IDs with an in-flight user mutation.
- * While an ID is locked, incoming sync writes skip mutable columns
- * (is_read, labels, snoozed_until), so optimistic state is not overwritten
- * by stale server snapshots.
- */
 const pendingCounts = new Map<string, number>();
 
 export function markPending(providerMessageIds: string[]): void {

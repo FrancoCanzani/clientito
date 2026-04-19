@@ -110,6 +110,7 @@ export const EmailRow = memo(function EmailRow({
   );
   const aiCategoryLabel = useMemo<Label | null>(() => {
     if (!email.aiCategory) return null;
+    if (email.aiCategory === "unknown") return null;
     const config = AI_CATEGORY_CHIP[email.aiCategory];
     return {
       gmailId: `AI_${email.aiCategory}`,
@@ -264,7 +265,7 @@ function EmailRowActions({
   onOpen: () => void;
   summary: string | null;
 }) {
-  const summaryText = summary?.trim() || "Summary not ready yet.";
+  const summaryText = summary?.trim() || null;
 
   return (
     <div
@@ -290,28 +291,30 @@ function EmailRowActions({
           </IconButton>
         );
       })}
-      <HoverCard openDelay={120}>
-        <HoverCardTrigger asChild>
-          <Button
-            type="button"
-            aria-label="Summary"
-            variant="ghost"
-            size="icon-sm"
-            className="font-semibold text-[10px]"
-            onClick={(event) => {
-              event.stopPropagation();
-            }}
+      {summaryText && (
+        <HoverCard openDelay={120}>
+          <HoverCardTrigger asChild>
+            <Button
+              type="button"
+              aria-label="Summary"
+              variant="ghost"
+              size="icon-sm"
+              className="font-semibold text-[10px]"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+            >
+              S
+            </Button>
+          </HoverCardTrigger>
+          <HoverCardContent
+            align="end"
+            className="w-80 text-xs leading-relaxed whitespace-pre-wrap"
           >
-            S
-          </Button>
-        </HoverCardTrigger>
-        <HoverCardContent
-          align="end"
-          className="w-80 text-xs leading-relaxed whitespace-pre-wrap"
-        >
-          {summaryText}
-        </HoverCardContent>
-      </HoverCard>
+            {summaryText}
+          </HoverCardContent>
+        </HoverCard>
+      )}
       <IconButton
         label="Open"
         shortcut="Enter"

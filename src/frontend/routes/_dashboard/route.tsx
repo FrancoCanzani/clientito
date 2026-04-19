@@ -1,5 +1,6 @@
 import { CommandPalette } from "@/components/command-palette/command-palette";
 import { KeyboardShortcutsDialog } from "@/components/keyboard-shortcuts-dialog";
+import { LoadingEmailsPending } from "@/components/loading-emails-pending";
 import { AppProviders } from "@/components/providers";
 import { InboxComposeProvider } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import { getDashboardGate } from "@/features/onboarding/dashboard-gate";
@@ -12,6 +13,8 @@ export const Route = createFileRoute("/_dashboard")({
       throw redirect({ to: "/login" });
     }
   },
+  pendingComponent: LoadingEmailsPending,
+  pendingMs: 0,
   component: DashboardLayout,
 });
 

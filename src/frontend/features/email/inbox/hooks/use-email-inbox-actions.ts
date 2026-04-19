@@ -173,8 +173,8 @@ export function useEmailInboxActions({
 
       if (LIST_CHANGING_ACTIONS.has(action)) {
         const idSet = new Set(ids);
-        queryClient.setQueryData<InfiniteData<EmailListPage> | undefined>(
-          queryKeys.emails.list(view, mailboxId),
+        queryClient.setQueriesData<InfiniteData<EmailListPage> | undefined>(
+          { queryKey: queryKeys.emails.list(view, mailboxId) },
           (current) => removeIdsFromInfiniteData(current, idSet),
         );
       }

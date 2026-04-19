@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { signIn } from "@/lib/auth-client";
 import { CircleNotchIcon, GoogleLogoIcon } from "@phosphor-icons/react";
 import { useMutation } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 const POLICY_LINKS = ["Privacy", "Terms", "Security"];
@@ -12,8 +12,6 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginRoute() {
-  const navigate = useNavigate();
-
   const signInMutation = useMutation({
     mutationFn: async () => {
       const result = await signIn.social({
@@ -24,9 +22,6 @@ function LoginRoute() {
       if (result?.error) {
         throw new Error(result.error.message || "Google sign in failed.");
       }
-    },
-    onSuccess: () => {
-      navigate({ to: "/" });
     },
     onError: (error) => {
       toast.error(error.message);

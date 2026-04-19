@@ -15,6 +15,13 @@
       "when": 1776197296414,
       "tag": "0001_pale_vulture",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1776622427218,
+      "tag": "0002_omniscient_dazzler",
+      "breakpoints": true
     }
   ]
 }

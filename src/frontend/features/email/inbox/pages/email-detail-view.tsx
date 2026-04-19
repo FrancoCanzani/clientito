@@ -15,6 +15,7 @@ import type {
 } from "@/features/email/inbox/types";
 import { buildForwardedEmailHtml } from "@/features/email/inbox/utils/build-forwarded-html";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
+import { isEmailListInfiniteData } from "@/features/email/inbox/utils/email-list-cache";
 import { clearFocusedEmail, setFocusedEmail } from "@/hooks/use-focused-email";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { queryKeys } from "@/lib/query-keys";
@@ -79,13 +80,22 @@ export function EmailDetailView({
   ]);
 
   const orderedEmails = useMemo(() => {
-    const cached = queryClient.getQueryData<InfiniteData<EmailListPage>>([
-      "emails",
-      view,
-      mailboxId,
-    ]);
-    return cached?.pages.flatMap((page) => page.emails) ?? [];
-  }, [queryClient, mailboxId, view]);
+    const snapshots = queryClient.getQueriesData<InfiniteData<EmailListPage>>({
+      queryKey: queryKeys.emails.list(view, mailboxId),
+    });
+    const candidateLists = snapshots
+      .map(([, data]) => data)
+      .filter((data): data is InfiniteData<EmailListPage> =>
+        isEmailListInfiniteData(data),
+      )
+      .map((data) => data.pages.flatMap((page) => page.emails))
+      .filter((emails) => emails.length > 0);
+
+    const containingCurrent = candidateLists.find((emails) =>
+      emails.some((item) => item.id === emailId),
+    );
+    return containingCurrent ?? candidateLists[0] ?? [];
+  }, [queryClient, mailboxId, view, emailId]);
 
   const orderedIds = orderedEmails.map((item) => item.id);
   const orderedEmailById = new Map(
@@ -205,7 +215,15 @@ export function EmailDetailView({
       enabled: hasNext,
       onKeyDown: () => goToEmail("next"),
     },
+    ArrowDown: {
+      enabled: hasNext,
+      onKeyDown: () => goToEmail("next"),
+    },
     k: {
+      enabled: hasPrev,
+      onKeyDown: () => goToEmail("prev"),
+    },
+    ArrowUp: {
       enabled: hasPrev,
       onKeyDown: () => goToEmail("prev"),
     },

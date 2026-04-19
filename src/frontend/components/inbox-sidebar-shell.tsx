@@ -198,7 +198,6 @@ function getNavTo(
 
 const NAV_ITEMS = [
   { view: "inbox", icon: TrayIcon, label: "Inbox" },
-  { view: "important", icon: TrayIcon, label: "Important" },
   { view: "starred", icon: StarIcon, label: "Starred" },
   { view: "archived", icon: CheckIcon, label: "Done" },
   { view: "sent", icon: PaperPlaneTiltIcon, label: "Sent" },
