@@ -51,23 +51,23 @@
 	"ai": {
 		"binding": "AI"
 	},
-		"d1_databases": [
-			{
-				"binding": "DB",
-				"database_name": "petit-db",
-				"database_id": "de15a119-b406-4b57-9158-063f939849fe",
-				"migrations_dir": "drizzle"
-			}
-		],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "petit-db",
+			"database_id": "05ba1e8d-3319-49b6-b0ed-90a27c5f0dc0",
+			"migrations_dir": "drizzle"
+		}
+	],
 	"r2_buckets": [
 		{
 			"binding": "ATTACHMENTS",
 			"bucket_name": "petit-attachments"
 		}
 	],
-		"vars": {
-			"BETTER_AUTH_URL": "https://petit.francocanzani.workers.dev"
-		},
+	"vars": {
+		"BETTER_AUTH_URL": "https://petit.francocanzani.workers.dev"
+	},
 	"triggers": {
 		"crons": [
 			"*/1 * * * *",
@@ -76,7 +76,10 @@
 	},
 	"queues": {
 		"producers": [
-			{ "queue": "email-label-mutations", "binding": "EMAIL_MUTATIONS_QUEUE" }
+			{
+				"queue": "email-label-mutations",
+				"binding": "EMAIL_MUTATIONS_QUEUE"
+			}
 		],
 		"consumers": [
 			{
