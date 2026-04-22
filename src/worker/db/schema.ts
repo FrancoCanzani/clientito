@@ -76,6 +76,37 @@ export const scheduledEmails = sqliteTable(
   ],
 );
 
+export type TrustEntityType = "sender" | "domain";
+export type TrustLevel = "trusted" | "blocked";
+
+export const trustEntities = sqliteTable(
+  "trust_entities",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mailboxId: integer("mailbox_id")
+      .notNull()
+      .references(() => mailboxes.id, { onDelete: "cascade" }),
+    entityType: text("entity_type").$type<TrustEntityType>().notNull(),
+    entityValue: text("entity_value").notNull(),
+    trustLevel: text("trust_level").$type<TrustLevel>().notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("trust_entities_unique_entity_idx").on(
+      table.userId,
+      table.mailboxId,
+      table.entityType,
+      table.entityValue,
+    ),
+    index("trust_entities_user_mailbox_idx").on(table.userId, table.mailboxId),
+    index("trust_entities_level_idx").on(table.trustLevel),
+  ],
+);
+
 export type SplitRule = {
   domains?: string[];
   senders?: string[];
@@ -83,7 +114,6 @@ export type SplitRule = {
   subjectContains?: string[];
   hasAttachment?: boolean | null;
   fromMailingList?: boolean | null;
-  hasCalendar?: boolean | null;
   gmailLabels?: string[];
 };
 

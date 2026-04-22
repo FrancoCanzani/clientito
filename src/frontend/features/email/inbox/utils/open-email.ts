@@ -93,6 +93,8 @@ export function openEmail(
         mailboxId: routeMailboxId,
         view: options?.context,
       }),
+    staleTime: 60_000,
+    gcTime: 2 * 60_000,
   });
 
   const context = options?.context ?? "inbox";

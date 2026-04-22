@@ -1,10 +1,19 @@
-import { CommandPalette } from "@/components/command-palette/command-palette";
-import { KeyboardShortcutsDialog } from "@/components/keyboard-shortcuts-dialog";
 import { LoadingEmailsPending } from "@/components/loading-emails-pending";
 import { AppProviders } from "@/components/providers";
 import { InboxComposeProvider } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import { getDashboardGate } from "@/features/onboarding/dashboard-gate";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { Suspense, lazy } from "react";
+
+const CommandPalette = lazy(async () => {
+  const mod = await import("@/components/command-palette/command-palette");
+  return { default: mod.CommandPalette };
+});
+
+const KeyboardShortcutsDialog = lazy(async () => {
+  const mod = await import("@/components/keyboard-shortcuts-dialog");
+  return { default: mod.KeyboardShortcutsDialog };
+});
 
 export const Route = createFileRoute("/_dashboard")({
   beforeLoad: async () => {
@@ -26,8 +35,10 @@ function DashboardLayout() {
           <main className="liquid-glass relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
             <Outlet />
           </main>
-          <CommandPalette />
-          <KeyboardShortcutsDialog />
+          <Suspense fallback={null}>
+            <CommandPalette />
+            <KeyboardShortcutsDialog />
+          </Suspense>
         </div>
       </InboxComposeProvider>
     </AppProviders>

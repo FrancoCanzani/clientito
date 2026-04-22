@@ -46,7 +46,7 @@ export default function DraftsPage() {
   };
 
   return (
-    <div className="w-full">
+    <>
       <PageHeader
         title={
           <div className="flex items-center gap-2">
@@ -105,6 +105,6 @@ export default function DraftsPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }

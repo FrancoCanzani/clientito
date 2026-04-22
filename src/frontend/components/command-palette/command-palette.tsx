@@ -15,7 +15,7 @@ export function CommandPalette() {
   const state = useCommandPaletteState();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { commands, ctx } = useAllCommands();
+  const { commands, ctx } = useAllCommands(state.open);
 
   const services: CommandServices = useMemo(
     () => ({

@@ -20,13 +20,6 @@ const SYSTEM_SPLITS: Array<{
     rules: { gmailLabels: ["IMPORTANT"] },
     visibleByDefault: false,
   },
-  {
-    systemKey: "calendar",
-    name: "Calendar",
-    description: "Emails with a calendar invite (.ics) attached.",
-    rules: { hasCalendar: true },
-    visibleByDefault: true,
-  },
 ];
 
 const splitRuleSchema: z.ZodType<SplitRule> = z.object({
@@ -36,7 +29,6 @@ const splitRuleSchema: z.ZodType<SplitRule> = z.object({
   subjectContains: z.array(z.string()).optional(),
   hasAttachment: z.boolean().nullable().optional(),
   fromMailingList: z.boolean().nullable().optional(),
-  hasCalendar: z.boolean().nullable().optional(),
   gmailLabels: z.array(z.string()).optional(),
 });
 
@@ -67,10 +59,24 @@ async function ensureSystemSplits(
   db: AppRouteEnv["Variables"]["db"],
   userId: string,
 ): Promise<void> {
-  const existing = await db
+  const existingRaw = await db
     .select()
     .from(splitViews)
     .where(eq(splitViews.userId, userId));
+  const allowedKeys = new Set(SYSTEM_SPLITS.map((split) => split.systemKey));
+
+  // Drop stale system splits that are no longer part of the built-in list.
+  for (const row of existingRaw) {
+    if (!row.isSystem || !row.systemKey) continue;
+    if (allowedKeys.has(row.systemKey)) continue;
+    await db
+      .delete(splitViews)
+      .where(and(eq(splitViews.id, row.id), eq(splitViews.userId, userId)));
+  }
+
+  const existing = existingRaw.filter(
+    (row) => !row.isSystem || !row.systemKey || allowedKeys.has(row.systemKey),
+  );
   const byKey = new Map(
     existing
       .filter((v) => v.systemKey != null)

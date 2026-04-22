@@ -59,9 +59,7 @@ export function ComposeDockedToolbar({
 
   const toolbarGroups = useMemo(
     () =>
-      editor
-        ? getComposeToolbarGroups({ editor, onOpenLink: openLink })
-        : [],
+      editor ? getComposeToolbarGroups({ editor, onOpenLink: openLink }) : [],
     [editor, openLink],
   );
 
@@ -98,12 +96,13 @@ export function ComposeDockedToolbar({
 
   if (!editor) return null;
 
-  const canLink = (state?.hasSelection ?? false) || (state?.linkActive ?? false);
+  const canLink =
+    (state?.hasSelection ?? false) || (state?.linkActive ?? false);
 
   return (
     <div
       className={cn(
-        "-mx-2 mb-1 flex flex-wrap items-center gap-0.5 border-t px-2 py-1",
+        "-mx-2 mb-1 flex flex-wrap items-center gap-0.5 border-t border-border/50 px-2 py-1",
         className,
       )}
     >

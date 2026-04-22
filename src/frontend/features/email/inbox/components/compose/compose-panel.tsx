@@ -76,8 +76,7 @@ function ComposePanelBody({
       .toString(36)
       .slice(2, 8)}`;
     const composeKey = await compose.saveDraftNow(handoffComposeKey);
-    // Move the draft from the panel key to the full-page key so reopening
-    // the small composer starts clean.
+
     await compose.clearDraft();
     onOpenChange(false);
     navigate({

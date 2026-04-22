@@ -8,6 +8,7 @@ import { queryClient } from "@/lib/query-client";
 import { queryKeys } from "@/lib/query-keys";
 import { isEmailListInfiniteData } from "./utils/email-list-cache";
 import type {
+  CalendarInviteResponseStatus,
   EmailDetailItem,
   EmailListItem,
   EmailListPage,
@@ -428,4 +429,35 @@ export async function uploadAttachments(
   }
 
   return response.json();
+}
+
+export type CalendarInviteResponseResult = {
+  inviteUid: string;
+  responseStatus: "accepted" | "declined";
+  selfResponseStatus: CalendarInviteResponseStatus | null;
+};
+
+export async function respondToCalendarInvite(input: {
+  mailboxId: number;
+  inviteUid: string;
+  response: "accepted" | "declined";
+}): Promise<CalendarInviteResponseResult> {
+  const response = await fetch("/api/inbox/calendar/respond", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  const json = (await response.json().catch(() => null)) as
+    | {
+        data?: CalendarInviteResponseResult;
+        error?: string;
+      }
+    | null;
+
+  if (!response.ok || !json?.data) {
+    throw new Error(json?.error ?? "Failed to respond to calendar invite");
+  }
+
+  return json.data;
 }

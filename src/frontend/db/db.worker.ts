@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS emails (
   inline_attachments TEXT,
   attachments TEXT,
   has_calendar INTEGER NOT NULL DEFAULT 0,
+  is_gatekept INTEGER NOT NULL DEFAULT 0,
   ai_category TEXT,
   ai_confidence REAL,
   ai_reason TEXT,
@@ -173,6 +174,7 @@ async function initDb(): Promise<void> {
   ensureEmailColumn(db, "inline_attachments", "TEXT");
   ensureEmailColumn(db, "attachments", "TEXT");
   ensureEmailColumn(db, "has_calendar", "INTEGER");
+  ensureEmailColumn(db, "is_gatekept", "INTEGER");
   ensureEmailColumn(db, "ai_category", "TEXT");
   ensureEmailColumn(db, "ai_confidence", "REAL");
   ensureEmailColumn(db, "ai_reason", "TEXT");

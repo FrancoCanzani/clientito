@@ -5,6 +5,7 @@ import { queryClient } from "@/lib/query-client";
 import { queryKeys } from "@/lib/query-keys";
 import { asyncQueue } from "@tanstack/pacer/async-queuer";
 import type {
+  CalendarInvitePreview,
   ContactSuggestion,
   DraftItem,
   EmailDetailItem,
@@ -95,6 +96,8 @@ type PulledEmail = {
   inlineAttachments?: PulledInlineAttachment[];
   attachments?: PulledAttachment[];
 };
+
+type GatekeeperTrustLevel = "trusted" | "blocked" | null;
 
 type ClassifyThreadPayload = {
   thread: {
@@ -201,6 +204,116 @@ function inferHasCalendar(email: PulledEmail): boolean {
     hasCalendarBodySignal(email.bodyText) ||
     hasCalendarBodySignal(email.bodyHtml)
   );
+}
+
+function normalizeSender(fromAddr: string | null | undefined): string | null {
+  if (!fromAddr) return null;
+  const normalized = fromAddr.trim().toLowerCase();
+  if (!normalized || !normalized.includes("@")) return null;
+  return normalized;
+}
+
+function gatekeeperActivatedAtKey(mailboxId: number): string {
+  return `gatekeeperActivatedAt:${mailboxId}`;
+}
+
+async function resolveGatekeeperActivatedAt(mailboxId: number): Promise<number> {
+  const key = gatekeeperActivatedAtKey(mailboxId);
+  const raw = await localDb.getMeta(key);
+  const parsed = raw ? Number(raw) : NaN;
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+
+  const now = Date.now();
+  await localDb.setMeta(key, String(now));
+  return now;
+}
+
+async function resolveGatekeeperTrust(
+  pulled: PulledEmail[],
+  mailboxId: number,
+  userId: string,
+): Promise<Map<string, GatekeeperTrustLevel>> {
+  const receivedInboxSenders = Array.from(
+    new Set(
+      pulled
+        .filter(
+          (email) => email.direction === "received" && email.labelIds.includes("INBOX"),
+        )
+        .map((email) => normalizeSender(email.fromAddr))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  if (receivedInboxSenders.length === 0) return new Map();
+
+  const map = new Map<string, GatekeeperTrustLevel>();
+  let serverResolveFailed = false;
+
+  try {
+    const response = await fetch("/api/inbox/gatekeeper/resolve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mailboxId,
+        senders: receivedInboxSenders,
+      }),
+    });
+
+    const payload = (await response.json().catch(() => null)) as
+      | {
+          data?: {
+            trust?: Array<{
+              sender: string;
+              trustLevel: GatekeeperTrustLevel;
+            }>;
+          };
+        }
+      | null;
+
+    const trust = payload?.data?.trust;
+    if (!response.ok || !Array.isArray(trust)) {
+      serverResolveFailed = true;
+    } else {
+      const serverResolved = new Map(
+        trust
+          .map((entry) => [normalizeSender(entry.sender), entry.trustLevel] as const)
+          .filter(
+            (entry): entry is [string, GatekeeperTrustLevel] =>
+              typeof entry[0] === "string",
+          ),
+      );
+      for (const [sender, trustLevel] of serverResolved) {
+        map.set(sender, trustLevel);
+      }
+    }
+  } catch {
+    serverResolveFailed = true;
+  }
+
+  try {
+    const knownSenders = await localDb.getKnownSenders({
+      userId,
+      mailboxId,
+      senders: receivedInboxSenders,
+    });
+    for (const sender of knownSenders) {
+      if (!map.has(sender)) {
+        map.set(sender, "trusted");
+      }
+    }
+  } catch {
+    // Ignore fallback errors.
+  }
+
+  if (serverResolveFailed) {
+    for (const sender of receivedInboxSenders) {
+      if (!map.has(sender)) {
+        map.set(sender, "trusted");
+      }
+    }
+  }
+
+  return map;
 }
 
 function buildClassificationTasks(
@@ -382,6 +495,7 @@ function scheduleClassificationDeferredRetry(task: ThreadClassificationTask): vo
   const { classificationKey } = task;
   const attempt = classificationDeferredRetryAttempts.get(classificationKey) ?? 0;
   if (attempt >= CLASSIFICATION_DEFERRED_RETRY_DELAYS_MS.length) {
+    classificationDeferredRetryAttempts.delete(classificationKey);
     return;
   }
   if (classificationDeferredRetryTimers.has(classificationKey)) {
@@ -443,8 +557,22 @@ function pulledToRow(
   email: PulledEmail,
   userId: string,
   mailboxId: number,
+  senderTrust: GatekeeperTrustLevel,
+  gatekeeperActivatedAt: number,
 ): EmailInsert {
   const labels = new Set(email.labelIds);
+  if (senderTrust === "blocked") {
+    labels.delete("INBOX");
+    labels.delete("UNREAD");
+    labels.add("TRASH");
+  }
+  const labelIds = Array.from(labels);
+  const isGatekept =
+    senderTrust === null &&
+    email.direction === "received" &&
+    labels.has("INBOX") &&
+    email.date >= gatekeeperActivatedAt;
+
   return {
     userId,
     mailboxId,
@@ -459,12 +587,12 @@ function pulledToRow(
     date: email.date,
     direction: email.direction,
     isRead: email.isRead,
-    labelIds: JSON.stringify(email.labelIds),
-    hasInbox: labels.has("INBOX"),
-    hasSent: labels.has("SENT"),
-    hasTrash: labels.has("TRASH"),
-    hasSpam: labels.has("SPAM"),
-    hasStarred: labels.has("STARRED"),
+    labelIds: JSON.stringify(labelIds),
+    hasInbox: labelIds.includes("INBOX"),
+    hasSent: labelIds.includes("SENT"),
+    hasTrash: labelIds.includes("TRASH"),
+    hasSpam: labelIds.includes("SPAM"),
+    hasStarred: labelIds.includes("STARRED"),
     unsubscribeUrl: email.unsubscribeUrl,
     unsubscribeEmail: email.unsubscribeEmail,
     snoozedUntil: null,
@@ -479,6 +607,7 @@ function pulledToRow(
         ? JSON.stringify(email.attachments)
         : null,
     hasCalendar: inferHasCalendar(email),
+    isGatekept,
     aiCategory: null,
     aiConfidence: null,
     aiReason: null,
@@ -508,8 +637,21 @@ async function persistEmails(
   mailboxId: number,
 ): Promise<EmailListItem[]> {
   if (pulled.length === 0) return [];
-  const rows = pulled.map((e) => pulledToRow(e, userId, mailboxId));
+  const trustBySender = await resolveGatekeeperTrust(pulled, mailboxId, userId);
+  const gatekeeperActivatedAt = await resolveGatekeeperActivatedAt(mailboxId);
+  const rows = pulled.map((e) =>
+    pulledToRow(
+      e,
+      userId,
+      mailboxId,
+      trustBySender.get(normalizeSender(e.fromAddr) ?? "") ?? null,
+      gatekeeperActivatedAt,
+    ),
+  );
   await localDb.insertEmails(rows);
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.gatekeeper.pending(mailboxId),
+  });
   const providerIds = pulled.map((e) => e.providerMessageId);
   const hydrated = await localDb.getEmailsByProviderMessageIds(userId, providerIds);
   const byProviderId = new Map(hydrated.map((r) => [r.providerMessageId, r]));
@@ -764,6 +906,33 @@ export async function fetchEmailDetail(
   const local = await localDb.getEmailDetail(userId, numericId);
   if (!local) throw new Error("Email not found in local database");
   return local;
+}
+
+export async function fetchCalendarInvitePreview(params: {
+  mailboxId: number;
+  providerMessageId: string;
+}): Promise<CalendarInvitePreview | null> {
+  const response = await fetch("/api/inbox/calendar/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mailboxId: params.mailboxId,
+      providerMessageId: params.providerMessageId,
+    }),
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | {
+        error?: string;
+        data?: { invite?: CalendarInvitePreview | null };
+      }
+    | null;
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? "Failed to load calendar invite preview");
+  }
+
+  return payload?.data?.invite ?? null;
 }
 
 export async function fetchEmailThread(

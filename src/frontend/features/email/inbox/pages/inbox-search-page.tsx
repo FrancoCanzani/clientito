@@ -83,6 +83,7 @@ export default function InboxSearchPage() {
       }),
     getNextPageParam: (lastPage) => lastPage?.cursor ?? undefined,
     staleTime: 30_000,
+    gcTime: 60_000,
   });
 
   const suggestionsQuery = useQuery({
@@ -99,6 +100,7 @@ export default function InboxSearchPage() {
       }),
     initialData: suggestions,
     staleTime: 30_000,
+    gcTime: 60_000,
   });
 
   const results = useMemo(

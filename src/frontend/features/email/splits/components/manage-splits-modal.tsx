@@ -89,12 +89,21 @@ function SplitListView({
 }: {
   onCreateClick: () => void;
 }) {
+  const systemDefs = [
+    {
+      systemKey: "important",
+      name: "Important",
+      description: "Emails Gmail marks as important.",
+    },
+  ] as const;
   const { data: splits } = useSplitViews();
   const sorted = (splits ?? [])
     .slice()
     .sort((a, b) => a.position - b.position || a.createdAt - b.createdAt);
-  const systemSplits = sorted.filter(
-    (s): s is SplitViewRow & { systemKey: string } => s.isSystem && !!s.systemKey,
+  const systemByKey = new Map(
+    sorted
+      .filter((s): s is SplitViewRow & { systemKey: string } => s.isSystem && !!s.systemKey)
+      .map((s) => [s.systemKey, s]),
   );
   const userSplits = sorted.filter((s) => !s.isSystem);
 
@@ -106,8 +115,12 @@ function SplitListView({
             System
           </div>
           <ul className="divide-y">
-            {systemSplits.map((split) => (
-              <SystemSplitRow key={split.id} split={split} />
+            {systemDefs.map((def) => (
+              <SystemSplitRow
+                key={def.systemKey}
+                def={def}
+                row={systemByKey.get(def.systemKey) ?? null}
+              />
             ))}
           </ul>
         </div>
@@ -140,20 +153,23 @@ function SplitListView({
 }
 
 function SystemSplitRow({
-  split,
+  def,
+  row,
 }: {
-  split: SplitViewRow & { systemKey: string };
+  def: { systemKey: string; name: string; description: string };
+  row: SplitViewRow | null;
 }) {
-  const [visible, setVisible] = useState(split.visible);
+  const [visible, setVisible] = useState(row?.visible ?? false);
   const [busy, setBusy] = useState(false);
+  const displayVisible = row?.visible ?? visible;
 
   const toggle = async () => {
     if (busy) return;
-    const next = !visible;
+    const next = !displayVisible;
     setVisible(next);
     setBusy(true);
     try {
-      await setSystemSplitVisible(split.systemKey, next);
+      await setSystemSplitVisible(def.systemKey, next);
     } catch {
       setVisible(!next);
     } finally {
@@ -165,11 +181,13 @@ function SystemSplitRow({
     <li className="flex items-center gap-3 px-4 py-3">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">{split.name}</span>
+          <span className="text-sm font-medium">{row?.name ?? def.name}</span>
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">{split.description}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {row?.description ?? def.description}
+        </p>
       </div>
-      <Toggle checked={visible} onChange={toggle} disabled={busy} />
+      <Toggle checked={displayVisible} onChange={toggle} disabled={busy} />
     </li>
   );
 }

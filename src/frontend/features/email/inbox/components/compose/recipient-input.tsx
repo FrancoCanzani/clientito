@@ -125,6 +125,7 @@ export function RecipientInput({
     queryFn: () => fetchContactSuggestions(debouncedQuery),
     enabled: debouncedQuery.length >= 2,
     staleTime: 30_000,
+    gcTime: 60_000,
   });
 
   const suggestions = data ?? [];

@@ -9,6 +9,8 @@ export const queryKeys = {
       ["emails", view, mailboxId, "__base__"] as const,
     detail: (emailId: string) => ["email-detail", emailId] as const,
     thread: (threadId: string) => ["email-thread", threadId] as const,
+    calendarInvitePreview: (mailboxId: number, providerMessageId: string) =>
+      ["calendar-invite-preview", mailboxId, providerMessageId] as const,
     search: {
       results: (
         query: string,
@@ -39,6 +41,9 @@ export const queryKeys = {
   ],
   labels: (mailboxId: number) => ["labels", mailboxId] as const,
   splitViews: () => ["split-views"] as const,
+  gatekeeper: {
+    pending: (mailboxId: number) => ["gatekeeper", "pending", mailboxId] as const,
+  },
   accounts: () => ["accounts"] as const,
   contactSuggestions: (query: string) =>
     ["contact-suggestions", query] as const,

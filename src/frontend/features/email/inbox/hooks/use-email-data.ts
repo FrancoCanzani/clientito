@@ -61,6 +61,7 @@ export function useEmailData({
       : {}),
     getNextPageParam: (lastPage) => lastPage?.cursor ?? undefined,
     staleTime: 5_000,
+    gcTime: 2 * 60_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });

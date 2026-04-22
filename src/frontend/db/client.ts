@@ -32,7 +32,6 @@ type ViewFilter =
   | "archived"
   | "starred"
   | "important"
-  | "calendar"
   | (string & {});
 
 type BindParam = string | number | boolean | null | Uint8Array;
@@ -69,6 +68,7 @@ type EmailRowDb = {
   aiClassifiedAt: number | null;
   aiClassificationKey: string | null;
   hasCalendar: number;
+  isGatekept: number;
   bodyText?: string | null;
   bodyHtml?: string | null;
   inlineAttachments?: string | null;
@@ -85,6 +85,8 @@ const STANDARD_LABELS = {
 } as const;
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
+const LEGACY_PARTIAL_CLASSIFICATION_REASON =
+  "Model classified thread using partial signal.";
 
 const snakeToCamel = (s: string) =>
   s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
@@ -410,12 +412,6 @@ function buildViewConditions(view: ViewFilter, now: number): SqlFragment[] {
           params: ["IMPORTANT"],
         },
       ];
-    case "calendar":
-      return [
-        { sql: "has_inbox = 1", params: [] },
-        { sql: "(snoozed_until IS NULL OR snoozed_until <= ?)", params: [now] },
-        { sql: "has_calendar = 1", params: [] },
-      ];
     default:
       if (typeof view === "string" && view.startsWith("Label_")) {
         return [
@@ -510,12 +506,6 @@ function buildSplitRuleConditions(rule: SplitRule): SqlFragment[] {
     });
   }
 
-  if (rule.hasCalendar === true) {
-    fragments.push({ sql: "has_calendar = 1", params: [] });
-  } else if (rule.hasCalendar === false) {
-    fragments.push({ sql: "has_calendar = 0", params: [] });
-  }
-
   if (rule.gmailLabels?.length) {
     const labels = rule.gmailLabels.filter(Boolean);
     if (labels.length) {
@@ -555,6 +545,7 @@ const EMAIL_SUMMARY_SELECT = `
   unsubscribe_email,
   snoozed_until,
   has_calendar,
+  is_gatekept,
   ai_category,
   ai_confidence,
   ai_reason,
@@ -566,6 +557,10 @@ const EMAIL_SUMMARY_SELECT = `
 
 function toEmailListItem(row: EmailRowDb) {
   const labelIds = parseLabelIds(row.labelIds);
+  const aiReason =
+    row.aiReason?.trim() === LEGACY_PARTIAL_CLASSIFICATION_REASON
+      ? null
+      : row.aiReason ?? null;
   return {
     id: String(row.id),
     mailboxId: row.mailboxId,
@@ -587,6 +582,7 @@ function toEmailListItem(row: EmailRowDb) {
     unsubscribeEmail: row.unsubscribeEmail,
     snoozedUntil: row.snoozedUntil,
     hasCalendar: toBool(row.hasCalendar),
+    isGatekept: toBool(row.isGatekept),
     aiCategory: row.aiCategory ?? null,
     aiConfidence:
       typeof row.aiConfidence === "number"
@@ -594,7 +590,7 @@ function toEmailListItem(row: EmailRowDb) {
         : row.aiConfidence == null
           ? null
           : Number(row.aiConfidence),
-    aiReason: row.aiReason ?? null,
+    aiReason,
     aiSummary: row.aiSummary ?? null,
     aiDraftReply: row.aiDraftReply ?? null,
     aiClassifiedAt: row.aiClassifiedAt ?? null,
@@ -692,6 +688,9 @@ export const localDb = {
     }
 
     fragments.push(...buildViewConditions(view, now));
+    if (view === "inbox" || view === "important") {
+      fragments.push({ sql: "is_gatekept = 0", params: [] });
+    }
 
     if (splitRule) fragments.push(...buildSplitRuleConditions(splitRule));
 
@@ -742,6 +741,117 @@ export const localDb = {
       count: row?.count ?? 0,
       oldestDateMs: row?.oldest ?? null,
     };
+  },
+
+  async getGatekeeperPending(params: {
+    userId: string;
+    mailboxId: number;
+    limit?: number;
+  }) {
+    const { userId, mailboxId, limit = 30 } = params;
+    const res = await dbClient.exec(
+      `SELECT ${EMAIL_SUMMARY_SELECT}
+       FROM emails
+       WHERE user_id = ? AND mailbox_id = ? AND has_inbox = 1 AND is_gatekept = 1
+       ORDER BY date DESC
+       LIMIT ?`,
+      [userId, mailboxId, limit],
+      "rows",
+    );
+    return rowsToObjects<EmailRowDb>(res).map(toEmailListItem);
+  },
+
+  async getGatekeeperPendingCount(userId: string, mailboxId: number): Promise<number> {
+    const res = await dbClient.exec(
+      `SELECT count(*) AS count
+       FROM emails
+       WHERE user_id = ? AND mailbox_id = ? AND has_inbox = 1 AND is_gatekept = 1`,
+      [userId, mailboxId],
+      "get",
+    );
+    const row = firstRow<{ count: number }>(res);
+    return Number(row?.count ?? 0);
+  },
+
+  async applyGatekeeperDecision(params: {
+    userId: string;
+    mailboxId: number;
+    fromAddr: string;
+    decision: "accept" | "reject";
+  }): Promise<void> {
+    const { userId, mailboxId, fromAddr, decision } = params;
+    const normalized = fromAddr.trim().toLowerCase();
+    if (!normalized) return;
+
+    const res = await dbClient.exec(
+      `SELECT id, label_ids
+       FROM emails
+       WHERE user_id = ? AND mailbox_id = ? AND LOWER(from_addr) = ? AND is_gatekept = 1`,
+      [userId, mailboxId, normalized],
+      "rows",
+    );
+    const rows = rowsToObjects<{ id: number; labelIds: string | null }>(res);
+    if (rows.length === 0) return;
+
+    for (const row of rows) {
+      if (decision === "accept") {
+        await dbClient.exec(
+          `UPDATE emails SET is_gatekept = 0 WHERE id = ?`,
+          [row.id],
+          "run",
+        );
+        continue;
+      }
+
+      const nextLabelIds = parseLabelIds(row.labelIds).filter(
+        (labelId) => labelId !== STANDARD_LABELS.INBOX && labelId !== STANDARD_LABELS.UNREAD,
+      );
+      if (!nextLabelIds.includes(STANDARD_LABELS.TRASH)) {
+        nextLabelIds.push(STANDARD_LABELS.TRASH);
+      }
+      const bools = labelBooleans(nextLabelIds);
+
+      await dbClient.exec(
+        `UPDATE emails
+         SET is_gatekept = 0, label_ids = ?, has_inbox = ?, has_sent = ?, has_trash = ?, has_spam = ?, has_starred = ?
+         WHERE id = ?`,
+        [
+          JSON.stringify(nextLabelIds),
+          bools.hasInbox ? 1 : 0,
+          bools.hasSent ? 1 : 0,
+          bools.hasTrash ? 1 : 0,
+          bools.hasSpam ? 1 : 0,
+          bools.hasStarred ? 1 : 0,
+          row.id,
+        ],
+        "run",
+      );
+    }
+  },
+
+  async reconcileGatekeeperKnownSenders(params: {
+    userId: string;
+    mailboxId: number;
+  }): Promise<void> {
+    const { userId, mailboxId } = params;
+    await dbClient.exec(
+      `UPDATE emails AS pending
+       SET is_gatekept = 0
+       WHERE pending.user_id = ?
+         AND pending.mailbox_id = ?
+         AND pending.is_gatekept = 1
+         AND EXISTS (
+           SELECT 1
+           FROM emails AS known
+           WHERE known.user_id = pending.user_id
+             AND known.mailbox_id = pending.mailbox_id
+             AND known.direction = ?
+             AND known.is_gatekept = 0
+             AND LOWER(known.from_addr) = LOWER(pending.from_addr)
+         )`,
+      [userId, mailboxId, "received"],
+      "run",
+    );
   },
 
   async getEmailDetail(userId: string, emailId: number) {
@@ -921,8 +1031,8 @@ export const localDb = {
       id, user_id, mailbox_id, provider_message_id, thread_id, from_addr, from_name,
       to_addr, cc_addr, subject, snippet, body_text, body_html, date, direction,
       is_read, label_ids, has_inbox, has_sent, has_trash, has_spam, has_starred,
-      unsubscribe_url, unsubscribe_email, snoozed_until, inline_attachments, attachments, has_calendar, created_at`;
-    const TUPLE = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+      unsubscribe_url, unsubscribe_email, snoozed_until, inline_attachments, attachments, has_calendar, is_gatekept, created_at`;
+    const TUPLE = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     // Fields that ARE safe to overwrite (immutable from the user's point of view).
     const CONFLICT_SAFE = `
@@ -936,7 +1046,8 @@ export const localDb = {
       body_html = excluded.body_html,
       inline_attachments = excluded.inline_attachments,
       attachments = excluded.attachments,
-      has_calendar = excluded.has_calendar`;
+      has_calendar = excluded.has_calendar,
+      is_gatekept = excluded.is_gatekept`;
     // Fields we overwrite only when the row has no pending local mutation.
     const CONFLICT_MUTABLE = `
       is_read = excluded.is_read,
@@ -980,6 +1091,7 @@ export const localDb = {
         row.inlineAttachments ?? null,
         row.attachments ?? null,
         boolParam(row.hasCalendar ?? false),
+        boolParam(row.isGatekept ?? false),
         row.createdAt,
       ];
     }
@@ -1301,6 +1413,43 @@ export const localDb = {
       all.push(...rowsToObjects<EmailRowDb>(res));
     }
     return all.map(toEmailListItem);
+  },
+
+  async getKnownSenders(params: {
+    userId: string;
+    mailboxId: number;
+    senders: string[];
+  }): Promise<string[]> {
+    const { userId, mailboxId, senders } = params;
+    const normalized = Array.from(
+      new Set(
+        senders.map((sender) => sender.trim().toLowerCase()).filter(Boolean),
+      ),
+    );
+    if (normalized.length === 0) return [];
+
+    const CHUNK = 80;
+    const known = new Set<string>();
+
+    for (let i = 0; i < normalized.length; i += CHUNK) {
+      const chunk = normalized.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => "?").join(", ");
+      const res = await dbClient.exec(
+        `SELECT DISTINCT LOWER(from_addr) AS from_addr
+         FROM emails
+         WHERE user_id = ? AND mailbox_id = ? AND direction = ? AND is_gatekept = 0
+           AND LOWER(from_addr) IN (${placeholders})`,
+        [userId, mailboxId, "received", ...chunk],
+        "rows",
+      );
+
+      const rows = rowsToObjects<{ fromAddr: string }>(res);
+      for (const row of rows) {
+        if (row.fromAddr) known.add(row.fromAddr);
+      }
+    }
+
+    return Array.from(known);
   },
 
   async isThreadClassificationFresh(params: {

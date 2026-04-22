@@ -36,6 +36,7 @@ export type EmailRow = {
   inlineAttachments: string | null;
   attachments: string | null;
   hasCalendar: boolean;
+  isGatekept: boolean;
   aiCategory: EmailAICategory | null;
   aiConfidence: number | null;
   aiReason: string | null;
@@ -73,7 +74,6 @@ export type SplitRule = {
   subjectContains?: string[];
   hasAttachment?: boolean | null;
   fromMailingList?: boolean | null;
-  hasCalendar?: boolean | null;
   gmailLabels?: string[];
 };
 

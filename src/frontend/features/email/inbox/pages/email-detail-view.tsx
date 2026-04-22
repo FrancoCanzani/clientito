@@ -57,6 +57,7 @@ export function EmailDetailView({
       }),
     initialData: email,
     staleTime: 60_000,
+    gcTime: 2 * 60_000,
   });
   const currentEmail = emailQuery.data ?? email;
 
@@ -159,6 +160,8 @@ export function EmailDetailView({
             mailboxId,
             view,
           }),
+        staleTime: 60_000,
+        gcTime: 2 * 60_000,
       });
     }
   }, [currentIndex, orderedIds, queryClient, mailboxId, view]);
@@ -171,6 +174,7 @@ export function EmailDetailView({
         : Promise.resolve([]),
     enabled: Boolean(currentEmail.threadId),
     staleTime: 60_000,
+    gcTime: 2 * 60_000,
   });
 
   const emailIdentifier = {

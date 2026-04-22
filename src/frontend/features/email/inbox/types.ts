@@ -75,6 +75,7 @@ export type EmailListItem = {
   labelIds: string[];
   hasAttachment: boolean;
   hasCalendar: boolean;
+  isGatekept: boolean;
   createdAt: number;
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
@@ -123,6 +124,27 @@ export type EmailDetailItem = EmailListItem & {
   resolvedBodyHtml: string | null;
   attachments: EmailAttachment[];
   inlineAttachments: EmailInlineAttachment[];
+};
+
+export type CalendarInviteResponseStatus =
+  | "needsAction"
+  | "accepted"
+  | "declined"
+  | "tentative";
+
+export type CalendarInvitePreview = {
+  uid: string;
+  method: string | null;
+  status: string | null;
+  title: string | null;
+  location: string | null;
+  organizerEmail: string | null;
+  startMs: number | null;
+  endMs: number | null;
+  startRaw: string | null;
+  endRaw: string | null;
+  timezone: string | null;
+  selfResponseStatus: CalendarInviteResponseStatus | null;
 };
 
 export type EmailThreadItem = EmailListItem & EmailBodySource & {

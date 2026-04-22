@@ -8,7 +8,6 @@ export const EMAIL_CONTENT_SHADOW_STYLE = `
 
   *, *::before, *::after {
     box-sizing: border-box;
-    max-width: 100%;
   }
 
   body {
@@ -25,8 +24,6 @@ export const EMAIL_CONTENT_SHADOW_STYLE = `
   }
 
   table {
-    width: 100%;
-    max-width: 100%;
     border-collapse: collapse;
     table-layout: auto;
   }

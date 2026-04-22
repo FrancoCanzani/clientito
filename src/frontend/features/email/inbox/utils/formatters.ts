@@ -1,7 +1,13 @@
+import DOMPurify from "dompurify";
 import { format, isThisYear, isToday } from "date-fns";
+import { decode } from "he";
 
 const MAX_SNIPPET_PREVIEW_CHARS = 180;
 const MIN_WORD_BREAK_INDEX = 120;
+const DEFAULT_IGNORABLE_RE = /[\p{Default_Ignorable_Code_Point}\u034F]/gu;
+const ZERO_WIDTH_CHARS_RE = /[\u200B\u200C\u200D\u2060\uFEFF]/g;
+const FORMAT_CONTROL_CHARS_RE = /[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
+const LEADING_NON_ALNUM_RE = /^[^\p{L}\p{N}]+/u;
 
 export function formatInboxRowDate(timestamp: number): string {
   const date = new Date(timestamp);
@@ -50,22 +56,40 @@ function truncateAtWordBoundary(value: string, maxChars: number): string {
   return `${chunk.slice(0, cutoff).trimEnd()}…`;
 }
 
+function extractTextFromSanitizedHtml(value: string): string {
+  if (!value || typeof DOMParser === "undefined") return value;
+  const doc = new DOMParser().parseFromString(value, "text/html");
+  return doc.body?.textContent ?? value;
+}
+
+function normalizeSnippetText(value: string): string {
+  return value
+    .replace(DEFAULT_IGNORABLE_RE, "")
+    .replace(ZERO_WIDTH_CHARS_RE, "")
+    .replace(FORMAT_CONTROL_CHARS_RE, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(LEADING_NON_ALNUM_RE, "")
+    .trimStart();
+}
+
 export function formatEmailSnippet(
   raw: string | null | undefined,
 ): string {
   if (!raw) return "";
 
-  // Use the browser to decode HTML entities and strip tags, then collapse
-  // whitespace. We apply a word-boundary trim so the rendered preview ellipsis
-  // lands at natural word boundaries rather than mid-word clipping.
-  const el = document.createElement("div");
-  el.innerHTML = raw;
+  const decoded = decode(raw, { strict: false });
+  const sanitizedHtml = DOMPurify.sanitize(decoded, {
+    USE_PROFILES: { html: true },
+    ALLOWED_ATTR: [],
+  });
+  const extractedText = extractTextFromSanitizedHtml(sanitizedHtml);
+  const cleaned = normalizeSnippetText(extractedText);
 
-  const normalized = (el.textContent ?? "").replace(/\s+/g, " ").trim();
-  if (!normalized) return "";
+  if (!cleaned) return "";
 
   return truncateAtWordBoundary(
-    trimTrailingEllipsis(normalized),
+    trimTrailingEllipsis(cleaned),
     MAX_SNIPPET_PREVIEW_CHARS,
   );
 }

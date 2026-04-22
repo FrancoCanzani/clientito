@@ -1,4 +1,3 @@
-import { ContactAvatar } from "@/components/ui/contact-avatar";
 import type {
   EmailAttachment,
   EmailBodySource,
@@ -18,12 +17,15 @@ import {
 } from "../../utils/formatters";
 import { AttachmentItem } from "../compose/attachment-item";
 import { MessageBody } from "../renderer/message-body";
+import { CalendarInviteCard } from "./calendar-invite-card";
 
 function normalizeCid(value: string): string {
   return value.trim().replace(/^<|>$/g, "").toLowerCase();
 }
 
-function collectReferencedCids(bodyHtml: string | null | undefined): Set<string> {
+function collectReferencedCids(
+  bodyHtml: string | null | undefined,
+): Set<string> {
   const referenced = new Set<string>();
   if (!bodyHtml) return referenced;
 
@@ -66,7 +68,10 @@ function AttachmentsSection({
       </div>
       <div className="divide-y divide-border/50">
         {attachments.map((attachment) => (
-          <AttachmentItem key={attachment.attachmentId} attachment={attachment} />
+          <AttachmentItem
+            key={attachment.attachmentId}
+            attachment={attachment}
+          />
         ))}
       </div>
     </section>
@@ -178,6 +183,8 @@ export function EmailThread({
         </div>
       </div>
 
+      <CalendarInviteCard email={email} />
+
       {threadError && showThread && (
         <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           Could not load the full thread.
@@ -220,7 +227,9 @@ export function EmailThread({
             <MessageBody detail={email} readingMode={readingMode} />
           </div>
 
-          {hasAttachments && <AttachmentsSection attachments={visibleAttachments} />}
+          {hasAttachments && (
+            <AttachmentsSection attachments={visibleAttachments} />
+          )}
         </div>
       )}
     </div>
@@ -254,7 +263,6 @@ function ThreadMessage({
         onClick={onToggle}
         className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
       >
-        <ContactAvatar name={email.fromName} email={email.fromAddr} size="lg" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">
             {expanded ? senderFull : senderName}

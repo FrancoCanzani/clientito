@@ -194,20 +194,21 @@ function normalizeClassificationCandidate(
   if (typeof candidate !== "object" || candidate === null) return null;
   const category = normalizeCategory(Reflect.get(candidate, "category"));
   const confidence = normalizeConfidence(Reflect.get(candidate, "confidence"));
-  const reason =
-    compactText(
-      typeof Reflect.get(candidate, "reason") === "string"
-        ? (Reflect.get(candidate, "reason") as string)
-        : "",
-      240,
-    ) || "Model classified thread using partial signal.";
+  const reason = compactText(
+    typeof Reflect.get(candidate, "reason") === "string"
+      ? (Reflect.get(candidate, "reason") as string)
+      : "",
+    240,
+  );
   const summary =
     compactText(
       typeof Reflect.get(candidate, "summary") === "string"
         ? (Reflect.get(candidate, "summary") as string)
         : "",
       500,
-    ) || reason;
+    ) ||
+    reason ||
+    "New email received. Open thread to review details and decide the next step.";
   const draftReply =
     compactText(
       typeof Reflect.get(candidate, "draftReply") === "string"

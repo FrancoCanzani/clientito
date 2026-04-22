@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { requireAuth } from "../../middleware/auth";
 import type { AppRouteEnv } from "../types";
+import calendarRoutes from "./calendar/router";
 import emailsRoutes from "./emails/router";
+import gatekeeperRoutes from "./gatekeeper/router";
 import labelsRoutes from "./labels/router";
 import { registerInboxSearch } from "./search";
 import subscriptionsRoutes from "./subscriptions/router";
@@ -14,6 +16,8 @@ inboxRoutes.use("*", requireAuth);
 inboxRoutes.route("/emails", emailsRoutes);
 inboxRoutes.route("/labels", labelsRoutes);
 inboxRoutes.route("/subscriptions", subscriptionsRoutes);
+inboxRoutes.route("/calendar", calendarRoutes);
+inboxRoutes.route("/gatekeeper", gatekeeperRoutes);
 
 const viewSubRoutes = new Hono<AppRouteEnv>();
 viewRoutes(viewSubRoutes);

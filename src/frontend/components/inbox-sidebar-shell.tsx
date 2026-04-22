@@ -263,7 +263,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   };
 
   return (
-    <Sidebar className=" *:bg-white/25 *:dark:bg-white/5">
+    <Sidebar className="border-none">
       <SidebarHeader className="space-y-2">
         <AccountHeader mailboxId={mailboxId} />
         <SidebarMenu>
@@ -347,10 +347,15 @@ export function InboxSidebarShell({ children }: { children: ReactNode }) {
   const { mailboxId } = mailboxRoute.useParams();
 
   return (
-    <SidebarProvider className="h-full min-h-0 flex-1 overflow-hidden">
+    <SidebarProvider
+      className="h-full overscroll-none
+ min-h-0 flex-1 overflow-hidden"
+    >
       <InboxSidebar mailboxId={mailboxId} />
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
-        {children}
+      <main className="flex min-h-0 flex-1 overflow-hidden bg-sidebar p-2">
+        <div className="flex min-h-0 md:px-2 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-background">
+          {children}
+        </div>
       </main>
     </SidebarProvider>
   );

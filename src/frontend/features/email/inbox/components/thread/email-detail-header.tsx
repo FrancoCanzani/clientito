@@ -42,8 +42,8 @@ export function EmailDetailHeader({
   return (
     <div
       className={cn(
-        "sticky top-0 z-20 flex min-h-14 shrink-0 items-center justify-between gap-3 border-b px-4 transition-colors duration-300 sm:px-6",
-        isScrolled ? "border-border/40 liquid-glass" : "border-transparent",
+        "sticky top-0 z-20 flex min-h-14 shrink-0 items-center justify-between bg-background gap-3 border-b px-4 transition-colors duration-300 sm:px-6",
+        isScrolled ? "border-border/40" : "border-transparent",
       )}
     >
       <div className="flex w-full items-center justify-between gap-2">

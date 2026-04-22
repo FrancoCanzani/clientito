@@ -27,5 +27,5 @@ export function createEmailDetailLoader(view: string) {
 
 export const emailDetailRouteOptions = {
   staleTime: 60_000,
-  gcTime: 10 * 60_000,
+  gcTime: 2 * 60_000,
 } as const;

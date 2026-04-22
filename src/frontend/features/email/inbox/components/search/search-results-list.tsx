@@ -5,6 +5,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import type { EmailListItem } from "@/features/email/inbox/types";
+import { formatEmailSnippet } from "@/features/email/inbox/utils/formatters";
 import { cn } from "@/lib/utils";
 import { CalendarIcon, PaperclipIcon, StarIcon } from "@phosphor-icons/react";
 import { format, isThisYear, isToday } from "date-fns";
@@ -31,6 +32,7 @@ function SearchResultRow({
         ? `To: ${email.toAddr}`
         : "To: (unknown recipient)"
       : email.fromName || email.fromAddr;
+  const snippet = formatEmailSnippet(email.snippet);
 
   return (
     <button
@@ -54,9 +56,9 @@ function SearchResultRow({
             {email.subject ?? "(no subject)"}
           </span>
         </div>
-        {email.snippet && (
+        {snippet && (
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            {email.snippet}
+            {snippet}
           </p>
         )}
       </div>
