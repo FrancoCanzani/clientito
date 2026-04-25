@@ -1,3 +1,4 @@
+import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import {
   Collapsible,
   CollapsibleContent,
@@ -11,7 +12,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { queryKeys } from "@/lib/query-keys";
 import { CaretDownIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -29,7 +29,7 @@ export function LabelSidebarSection({
 }: LabelSidebarSectionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const labelsQuery = useQuery({
-    queryKey: queryKeys.labels(mailboxId),
+    queryKey: labelQueryKeys.list(mailboxId),
     queryFn: () => fetchLabels(mailboxId),
     staleTime: 60_000,
   });

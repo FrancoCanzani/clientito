@@ -1,3 +1,4 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { localDb } from "@/db/client";
 import {
   clearPending,
@@ -5,7 +6,6 @@ import {
 } from "@/db/pending-lock";
 import { getCurrentUserId } from "@/db/user";
 import { queryClient } from "@/lib/query-client";
-import { queryKeys } from "@/lib/query-keys";
 import { isEmailListInfiniteData } from "./utils/email-list-cache";
 import type {
   CalendarInviteResponseStatus,
@@ -119,7 +119,7 @@ function applyOptimisticCachePatch(
   patch: EmailPatchPayload,
 ) {
   queryClient.setQueriesData(
-    { queryKey: queryKeys.emails.all() },
+    { queryKey: emailQueryKeys.all() },
     (current) => {
       if (!isEmailListInfiniteData(current)) return current;
       let changed = false;
@@ -141,7 +141,7 @@ function applyOptimisticCachePatch(
 
   for (const emailId of emailIds) {
     queryClient.setQueryData<EmailDetailItem | undefined>(
-      queryKeys.emails.detail(emailId),
+      emailQueryKeys.detail(emailId),
       (current) => {
         if (!current) return current;
         return applyPatchToItem(current, patch);
@@ -190,7 +190,7 @@ async function rollbackLocalPatch(
   }
 }
 
-export async function patchEmails(
+async function patchEmails(
   emails: EmailIdentifier[],
   data: EmailPatchPayload,
 ): Promise<void> {
@@ -203,10 +203,10 @@ export async function patchEmails(
   const emailIds = emails.map((e) => e.id);
   const emailIdSet = new Set(emailIds);
   const beforeLocal = await localDb.getEmailsByProviderMessageIds(userId, providerIds);
-  await queryClient.cancelQueries({ queryKey: queryKeys.emails.all() });
+  await queryClient.cancelQueries({ queryKey: emailQueryKeys.all() });
   await Promise.all(
     emailIds.map((id) =>
-      queryClient.cancelQueries({ queryKey: queryKeys.emails.detail(id) }),
+      queryClient.cancelQueries({ queryKey: emailQueryKeys.detail(id) }),
     ),
   );
   applyOptimisticCachePatch(emailIdSet, data);
@@ -382,32 +382,6 @@ export async function sendEmail(
   }
 
   return response.json();
-}
-
-export type ScheduledEmail = {
-  id: number;
-  to: string;
-  subject: string;
-  scheduledFor: number;
-  status: "pending" | "sent" | "failed" | "cancelled";
-  error: string | null;
-  createdAt: number;
-};
-
-export async function fetchScheduledEmails(): Promise<ScheduledEmail[]> {
-  const response = await fetch("/api/inbox/emails/scheduled");
-  if (!response.ok) throw new Error("Failed to fetch scheduled emails");
-  return response.json();
-}
-
-export async function cancelScheduledEmail(id: number): Promise<void> {
-  const response = await fetch(`/api/inbox/emails/scheduled/${id}`, {
-    method: "DELETE",
-  });
-  if (!response.ok) {
-    const json = await response.json().catch(() => null);
-    throwApiError(json, "Failed to cancel scheduled email");
-  }
 }
 
 export async function uploadAttachments(

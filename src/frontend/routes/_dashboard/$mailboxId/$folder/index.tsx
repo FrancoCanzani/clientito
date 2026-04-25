@@ -1,9 +1,9 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { LoadingEmailsPending } from "@/components/loading-emails-pending";
 import { Error as RouteError } from "@/components/error";
 import FolderPage from "@/features/email/inbox/pages/folder-page";
 import { fetchViewPage } from "@/features/email/inbox/queries";
 import { parseEmailFolderParam } from "@/features/email/inbox/utils/inbox-filters";
-import { queryKeys } from "@/lib/query-keys";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/$folder/")({
@@ -12,8 +12,8 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/$folder/")({
   },
   skipRouteOnParseError: { params: true },
   loader: async ({ context, params }) => {
-    await context.queryClient.prefetchInfiniteQuery({
-      queryKey: queryKeys.emails.listBase(params.folder, params.mailboxId),
+    void context.queryClient.prefetchInfiniteQuery({
+      queryKey: emailQueryKeys.listBase(params.folder, params.mailboxId),
       queryFn: ({ pageParam }) =>
         fetchViewPage({
           view: params.folder,
@@ -26,6 +26,7 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/$folder/")({
     });
   },
   pendingComponent: LoadingEmailsPending,
+  pendingMs: 120,
   errorComponent: RouteError,
   component: FolderPage,
 });

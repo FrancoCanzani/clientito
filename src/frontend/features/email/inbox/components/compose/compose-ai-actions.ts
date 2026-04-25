@@ -22,7 +22,7 @@ export type ComposerAiActionId =
   | "casual"
   | "shorten";
 
-export type ComposerAiActionDefinition = {
+type ComposerAiActionDefinition = {
   id: ComposerAiActionId;
   label: string;
   icon: ComponentType<{ className?: string }>;

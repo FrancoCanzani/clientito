@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6c6b1b02-de7f-4147-97ba-847bd053116f",
+  "id": "4da0d637-1374-45f7-998f-e785dcd092c6",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "account": {
@@ -503,561 +503,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "email_subscriptions": {
-      "name": "email_subscriptions",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "mailbox_id": {
-          "name": "mailbox_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "sender_key": {
-          "name": "sender_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "from_addr": {
-          "name": "from_addr",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "from_name": {
-          "name": "from_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "unsubscribe_url": {
-          "name": "unsubscribe_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "unsubscribe_email": {
-          "name": "unsubscribe_email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'active'"
-        },
-        "email_count": {
-          "name": "email_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "last_received_at": {
-          "name": "last_received_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "unsubscribe_method": {
-          "name": "unsubscribe_method",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "unsubscribe_requested_at": {
-          "name": "unsubscribe_requested_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "unsubscribed_at": {
-          "name": "unsubscribed_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "email_subscriptions_mailbox_sender_idx": {
-          "name": "email_subscriptions_mailbox_sender_idx",
-          "columns": [
-            "mailbox_id",
-            "sender_key"
-          ],
-          "isUnique": true
-        },
-        "email_subscriptions_user_status_idx": {
-          "name": "email_subscriptions_user_status_idx",
-          "columns": [
-            "user_id",
-            "status"
-          ],
-          "isUnique": false
-        },
-        "email_subscriptions_user_updated_idx": {
-          "name": "email_subscriptions_user_updated_idx",
-          "columns": [
-            "user_id",
-            "updated_at"
-          ],
-          "isUnique": false
-        },
-        "email_subscriptions_user_last_received_idx": {
-          "name": "email_subscriptions_user_last_received_idx",
-          "columns": [
-            "user_id",
-            "last_received_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "email_subscriptions_user_id_user_id_fk": {
-          "name": "email_subscriptions_user_id_user_id_fk",
-          "tableFrom": "email_subscriptions",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "email_subscriptions_mailbox_id_mailboxes_id_fk": {
-          "name": "email_subscriptions_mailbox_id_mailboxes_id_fk",
-          "tableFrom": "email_subscriptions",
-          "tableTo": "mailboxes",
-          "columnsFrom": [
-            "mailbox_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "emails": {
-      "name": "emails",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "mailbox_id": {
-          "name": "mailbox_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "provider_message_id": {
-          "name": "provider_message_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "thread_id": {
-          "name": "thread_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "message_id": {
-          "name": "message_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "from_addr": {
-          "name": "from_addr",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "from_name": {
-          "name": "from_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "to_addr": {
-          "name": "to_addr",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "cc_addr": {
-          "name": "cc_addr",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "subject": {
-          "name": "subject",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "snippet": {
-          "name": "snippet",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "body_text": {
-          "name": "body_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "body_html": {
-          "name": "body_html",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "date": {
-          "name": "date",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "direction": {
-          "name": "direction",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "is_read": {
-          "name": "is_read",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "label_ids": {
-          "name": "label_ids",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "unsubscribe_url": {
-          "name": "unsubscribe_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "unsubscribe_email": {
-          "name": "unsubscribe_email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "snoozed_until": {
-          "name": "snoozed_until",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "emails_provider_message_id_unique": {
-          "name": "emails_provider_message_id_unique",
-          "columns": [
-            "provider_message_id"
-          ],
-          "isUnique": true
-        },
-        "emails_user_idx": {
-          "name": "emails_user_idx",
-          "columns": [
-            "user_id"
-          ],
-          "isUnique": false
-        },
-        "emails_user_date_idx": {
-          "name": "emails_user_date_idx",
-          "columns": [
-            "user_id",
-            "date"
-          ],
-          "isUnique": false
-        },
-        "emails_thread_idx": {
-          "name": "emails_thread_idx",
-          "columns": [
-            "thread_id"
-          ],
-          "isUnique": false
-        },
-        "emails_user_snoozed_idx": {
-          "name": "emails_user_snoozed_idx",
-          "columns": [
-            "user_id",
-            "snoozed_until"
-          ],
-          "isUnique": false
-        },
-        "emails_mailbox_date_idx": {
-          "name": "emails_mailbox_date_idx",
-          "columns": [
-            "mailbox_id",
-            "date"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "emails_user_id_user_id_fk": {
-          "name": "emails_user_id_user_id_fk",
-          "tableFrom": "emails",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "emails_mailbox_id_mailboxes_id_fk": {
-          "name": "emails_mailbox_id_mailboxes_id_fk",
-          "tableFrom": "emails",
-          "tableTo": "mailboxes",
-          "columnsFrom": [
-            "mailbox_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "labels": {
-      "name": "labels",
-      "columns": {
-        "gmail_id": {
-          "name": "gmail_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "mailbox_id": {
-          "name": "mailbox_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "type": {
-          "name": "type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'user'"
-        },
-        "text_color": {
-          "name": "text_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "background_color": {
-          "name": "background_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "messages_total": {
-          "name": "messages_total",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "messages_unread": {
-          "name": "messages_unread",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "synced_at": {
-          "name": "synced_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "labels_mailbox_gmail_idx": {
-          "name": "labels_mailbox_gmail_idx",
-          "columns": [
-            "mailbox_id",
-            "gmail_id"
-          ],
-          "isUnique": true
-        },
-        "labels_user_idx": {
-          "name": "labels_user_idx",
-          "columns": [
-            "user_id"
-          ],
-          "isUnique": false
-        },
-        "labels_mailbox_idx": {
-          "name": "labels_mailbox_idx",
-          "columns": [
-            "mailbox_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "labels_user_id_user_id_fk": {
-          "name": "labels_user_id_user_id_fk",
-          "tableFrom": "labels",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "labels_mailbox_id_mailboxes_id_fk": {
-          "name": "labels_mailbox_id_mailboxes_id_fk",
-          "tableFrom": "labels",
-          "tableTo": "mailboxes",
-          "columnsFrom": [
-            "mailbox_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "mailboxes": {
       "name": "mailboxes",
       "columns": {
@@ -1099,6 +544,13 @@
         },
         "signature": {
           "name": "signature",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "templates": {
+          "name": "templates",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1150,13 +602,6 @@
         "last_error_message": {
           "name": "last_error_message",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "lock_until": {
-          "name": "lock_until",
-          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1407,13 +852,180 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "sync_jobs": {
-      "name": "sync_jobs",
+    "split_views": {
+      "name": "split_views",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "icon": {
+          "name": "icon",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "visible": {
+          "name": "visible",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "pinned": {
+          "name": "pinned",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "is_system": {
+          "name": "is_system",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "system_key": {
+          "name": "system_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "rules": {
+          "name": "rules",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "match_mode": {
+          "name": "match_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'rules'"
+        },
+        "show_in_other": {
+          "name": "show_in_other",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "split_views_user_idx": {
+          "name": "split_views_user_idx",
+          "columns": [
+            "user_id",
+            "position"
+          ],
+          "isUnique": false
+        },
+        "split_views_user_system_idx": {
+          "name": "split_views_user_system_idx",
+          "columns": [
+            "user_id",
+            "system_key"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "split_views_user_id_user_id_fk": {
+          "name": "split_views_user_id_user_id_fk",
+          "tableFrom": "split_views",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "trust_entities": {
+      "name": "trust_entities",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -1424,89 +1036,25 @@
           "notNull": true,
           "autoincrement": false
         },
-        "kind": {
-          "name": "kind",
+        "entity_type": {
+          "name": "entity_type",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "trigger": {
-          "name": "trigger",
+        "entity_value": {
+          "name": "entity_value",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "status": {
-          "name": "status",
+        "trust_level": {
+          "name": "trust_level",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "phase": {
-          "name": "phase",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "progress_current": {
-          "name": "progress_current",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "progress_total": {
-          "name": "progress_total",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "attempt": {
-          "name": "attempt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "error_class": {
-          "name": "error_class",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "error_message": {
-          "name": "error_message",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "run_after_at": {
-          "name": "run_after_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "started_at": {
-          "name": "started_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "finished_at": {
-          "name": "finished_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "created_at": {
@@ -1515,30 +1063,59 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         }
       },
       "indexes": {
-        "sync_jobs_mailbox_created_idx": {
-          "name": "sync_jobs_mailbox_created_idx",
+        "trust_entities_unique_entity_idx": {
+          "name": "trust_entities_unique_entity_idx",
           "columns": [
+            "user_id",
             "mailbox_id",
-            "created_at"
+            "entity_type",
+            "entity_value"
+          ],
+          "isUnique": true
+        },
+        "trust_entities_user_mailbox_idx": {
+          "name": "trust_entities_user_mailbox_idx",
+          "columns": [
+            "user_id",
+            "mailbox_id"
           ],
           "isUnique": false
         },
-        "sync_jobs_mailbox_status_idx": {
-          "name": "sync_jobs_mailbox_status_idx",
+        "trust_entities_level_idx": {
+          "name": "trust_entities_level_idx",
           "columns": [
-            "mailbox_id",
-            "status"
+            "trust_level"
           ],
           "isUnique": false
         }
       },
       "foreignKeys": {
-        "sync_jobs_mailbox_id_mailboxes_id_fk": {
-          "name": "sync_jobs_mailbox_id_mailboxes_id_fk",
-          "tableFrom": "sync_jobs",
+        "trust_entities_user_id_user_id_fk": {
+          "name": "trust_entities_user_id_user_id_fk",
+          "tableFrom": "trust_entities",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "trust_entities_mailbox_id_mailboxes_id_fk": {
+          "name": "trust_entities_mailbox_id_mailboxes_id_fk",
+          "tableFrom": "trust_entities",
           "tableTo": "mailboxes",
           "columnsFrom": [
             "mailbox_id"

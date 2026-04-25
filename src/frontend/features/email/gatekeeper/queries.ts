@@ -1,18 +1,19 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
+import { gatekeeperQueryKeys } from "@/features/email/gatekeeper/query-keys";
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
 import type { EmailListItem } from "@/features/email/inbox/types";
 import { queryClient } from "@/lib/query-client";
-import { queryKeys } from "@/lib/query-keys";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-export type GatekeeperPendingState = {
+type GatekeeperPendingState = {
   pendingCount: number;
   items: EmailListItem[];
 };
 
 type GatekeeperDecision = "accept" | "reject";
 
-export type GatekeeperDecisionResult = {
+type GatekeeperDecisionResult = {
   fromAddr: string;
   trustLevel: "trusted" | "blocked";
   decision: GatekeeperDecision;
@@ -22,16 +23,33 @@ export type GatekeeperDecisionResult = {
   requiresReconnect: boolean;
 };
 
-export async function fetchGatekeeperPending(
+function gatekeeperActivatedAtKey(mailboxId: number): string {
+  return `gatekeeperActivatedAt:${mailboxId}`;
+}
+
+async function resolveGatekeeperActivatedAt(mailboxId: number): Promise<number> {
+  const key = gatekeeperActivatedAtKey(mailboxId);
+  const raw = await localDb.getMeta(key);
+  const parsed = raw ? Number(raw) : NaN;
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+
+  const now = Date.now();
+  await localDb.setMeta(key, String(now));
+  return now;
+}
+
+async function fetchGatekeeperPending(
   mailboxId: number,
   limit = 30,
 ): Promise<GatekeeperPendingState> {
   const userId = await getCurrentUserId();
   if (!userId) return { pendingCount: 0, items: [] };
+  const gatekeeperActivatedAt = await resolveGatekeeperActivatedAt(mailboxId);
 
   await localDb.reconcileGatekeeperKnownSenders({
     userId,
     mailboxId,
+    gatekeeperActivatedAt,
   });
 
   const [pendingCount, items] = await Promise.all([
@@ -66,7 +84,7 @@ async function submitGatekeeperDecision(input: {
 
 export function useGatekeeperPending(mailboxId: number, enabled = true) {
   return useQuery({
-    queryKey: queryKeys.gatekeeper.pending(mailboxId),
+    queryKey: gatekeeperQueryKeys.pending(mailboxId),
     queryFn: () => fetchGatekeeperPending(mailboxId),
     staleTime: 5_000,
     enabled,
@@ -99,8 +117,8 @@ export function useGatekeeperDecision(mailboxId: number) {
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.gatekeeper.pending(mailboxId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() }),
+        queryClient.invalidateQueries({ queryKey: gatekeeperQueryKeys.pending(mailboxId) }),
+        queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() }),
       ]);
     },
   });

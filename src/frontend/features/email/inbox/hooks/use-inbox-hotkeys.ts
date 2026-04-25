@@ -1,3 +1,4 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import { fetchEmailDetail } from "@/features/email/inbox/queries";
 import type { EmailListItem } from "@/features/email/inbox/types";
@@ -7,7 +8,6 @@ import {
   clearFocusedEmail,
 } from "@/hooks/use-focused-email";
 import { useHotkeys } from "@/hooks/use-hotkeys";
-import { queryKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
@@ -109,7 +109,7 @@ export function useInboxHotkeys({
     for (const idx of neighbors) {
       const email = groups[idx]?.representative;
       if (!email) continue;
-      const key = queryKeys.emails.detail(email.id);
+      const key = emailQueryKeys.detail(email.id);
       if (queryClient.getQueryState(key)?.status === "success") continue;
       void queryClient.prefetchQuery({
         queryKey: key,

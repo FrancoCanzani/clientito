@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
+import { useGatekeeperPending } from "@/features/email/gatekeeper/queries";
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import { LabelSidebarSection } from "@/features/email/labels/components/label-sidebar-section";
 import { useAuth } from "@/hooks/use-auth";
@@ -93,6 +94,7 @@ function useActiveSidebarState(): {
   activeLabelId?: string;
   isSearchRoute: boolean;
   isSettingsRoute: boolean;
+  isScreenerRoute: boolean;
 } {
   return useRouterState({
     select: (state) => {
@@ -102,6 +104,9 @@ function useActiveSidebarState(): {
       );
       const isSettingsRoute = matches.some(
         (match) => match.routeId === "/_dashboard/$mailboxId/settings",
+      );
+      const isScreenerRoute = matches.some(
+        (match) => match.routeId === "/_dashboard/$mailboxId/screener",
       );
       const isDraftsRoute = matches.some(
         (match) => match.routeId === "/_dashboard/$mailboxId/inbox/drafts",
@@ -120,6 +125,7 @@ function useActiveSidebarState(): {
           activeLabelId,
           isSearchRoute,
           isSettingsRoute,
+          isScreenerRoute,
         };
       if (isDraftsRoute)
         return {
@@ -127,6 +133,7 @@ function useActiveSidebarState(): {
           activeLabelId,
           isSearchRoute,
           isSettingsRoute,
+          isScreenerRoute,
         };
 
       if (activeLabelId === "important")
@@ -135,6 +142,7 @@ function useActiveSidebarState(): {
           activeLabelId,
           isSearchRoute,
           isSettingsRoute,
+          isScreenerRoute,
         };
 
       const folder = matches.find(
@@ -155,6 +163,7 @@ function useActiveSidebarState(): {
           activeLabelId,
           isSearchRoute,
           isSettingsRoute,
+          isScreenerRoute,
         };
 
       return {
@@ -162,6 +171,7 @@ function useActiveSidebarState(): {
         activeLabelId,
         isSearchRoute,
         isSettingsRoute,
+        isScreenerRoute,
       };
     },
   });
@@ -208,14 +218,22 @@ const NAV_ITEMS = [
 ];
 
 function InboxSidebar({ mailboxId }: { mailboxId: number }) {
-  const { activeView, activeLabelId, isSearchRoute, isSettingsRoute } =
-    useActiveSidebarState();
+  const {
+    activeView,
+    activeLabelId,
+    isSearchRoute,
+    isSettingsRoute,
+    isScreenerRoute,
+  } = useActiveSidebarState();
   const navigate = useNavigate();
   const { openCompose } = useInboxCompose();
   const [moreOpen, setMoreOpen] = useState(false);
+  const screenerPendingQuery = useGatekeeperPending(mailboxId, true);
+  const screenerPendingCount = screenerPendingQuery.data?.pendingCount ?? 0;
   const hasStandaloneRouteSelection =
     isSearchRoute ||
     isSettingsRoute ||
+    isScreenerRoute ||
     Boolean(activeLabelId && activeLabelId !== "important");
 
   const sentIndex = NAV_ITEMS.findIndex((item) => item.view === "sent");
@@ -251,7 +269,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
           tooltip={item.label}
           className="text-sm"
         >
-          <Link to={nav.to as string} params={nav.params}>
+          <Link to={nav.to} params={nav.params} preload="intent">
             {item.label}
             <Kbd className="ml-auto opacity-0 transition-opacity group-hover/nav:opacity-100">
               ⌘{navIndex + 1}
@@ -284,8 +302,32 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
               asChild
               isActive={isSearchRoute}
             >
-              <Link to="/$mailboxId/inbox/search" params={{ mailboxId }}>
+              <Link
+                to="/$mailboxId/inbox/search"
+                params={{ mailboxId }}
+                preload="intent"
+              >
                 Search
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              className="text-sm"
+              asChild
+              isActive={isScreenerRoute}
+            >
+              <Link
+                to="/$mailboxId/screener"
+                params={{ mailboxId }}
+                preload="intent"
+              >
+                Screener
+                {screenerPendingCount > 0 && (
+                  <span className="ml-auto rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    {screenerPendingCount}
+                  </span>
+                )}
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -295,7 +337,11 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
               asChild
               isActive={isSettingsRoute}
             >
-              <Link to="/$mailboxId/settings" params={{ mailboxId }}>
+              <Link
+                to="/$mailboxId/settings"
+                params={{ mailboxId }}
+                preload="intent"
+              >
                 Settings
               </Link>
             </SidebarMenuButton>
@@ -353,7 +399,7 @@ export function InboxSidebarShell({ children }: { children: ReactNode }) {
     >
       <InboxSidebar mailboxId={mailboxId} />
       <main className="flex min-h-0 flex-1 overflow-hidden bg-sidebar p-2">
-        <div className="flex min-h-0 md:px-2 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-background">
+        <div className="flex min-h-0 md:px-2 min-w-0 flex-1 flex-col overflow-hidden rounded bg-background">
           {children}
         </div>
       </main>

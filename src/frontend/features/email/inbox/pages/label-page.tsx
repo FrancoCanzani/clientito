@@ -1,8 +1,8 @@
+import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { EmailList } from "@/features/email/inbox/components/list/email-list";
 import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
 import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import { fetchLabels } from "@/features/email/labels/queries";
-import { queryKeys } from "@/lib/query-keys";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 
@@ -12,7 +12,7 @@ export default function LabelPage() {
   const { mailboxId, label } = route.useParams();
   const emailData = useEmailData({ view: label, mailboxId });
   const labelsQuery = useQuery({
-    queryKey: queryKeys.labels(mailboxId),
+    queryKey: labelQueryKeys.list(mailboxId),
     queryFn: () => fetchLabels(mailboxId),
     staleTime: 60_000,
   });

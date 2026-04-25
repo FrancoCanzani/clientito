@@ -60,5 +60,5 @@ export function EmailHtmlRenderer({ html }: { html: string }) {
     return () => shadowRoot.removeEventListener("click", handleClick);
   }, []);
 
-  return <div ref={hostRef} className="w-full" />;
+  return <div ref={hostRef} className="w-full min-w-0 max-w-full" />;
 }

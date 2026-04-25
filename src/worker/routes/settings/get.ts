@@ -50,6 +50,7 @@ export function registerGetSettings(api: Hono<AppRouteEnv>) {
         mailboxId: mailbox?.id ?? null,
         email: mailbox?.email ?? null,
         signature: mailbox?.signature ?? null,
+        templates: mailbox?.templates ?? null,
         authState: mailbox?.authState ?? "unknown",
         lastSync: mailbox?.lastSuccessfulSyncAt ?? null,
         hasSynced,

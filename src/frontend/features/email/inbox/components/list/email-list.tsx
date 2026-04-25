@@ -1,3 +1,4 @@
+import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +9,6 @@ import {
 } from "@/components/ui/empty";
 import { IconButton } from "@/components/ui/icon-button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { GatekeeperReviewDialog } from "@/features/email/gatekeeper/components/gatekeeper-review-dialog";
 import { useGatekeeperPending } from "@/features/email/gatekeeper/queries";
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
@@ -19,11 +19,10 @@ import { VIEW_LABELS } from "@/features/email/inbox/utils/inbox-filters";
 import { fetchLabels } from "@/features/email/labels/queries";
 import { useIsScrolled } from "@/hooks/use-is-scrolled";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { CircleNotchIcon, FunnelSimpleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { getRouteApi, useNavigate } from "@tanstack/react-router";
+import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef, useState } from "react";
 import { DesktopEmailRow } from "./desktop-email-row";
@@ -64,7 +63,6 @@ export function EmailList({
     hasActiveFilters,
   } = emailData;
   const [showFilters, setShowFilters] = useState(false);
-  const [gatekeeperOpen, setGatekeeperOpen] = useState(false);
   const filterBarVisible = showFilters || hasActiveFilters;
   const { openCompose } = useInboxCompose();
   const isMobile = useIsMobile();
@@ -75,7 +73,7 @@ export function EmailList({
     pageTitleOverride ?? (VIEW_LABELS as Record<string, string>)[view] ?? view;
 
   const { data: allLabels } = useQuery({
-    queryKey: queryKeys.labels(mailboxId),
+    queryKey: labelQueryKeys.list(mailboxId),
     queryFn: () => fetchLabels(mailboxId),
     staleTime: 60_000,
   });
@@ -156,13 +154,14 @@ export function EmailList({
     headerSlot || extraActions || filterToggleButton || hasGatekeeperButton ? (
       <>
         {hasGatekeeperButton ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setGatekeeperOpen(true)}
-            className="text-xs"
-          >
-            New senders: {pendingSendersCount} pending
+          <Button asChild variant="outline" size="sm" className="text-xs">
+            <Link
+              to="/$mailboxId/screener"
+              params={{ mailboxId: routeMailboxId }}
+              preload="intent"
+            >
+              New senders: {pendingSendersCount} pending
+            </Link>
           </Button>
         ) : null}
         {headerSlot}
@@ -238,11 +237,6 @@ export function EmailList({
         )}
       </div>
 
-      <GatekeeperReviewDialog
-        open={gatekeeperOpen}
-        onOpenChange={setGatekeeperOpen}
-        mailboxId={mailboxId}
-      />
     </div>
   );
 }

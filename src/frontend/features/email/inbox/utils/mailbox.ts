@@ -9,18 +9,13 @@ function parseStrictMailboxId(value: string): number | undefined {
   return result.success ? result.data : undefined;
 }
 
-export function getStoredMailboxId(): number | null {
+function getStoredMailboxId(): number | null {
   if (typeof window === "undefined") return null;
 
   const stored = window.localStorage.getItem(ACTIVE_MAILBOX_STORAGE_KEY);
   if (!stored) return null;
 
   return parseStrictMailboxId(stored) ?? null;
-}
-
-export function storeMailboxId(mailboxId: number) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(ACTIVE_MAILBOX_STORAGE_KEY, String(mailboxId));
 }
 
 export function getPreferredMailboxId<

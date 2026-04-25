@@ -1,8 +1,8 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { invalidateInboxQueries } from "@/features/email/inbox/queries";
 import { patchEmail, type EmailIdentifier } from "@/features/email/inbox/mutations";
 import type { EmailListItem, EmailListPage } from "@/features/email/inbox/types";
 import { isEmailListInfiniteData } from "@/features/email/inbox/utils/email-list-cache";
-import { queryKeys } from "@/lib/query-keys";
 import {
   CheckIcon,
   ClockIcon,
@@ -60,7 +60,7 @@ async function performEmailAction(
   let emailItem: EmailListItem | undefined;
   const caches = services.queryClient.getQueriesData<
     InfiniteData<EmailListPage>
-  >({ queryKey: queryKeys.emails.all() });
+  >({ queryKey: emailQueryKeys.all() });
   for (const [, cache] of caches) {
     for (const page of cache?.pages ?? []) {
       const found = page.emails.find((e) => e.id === emailId);
@@ -81,7 +81,7 @@ async function performEmailAction(
   // Optimistically remove from all list caches if this action hides the email.
   if (removesFromList(data)) {
     services.queryClient.setQueriesData(
-      { queryKey: queryKeys.emails.all() },
+      { queryKey: emailQueryKeys.all() },
       (old) => optimisticRemove(old, emailId),
     );
   }
@@ -94,7 +94,7 @@ async function performEmailAction(
 
   invalidateInboxQueries();
   void services.queryClient.invalidateQueries({
-    queryKey: queryKeys.emails.detail(emailId),
+    queryKey: emailQueryKeys.detail(emailId),
   });
 
   if (label) toast(label);

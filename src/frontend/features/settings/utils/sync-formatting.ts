@@ -1,32 +1,6 @@
 import type { MailboxAccount } from "@/hooks/use-mailboxes";
 import { formatDistanceToNow } from "date-fns";
 
-export function formatImportHistoryHint(
-  months: 3 | 6 | 12 | null,
-  cutoffAt: number | null,
-): string {
-  if (cutoffAt === null) {
-    return "New imports can include your full Gmail history.";
-  }
-
-  const date = new Date(cutoffAt).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-
-  const label =
-    months === 3
-      ? "last 3 months"
-      : months === 6
-        ? "last 6 months"
-        : months === 12
-          ? "last year"
-          : "extended history";
-
-  return `New imports currently include mail from ${date} onward (${label}).`;
-}
-
 function formatRelativeTime(value: number | null): string | null {
   if (!value) return null;
   return formatDistanceToNow(new Date(value), { addSuffix: true });

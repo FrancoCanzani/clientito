@@ -1,3 +1,5 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
+import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { SnoozePicker } from "@/components/snooze-picker";
 import {
   AlertDialog,
@@ -25,7 +27,6 @@ import { removeLabel } from "@/features/email/labels/mutations";
 import { fetchLabels } from "@/features/email/labels/queries";
 import { useAuth } from "@/hooks/use-auth";
 import { useMailboxes } from "@/hooks/use-mailboxes";
-import { queryKeys } from "@/lib/query-keys";
 import type { Icon } from "@phosphor-icons/react";
 import {
   ArrowBendDoubleUpLeftIcon,
@@ -98,14 +99,13 @@ export function EmailActions({
   );
   const hasAiDraftReply = Boolean(email.aiDraftReply?.trim());
   const mailboxId = email.mailboxId;
-
-  if (mailboxId == null) return null;
+  const resolvedMailboxId = mailboxId ?? 0;
 
   const labelsQuery = useQuery({
-    queryKey: queryKeys.labels(mailboxId),
-    queryFn: () => fetchLabels(mailboxId),
+    queryKey: labelQueryKeys.list(resolvedMailboxId),
+    queryFn: () => fetchLabels(resolvedMailboxId),
     staleTime: 60_000,
-    enabled: true,
+    enabled: mailboxId != null,
   });
   const allLabels = labelsQuery.data ?? [];
   const userLabelIds = email.labelIds.filter((id) => id.startsWith("Label_"));
@@ -116,7 +116,7 @@ export function EmailActions({
   const invalidateEmails = () => {
     invalidateInboxQueries();
     queryClient.invalidateQueries({
-      queryKey: queryKeys.emails.detail(email.id),
+      queryKey: emailQueryKeys.detail(email.id),
     });
     void router.invalidate();
   };
@@ -124,7 +124,7 @@ export function EmailActions({
   const emailIdentifier = {
     id: email.id,
     providerMessageId: email.providerMessageId,
-    mailboxId,
+    mailboxId: resolvedMailboxId,
     labelIds: email.labelIds,
   };
 
@@ -159,7 +159,7 @@ export function EmailActions({
 
   const removeLabelMutation = useMutation({
     mutationFn: (labelId: string) =>
-      removeLabel([email.providerMessageId], labelId, mailboxId),
+      removeLabel([email.providerMessageId], labelId, resolvedMailboxId),
     onSuccess: () => invalidateEmails(),
     onError: (error: Error) =>
       toast.error(error.message || "Failed to remove label"),
@@ -203,6 +203,8 @@ export function EmailActions({
     },
     onError: (error: Error) => toast.error(error.message),
   });
+
+  if (mailboxId == null) return null;
 
   const handleForward = () => {
     const subject = email.subject

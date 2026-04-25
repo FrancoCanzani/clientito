@@ -6,6 +6,7 @@ import {
   GearIcon,
   MagnifyingGlassIcon,
   PaperPlaneTiltIcon,
+  ShieldCheckIcon,
   StarIcon,
   TrashIcon,
   TrayIcon,
@@ -188,6 +189,18 @@ const navigationCommands: Command[] = [
       services.close();
     },
   },
+  makeNavCommand({
+    id: "nav:screener",
+    label: "Screener",
+    icon: paletteIcon(ShieldCheckIcon),
+    keywords: ["screener", "gatekeeper", "senders", "block", "trust"],
+    perform: (mailboxId, services) => {
+      services.navigate({
+        to: "/$mailboxId/screener",
+        params: { mailboxId },
+      });
+    },
+  }),
   {
     id: "nav:settings",
     label: "Settings",

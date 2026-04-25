@@ -23,7 +23,7 @@ export const Route = createFileRoute("/_dashboard")({
     }
   },
   pendingComponent: LoadingEmailsPending,
-  pendingMs: 0,
+  pendingMs: 120,
   component: DashboardLayout,
 });
 

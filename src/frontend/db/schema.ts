@@ -96,8 +96,6 @@ export type SplitViewRow = {
   updatedAt: number;
 };
 
-export type SplitViewInsert = SplitViewRow;
-
 export type DraftAttachmentKey = {
   key: string;
   filename: string;

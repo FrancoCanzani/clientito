@@ -1,6 +1,6 @@
 import { authClient } from "@/lib/auth-client";
 
-const GMAIL_SCOPES = [
+export const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.modify",
   "https://www.googleapis.com/auth/gmail.send",
@@ -18,4 +18,3 @@ export async function beginGmailConnection(callbackURL = "/settings") {
     throw new Error(result.error.message || "Google connection failed.");
   }
 }
-

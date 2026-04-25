@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_dashboard/$mailboxId")({
   }),
   stringifyParams: ({ mailboxId }) => ({ mailboxId: String(mailboxId) }),
   pendingComponent: LoadingEmailsPending,
-  pendingMs: 0,
+  pendingMs: 120,
   loader: async ({ context, params }) => {
     const accountsData =
       await context.queryClient.ensureQueryData(accountsQueryOptions);

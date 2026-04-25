@@ -1,3 +1,4 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import type { EmailAICategory } from "@/db/schema";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import { fetchEmailDetail } from "@/features/email/inbox/queries";
@@ -6,7 +7,6 @@ import {
   type RowAction,
 } from "@/features/email/inbox/utils/row-actions";
 import type { Label } from "@/features/email/labels/types";
-import { queryKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import { type KeyboardEvent, useMemo, useRef, useState } from "react";
 import type { EmailListItem } from "../../types";
@@ -114,7 +114,7 @@ export function useEmailRowModel({
     prefetchedRef.current = true;
 
     void queryClient.prefetchQuery({
-      queryKey: queryKeys.emails.detail(email.id),
+      queryKey: emailQueryKeys.detail(email.id),
       queryFn: () =>
         fetchEmailDetail(email.id, {
           mailboxId: email.mailboxId ?? undefined,

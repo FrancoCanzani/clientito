@@ -4,17 +4,13 @@ import type { Database } from "../../db/client";
 import { mailboxes } from "../../db/schema";
 import { sleep } from "../utils";
 import {
-  createGmailHistoryExpiredError,
   createGmailRateLimitError,
   GOOGLE_RECONNECT_REQUIRED_MESSAGE,
   isGmailReconnectRequiredError,
 } from "./errors";
 import type {
   GmailErrorResponse,
-  GmailHistoryResponse,
-  GmailMessage,
   GmailMessageFormat,
-  GmailProfileResponse,
   GmailThreadResponse,
   GmailThreadsListResponse,
   GoogleOAuthConfig,
@@ -22,9 +18,6 @@ import type {
 } from "./types";
 
 export const GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
-const GMAIL_PAGE_SIZE = 500;
-export const MESSAGE_CHUNK_SIZE = 50;
-
 const GMAIL_MAX_RATE_LIMIT_RETRIES = 5;
 const GMAIL_RETRY_BASE_DELAY_MS = 1_000;
 const GMAIL_RETRY_MAX_DELAY_MS = 30_000;
@@ -181,49 +174,6 @@ export async function gmailRequest<T>(
   return JSON.parse(text) as T;
 }
 
-export async function getCurrentHistoryId(
-  accessToken: string,
-): Promise<string | null> {
-  const profile = await gmailRequest<GmailProfileResponse>(
-    accessToken,
-    "/profile",
-  );
-  return profile.historyId ?? null;
-}
-
-export async function listHistoryPage(
-  accessToken: string,
-  startHistoryId: string,
-  pageToken?: string,
-): Promise<GmailHistoryResponse> {
-  const response = await gmailRequestRaw(accessToken, "/history", {
-    startHistoryId,
-    maxResults: String(GMAIL_PAGE_SIZE),
-    pageToken,
-    fields:
-      "history/id,history/messagesAdded/message/id,history/messagesDeleted/message/id,history/labelsAdded/message/id,history/labelsAdded/labelIds,history/labelsRemoved/message/id,history/labelsRemoved/labelIds,nextPageToken,historyId",
-  });
-
-  if (response.status === 404) {
-    throw createGmailHistoryExpiredError(
-      "Gmail history is too old. Run a full sync again.",
-    );
-  }
-
-  if (response.status === 401) {
-    throw new Error(GOOGLE_RECONNECT_REQUIRED_MESSAGE);
-  }
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `Gmail history request failed (${response.status}): ${body || response.statusText}`,
-    );
-  }
-
-  return (await response.json()) as GmailHistoryResponse;
-}
-
 export async function listThreadsPage(
   accessToken: string,
   options: {
@@ -244,7 +194,7 @@ export async function listThreadsPage(
   });
 }
 
-export async function fetchThread(
+async function fetchThread(
   accessToken: string,
   threadId: string,
   format: GmailMessageFormat = "full",
@@ -297,161 +247,6 @@ export async function fetchThreadsBatch(
   await Promise.all(workers);
 
   if (firstError) throw firstError;
-  return results;
-}
-
-export async function fetchMessage(
-  accessToken: string,
-  messageId: string,
-  format: GmailMessageFormat,
-): Promise<GmailMessage> {
-  return gmailRequest<GmailMessage>(accessToken, `/messages/${messageId}`, {
-    format,
-    fields:
-      format === "minimal"
-        ? "id,threadId,historyId,internalDate,labelIds"
-        // Keep full payload for non-batch fallbacks so attachment parsing stays
-        // consistent with batched full fetches.
-        : "id,threadId,historyId,internalDate,snippet,labelIds,payload",
-  });
-}
-
-const BATCH_BOUNDARY = "batch_petit";
-const GMAIL_BATCH_URL = "https://www.googleapis.com/batch/gmail/v1";
-const GMAIL_BATCH_MAX_SIZE = 100;
-
-function buildBatchRequestBody(
-  messageIds: string[],
-  format: GmailMessageFormat,
-): string {
-  return messageIds
-    .map((id) => {
-      const path =
-        format === "minimal"
-          ? `/gmail/v1/users/me/messages/${id}?format=minimal&fields=${encodeURIComponent(
-              "id,threadId,historyId,internalDate,labelIds",
-            )}`
-          : `/gmail/v1/users/me/messages/${id}?format=full`;
-      return `--${BATCH_BOUNDARY}\r\nContent-Type: application/http\r\n\r\nGET ${path}\r\n`;
-    })
-    .join("\r\n") + `\r\n--${BATCH_BOUNDARY}--`;
-}
-
-function parseBatchResponse(
-  responseText: string,
-  boundary: string,
-): Array<{ status: number; body: string }> {
-  const parts = responseText.split(`--${boundary}`);
-  const results: Array<{ status: number; body: string }> = [];
-
-  for (const part of parts) {
-    if (part.trim() === "" || part.trim() === "--") continue;
-
-    const httpResponseStart = part.indexOf("HTTP/");
-    if (httpResponseStart === -1) continue;
-
-    const httpSection = part.slice(httpResponseStart);
-    const statusMatch = httpSection.match(/HTTP\/[\d.]+ (\d+)/);
-    const status = statusMatch ? Number(statusMatch[1]) : 0;
-
-    const bodyStart = httpSection.indexOf("\r\n\r\n");
-    const body = bodyStart !== -1 ? httpSection.slice(bodyStart + 4).trim() : "";
-
-    results.push({ status, body });
-  }
-
-  return results;
-}
-
-export async function fetchMessagesBatch(
-  accessToken: string,
-  messageIds: string[],
-  format: GmailMessageFormat = "full",
-): Promise<Map<string, GmailMessage | null>> {
-  if (messageIds.length === 0) return new Map();
-
-  const results = new Map<string, GmailMessage | null>();
-
-  for (let i = 0; i < messageIds.length; i += GMAIL_BATCH_MAX_SIZE) {
-    const chunk = messageIds.slice(i, i + GMAIL_BATCH_MAX_SIZE);
-    const body = buildBatchRequestBody(chunk, format);
-
-    let attempt = 0;
-    let response: Response | null = null;
-
-    while (attempt <= GMAIL_MAX_RATE_LIMIT_RETRIES) {
-      try {
-        response = await fetch(GMAIL_BATCH_URL, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": `multipart/mixed; boundary=${BATCH_BOUNDARY}`,
-          },
-          body,
-          signal: AbortSignal.timeout(60_000),
-        });
-      } catch (error) {
-        if (attempt === GMAIL_MAX_RATE_LIMIT_RETRIES) throw error;
-        await sleep(computeRetryDelayMs(attempt));
-        attempt++;
-        continue;
-      }
-
-      if (response.status === 429 || response.status === 503) {
-        if (attempt === GMAIL_MAX_RATE_LIMIT_RETRIES) break;
-        const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
-        await sleep(retryAfterMs ?? computeRetryDelayMs(attempt));
-        attempt++;
-        continue;
-      }
-
-      break;
-    }
-
-    if (!response || !response.ok) {
-      for (const id of chunk) {
-        try {
-          const msg = await fetchMessage(accessToken, id, format);
-          results.set(id, msg);
-        } catch {
-          results.set(id, null);
-        }
-      }
-      continue;
-    }
-
-    const responseText = await response.text();
-    const contentType = response.headers.get("content-type") ?? "";
-    const boundaryMatch = contentType.match(/boundary=(.+)/);
-    const responseBoundary = boundaryMatch?.[1]?.replace(/^["']|["']$/g, "") ?? BATCH_BOUNDARY;
-
-    const parsed = parseBatchResponse(responseText, responseBoundary);
-
-    for (let j = 0; j < chunk.length && j < parsed.length; j++) {
-      const part = parsed[j];
-      if (part.status === 200) {
-        try {
-          results.set(chunk[j], JSON.parse(part.body) as GmailMessage);
-        } catch {
-          results.set(chunk[j], null);
-        }
-      } else {
-        results.set(chunk[j], null);
-      }
-    }
-
-    for (const id of chunk) {
-      if (!results.has(id)) {
-        try {
-          const msg = await fetchMessage(accessToken, id, format);
-          results.set(id, msg);
-        } catch {
-          results.set(id, null);
-        }
-      }
-    }
-  }
-
   return results;
 }
 

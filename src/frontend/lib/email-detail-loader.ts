@@ -1,7 +1,7 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import {
   fetchEmailDetail,
 } from "@/features/email/inbox/queries";
-import { queryKeys } from "@/lib/query-keys";
 import type { QueryClient } from "@tanstack/react-query";
 
 export function createEmailDetailLoader(view: string) {
@@ -13,7 +13,7 @@ export function createEmailDetailLoader(view: string) {
     params: { emailId: string; mailboxId: number };
   }) => {
     const email = await context.queryClient.ensureQueryData({
-      queryKey: queryKeys.emails.detail(params.emailId),
+      queryKey: emailQueryKeys.detail(params.emailId),
       queryFn: () =>
         fetchEmailDetail(params.emailId, {
           mailboxId: params.mailboxId,

@@ -1,9 +1,9 @@
-export function extractEmailAddress(raw: string): string {
+function extractEmailAddress(raw: string): string {
   const match = raw.match(/<([^>]+)>/);
   return (match?.[1] ?? raw).trim().toLowerCase();
 }
 
-export function parseRecipientList(raw: string | null): string[] {
+function parseRecipientList(raw: string | null): string[] {
   if (!raw) return [];
   return raw
     .split(",")

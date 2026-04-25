@@ -1,4 +1,10 @@
-import { useMailboxes, type MailboxAccount } from "@/hooks/use-mailboxes";
+import { emailQueryKeys, draftQueryKeys, scheduledEmailQueryKeys } from "@/features/email/inbox/query-keys";
+import {
+  useMailboxes,
+  type MailboxAccount,
+  type MailboxSignature,
+  type MailboxTemplate,
+} from "@/hooks/use-mailboxes";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -7,7 +13,6 @@ import { loadDraft, persistDraftNow, useDraft } from "../../hooks/use-draft";
 import { useUndoSend } from "../../hooks/use-undo-send";
 import { sendEmail } from "../../mutations";
 import { invalidateInboxQueries } from "../../queries";
-import { queryKeys } from "@/lib/query-keys";
 import type { ComposeInitial, DraftState } from "../../types";
 import { buildPlainForwardedHtml } from "../../utils/build-forwarded-html";
 
@@ -74,6 +79,77 @@ function splitForwardedContent(content: string) {
 }
 
 type AttachmentKey = { key: string; filename: string; mimeType: string };
+
+function detectInsertedSignatureId(content: string): string | null {
+  if (!content.includes("data-petit-signature-id")) return null;
+  if (typeof DOMParser === "undefined") return null;
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(content, "text/html");
+  const node = doc.body.querySelector("[data-petit-signature-id]");
+  const id = node?.getAttribute("data-petit-signature-id")?.trim();
+  return id ? id : null;
+}
+
+function stripInsertedSignature(content: string): string {
+  if (!content.includes("data-petit-signature-id")) return content;
+
+  if (typeof DOMParser === "undefined") {
+    return content
+      .replace(
+        /<p><br><\/p>\s*<div[^>]*data-petit-signature-id="[^"]+"[^>]*>[\s\S]*?<\/div>\s*$/i,
+        "",
+      )
+      .replace(
+        /<div[^>]*data-petit-signature-id="[^"]+"[^>]*>[\s\S]*?<\/div>\s*$/i,
+        "",
+      );
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(content, "text/html");
+  const signatures = doc.body.querySelectorAll("[data-petit-signature-id]");
+  signatures.forEach((node) => {
+    const previous = node.previousElementSibling;
+    const previousHtml = previous?.outerHTML?.trim().toLowerCase();
+    const isSpacer =
+      previousHtml === "<p><br></p>" || previousHtml === "<p></p>";
+    if (isSpacer) {
+      previous?.remove();
+    }
+    node.remove();
+  });
+  return doc.body.innerHTML.trim();
+}
+
+function applySignatureToBody(
+  content: string,
+  signature: MailboxSignature | null,
+): string {
+  const withoutSignature = stripInsertedSignature(content);
+  if (!signature) return withoutSignature;
+
+  const signatureBlock = `<div data-petit-signature-id="${signature.id}" style="margin-top:16px;border-top:1px solid #dadce0;padding-top:12px;color:#5f6368;font-size:13px;white-space:pre-wrap">${signature.body}</div>`;
+  if (!withoutSignature.trim()) {
+    return signatureBlock;
+  }
+  return `${withoutSignature}<p><br></p>${signatureBlock}`;
+}
+
+function appendTemplateToBody(
+  content: string,
+  template: MailboxTemplate,
+  signature: MailboxSignature | null,
+): string {
+  const bodyWithoutSignature = stripInsertedSignature(content);
+  const templateBody = template.body.trim();
+  if (!templateBody) {
+    return applySignatureToBody(bodyWithoutSignature, signature);
+  }
+  const nextBody = bodyWithoutSignature.trim()
+    ? `${bodyWithoutSignature}<p><br></p>${templateBody}`
+    : templateBody;
+  return applySignatureToBody(nextBody, signature);
+}
 
 function buildEmailPayload(
   snap: DraftState,
@@ -157,6 +233,10 @@ export function useComposeEmail(
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const [sendPending, setSendPending] = useState(false);
+  const [selectedSignatureId, setSelectedSignatureId] = useState<string | null>(
+    null,
+  );
+  const autoSignatureMailboxRef = useRef<number | null>(null);
 
   const threadId = initial?.threadId;
   const { mailboxId, to, cc, bcc, subject, body, forwardedContent } = draft;
@@ -201,6 +281,13 @@ export function useComposeEmail(
       ),
     [mailboxesQuery.data?.accounts],
   );
+  const activeMailbox = useMemo(
+    () => availableMailboxes.find((entry) => entry.mailboxId === mailboxId),
+    [availableMailboxes, mailboxId],
+  );
+  const signatures = activeMailbox?.signatures.items ?? [];
+  const defaultSignatureId = activeMailbox?.signatures.defaultId ?? null;
+  const templates = activeMailbox?.templates.items ?? [];
 
   useEffect(() => {
     if (draft.mailboxId != null || availableMailboxes.length !== 1) {
@@ -212,7 +299,42 @@ export function useComposeEmail(
     }));
   }, [availableMailboxes, draft.mailboxId]);
 
+  useEffect(() => {
+    if (loadingDraft) return;
+    if (mailboxId == null) return;
+    if (autoSignatureMailboxRef.current === mailboxId) return;
+
+    const existingSignatureId = detectInsertedSignatureId(bodyRef.current);
+    if (existingSignatureId) {
+      if (signatures.some((item) => item.id === existingSignatureId)) {
+        setSelectedSignatureId(existingSignatureId);
+        autoSignatureMailboxRef.current = mailboxId;
+        return;
+      }
+      const cleanedBody = applySignatureToBody(bodyRef.current, null);
+      bodyRef.current = cleanedBody;
+      setDraft((current) => ({ ...current, body: cleanedBody }));
+    }
+
+    const defaultSignature =
+      defaultSignatureId != null
+        ? signatures.find((item) => item.id === defaultSignatureId) ?? null
+        : null;
+
+    if (defaultSignature) {
+      const nextBody = applySignatureToBody(bodyRef.current, defaultSignature);
+      bodyRef.current = nextBody;
+      setDraft((current) => ({ ...current, body: nextBody }));
+      setSelectedSignatureId(defaultSignature.id);
+    } else {
+      setSelectedSignatureId(null);
+    }
+
+    autoSignatureMailboxRef.current = mailboxId;
+  }, [defaultSignatureId, loadingDraft, mailboxId, signatures]);
+
   const setMailboxId = (value: number) => {
+    autoSignatureMailboxRef.current = null;
     setDraft((current) => ({ ...current, mailboxId: value }));
   };
 
@@ -237,11 +359,50 @@ export function useComposeEmail(
     setDraft((current) => ({ ...current, body: value }));
   };
 
+  const applySignatureById = useCallback(
+    (signatureId: string | null) => {
+      const signature =
+        signatureId != null
+          ? signatures.find((item) => item.id === signatureId) ?? null
+          : null;
+      const nextBody = applySignatureToBody(bodyRef.current, signature);
+      bodyRef.current = nextBody;
+      setDraft((current) => ({ ...current, body: nextBody }));
+      setSelectedSignatureId(signature?.id ?? null);
+    },
+    [signatures],
+  );
+
+  const applyTemplateById = useCallback(
+    (templateId: string) => {
+      const template = templates.find((item) => item.id === templateId);
+      if (!template) return;
+      const signature =
+        selectedSignatureId != null
+          ? signatures.find((item) => item.id === selectedSignatureId) ?? null
+          : null;
+      const nextBody = appendTemplateToBody(
+        bodyRef.current,
+        template,
+        signature,
+      );
+      bodyRef.current = nextBody;
+      setDraft((current) => ({
+        ...current,
+        subject: current.subject.trim() ? current.subject : template.subject,
+        body: nextBody,
+      }));
+    },
+    [selectedSignatureId, signatures, templates],
+  );
+
   const clearDraft = useCallback(async () => {
     await serverDraft.clearDraft();
     bodyRef.current = initialDraft.body;
     attachments.clear();
     setSendPending(false);
+    setSelectedSignatureId(null);
+    autoSignatureMailboxRef.current = null;
     setDraft(initialDraft);
   }, [attachments, initialDraft, serverDraft]);
 
@@ -252,7 +413,7 @@ export function useComposeEmail(
       body: bodyRef.current,
     });
     queryClient.invalidateQueries({
-      queryKey: queryKeys.drafts(draftRef.current.mailboxId),
+      queryKey: draftQueryKeys.list(draftRef.current.mailboxId),
     });
     return key;
   }, [composeKey, queryClient]);
@@ -280,10 +441,10 @@ export function useComposeEmail(
       toast.success("Email sent");
       invalidateInboxQueries();
       queryClient.invalidateQueries({
-        queryKey: queryKeys.drafts(draftSnapshotRef.current.mailboxId),
+        queryKey: draftQueryKeys.list(draftSnapshotRef.current.mailboxId),
       });
       if (threadId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.emails.thread(threadId) });
+        queryClient.invalidateQueries({ queryKey: emailQueryKeys.thread(threadId) });
       }
       options?.onSent?.();
     },
@@ -324,9 +485,9 @@ export function useComposeEmail(
           minute: "2-digit",
         }).format(new Date(scheduledFor));
         clearDraft();
-        queryClient.invalidateQueries({ queryKey: queryKeys.scheduledEmails() });
+        queryClient.invalidateQueries({ queryKey: scheduledEmailQueryKeys.all() });
         queryClient.invalidateQueries({
-          queryKey: queryKeys.drafts(draft.mailboxId),
+          queryKey: draftQueryKeys.list(draft.mailboxId),
         });
         toast.success(`Email scheduled for ${timeStr}`);
         options?.onSent?.();
@@ -364,6 +525,11 @@ export function useComposeEmail(
     scheduleSend,
     isPending: sendPending,
     attachments,
+    signatures,
+    selectedSignatureId,
+    applySignatureById,
+    templates,
+    applyTemplateById,
     clearDraft,
     saveDraftNow,
     composeKey,

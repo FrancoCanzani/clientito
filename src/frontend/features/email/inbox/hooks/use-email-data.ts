@@ -1,9 +1,9 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { fetchViewPage } from "@/features/email/inbox/queries";
 import type { EmailListPage } from "@/features/email/inbox/types";
 import { groupEmailsByThread } from "@/features/email/inbox/utils/group-emails-by-thread";
 import type { SplitViewRow } from "@/db/schema";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
-import { queryKeys } from "@/lib/query-keys";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
@@ -44,10 +44,10 @@ export function useEmailData({
   const hasActiveFilters = Boolean(
     filters.unread || filters.starred || filters.hasAttachment,
   );
-  const splitScopeKey = activeSplit?.id ?? queryKeys.emails.baseScope;
+  const splitScopeKey = activeSplit?.id ?? emailQueryKeys.baseScope;
 
   const emailsQuery = useInfiniteQuery({
-    queryKey: queryKeys.emails.listScoped(view, mailboxId, splitScopeKey),
+    queryKey: emailQueryKeys.listScoped(view, mailboxId, splitScopeKey),
     queryFn: ({ pageParam }) =>
       fetchViewPage({
         view,
@@ -60,6 +60,7 @@ export function useEmailData({
       ? { initialData: { pages: [initialPage], pageParams: [""] } }
       : {}),
     getNextPageParam: (lastPage) => lastPage?.cursor ?? undefined,
+    placeholderData: (previousData) => previousData,
     staleTime: 5_000,
     gcTime: 2 * 60_000,
     refetchOnWindowFocus: false,

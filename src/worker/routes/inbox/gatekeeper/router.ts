@@ -223,8 +223,10 @@ gatekeeperRoutes.post(
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to block sender in Gmail";
-        providerError = message;
         requiresReconnect = /403|insufficient|scope|permission/i.test(message);
+        providerError = requiresReconnect
+          ? "Reconnect Gmail in Settings to grant filter-management permission."
+          : message;
       }
     }
 

@@ -1,3 +1,4 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,6 @@ import {
 import type { EmailListItem } from "@/features/email/inbox/types";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
-import { queryKeys } from "@/lib/query-keys";
 import {
   useInfiniteQuery,
   useQuery,
@@ -61,7 +61,7 @@ export default function InboxSearchPage() {
   );
 
   const resultsQuery = useInfiniteQuery({
-    queryKey: queryKeys.emails.search.results(
+    queryKey: emailQueryKeys.search.results(
       normalizeQuery(scope.q),
       scope.mailboxId,
       "inbox",
@@ -87,7 +87,7 @@ export default function InboxSearchPage() {
   });
 
   const suggestionsQuery = useQuery({
-    queryKey: queryKeys.emails.search.suggestions(
+    queryKey: emailQueryKeys.search.suggestions(
       normalizeQuery(scope.q),
       scope.mailboxId,
       "inbox",

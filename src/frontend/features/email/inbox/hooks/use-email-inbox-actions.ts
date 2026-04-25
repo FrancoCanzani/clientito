@@ -1,3 +1,4 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import {
   batchPatchEmails,
   deleteEmailForever,
@@ -9,7 +10,6 @@ import type {
   EmailListPage,
 } from "@/features/email/inbox/types";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
-import { queryKeys } from "@/lib/query-keys";
 import {
   useMutation,
   useQueryClient,
@@ -129,10 +129,10 @@ export function useEmailInboxActions({
     onError: (error, { ids }) => {
       toast.error(error instanceof Error ? error.message : "Action failed");
       // Re-sync to roll back optimistic cache and local DB state.
-      void queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
       for (const id of ids) {
         void queryClient.invalidateQueries({
-          queryKey: queryKeys.emails.detail(id),
+          queryKey: emailQueryKeys.detail(id),
         });
       }
     },
@@ -145,7 +145,7 @@ export function useEmailInboxActions({
 
       const idSet = new Set(ids);
       const snapshots = queryClient.getQueriesData<EmailsCache>({
-        queryKey: queryKeys.emails.all(),
+        queryKey: emailQueryKeys.all(),
       });
       const itemById = new Map<string, EmailListItem>();
       for (const [, cache] of snapshots) {
@@ -174,7 +174,7 @@ export function useEmailInboxActions({
       if (LIST_CHANGING_ACTIONS.has(action)) {
         const idSet = new Set(ids);
         queryClient.setQueriesData<InfiniteData<EmailListPage> | undefined>(
-          { queryKey: queryKeys.emails.list(view, mailboxId) },
+          { queryKey: emailQueryKeys.list(view, mailboxId) },
           (current) => removeIdsFromInfiniteData(current, idSet),
         );
       }

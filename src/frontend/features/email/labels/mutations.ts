@@ -1,7 +1,7 @@
+import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { localDb } from "@/db/client";
 import { invalidateInboxQueries } from "@/features/email/inbox/queries";
 import { queryClient } from "@/lib/query-client";
-import { queryKeys } from "@/lib/query-keys";
 import { syncLabelsFromServer } from "./queries";
 import type { CreateLabelInput, Label, UpdateLabelInput } from "./types";
 
@@ -14,7 +14,7 @@ async function throwOnError(response: Response, fallback: string) {
 
 async function refreshLabels(mailboxId: number) {
   await syncLabelsFromServer(mailboxId);
-  await queryClient.invalidateQueries({ queryKey: queryKeys.labels(mailboxId) });
+  await queryClient.invalidateQueries({ queryKey: labelQueryKeys.list(mailboxId) });
 }
 
 export async function createLabel(mailboxId: number, input: CreateLabelInput): Promise<Label> {

@@ -42,7 +42,7 @@ async function calendarRequest<T>(
   return (await response.json()) as T;
 }
 
-export function normalizeCalendarResponseStatus(
+function normalizeCalendarResponseStatus(
   value: string | null | undefined,
 ): CalendarInviteResponseStatus | null {
   if (!value) return null;

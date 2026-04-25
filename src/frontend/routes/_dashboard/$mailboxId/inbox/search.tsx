@@ -1,3 +1,4 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { Error as RouteError } from "@/components/error";
 import InboxSearchPage from "@/features/email/inbox/pages/inbox-search-page";
 import {
@@ -5,7 +6,6 @@ import {
   fetchSearchSuggestions,
 } from "@/features/email/inbox/queries";
 import type { EmailListPage } from "@/features/email/inbox/types";
-import { queryKeys } from "@/lib/query-keys";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
@@ -34,7 +34,7 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/search")({
     const scope = { ...deps, mailboxId: params.mailboxId };
     const includeJunk = scope.includeJunk ?? false;
     const suggestions = await context.queryClient.ensureQueryData({
-      queryKey: queryKeys.emails.search.suggestions(
+      queryKey: emailQueryKeys.search.suggestions(
         normalizedQuery,
         scope.mailboxId,
         "inbox",
@@ -50,7 +50,7 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/search")({
       normalizedQuery.length >= 2
         ? (
             await context.queryClient.ensureInfiniteQueryData({
-              queryKey: queryKeys.emails.search.results(
+              queryKey: emailQueryKeys.search.results(
                 normalizedQuery,
                 scope.mailboxId,
                 "inbox",

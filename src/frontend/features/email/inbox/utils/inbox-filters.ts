@@ -11,7 +11,7 @@ export type EmailView =
 export type EmailFolderView = Exclude<EmailView, "inbox">;
 export type InboxLabelView = "important" | (string & {});
 
-export const VIEW_VALUES: ReadonlyArray<EmailView> = [
+const VIEW_VALUES: ReadonlyArray<EmailView> = [
   "inbox",
   "sent",
   "spam",
@@ -22,7 +22,7 @@ export const VIEW_VALUES: ReadonlyArray<EmailView> = [
   "important",
 ];
 
-export const FOLDER_VIEW_VALUES: ReadonlyArray<EmailFolderView> = [
+const FOLDER_VIEW_VALUES: ReadonlyArray<EmailFolderView> = [
   "sent",
   "spam",
   "trash",
@@ -31,7 +31,7 @@ export const FOLDER_VIEW_VALUES: ReadonlyArray<EmailFolderView> = [
   "starred",
 ];
 
-export const INBOX_LABEL_VALUES: ReadonlyArray<InboxLabelView> = [
+const INBOX_LABEL_VALUES: ReadonlyArray<InboxLabelView> = [
   "important",
 ];
 

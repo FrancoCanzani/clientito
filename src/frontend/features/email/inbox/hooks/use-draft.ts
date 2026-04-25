@@ -1,6 +1,6 @@
+import { draftQueryKeys } from "@/features/email/inbox/query-keys";
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
-import { queryKeys } from "@/lib/query-keys";
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DraftState } from "../types";
@@ -125,7 +125,7 @@ export function useDraft(composeKey: string, draft: DraftState) {
     clearDraft: async () => {
       await deleteDraftByKey(composeKey);
       queryClient.invalidateQueries({
-        queryKey: queryKeys.drafts(draftRef.current.mailboxId),
+        queryKey: draftQueryKeys.list(draftRef.current.mailboxId),
       });
     },
   };

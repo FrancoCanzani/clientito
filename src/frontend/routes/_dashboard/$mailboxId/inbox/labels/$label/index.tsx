@@ -1,9 +1,9 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { LoadingEmailsPending } from "@/components/loading-emails-pending";
 import { Error as RouteError } from "@/components/error";
 import LabelPage from "@/features/email/inbox/pages/label-page";
 import { fetchViewPage } from "@/features/email/inbox/queries";
 import { parseInboxLabelParam } from "@/features/email/inbox/utils/inbox-filters";
-import { queryKeys } from "@/lib/query-keys";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute(
@@ -14,8 +14,8 @@ export const Route = createFileRoute(
   },
   skipRouteOnParseError: { params: true },
   loader: async ({ context, params }) => {
-    await context.queryClient.prefetchInfiniteQuery({
-      queryKey: queryKeys.emails.listBase(params.label, params.mailboxId),
+    void context.queryClient.prefetchInfiniteQuery({
+      queryKey: emailQueryKeys.listBase(params.label, params.mailboxId),
       queryFn: ({ pageParam }) =>
         fetchViewPage({
           view: params.label,
@@ -28,6 +28,7 @@ export const Route = createFileRoute(
     });
   },
   pendingComponent: LoadingEmailsPending,
+  pendingMs: 120,
   errorComponent: RouteError,
   component: LabelPage,
 });

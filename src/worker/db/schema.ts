@@ -20,6 +20,7 @@ export const mailboxes = sqliteTable(
     provider: text("provider").$type<"google" | "outlook">().notNull().default("google"),
     email: text("email"),
     signature: text("signature"),
+    templates: text("templates"),
     historyId: text("history_id"),
     syncWindowMonths: integer("sync_window_months"),
     syncCutoffAt: integer("sync_cutoff_at"),

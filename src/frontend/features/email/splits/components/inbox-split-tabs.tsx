@@ -5,12 +5,14 @@ export type InboxSplitTabsProps = {
   splits: SplitViewRow[];
   activeSplitId: string | null;
   onSelect: (splitId: string | null) => void;
+  onPrefetch?: (split: SplitViewRow) => void;
 };
 
 export function InboxSplitTabs({
   splits,
   activeSplitId,
   onSelect,
+  onPrefetch,
 }: InboxSplitTabsProps) {
   const visible = splits
     .filter((s) => s.visible)
@@ -27,6 +29,8 @@ export function InboxSplitTabs({
             key={split.id}
             type="button"
             onClick={() => onSelect(active ? null : split.id)}
+            onMouseEnter={() => onPrefetch?.(split)}
+            onFocus={() => onPrefetch?.(split)}
             className={cn(
               "inline-flex h-7 shrink-0 items-center rounded-md border px-2 transition-colors",
               active

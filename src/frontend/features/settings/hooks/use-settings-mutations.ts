@@ -1,12 +1,13 @@
+import { accountQueryKeys } from "@/features/settings/query-keys";
 import { clearLocalData } from "@/db/client";
 import { beginGmailConnection } from "@/features/onboarding/mutations";
 import {
   deleteAccount,
   updateMailboxSignature,
+  updateMailboxTemplates,
   updateSyncPreference,
 } from "@/features/settings/mutations";
 import { removeAccount } from "@/hooks/use-mailboxes";
-import { queryKeys } from "@/lib/query-keys";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -19,7 +20,8 @@ export function useSettingsMutations({
   const queryClient = useQueryClient();
 
   const addAccountMutation = useMutation({
-    mutationFn: () => beginGmailConnection("/settings?connected=1"),
+    mutationFn: () =>
+      beginGmailConnection(`${window.location.pathname}?connected=1`),
     onError: () => toast.error("Failed to connect Gmail account"),
   });
 
@@ -33,7 +35,7 @@ export function useSettingsMutations({
     },
     onSuccess: async () => {
       toast.success("Account removed");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+      await queryClient.invalidateQueries({ queryKey: accountQueryKeys.all() });
     },
     onError: (error) => toast.error(error.message),
     onSettled: () => setRemovingAccountId(null),
@@ -74,7 +76,7 @@ export function useSettingsMutations({
       );
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+      await queryClient.invalidateQueries({ queryKey: accountQueryKeys.all() });
       toast.success("Import history updated");
     },
     onError: (error) => toast.error(error.message),
@@ -94,10 +96,25 @@ export function useSettingsMutations({
       signature: string;
     }) => updateMailboxSignature(mailboxId, signature),
     onSuccess: async () => {
-      toast.success("Signature saved");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
+      toast.success("Signatures saved");
+      await queryClient.invalidateQueries({ queryKey: accountQueryKeys.all() });
     },
-    onError: () => toast.error("Failed to save signature"),
+    onError: () => toast.error("Failed to save signatures"),
+  });
+
+  const templatesMutation = useMutation({
+    mutationFn: async ({
+      mailboxId,
+      templates,
+    }: {
+      mailboxId: number;
+      templates: string;
+    }) => updateMailboxTemplates(mailboxId, templates),
+    onSuccess: async () => {
+      toast.success("Templates saved");
+      await queryClient.invalidateQueries({ queryKey: accountQueryKeys.all() });
+    },
+    onError: () => toast.error("Failed to save templates"),
   });
 
   const deleteMutation = useMutation({
@@ -118,6 +135,7 @@ export function useSettingsMutations({
     syncPreferenceMutation,
     pendingSyncWindowMailboxIds,
     signatureMutation,
+    templatesMutation,
     deleteMutation,
   };
 }

@@ -47,7 +47,23 @@ export async function updateMailboxSignature(
 
   if (!response.ok) {
     const json = await response.json().catch(() => ({}));
-    throw new Error(getErrorMessage(json) ?? "Failed to update signature");
+    throw new Error(getErrorMessage(json) ?? "Failed to update signatures");
+  }
+}
+
+export async function updateMailboxTemplates(
+  mailboxId: number,
+  templates: string,
+): Promise<void> {
+  const response = await fetch(`/api/settings/mailboxes/${mailboxId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ templates }),
+  });
+
+  if (!response.ok) {
+    const json = await response.json().catch(() => ({}));
+    throw new Error(getErrorMessage(json) ?? "Failed to update templates");
   }
 }
 

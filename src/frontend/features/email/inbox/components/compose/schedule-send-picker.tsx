@@ -42,14 +42,6 @@ function getNextMondayMorning(): number {
   return d.getTime();
 }
 
-const dateFormat = new Intl.DateTimeFormat(undefined, {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
-
 export function ScheduleSendPicker({
   onSchedule,
   children,
@@ -165,8 +157,4 @@ export function ScheduleSendPicker({
       </PopoverContent>
     </Popover>
   );
-}
-
-export function formatScheduledTime(timestamp: number): string {
-  return dateFormat.format(new Date(timestamp));
 }

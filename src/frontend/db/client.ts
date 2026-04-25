@@ -127,7 +127,7 @@ function parseLabelIds(raw: string | null): string[] {
   }
 }
 
-export type LocalInlineAttachment = {
+type LocalInlineAttachment = {
   contentId: string;
   attachmentId: string;
   mimeType: string | null;
@@ -160,7 +160,7 @@ function parseInlineAttachments(
   }
 }
 
-export type LocalAttachment = {
+type LocalAttachment = {
   attachmentId: string;
   filename: string | null;
   mimeType: string | null;
@@ -646,7 +646,7 @@ export const localDb = {
     mailboxId?: number;
     limit?: number;
     offset?: number;
-    cursor?: number;
+    cursor?: { date: number; id?: number };
     search?: string;
     isRead?: "true" | "false";
     starred?: boolean;
@@ -694,12 +694,21 @@ export const localDb = {
 
     if (splitRule) fragments.push(...buildSplitRuleConditions(splitRule));
 
-    if (cursor != null) fragments.push({ sql: "date < ?", params: [cursor] });
+    if (cursor != null) {
+      if (typeof cursor.id === "number" && Number.isFinite(cursor.id)) {
+        fragments.push({
+          sql: "(date < ? OR (date = ? AND id < ?))",
+          params: [cursor.date, cursor.date, cursor.id],
+        });
+      } else {
+        fragments.push({ sql: "date < ?", params: [cursor.date] });
+      }
+    }
 
     const { where, params: whereParams } = composeWhere(fragments);
     const effectiveOffset = cursor != null ? 0 : offset;
 
-    const sql = `SELECT ${EMAIL_SUMMARY_SELECT} FROM emails ${where} ORDER BY date DESC LIMIT ? OFFSET ?`;
+    const sql = `SELECT ${EMAIL_SUMMARY_SELECT} FROM emails ${where} ORDER BY date DESC, id DESC LIMIT ? OFFSET ?`;
     const allParams = [...whereParams, limit + 1, effectiveOffset];
     const res = await dbClient.exec(sql, allParams, "rows");
 
@@ -714,7 +723,7 @@ export const localDb = {
         limit,
         offset,
         hasMore,
-        cursor: lastRow?.date,
+        cursor: lastRow ? { date: lastRow.date, id: lastRow.id } : undefined,
       },
     };
   },
@@ -832,8 +841,9 @@ export const localDb = {
   async reconcileGatekeeperKnownSenders(params: {
     userId: string;
     mailboxId: number;
+    gatekeeperActivatedAt: number;
   }): Promise<void> {
-    const { userId, mailboxId } = params;
+    const { userId, mailboxId, gatekeeperActivatedAt } = params;
     await dbClient.exec(
       `UPDATE emails AS pending
        SET is_gatekept = 0
@@ -846,10 +856,10 @@ export const localDb = {
            WHERE known.user_id = pending.user_id
              AND known.mailbox_id = pending.mailbox_id
              AND known.direction = ?
-             AND known.is_gatekept = 0
+             AND (known.is_gatekept = 0 OR known.date < ?)
              AND LOWER(known.from_addr) = LOWER(pending.from_addr)
          )`,
-      [userId, mailboxId, "received"],
+      [userId, mailboxId, "received", gatekeeperActivatedAt],
       "run",
     );
   },
@@ -1418,9 +1428,10 @@ export const localDb = {
   async getKnownSenders(params: {
     userId: string;
     mailboxId: number;
+    gatekeeperActivatedAt: number;
     senders: string[];
   }): Promise<string[]> {
-    const { userId, mailboxId, senders } = params;
+    const { userId, mailboxId, gatekeeperActivatedAt, senders } = params;
     const normalized = Array.from(
       new Set(
         senders.map((sender) => sender.trim().toLowerCase()).filter(Boolean),
@@ -1437,9 +1448,10 @@ export const localDb = {
       const res = await dbClient.exec(
         `SELECT DISTINCT LOWER(from_addr) AS from_addr
          FROM emails
-         WHERE user_id = ? AND mailbox_id = ? AND direction = ? AND is_gatekept = 0
+         WHERE user_id = ? AND mailbox_id = ? AND direction = ?
+           AND (is_gatekept = 0 OR date < ?)
            AND LOWER(from_addr) IN (${placeholders})`,
-        [userId, mailboxId, "received", ...chunk],
+        [userId, mailboxId, "received", gatekeeperActivatedAt, ...chunk],
         "rows",
       );
 

@@ -4,7 +4,7 @@ type Heading = {
   text: string;
 };
 
-export type Doc = {
+type Doc = {
   slug: string;
   title: string;
   description: string;

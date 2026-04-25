@@ -109,32 +109,6 @@ export type GmailAttachmentResponse = {
   size?: number;
 };
 
-export type GmailHistoryResponse = {
-  history?: Array<{
-    id?: string;
-    messagesAdded?: Array<{
-      message?: { id?: string };
-    }>;
-    messagesDeleted?: Array<{
-      message?: { id?: string };
-    }>;
-    labelsAdded?: Array<{
-      message?: { id?: string };
-      labelIds?: string[];
-    }>;
-    labelsRemoved?: Array<{
-      message?: { id?: string };
-      labelIds?: string[];
-    }>;
-  }>;
-  nextPageToken?: string;
-  historyId?: string;
-};
-
-export type GmailProfileResponse = {
-  historyId?: string;
-};
-
 export type GmailErrorResponse = {
   error?: {
     status?: string;
@@ -144,13 +118,6 @@ export type GmailErrorResponse = {
       message?: string;
     }>;
   };
-};
-
-export type GmailSyncResult = {
-  processed: number;
-  inserted: number;
-  skipped: number;
-  historyId: string | null;
 };
 
 export type GmailAttachmentMeta = AttachmentMeta;
@@ -176,9 +143,3 @@ export type GmailLabel = {
 export type GmailLabelsListResponse = {
   labels: GmailLabel[];
 };
-
-export type SyncProgressFn = (
-  phase: string,
-  current: number,
-  total: number,
-) => Promise<void>;

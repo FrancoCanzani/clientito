@@ -1,3 +1,4 @@
+import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { queryKeys } from "@/lib/query-keys";
 import { PlusIcon, TagIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -39,7 +39,7 @@ export function LabelPicker({
   );
 
   const labelsQuery = useQuery({
-    queryKey: queryKeys.labels(mailboxId),
+    queryKey: labelQueryKeys.list(mailboxId),
     queryFn: () => fetchLabels(mailboxId),
   });
 

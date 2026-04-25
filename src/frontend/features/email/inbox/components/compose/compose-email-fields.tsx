@@ -131,6 +131,11 @@ export function ComposeEmailFields({
     scheduleSend,
     isPending,
     attachments,
+    signatures,
+    selectedSignatureId,
+    applySignatureById,
+    templates,
+    applyTemplateById,
   } = compose;
 
   const [showCc, setShowCc] = useState(cc.length > 0);
@@ -474,6 +479,79 @@ export function ComposeEmailFields({
             >
               <TextAaIcon className="size-3" />
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isReviewing}
+                  className="h-7 px-2 text-xs"
+                >
+                  Sig
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuItem
+                  onSelect={() => applySignatureById(null)}
+                >
+                  {selectedSignatureId == null ? (
+                    <CheckIcon className="size-3" />
+                  ) : (
+                    <span className="size-3" />
+                  )}
+                  No signature
+                </DropdownMenuItem>
+                {signatures.length === 0 && (
+                  <DropdownMenuItem disabled>
+                    <span className="size-3" />
+                    No saved signatures
+                  </DropdownMenuItem>
+                )}
+                {signatures.map((signature) => (
+                  <DropdownMenuItem
+                    key={signature.id}
+                    onSelect={() => applySignatureById(signature.id)}
+                  >
+                    {selectedSignatureId === signature.id ? (
+                      <CheckIcon className="size-3" />
+                    ) : (
+                      <span className="size-3" />
+                    )}
+                    {signature.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isReviewing}
+                  className="h-7 px-2 text-xs"
+                >
+                  Tpl
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                {templates.length === 0 ? (
+                  <DropdownMenuItem disabled>
+                    <span className="size-3" />
+                    No saved templates
+                  </DropdownMenuItem>
+                ) : (
+                  templates.map((template) => (
+                    <DropdownMenuItem
+                      key={template.id}
+                      onSelect={() => applyTemplateById(template.id)}
+                    >
+                      <span className="size-3" />
+                      <span className="min-w-0 truncate">{template.name}</span>
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
             {isReviewing ? (
               <>
                 <Button

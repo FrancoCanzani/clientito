@@ -1,3 +1,4 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import {
   EmailDetailContent,
@@ -18,7 +19,6 @@ import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-e
 import { isEmailListInfiniteData } from "@/features/email/inbox/utils/email-list-cache";
 import { clearFocusedEmail, setFocusedEmail } from "@/hooks/use-focused-email";
 import { useHotkeys } from "@/hooks/use-hotkeys";
-import { queryKeys } from "@/lib/query-keys";
 import {
   useMutation,
   useQuery,
@@ -49,7 +49,7 @@ export function EmailDetailView({
   const contentRef = useRef<EmailDetailContentHandle>(null);
 
   const emailQuery = useQuery({
-    queryKey: queryKeys.emails.detail(emailId),
+    queryKey: emailQueryKeys.detail(emailId),
     queryFn: () =>
       fetchEmailDetail(emailId, {
         mailboxId,
@@ -82,7 +82,7 @@ export function EmailDetailView({
 
   const orderedEmails = useMemo(() => {
     const snapshots = queryClient.getQueriesData<InfiniteData<EmailListPage>>({
-      queryKey: queryKeys.emails.list(view, mailboxId),
+      queryKey: emailQueryKeys.list(view, mailboxId),
     });
     const candidateLists = snapshots
       .map(([, data]) => data)
@@ -154,7 +154,7 @@ export function EmailDetailView({
     for (const neighborId of [previousId, nextId]) {
       if (!neighborId) continue;
       void queryClient.prefetchQuery({
-        queryKey: queryKeys.emails.detail(neighborId),
+        queryKey: emailQueryKeys.detail(neighborId),
         queryFn: () =>
           fetchEmailDetail(neighborId, {
             mailboxId,
@@ -167,7 +167,7 @@ export function EmailDetailView({
   }, [currentIndex, orderedIds, queryClient, mailboxId, view]);
 
   const threadQuery = useQuery({
-    queryKey: queryKeys.emails.thread(currentEmail.threadId ?? "none"),
+    queryKey: emailQueryKeys.thread(currentEmail.threadId ?? "none"),
     queryFn: () =>
       currentEmail.threadId
         ? fetchEmailThread(currentEmail.threadId)

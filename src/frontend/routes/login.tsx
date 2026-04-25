@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { GMAIL_SCOPES } from "@/features/onboarding/mutations";
 import { signIn } from "@/lib/auth-client";
 import { CircleNotchIcon, GoogleLogoIcon } from "@phosphor-icons/react";
 import { useMutation } from "@tanstack/react-query";
@@ -17,6 +18,7 @@ function LoginRoute() {
       const result = await signIn.social({
         provider: "google",
         callbackURL: "/",
+        scopes: GMAIL_SCOPES,
       });
 
       if (result?.error) {

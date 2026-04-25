@@ -1,3 +1,4 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { Button } from "@/components/ui/button";
 import { respondToCalendarInvite } from "@/features/email/inbox/mutations";
 import { fetchCalendarInvitePreview } from "@/features/email/inbox/queries";
@@ -6,7 +7,6 @@ import type {
   CalendarInviteResponseStatus,
   EmailDetailItem,
 } from "@/features/email/inbox/types";
-import { queryKeys } from "@/lib/query-keys";
 import { CalendarIcon, MapPinIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -54,7 +54,7 @@ export function CalendarInviteCard({ email }: { email: EmailDetailItem }) {
   const queryKey =
     mailboxId == null
       ? (["calendar-invite-preview", "none", email.providerMessageId] as const)
-      : queryKeys.emails.calendarInvitePreview(mailboxId, email.providerMessageId);
+      : emailQueryKeys.calendarInvitePreview(mailboxId, email.providerMessageId);
 
   const previewQuery = useQuery({
     queryKey,

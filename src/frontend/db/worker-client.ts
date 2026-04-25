@@ -1,6 +1,6 @@
 type BindParam = string | number | boolean | null | Uint8Array;
 
-export type ExecMode = "rows" | "run" | "get";
+type ExecMode = "rows" | "run" | "get";
 
 type RpcRequest =
   | { id: number; type: "init" }

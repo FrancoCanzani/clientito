@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
 import { LabelsSettingsSection } from "@/features/settings/components/labels-settings-section";
@@ -21,7 +22,6 @@ import {
   MoonIcon,
   SpinnerGapIcon,
   SunIcon,
-  TrashIcon,
 } from "@phosphor-icons/react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -51,11 +51,11 @@ export default function SettingsPage() {
 
   const accountsQuery = useMailboxes();
   const accounts = accountsQuery.data?.accounts ?? [];
+  const isLoadingAccounts = accountsQuery.isPending;
+  const activeAccount =
+    accounts.find((account) => account.mailboxId === mailboxId) ?? null;
 
   const {
-    addAccountMutation,
-    removeAccountMutation,
-    removingAccountId,
     fullReimportMutation,
     pendingMailboxActionIds,
     signatureMutation,
@@ -80,182 +80,249 @@ export default function SettingsPage() {
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-8 px-4 pb-12">
-      <PageHeader title="Settings" className="px-0" />
-
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Account
-          </h2>
-        </div>
-        <div className="border-t border-border/60">
-          <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-0.5">
-              <p className="text-sm font-medium">Name</p>
-            </div>
-            <p className="text-sm text-foreground sm:text-right">
-              {user?.name ?? "—"}
-            </p>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <PageHeader
+        title={
+          <div className="flex items-center gap-2">
+            <SidebarTrigger className="md:hidden" />
+            <span>Settings</span>
           </div>
-          <div className="border-t border-border/60" />
-          <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-0.5">
-              <p className="text-sm font-medium">Email</p>
-            </div>
-            <p className="truncate text-sm text-foreground sm:text-right">
-              {user?.email ?? "—"}
-            </p>
+        }
+        className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+      />
+
+      <div className="mx-auto w-full max-w-6xl px-4 pb-12">
+        {isLoadingAccounts ? (
+          <div className="flex min-h-[40vh] items-center justify-center">
+            <SpinnerGapIcon className="size-6 animate-spin text-muted-foreground" />
           </div>
-        </div>
-      </section>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <aside className="hidden lg:block">
+              <div className="sticky top-20 p-1">
+                <p className="px-3 py-1 text-[10px] font-medium text-muted-foreground">
+                  General
+                </p>
+                <a
+                  href="#account"
+                  className="block rounded-md px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                >
+                  Account
+                </a>
+                <a
+                  href="#appearance"
+                  className="block rounded-md px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                >
+                  Appearance
+                </a>
 
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Connected accounts
-          </h2>
-          <p className="max-w-lg text-sm text-muted-foreground">
-            Manage your linked Gmail accounts.
-          </p>
-        </div>
+                <p className="px-3 pt-4 pb-1 text-[10px] font-medium text-muted-foreground">
+                  Mail
+                </p>
+                <a
+                  href="#connected-accounts"
+                  className="block rounded-md px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                >
+                  Mailbox
+                </a>
+                <a
+                  href="#labels"
+                  className="block rounded-md px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                >
+                  Labels
+                </a>
 
-        <div className="border-t border-border/60">
-          {accounts.map((account) => (
-            <AccountRow
-              key={account.accountId}
-              account={account}
-              canRemove={accounts.length > 1}
-              isBusy={
-                account.mailboxId != null &&
-                pendingMailboxActionIds.includes(account.mailboxId)
-              }
-              isRemoving={removingAccountId === account.accountId}
-              onRemove={() => removeAccountMutation.mutate(account.accountId)}
-              onReimport={async (mailboxId) => {
-                const drafts = await countLocalDrafts();
-                if (!confirmReimport(drafts)) return;
-                fullReimportMutation.mutate(mailboxId);
-              }}
-              onSaveSignature={(mailboxId, signature) =>
-                signatureMutation.mutate({ mailboxId, signature })
-              }
-              isSavingSignature={signatureMutation.isPending}
-            />
-          ))}
-
-          <div className="py-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => addAccountMutation.mutate()}
-              disabled={addAccountMutation.isPending}
-            >
-              Add Gmail account
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <LabelsSettingsSection mailboxId={mailboxId} />
-
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Appearance
-          </h2>
-        </div>
-        <div className="border-t border-border/60">
-          <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-0.5">
-              <p className="text-sm font-medium">Theme</p>
-              <p className="text-xs text-muted-foreground">
-                Choose how Petit looks.
-              </p>
-            </div>
-            <div className="min-w-0 sm:max-w-[60%]">
-              <ButtonGroup className="w-full sm:w-auto">
-                {themeOptions.map((option) => (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    size="sm"
-                    variant={theme === option.value ? "default" : "outline"}
-                    onClick={() => setTheme(option.value)}
-                  >
-                    <option.icon className="size-3.5" />
-                    {option.label}
-                  </Button>
-                ))}
-              </ButtonGroup>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-destructive">
-            Danger Zone
-          </h2>
-          <p className="max-w-lg text-sm text-muted-foreground">
-            Permanently delete your account and all associated data.
-          </p>
-        </div>
-        <div className="border-t border-destructive/30">
-          <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-0.5">
-              <p className="text-sm font-medium">Delete account</p>
-              <p className="text-xs text-muted-foreground">
-                Type "DELETE" to enable the action.
-              </p>
-            </div>
-            <div className="min-w-0 sm:max-w-[60%]">
-              <div className="space-y-3">
-                <Input
-                  value={confirmText}
-                  onChange={(e) => setConfirmText(e.target.value)}
-                  placeholder='Type "DELETE" to confirm'
-                  className="w-full text-sm sm:w-64"
-                />
-                <div className="flex justify-end sm:justify-start">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => deleteMutation.mutate()}
-                    disabled={
-                      confirmText !== "DELETE" || deleteMutation.isPending
-                    }
-                  >
-                    {deleteMutation.isPending
-                      ? "Deleting..."
-                      : "Delete account"}
-                  </Button>
-                </div>
+                <p className="px-3 pt-4 pb-1 text-[10px] font-medium text-muted-foreground">
+                  Safety
+                </p>
+                <a
+                  href="#danger-zone"
+                  className="block rounded-md px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                >
+                  Danger zone
+                </a>
               </div>
+            </aside>
+
+            <div className="space-y-12">
+              <section id="account" className="scroll-mt-20">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-medium text-muted-foreground">
+                    General
+                  </p>
+                  <h2 className="text-xs font-medium text-foreground">
+                    Account
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Basic profile details for your Petit account.
+                  </p>
+                </div>
+                <div className="mt-4 border-t border-border/60">
+                  <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium">Name</p>
+                    </div>
+                    <p className="text-xs text-foreground sm:text-right">
+                      {user?.name ?? "—"}
+                    </p>
+                  </div>
+                  <div className="border-t border-border/60" />
+                  <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium">Email</p>
+                    </div>
+                    <p className="truncate text-xs text-foreground sm:text-right">
+                      {user?.email ?? "—"}
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              <section id="connected-accounts" className="scroll-mt-20">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-medium text-muted-foreground">
+                    Mail
+                  </p>
+                  <h2 className="text-xs font-medium text-foreground">
+                    Mailbox
+                  </h2>
+                  <p className="max-w-lg text-xs text-muted-foreground">
+                    Settings for the currently selected account.
+                  </p>
+                </div>
+
+                <div className="mt-4 border-t border-border/60">
+                  {activeAccount ? (
+                    <AccountRow
+                      account={activeAccount}
+                      isBusy={
+                        activeAccount.mailboxId != null &&
+                        pendingMailboxActionIds.includes(activeAccount.mailboxId)
+                      }
+                      onReimport={async (mailboxId) => {
+                        const drafts = await countLocalDrafts();
+                        if (!confirmReimport(drafts)) return;
+                        fullReimportMutation.mutate(mailboxId);
+                      }}
+                      onSaveSignature={(mailboxId, signature) =>
+                        signatureMutation.mutate({ mailboxId, signature })
+                      }
+                      isSavingSignature={signatureMutation.isPending}
+                    />
+                  ) : (
+                    <p className="py-3 text-xs text-muted-foreground">
+                      Mailbox not found.
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              <LabelsSettingsSection mailboxId={mailboxId} />
+
+              <section id="appearance" className="scroll-mt-20">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-medium text-muted-foreground">
+                    General
+                  </p>
+                  <h2 className="text-xs font-medium text-foreground">
+                    Appearance
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Pick how the interface is rendered.
+                  </p>
+                </div>
+                <div className="mt-4 border-t border-border/60">
+                  <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium">Theme</p>
+                      <p className="text-xs text-muted-foreground">
+                        Choose how Petit looks.
+                      </p>
+                    </div>
+                    <div className="min-w-0 sm:max-w-[60%]">
+                      <ButtonGroup className="w-full sm:w-auto">
+                        {themeOptions.map((option) => (
+                          <Button
+                            key={option.value}
+                            type="button"
+                            size="sm"
+                            variant={theme === option.value ? "default" : "outline"}
+                            onClick={() => setTheme(option.value)}
+                          >
+                            <option.icon className="size-3.5" />
+                            {option.label}
+                          </Button>
+                        ))}
+                      </ButtonGroup>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section id="danger-zone" className="scroll-mt-20">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-medium text-muted-foreground">
+                    Safety
+                  </p>
+                  <h2 className="text-xs font-medium text-destructive">
+                    Danger Zone
+                  </h2>
+                  <p className="max-w-lg text-xs text-muted-foreground">
+                    Permanently delete your account and all associated data.
+                  </p>
+                </div>
+                <div className="mt-4 border-t border-destructive/30">
+                  <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium">Delete account</p>
+                      <p className="text-xs text-muted-foreground">
+                        Type "DELETE" to enable the action.
+                      </p>
+                    </div>
+                    <div className="min-w-0 sm:max-w-[60%]">
+                      <div className="space-y-3">
+                        <Input
+                          value={confirmText}
+                          onChange={(e) => setConfirmText(e.target.value)}
+                          placeholder='Type "DELETE" to confirm'
+                          className="w-full text-xs sm:w-64"
+                        />
+                        <div className="flex justify-end sm:justify-start">
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => deleteMutation.mutate()}
+                            disabled={
+                              confirmText !== "DELETE" || deleteMutation.isPending
+                            }
+                          >
+                            {deleteMutation.isPending
+                              ? "Deleting..."
+                              : "Delete account"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
-        </div>
-      </section>
+        )}
+      </div>
     </div>
   );
 }
 
 function AccountRow({
   account,
-  canRemove,
   isBusy,
-  isRemoving,
-  onRemove,
   onReimport,
   onSaveSignature,
   isSavingSignature,
 }: {
   account: MailboxAccount;
-  canRemove: boolean;
   isBusy: boolean;
-  isRemoving: boolean;
-  onRemove: () => void;
   onReimport: (mailboxId: number) => void | Promise<void>;
   onSaveSignature: (mailboxId: number, signature: string) => void;
   isSavingSignature: boolean;
@@ -270,7 +337,7 @@ function AccountRow({
     <div>
       <div className="flex items-start justify-between gap-3 py-4">
         <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="truncate text-sm font-medium">
+          <p className="truncate text-xs font-medium">
             {getMailboxDisplayEmail(account) ?? "Unknown account"}
           </p>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -281,29 +348,19 @@ function AccountRow({
           </div>
           <p className="text-xs text-muted-foreground">{statusCopy.detail}</p>
         </div>
-        {canRemove && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onRemove}
-            disabled={isRemoving || isBusy}
-          >
-            <TrashIcon className="size-3.5 text-muted-foreground" />
-          </Button>
-        )}
       </div>
 
       <div className="border-t border-border/60">
         <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-0.5">
-            <p className="text-sm font-medium">Clear local cache</p>
+            <p className="text-xs font-medium">Clear local cache</p>
             <p className="text-xs text-muted-foreground">
               {statusCopy.reimportHint}
             </p>
           </div>
           <div className="min-w-0 sm:max-w-[60%]">
             {isBusy ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <SpinnerGapIcon className="size-4 animate-spin" />
                 <span>In progress</span>
               </div>

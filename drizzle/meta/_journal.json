@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1776106177288,
-      "tag": "0000_amused_obadiah_stane",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1776197296414,
-      "tag": "0001_pale_vulture",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1776622427218,
-      "tag": "0002_omniscient_dazzler",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1776804376236,
-      "tag": "0003_chief_baron_zemo",
+      "when": 1777149099393,
+      "tag": "0000_gray_surge",
       "breakpoints": true
     }
   ]

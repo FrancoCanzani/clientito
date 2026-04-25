@@ -1,10 +1,10 @@
+import { splitViewQueryKeys } from "@/features/email/splits/query-keys";
 import { localDb } from "@/db/client";
 import type {
   SplitRule,
   SplitViewRow,
 } from "@/db/schema";
 import { queryClient } from "@/lib/query-client";
-import { queryKeys } from "@/lib/query-keys";
 import { useQuery } from "@tanstack/react-query";
 
 type ApiSplitView = {
@@ -30,7 +30,7 @@ function toRow(api: ApiSplitView): SplitViewRow {
   return { ...api };
 }
 
-export async function fetchSplitViews(): Promise<SplitViewRow[]> {
+async function fetchSplitViews(): Promise<SplitViewRow[]> {
   const response = await fetch("/api/split-views", {
     credentials: "include",
   });
@@ -57,7 +57,7 @@ export async function fetchSplitViews(): Promise<SplitViewRow[]> {
 
 export function useSplitViews() {
   return useQuery({
-    queryKey: queryKeys.splitViews(),
+    queryKey: splitViewQueryKeys.all(),
     queryFn: fetchSplitViews,
     staleTime: 30_000,
   });
@@ -90,11 +90,11 @@ export async function createSplitView(
     data: { splitView: ApiSplitView };
   };
   const row = toRow(json.data.splitView);
-  queryClient.invalidateQueries({ queryKey: queryKeys.splitViews() });
+  queryClient.invalidateQueries({ queryKey: splitViewQueryKeys.all() });
   return row;
 }
 
-export async function updateSplitView(
+async function updateSplitView(
   id: string,
   patch: Partial<SplitViewCreateInput> & { position?: number },
 ): Promise<SplitViewRow> {
@@ -111,19 +111,8 @@ export async function updateSplitView(
     data: { splitView: ApiSplitView };
   };
   const row = toRow(json.data.splitView);
-  queryClient.invalidateQueries({ queryKey: queryKeys.splitViews() });
+  queryClient.invalidateQueries({ queryKey: splitViewQueryKeys.all() });
   return row;
-}
-
-export async function deleteSplitView(id: string): Promise<void> {
-  const response = await fetch(`/api/split-views/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to delete split (${response.status})`);
-  }
-  queryClient.invalidateQueries({ queryKey: queryKeys.splitViews() });
 }
 
 export async function setSplitViewVisible(
@@ -153,6 +142,6 @@ export async function setSystemSplitVisible(
     data: { splitView: ApiSplitView };
   };
   const row = toRow(json.data.splitView);
-  queryClient.invalidateQueries({ queryKey: queryKeys.splitViews() });
+  queryClient.invalidateQueries({ queryKey: splitViewQueryKeys.all() });
   return row;
 }

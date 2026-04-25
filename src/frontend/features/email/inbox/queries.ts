@@ -1,8 +1,9 @@
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
+import { gatekeeperQueryKeys } from "@/features/email/gatekeeper/query-keys";
 import { localDb, type EmailInsert } from "@/db/client";
 import type { EmailAICategory, SplitRule } from "@/db/schema";
 import { getCurrentUserId } from "@/db/user";
 import { queryClient } from "@/lib/query-client";
-import { queryKeys } from "@/lib/query-keys";
 import { asyncQueue } from "@tanstack/pacer/async-queuer";
 import type {
   CalendarInvitePreview,
@@ -232,6 +233,7 @@ async function resolveGatekeeperTrust(
   pulled: PulledEmail[],
   mailboxId: number,
   userId: string,
+  gatekeeperActivatedAt: number,
 ): Promise<Map<string, GatekeeperTrustLevel>> {
   const receivedInboxSenders = Array.from(
     new Set(
@@ -283,7 +285,7 @@ async function resolveGatekeeperTrust(
           ),
       );
       for (const [sender, trustLevel] of serverResolved) {
-        map.set(sender, trustLevel);
+        if (trustLevel !== null) map.set(sender, trustLevel);
       }
     }
   } catch {
@@ -294,6 +296,7 @@ async function resolveGatekeeperTrust(
     const knownSenders = await localDb.getKnownSenders({
       userId,
       mailboxId,
+      gatekeeperActivatedAt,
       senders: receivedInboxSenders,
     });
     for (const sender of knownSenders) {
@@ -483,7 +486,7 @@ async function processThreadClassificationTask(
       classifiedAt: Date.now(),
     });
 
-    queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+    queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
     return "classified";
   } catch {
     // Classification is best-effort and must never block inbox rendering.
@@ -637,8 +640,13 @@ async function persistEmails(
   mailboxId: number,
 ): Promise<EmailListItem[]> {
   if (pulled.length === 0) return [];
-  const trustBySender = await resolveGatekeeperTrust(pulled, mailboxId, userId);
   const gatekeeperActivatedAt = await resolveGatekeeperActivatedAt(mailboxId);
+  const trustBySender = await resolveGatekeeperTrust(
+    pulled,
+    mailboxId,
+    userId,
+    gatekeeperActivatedAt,
+  );
   const rows = pulled.map((e) =>
     pulledToRow(
       e,
@@ -650,7 +658,7 @@ async function persistEmails(
   );
   await localDb.insertEmails(rows);
   void queryClient.invalidateQueries({
-    queryKey: queryKeys.gatekeeper.pending(mailboxId),
+    queryKey: gatekeeperQueryKeys.pending(mailboxId),
   });
   const providerIds = pulled.map((e) => e.providerMessageId);
   const hydrated = await localDb.getEmailsByProviderMessageIds(userId, providerIds);
@@ -661,13 +669,14 @@ async function persistEmails(
     .filter((e): e is EmailListItem => e !== undefined);
 }
 
-type LocalCursor = { type: "local"; beforeMs: number };
+type LocalCursor = { type: "local"; beforeDate: number; beforeId: number };
+type LegacyLocalCursor = { type: "local"; beforeMs: number };
 type RemoteCursor = {
   type: "remote";
   token?: string;
   beforeMs?: number;
 };
-type DecodedCursor = LocalCursor | RemoteCursor;
+type DecodedCursor = LocalCursor | LegacyLocalCursor | RemoteCursor;
 
 function encodeViewCursor(cursor: DecodedCursor): string {
   return btoa(JSON.stringify(cursor));
@@ -731,7 +740,7 @@ async function refreshViewFromServer(
       if (body.emails.length === 0) return;
       await persistEmails(body.emails, userId, mailboxId);
       queryClient.invalidateQueries({
-        queryKey: queryKeys.emails.list(view, mailboxId),
+        queryKey: emailQueryKeys.list(view, mailboxId),
       });
     } catch {
       /* background refresh failure is non-fatal */
@@ -798,13 +807,24 @@ export async function fetchViewPage(params: {
     return fetchServerPage(userId, params.mailboxId, params.view, decoded);
   }
 
-  const beforeMs = decoded?.type === "local" ? decoded.beforeMs : undefined;
+  const localCursor =
+    decoded?.type === "local"
+      ? "beforeDate" in decoded
+        ? {
+            date: decoded.beforeDate,
+            id: decoded.beforeId,
+          }
+        : typeof decoded.beforeMs === "number"
+          ? { date: decoded.beforeMs }
+          : undefined
+      : undefined;
+  const beforeMs = localCursor?.date;
   const local = await localDb.getEmails({
     userId,
     mailboxId: params.mailboxId,
     view: params.view,
     limit: VIEW_PAGE_SIZE,
-    cursor: beforeMs,
+    cursor: localCursor,
     splitRule,
   });
 
@@ -825,14 +845,17 @@ export async function fetchViewPage(params: {
         mailboxId: params.mailboxId,
         view: params.view,
         limit: VIEW_PAGE_SIZE,
-        cursor: beforeMs,
+        cursor: localCursor,
         splitRule,
       });
-      const seededLastDate = seeded.data[seeded.data.length - 1]?.date;
-      if (seeded.pagination.hasMore && seededLastDate != null) {
+      if (seeded.pagination.hasMore && seeded.pagination.cursor) {
         return {
           emails: seeded.data,
-          cursor: encodeViewCursor({ type: "local", beforeMs: seededLastDate }),
+          cursor: encodeViewCursor({
+            type: "local",
+            beforeDate: seeded.pagination.cursor.date,
+            beforeId: seeded.pagination.cursor.id,
+          }),
         };
       }
       return { emails: seeded.data, cursor: null };
@@ -844,12 +867,18 @@ export async function fetchViewPage(params: {
     });
   }
 
-  const lastDate = local.data[local.data.length - 1]?.date;
+  const lastDate =
+    local.pagination.cursor?.date ??
+    local.data[local.data.length - 1]?.date;
 
-  if (local.pagination.hasMore && lastDate != null) {
+  if (local.pagination.hasMore && local.pagination.cursor) {
     return {
       emails: local.data,
-      cursor: encodeViewCursor({ type: "local", beforeMs: lastDate }),
+      cursor: encodeViewCursor({
+        type: "local",
+        beforeDate: local.pagination.cursor.date,
+        beforeId: local.pagination.cursor.id,
+      }),
     };
   }
 
@@ -980,5 +1009,5 @@ export async function deleteDraft(id: number): Promise<void> {
 }
 
 export function invalidateInboxQueries() {
-  queryClient.invalidateQueries({ queryKey: queryKeys.emails.all() });
+  queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
 }

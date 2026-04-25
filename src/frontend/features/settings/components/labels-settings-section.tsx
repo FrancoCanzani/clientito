@@ -1,3 +1,4 @@
+import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQuery } from "@tanstack/react-query";
-import { queryKeys } from "@/lib/query-keys";
 import { fetchLabels } from "@/features/email/labels/queries";
 import { createLabel, updateLabel, deleteLabel } from "@/features/email/labels/mutations";
 import { GMAIL_LABEL_COLORS, type Label } from "@/features/email/labels/types";
@@ -38,7 +38,7 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
   const [saving, setSaving] = useState(false);
 
   const labelsQuery = useQuery({
-    queryKey: queryKeys.labels(mailboxId),
+    queryKey: labelQueryKeys.list(mailboxId),
     queryFn: () => fetchLabels(mailboxId),
     staleTime: 60_000,
   });
@@ -98,19 +98,25 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
   }
 
   return (
-    <section id="labels" className="space-y-3">
+    <section
+      id="labels"
+      className="scroll-mt-20 space-y-3"
+    >
       <div className="space-y-1">
-        <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-[10px] font-medium text-muted-foreground">
+          Mail
+        </p>
+        <h2 className="text-xs font-medium text-foreground">
           Labels
         </h2>
-        <p className="max-w-lg text-sm text-muted-foreground">
+        <p className="max-w-lg text-xs text-muted-foreground">
           Manage your email labels.
         </p>
       </div>
 
-      <div className="border-t border-border/60">
+      <div className="mt-4 border-t border-border/60">
         {labels.length === 0 && !creating && (
-          <p className="py-3 text-sm text-muted-foreground">
+          <p className="py-3 text-xs text-muted-foreground">
             No labels yet.
           </p>
         )}
@@ -129,7 +135,7 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
                       onChange={(e) =>
                         setEditing({ ...editing, name: e.target.value })
                       }
-                      className="h-7 flex-1 text-sm"
+                      className="h-7 flex-1 text-xs"
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handleSave();
@@ -161,7 +167,7 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
                 ) : (
                   <>
                     <ColorDot bg={label.backgroundColor ?? "#999"} />
-                    <span className="flex-1 truncate text-sm font-medium">
+                    <span className="flex-1 truncate text-xs font-medium">
                       {label.name}
                     </span>
                     <Button
@@ -217,7 +223,7 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Label name"
-                className="h-7 flex-1 text-sm"
+                className="h-7 flex-1 text-xs"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleCreate();
