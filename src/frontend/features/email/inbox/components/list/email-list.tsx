@@ -56,7 +56,6 @@ export function EmailList({
     threadGroups,
     hasNextPage,
     isFetchingNextPage,
-    isLoading,
     loadMoreRef,
     filters,
     setFilters,

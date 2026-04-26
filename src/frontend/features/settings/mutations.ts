@@ -67,6 +67,22 @@ export async function updateMailboxTemplates(
   }
 }
 
+export async function updateMailboxAiEnabled(
+  mailboxId: number,
+  aiEnabled: boolean,
+): Promise<void> {
+  const response = await fetch(`/api/settings/mailboxes/${mailboxId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ aiEnabled }),
+  });
+
+  if (!response.ok) {
+    const json = await response.json().catch(() => ({}));
+    throw new Error(getErrorMessage(json) ?? "Failed to update AI setting");
+  }
+}
+
 export async function deleteAccount(): Promise<void> {
   const response = await fetch("/api/settings/account", {
     method: "DELETE",

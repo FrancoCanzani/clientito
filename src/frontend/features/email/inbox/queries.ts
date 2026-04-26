@@ -3,6 +3,7 @@ import { gatekeeperQueryKeys } from "@/features/email/gatekeeper/query-keys";
 import { localDb, type EmailInsert } from "@/db/client";
 import type { EmailAICategory, SplitRule } from "@/db/schema";
 import { getCurrentUserId } from "@/db/user";
+import { accountsQueryOptions } from "@/hooks/use-mailboxes";
 import { queryClient } from "@/lib/query-client";
 import { asyncQueue } from "@tanstack/pacer/async-queuer";
 import { Throttler } from "@tanstack/pacer/throttler";
@@ -102,6 +103,7 @@ type PulledEmail = {
 type GatekeeperTrustLevel = "trusted" | "blocked" | null;
 
 type ClassifyThreadPayload = {
+  mailboxId: number;
   thread: {
     subject: string | null;
     fromAddr: string;
@@ -381,6 +383,7 @@ function buildClassificationTasks(
       representativeProviderMessageId: representative.providerMessageId,
       classificationKey: `${mailboxId}:${groupKey}:${representative.providerMessageId}`,
       payload: {
+        mailboxId,
         thread: {
           subject: representative.subject ?? null,
           fromAddr: representative.fromAddr,
@@ -565,11 +568,18 @@ const enqueueThreadClassification = asyncQueue<ThreadClassificationTask>(
   },
 );
 
+function isMailboxAiEnabled(mailboxId: number): boolean {
+  const cached = queryClient.getQueryData(accountsQueryOptions.queryKey);
+  const account = cached?.accounts.find((a) => a.mailboxId === mailboxId);
+  return account?.aiEnabled ?? true;
+}
+
 function enqueueClassificationTasks(
   pulled: PulledEmail[],
   userId: string,
   mailboxId: number,
 ): void {
+  if (!isMailboxAiEnabled(mailboxId)) return;
   const tasks = buildClassificationTasks(pulled, userId, mailboxId);
   if (tasks.length === 0) return;
 

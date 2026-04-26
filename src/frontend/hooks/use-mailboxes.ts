@@ -37,6 +37,7 @@ export type MailboxAccount = {
   hasValidCredentials: boolean;
   syncWindowMonths: 3 | 6 | 12 | null;
   syncCutoffAt: number | null;
+  aiEnabled: boolean;
   syncState: "needs_reconnect" | "ready_to_sync" | "error" | "ready";
   error: string | null;
   createdAt: number | null;

@@ -29,6 +29,7 @@ import { Route as DashboardMailboxIdSettingsMailboxRouteImport } from './routes/
 import { Route as DashboardMailboxIdSettingsLabelsRouteImport } from './routes/_dashboard/$mailboxId/settings/labels'
 import { Route as DashboardMailboxIdSettingsDangerRouteImport } from './routes/_dashboard/$mailboxId/settings/danger'
 import { Route as DashboardMailboxIdSettingsAppearanceRouteImport } from './routes/_dashboard/$mailboxId/settings/appearance'
+import { Route as DashboardMailboxIdSettingsAiRouteImport } from './routes/_dashboard/$mailboxId/settings/ai'
 import { Route as DashboardMailboxIdSettingsAccountRouteImport } from './routes/_dashboard/$mailboxId/settings/account'
 import { Route as DashboardMailboxIdInboxSearchRouteImport } from './routes/_dashboard/$mailboxId/inbox/search'
 import { Route as DashboardMailboxIdInboxNewRouteImport } from './routes/_dashboard/$mailboxId/inbox/new'
@@ -148,6 +149,12 @@ const DashboardMailboxIdSettingsAppearanceRoute =
     path: '/appearance',
     getParentRoute: () => DashboardMailboxIdSettingsRouteRoute,
   } as any)
+const DashboardMailboxIdSettingsAiRoute =
+  DashboardMailboxIdSettingsAiRouteImport.update({
+    id: '/ai',
+    path: '/ai',
+    getParentRoute: () => DashboardMailboxIdSettingsRouteRoute,
+  } as any)
 const DashboardMailboxIdSettingsAccountRoute =
   DashboardMailboxIdSettingsAccountRouteImport.update({
     id: '/account',
@@ -212,6 +219,7 @@ export interface FileRoutesByFullPath {
   '/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
   '/$mailboxId/settings/account': typeof DashboardMailboxIdSettingsAccountRoute
+  '/$mailboxId/settings/ai': typeof DashboardMailboxIdSettingsAiRoute
   '/$mailboxId/settings/appearance': typeof DashboardMailboxIdSettingsAppearanceRoute
   '/$mailboxId/settings/danger': typeof DashboardMailboxIdSettingsDangerRoute
   '/$mailboxId/settings/labels': typeof DashboardMailboxIdSettingsLabelsRoute
@@ -239,6 +247,7 @@ export interface FileRoutesByTo {
   '/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
   '/$mailboxId/settings/account': typeof DashboardMailboxIdSettingsAccountRoute
+  '/$mailboxId/settings/ai': typeof DashboardMailboxIdSettingsAiRoute
   '/$mailboxId/settings/appearance': typeof DashboardMailboxIdSettingsAppearanceRoute
   '/$mailboxId/settings/danger': typeof DashboardMailboxIdSettingsDangerRoute
   '/$mailboxId/settings/labels': typeof DashboardMailboxIdSettingsLabelsRoute
@@ -270,6 +279,7 @@ export interface FileRoutesById {
   '/_dashboard/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/_dashboard/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
   '/_dashboard/$mailboxId/settings/account': typeof DashboardMailboxIdSettingsAccountRoute
+  '/_dashboard/$mailboxId/settings/ai': typeof DashboardMailboxIdSettingsAiRoute
   '/_dashboard/$mailboxId/settings/appearance': typeof DashboardMailboxIdSettingsAppearanceRoute
   '/_dashboard/$mailboxId/settings/danger': typeof DashboardMailboxIdSettingsDangerRoute
   '/_dashboard/$mailboxId/settings/labels': typeof DashboardMailboxIdSettingsLabelsRoute
@@ -301,6 +311,7 @@ export interface FileRouteTypes {
     | '/$mailboxId/inbox/new'
     | '/$mailboxId/inbox/search'
     | '/$mailboxId/settings/account'
+    | '/$mailboxId/settings/ai'
     | '/$mailboxId/settings/appearance'
     | '/$mailboxId/settings/danger'
     | '/$mailboxId/settings/labels'
@@ -328,6 +339,7 @@ export interface FileRouteTypes {
     | '/$mailboxId/inbox/new'
     | '/$mailboxId/inbox/search'
     | '/$mailboxId/settings/account'
+    | '/$mailboxId/settings/ai'
     | '/$mailboxId/settings/appearance'
     | '/$mailboxId/settings/danger'
     | '/$mailboxId/settings/labels'
@@ -358,6 +370,7 @@ export interface FileRouteTypes {
     | '/_dashboard/$mailboxId/inbox/new'
     | '/_dashboard/$mailboxId/inbox/search'
     | '/_dashboard/$mailboxId/settings/account'
+    | '/_dashboard/$mailboxId/settings/ai'
     | '/_dashboard/$mailboxId/settings/appearance'
     | '/_dashboard/$mailboxId/settings/danger'
     | '/_dashboard/$mailboxId/settings/labels'
@@ -524,6 +537,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardMailboxIdSettingsAppearanceRouteImport
       parentRoute: typeof DashboardMailboxIdSettingsRouteRoute
     }
+    '/_dashboard/$mailboxId/settings/ai': {
+      id: '/_dashboard/$mailboxId/settings/ai'
+      path: '/ai'
+      fullPath: '/$mailboxId/settings/ai'
+      preLoaderRoute: typeof DashboardMailboxIdSettingsAiRouteImport
+      parentRoute: typeof DashboardMailboxIdSettingsRouteRoute
+    }
     '/_dashboard/$mailboxId/settings/account': {
       id: '/_dashboard/$mailboxId/settings/account'
       path: '/account'
@@ -585,6 +605,7 @@ declare module '@tanstack/react-router' {
 
 interface DashboardMailboxIdSettingsRouteRouteChildren {
   DashboardMailboxIdSettingsAccountRoute: typeof DashboardMailboxIdSettingsAccountRoute
+  DashboardMailboxIdSettingsAiRoute: typeof DashboardMailboxIdSettingsAiRoute
   DashboardMailboxIdSettingsAppearanceRoute: typeof DashboardMailboxIdSettingsAppearanceRoute
   DashboardMailboxIdSettingsDangerRoute: typeof DashboardMailboxIdSettingsDangerRoute
   DashboardMailboxIdSettingsLabelsRoute: typeof DashboardMailboxIdSettingsLabelsRoute
@@ -598,6 +619,7 @@ const DashboardMailboxIdSettingsRouteRouteChildren: DashboardMailboxIdSettingsRo
   {
     DashboardMailboxIdSettingsAccountRoute:
       DashboardMailboxIdSettingsAccountRoute,
+    DashboardMailboxIdSettingsAiRoute: DashboardMailboxIdSettingsAiRoute,
     DashboardMailboxIdSettingsAppearanceRoute:
       DashboardMailboxIdSettingsAppearanceRoute,
     DashboardMailboxIdSettingsDangerRoute:

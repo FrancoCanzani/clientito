@@ -3,9 +3,11 @@ import { zValidator } from "@hono/zod-validator";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { z } from "zod";
+import { resolveMailbox } from "../../lib/gmail/mailboxes";
 import type { AppRouteEnv } from "../types";
 
 const rewriteBodySchema = z.object({
+  mailboxId: z.number().int().positive(),
   text: z.string().trim().min(1).max(20000),
   instruction: z.enum([
     "improve",
@@ -31,7 +33,14 @@ export function registerPostRewrite(app: Hono<AppRouteEnv>) {
     "/rewrite",
     zValidator("json", rewriteBodySchema),
     async (c) => {
-      const { text, instruction } = c.req.valid("json");
+      const { mailboxId, text, instruction } = c.req.valid("json");
+      const db = c.get("db");
+      const user = c.get("user")!;
+      const mailbox = await resolveMailbox(db, user.id, mailboxId);
+      if (!mailbox) return c.json({ error: "Mailbox not found" }, 404);
+      if (!mailbox.aiEnabled) {
+        return c.json({ error: "AI features are disabled for this mailbox" }, 403);
+      }
       const openai = createOpenAI({ apiKey: c.env.OPENAI_API_KEY });
 
       try {

@@ -147,6 +147,8 @@ export function ComposeEmailFields({
   const subjectInputRef = useRef<HTMLInputElement>(null);
   const hasBody =
     body.trim().length > 0 && body !== "<p></p>" && body !== "<p><br></p>";
+  const aiEnabledForMailbox =
+    availableMailboxes.find((m) => m.mailboxId === mailboxId)?.aiEnabled ?? true;
   const [focusedField, setFocusedField] = useState<ComposeFocusedField | null>(
     () =>
       getInitialFocusedField({
@@ -168,7 +170,7 @@ export function ComposeEmailFields({
   const handleComposerAiAction = async (action: ComposerAiActionId) => {
     setReviewState({ status: "loading", action });
     try {
-      const review = await previewComposerAiAction(action);
+      const review = await previewComposerAiAction(action, mailboxId);
       if (review === "no_changes") {
         toast.info("No changes suggested");
         setReviewState({ status: "idle" });
@@ -577,7 +579,7 @@ export function ComposeEmailFields({
                   <CheckIcon className="size-3" />
                 </Button>
               </>
-            ) : (
+            ) : !aiEnabledForMailbox ? null : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button

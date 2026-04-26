@@ -73,11 +73,14 @@ export const COMPOSER_AI_ACTIONS: ComposerAiActionDefinition[] = [
   },
 ];
 
-async function grammarCheck(text: string): Promise<string | null> {
+async function grammarCheck(
+  text: string,
+  mailboxId: number,
+): Promise<string | null> {
   const response = await fetch("/api/ai/grammar-check", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ mailboxId, text }),
   });
   if (!response.ok) return null;
   const json: { corrected: string } = await response.json();
@@ -87,11 +90,12 @@ async function grammarCheck(text: string): Promise<string | null> {
 async function rewrite(
   text: string,
   instruction: "improve" | "formal" | "casual" | "shorten",
+  mailboxId: number,
 ): Promise<string | null> {
   const response = await fetch("/api/ai/rewrite", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, instruction }),
+    body: JSON.stringify({ mailboxId, text, instruction }),
   });
   if (!response.ok) return null;
   const json: { rewritten: string } = await response.json();
@@ -160,7 +164,13 @@ export function getComposerAiLabel(action: ComposerAiActionId) {
 
 export async function previewComposerAiAction(
   action: ComposerAiActionId,
+  mailboxId: number | null,
 ): Promise<ComposerAiReview | "no_changes" | false> {
+  if (mailboxId == null) {
+    toast.error("Select a mailbox first");
+    return false;
+  }
+
   const input = getComposerInput();
   if (!input?.text.trim()) {
     toast.info("Write something in the composer first");
@@ -172,19 +182,19 @@ export async function previewComposerAiAction(
 
   switch (action) {
     case "grammar":
-      result = await grammarCheck(text);
+      result = await grammarCheck(text, mailboxId);
       break;
     case "improve":
-      result = await rewrite(text, "improve");
+      result = await rewrite(text, "improve", mailboxId);
       break;
     case "formal":
-      result = await rewrite(text, "formal");
+      result = await rewrite(text, "formal", mailboxId);
       break;
     case "casual":
-      result = await rewrite(text, "casual");
+      result = await rewrite(text, "casual", mailboxId);
       break;
     case "shorten":
-      result = await rewrite(text, "shorten");
+      result = await rewrite(text, "shorten", mailboxId);
       break;
   }
 
@@ -211,8 +221,9 @@ export function applyComposerAiReview(review: ComposerAiReview): boolean {
 
 export async function runComposerAiAction(
   action: ComposerAiActionId,
+  mailboxId: number | null,
 ): Promise<boolean> {
-  const review = await previewComposerAiAction(action);
+  const review = await previewComposerAiAction(action, mailboxId);
   if (!review || review === "no_changes") {
     if (review === "no_changes") {
       toast.info("No changes suggested");

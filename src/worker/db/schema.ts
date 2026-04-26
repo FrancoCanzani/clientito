@@ -24,6 +24,7 @@ export const mailboxes = sqliteTable(
     historyId: text("history_id"),
     syncWindowMonths: integer("sync_window_months"),
     syncCutoffAt: integer("sync_cutoff_at"),
+    aiEnabled: integer("ai_enabled", { mode: "boolean" }).notNull().default(true),
     authState: text("auth_state")
       .$type<"unknown" | "ok" | "reconnect_required">()
       .notNull()

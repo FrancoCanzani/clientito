@@ -1,4 +1,3 @@
-import { Kbd } from "@/components/ui/kbd";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -6,6 +5,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Kbd } from "@/components/ui/kbd";
 import {
   Sidebar,
   SidebarContent,
@@ -21,8 +21,8 @@ import {
 } from "@/components/ui/sidebar";
 import { useGatekeeperPending } from "@/features/email/gatekeeper/queries";
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
-import { beginGmailConnection } from "@/features/onboarding/mutations";
 import { LabelSidebarSection } from "@/features/email/labels/components/label-sidebar-section";
+import { beginGmailConnection } from "@/features/onboarding/mutations";
 import { useAuth } from "@/hooks/use-auth";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
@@ -97,8 +97,7 @@ function AccountSwitcher({ mailboxId }: { mailboxId: number }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         {accounts.map((account) => {
-          const email =
-            getMailboxDisplayEmail(account) ?? account.email ?? "";
+          const email = getMailboxDisplayEmail(account) ?? account.email ?? "";
           const isActive = account.mailboxId === mailboxId;
           return (
             <DropdownMenuItem
@@ -382,7 +381,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
             >
               Compose
               <Kbd className="ml-auto opacity-0 transition-opacity group-hover:opacity-100">
-                ⌘C
+                C
               </Kbd>
             </SidebarMenuButton>
           </SidebarMenuItem>

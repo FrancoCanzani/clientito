@@ -16,6 +16,7 @@ type SettingsNavTo =
   | "/$mailboxId/settings/signatures"
   | "/$mailboxId/settings/templates"
   | "/$mailboxId/settings/labels"
+  | "/$mailboxId/settings/ai"
   | "/$mailboxId/settings/danger";
 
 const NAV_GROUPS: NavGroup[] = [
@@ -33,6 +34,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/$mailboxId/settings/signatures", label: "Signatures" },
       { to: "/$mailboxId/settings/templates", label: "Templates" },
       { to: "/$mailboxId/settings/labels", label: "Labels" },
+      { to: "/$mailboxId/settings/ai", label: "AI" },
     ],
   },
   {

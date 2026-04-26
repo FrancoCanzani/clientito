@@ -1,22 +1,184 @@
 import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
 import { useAuth } from "@/hooks/use-auth";
 import { useMailboxes } from "@/hooks/use-mailboxes";
+import { CaretDownIcon, CheckIcon } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { diffWords } from "diff";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "./ui/accordion";
 import { Button } from "./ui/button";
 
-const SHORTCUTS: Array<{ keys: string; label: string }> = [
-  { keys: "⌘K", label: "Open command palette" },
-  { keys: "⌘C", label: "Compose new message" },
-  { keys: "⌘1", label: "Inbox" },
-  { keys: "⌘2", label: "Starred" },
-  { keys: "⌘3", label: "Done" },
-  { keys: "J / K", label: "Move between threads" },
-  { keys: "E", label: "Mark as done" },
-  { keys: "S", label: "Snooze" },
-  { keys: "/", label: "Search" },
-  { keys: "?", label: "Show all shortcuts" },
+type Shortcut = {
+  keys: string;
+  label: string;
+  keyIds: string[];
+};
+
+type KeyboardKey = {
+  id: string;
+  label: string;
+  width?: number;
+};
+const KEYBOARD_UNIT_REM = 1.8;
+
+const SHORTCUTS: Shortcut[] = [
+  { keys: "⌘K", label: "Open command palette", keyIds: ["CMD", "K"] },
+  { keys: "⌘C", label: "Compose new message", keyIds: ["CMD", "C"] },
+  { keys: "⌘1", label: "Inbox", keyIds: ["CMD", "1"] },
+  { keys: "⌘2", label: "Starred", keyIds: ["CMD", "2"] },
+  { keys: "⌘3", label: "Done", keyIds: ["CMD", "3"] },
+  { keys: "J / K", label: "Move between threads", keyIds: ["J", "K"] },
+  { keys: "E", label: "Mark as done", keyIds: ["E"] },
+  { keys: "S", label: "Snooze", keyIds: ["S"] },
+  { keys: "/", label: "Search", keyIds: ["SLASH"] },
+  { keys: "?", label: "Show all shortcuts", keyIds: ["SHIFT", "SLASH"] },
 ];
+const FAQ_ITEMS: Array<{ question: string; answer: string }> = [
+  {
+    question: "Do you store my emails on your servers?",
+    answer:
+      "No. Mail is fetched from Gmail and stored locally in your browser.",
+  },
+  {
+    question: "When does AI see my text?",
+    answer:
+      "Only when you trigger an AI action. It is request-by-request, not always on.",
+  },
+  {
+    question: "Can I use Duomo without shortcuts?",
+    answer:
+      "Yes. Every workflow is accessible with mouse and touch, shortcuts are optional.",
+  },
+  {
+    question: "What if I reject a sender in Screener?",
+    answer:
+      "New messages from that sender are moved out of inbox and blocked according to your mailbox rules.",
+  },
+];
+
+const KEYBOARD_LAYOUT: KeyboardKey[][] = [
+  [
+    { id: "ESC", label: "Esc", width: 1.4 },
+    { id: "F1", label: "F1" },
+    { id: "F2", label: "F2" },
+    { id: "F3", label: "F3" },
+    { id: "F4", label: "F4" },
+    { id: "F5", label: "F5" },
+    { id: "F6", label: "F6" },
+    { id: "F7", label: "F7" },
+    { id: "F8", label: "F8" },
+    { id: "F9", label: "F9" },
+    { id: "F10", label: "F10" },
+    { id: "F11", label: "F11" },
+    { id: "F12", label: "F12" },
+    { id: "LOCK", label: "🔒", width: 1.4 },
+  ],
+  [
+    { id: "BACKTICK", label: "~\n`" },
+    { id: "1", label: "!\n1" },
+    { id: "2", label: "@\n2" },
+    { id: "3", label: "#\n3" },
+    { id: "4", label: "$\n4" },
+    { id: "5", label: "%\n5" },
+    { id: "6", label: "^\n6" },
+    { id: "7", label: "&\n7" },
+    { id: "8", label: "*\n8" },
+    { id: "9", label: "(\n9" },
+    { id: "0", label: ")\n0" },
+    { id: "MINUS", label: "_\n-" },
+    { id: "EQUAL", label: "+\n=" },
+    { id: "BACKSPACE", label: "delete", width: 2.2 },
+  ],
+  [
+    { id: "TAB", label: "Tab", width: 1.6 },
+    { id: "Q", label: "Q" },
+    { id: "W", label: "W" },
+    { id: "E", label: "E" },
+    { id: "R", label: "R" },
+    { id: "T", label: "T" },
+    { id: "Y", label: "Y" },
+    { id: "U", label: "U" },
+    { id: "I", label: "I" },
+    { id: "O", label: "O" },
+    { id: "P", label: "P" },
+    { id: "LBRACKET", label: "[" },
+    { id: "RBRACKET", label: "]" },
+    { id: "BACKSLASH", label: "\\", width: 1.6 },
+  ],
+  [
+    { id: "CAPS", label: "Caps", width: 1.9 },
+    { id: "A", label: "A" },
+    { id: "S", label: "S" },
+    { id: "D", label: "D" },
+    { id: "F", label: "F" },
+    { id: "G", label: "G" },
+    { id: "H", label: "H" },
+    { id: "J", label: "J" },
+    { id: "K", label: "K" },
+    { id: "L", label: "L" },
+    { id: "SEMICOLON", label: ";" },
+    { id: "QUOTE", label: "'" },
+    { id: "ENTER", label: "Enter", width: 2.3 },
+  ],
+  [
+    { id: "SHIFT", label: "Shift", width: 2.4 },
+    { id: "Z", label: "Z" },
+    { id: "X", label: "X" },
+    { id: "C", label: "C" },
+    { id: "V", label: "V" },
+    { id: "B", label: "B" },
+    { id: "N", label: "N" },
+    { id: "M", label: "M" },
+    { id: "COMMA", label: "," },
+    { id: "DOT", label: "." },
+    { id: "SLASH", label: "/" },
+    { id: "SHIFT_R", label: "Shift", width: 2.8 },
+  ],
+  [
+    { id: "GLOBE", label: "🌐", width: 1.3 },
+    { id: "CTRL", label: "Ctrl", width: 1.6 },
+    { id: "ALT", label: "Alt", width: 1.4 },
+    { id: "CMD", label: "⌘", width: 1.8 },
+    { id: "SPACE", label: "", width: 5.8 },
+    { id: "CMD_R", label: "⌘", width: 1.8 },
+    { id: "ALT_R", label: "Alt", width: 1.4 },
+    { id: "ARROWS", label: "", width: 3.4 },
+  ],
+];
+
+const AI_GRAMMAR_ORIGINAL =
+  "hi team, i reviewed the deck and its looking good. can you send me the latest numbers by friday?";
+const AI_GRAMMAR_CORRECTED =
+  "Hi team, I reviewed the deck, and it's looking good. Can you send me the latest numbers by Friday?";
+const AI_TONE_OPTIONS: Array<{ label: string; selected?: boolean }> = [
+  { label: "Improve writing" },
+  { label: "Make more formal", selected: true },
+  { label: "Make more casual" },
+  { label: "Make more concise" },
+];
+const AI_AUTO_LABELS: Array<{ sender: string; label: string; color: string }> =
+  [
+    {
+      sender: "billing@acmefinance.com",
+      label: "Invoice",
+      color: "#ffe6c7",
+    },
+    {
+      sender: "updates@orbitstatus.com",
+      label: "Notification",
+      color: "#c9daf8",
+    },
+    {
+      sender: "digest@builderweekly.com",
+      label: "Newsletter",
+      color: "#b9e4d0",
+    },
+  ];
 
 const SCREENER_PREVIEW_ROWS: Array<{
   sender: string;
@@ -205,10 +367,174 @@ function EncryptionPreviewRow() {
   );
 }
 
+function AiGrammarDiffPreview() {
+  const parts = useMemo(
+    () => diffWords(AI_GRAMMAR_ORIGINAL, AI_GRAMMAR_CORRECTED),
+    [],
+  );
+
+  return (
+    <AiFeatureCard title="Grammar diff">
+      <div className="flex min-h-0 flex-1 flex-col rounded border border-border/30 bg-sidebar/30 p-2">
+        <div className="pb-2 whitespace-pre-wrap text-[13px] leading-relaxed text-foreground/90">
+          {parts.map((part, index) => {
+            if (part.added) {
+              return (
+                <span
+                  key={index}
+                  className="rounded-sm bg-green-500/15 text-green-700 dark:text-green-400"
+                >
+                  {part.value}
+                </span>
+              );
+            }
+            if (part.removed) {
+              return (
+                <span
+                  key={index}
+                  className="rounded-sm bg-red-500/15 text-red-700 line-through dark:text-red-400"
+                >
+                  {part.value}
+                </span>
+              );
+            }
+            return <span key={index}>{part.value}</span>;
+          })}
+        </div>
+        <div className="flex items-center justify-end gap-1 border-t border-border/30 pt-2">
+          <Button variant="destructive" size="xs">
+            Discard
+          </Button>
+          <Button variant="secondary" size="xs">
+            Accept
+          </Button>
+        </div>
+      </div>
+    </AiFeatureCard>
+  );
+}
+
+function AiFeatureCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <article className="overflow-hidden rounded bg-sidebar p-1">
+      <div className="flex h-full min-h-0 flex-col rounded bg-background p-3">
+        <p className="mb-2 text-xs text-muted-foreground">{title}</p>
+        {children}
+      </div>
+    </article>
+  );
+}
+
+function AiPastelLabel({ label, color }: { label: string; color: string }) {
+  return (
+    <span
+      style={{
+        backgroundColor: `color-mix(in oklch, ${color} 20%, transparent)`,
+      }}
+      className="rounded px-1.5 py-0.5 text-[11px] text-foreground/85"
+    >
+      {label}
+    </span>
+  );
+}
+
+function AiAutoLabelPreview() {
+  return (
+    <AiFeatureCard title="Auto labeling">
+      <div className="space-y-1.5 rounded border border-border/30 bg-sidebar/30 p-2">
+        {AI_AUTO_LABELS.map((item) => (
+          <div
+            key={item.sender}
+            className="flex items-center justify-between gap-2 rounded bg-background px-2 py-1.5 text-xs"
+          >
+            <span className="truncate">{item.sender}</span>
+            <AiPastelLabel label={item.label} color={item.color} />
+          </div>
+        ))}
+      </div>
+    </AiFeatureCard>
+  );
+}
+
+function AiToneComposerPreview() {
+  return (
+    <AiFeatureCard title="Tone change">
+      <div className="rounded border border-border/30 bg-sidebar/30 p-2">
+        <div className="rounded border border-border/30 bg-background px-2 py-2 text-xs leading-relaxed text-foreground/90">
+          Hi team,{" "}
+          <span className="bg-blue-600 text-secondary px-1">
+            i wanted to follow up
+          </span>{" "}
+          on the rollout updates.
+        </div>
+
+        <div className="mt-1.5 inline-flex items-center gap-1 rounded border border-border/40 bg-background px-2 py-1 text-[11px] text-muted-foreground">
+          Make more formal
+          <CaretDownIcon className="size-3" />
+        </div>
+
+        <div className="mt-1 rounded border border-border/40 bg-background p-0.5">
+          {AI_TONE_OPTIONS.map((option) => (
+            <div
+              key={option.label}
+              className="flex items-center gap-2 rounded px-2 py-1 text-[11px] text-muted-foreground"
+            >
+              <span
+                className={option.selected ? "font-medium text-foreground" : ""}
+              >
+                {option.label}
+              </span>
+              {option.selected ? (
+                <CheckIcon className="ml-auto size-3 text-foreground" />
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    </AiFeatureCard>
+  );
+}
+
+function AiSummaryPreview() {
+  return (
+    <AiFeatureCard title="Summaries">
+      <div className="rounded border border-border/30 bg-sidebar/30 p-2">
+        <div className="rounded border border-border/30 bg-background px-2 py-2 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">Email</p>
+          <p className="mt-1 line-clamp-2">
+            Quarterly planning notes: launch moved to Thursday, budget still
+            pending sign-off, and legal review is blocking external comms.
+          </p>
+        </div>
+        <div className="mt-2 rounded border border-border/30 bg-background px-2 py-2 text-xs leading-relaxed text-muted-foreground">
+          <p className="font-medium text-foreground">AI summary</p>
+          <ul className="mt-1 space-y-0.5">
+            <li>- Launch moved to Thursday</li>
+            <li>- Budget update needed before sign-off</li>
+            <li>- Legal review is the current blocker</li>
+          </ul>
+        </div>
+      </div>
+    </AiFeatureCard>
+  );
+}
+
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
   const accounts = useMailboxes().data?.accounts ?? [];
   const preferredMailboxId = getPreferredMailboxId(accounts);
+  const [hoveredShortcut, setHoveredShortcut] = useState<string | null>(null);
+  const highlightedKeyIds = useMemo(() => {
+    if (!hoveredShortcut) return new Set<string>();
+    const shortcut = SHORTCUTS.find((entry) => entry.keys === hoveredShortcut);
+    return new Set(shortcut?.keyIds ?? []);
+  }, [hoveredShortcut]);
 
   return (
     <div className="min-h-svh bg-background text-foreground antialiased">
@@ -364,32 +690,22 @@ export default function LandingPage() {
 
         <section className="py-20 md:py-24">
           <div className="mb-6 flex items-center gap-3 text-muted-foreground">
-            <span className="text-lg">A Finished Inbox</span>
+            <span className="text-lg">AI Helpers</span>
             <span className="h-px flex-1 bg-border" />
-          </div>{" "}
+          </div>
           <h2 className="font-serif text-3xl leading-tight tracking-tight md:text-4xl">
-            Done is a place.
+            Built into the flow.
           </h2>
-          <dl className="mt-8 grid gap-6 md:grid-cols-3">
-            <div>
-              <dt className="mb-1.5 text-sm font-medium">Done</dt>
-              <dd className="text-sm leading-relaxed text-muted-foreground">
-                Archived in one keystroke. Out of sight, easy to recover.
-              </dd>
-            </div>
-            <div>
-              <dt className="mb-1.5 text-sm font-medium">Snoozed</dt>
-              <dd className="text-sm leading-relaxed text-muted-foreground">
-                Comes back when you said it should — not a minute earlier.
-              </dd>
-            </div>
-            <div>
-              <dt className="mb-1.5 text-sm font-medium">Splits</dt>
-              <dd className="text-sm leading-relaxed text-muted-foreground">
-                Separate streams of mail by rule, side by side, on one page.
-              </dd>
-            </div>
-          </dl>
+          <p className="mt-5 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
+            The same tools from composer: auto labeling, review diffs, tone
+            controls, and quick summaries.
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <AiAutoLabelPreview />
+            <AiGrammarDiffPreview />
+            <AiToneComposerPreview />
+            <AiSummaryPreview />
+          </div>
         </section>
 
         <section className="py-20 md:py-24">
@@ -403,30 +719,123 @@ export default function LandingPage() {
           <p className="mt-6 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
             Every primary action has a shortcut. The mouse is optional.
           </p>
-          <ul className="mt-8 grid gap-x-8 gap-y-2 font-mono text-xs sm:grid-cols-2">
-            {SHORTCUTS.map((shortcut) => (
-              <li
-                key={shortcut.keys}
-                className="flex items-center justify-between border-b border-border/40 py-2"
-              >
-                <span className="text-muted-foreground">{shortcut.label}</span>
-                <kbd className="rounded border border-border/60 bg-muted px-1.5 py-0.5 text-[11px] text-foreground">
-                  {shortcut.keys}
-                </kbd>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-5 overflow-hidden rounded bg-sidebar p-1">
+            <div className="rounded bg-background p-3 md:p-4">
+              <div className="space-y-3">
+                <div className="rounded border border-border/30 bg-sidebar/30 p-2">
+                  <div className="w-full">
+                    {KEYBOARD_LAYOUT.map((row, rowIndex) => (
+                      <div key={rowIndex} className="mb-1.5 flex gap-1 last:mb-0">
+                        {row.map((key) => {
+                          if (key.id === "ARROWS") {
+                            const arrowIds = ["LEFT", "DOWN", "UP", "RIGHT"];
+                            const hasActiveArrow = arrowIds.some((id) =>
+                              highlightedKeyIds.has(id),
+                            );
+                            const getArrowClass = (id: string) =>
+                              `flex items-center justify-center rounded border text-[9px] font-medium transition-colors ${
+                                highlightedKeyIds.has(id)
+                                  ? "border-primary/40 bg-primary/10 text-foreground"
+                                  : "border-border/40 bg-background text-muted-foreground"
+                              }`;
+
+                            return (
+                              <div
+                                key={key.id}
+                                style={{
+                                  width: `${(key.width ?? 1) * KEYBOARD_UNIT_REM}rem`,
+                                }}
+                                className={`grid h-8 grid-cols-3 grid-rows-2 gap-0.5 rounded border p-0.5 ${
+                                  hasActiveArrow
+                                    ? "border-primary/30 bg-primary/5"
+                                    : "border-border/40 bg-muted/20"
+                                }`}
+                              >
+                                <span />
+                                <span className={getArrowClass("UP")}>↑</span>
+                                <span />
+                                <span className={getArrowClass("LEFT")}>←</span>
+                                <span className={getArrowClass("DOWN")}>↓</span>
+                                <span className={getArrowClass("RIGHT")}>→</span>
+                              </div>
+                            );
+                          }
+
+                          const isActive = highlightedKeyIds.has(key.id);
+                          return (
+                            <kbd
+                              key={key.id}
+                              style={{
+                                width: `${(key.width ?? 1) * KEYBOARD_UNIT_REM}rem`,
+                              }}
+                              className={`inline-flex h-8 items-center justify-center rounded border px-1.5 text-[10px] leading-tight whitespace-pre-line font-medium transition-colors ${
+                                isActive
+                                  ? "border-primary/40 bg-primary/10 text-foreground"
+                                  : "border-border/40 bg-background text-muted-foreground"
+                              }`}
+                            >
+                              {key.label}
+                            </kbd>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="my-4 text-[11px] text-center text-muted-foreground font-medium">
+                  Hover a command to preview the keys.
+                </p>
+
+                <div className="rounded border border-border/30 bg-sidebar/30 p-2">
+                  <div className="grid gap-1.5 sm:grid-cols-2">
+                    {SHORTCUTS.map((shortcut) => (
+                      <div
+                        key={shortcut.keys}
+                        className={`flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-xs ${
+                          hoveredShortcut === shortcut.keys
+                            ? "border-primary/30 bg-primary/10"
+                            : "border-border/30 bg-background"
+                        }`}
+                        onMouseEnter={() => setHoveredShortcut(shortcut.keys)}
+                        onMouseLeave={() => setHoveredShortcut(null)}
+                      >
+                        <span className="truncate text-muted-foreground">
+                          {shortcut.label}
+                        </span>
+                        <kbd className="rounded border border-border/50 bg-muted px-1.5 py-0.5 text-[11px] text-foreground">
+                          {shortcut.keys}
+                        </kbd>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
 
+        <span className="w-full flex justify-center font-medium text-xl">
+          FAQ
+        </span>
+
         <section className="py-20 md:py-24">
-          <div className="mb-6 flex items-center gap-3 text-muted-foreground">
-            <span className="text-lg">Made Carefully</span>
-            <span className="h-px flex-1 bg-border" />
-          </div>{" "}
-          <p className="font-serif text-2xl italic leading-relaxed tracking-tight text-foreground/90 md:text-3xl">
-            Email used to feel like a place you visited and then left. Duomo is
-            built to give that back — a calm room, a clear door, and a way out.
-          </p>
+          <Accordion type="single" collapsible className="border-border/30">
+            {FAQ_ITEMS.map((item, index) => (
+              <AccordionItem
+                key={item.question}
+                value={`faq-${index}`}
+                className="bg-sidebar/30"
+              >
+                <AccordionTrigger className="px-3 py-2 text-sm">
+                  {item.question}
+                </AccordionTrigger>
+                <AccordionContent className="px-3 pb-3 pt-0 text-sm text-muted-foreground">
+                  {item.answer}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         </section>
 
         <section className="border-t border-border/60 py-16">

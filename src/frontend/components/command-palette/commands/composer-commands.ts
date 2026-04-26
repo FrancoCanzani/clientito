@@ -3,11 +3,20 @@ import {
   getComposerAiLabel,
   runComposerAiAction,
 } from "@/features/email/inbox/components/compose/compose-ai-actions";
+import { accountsQueryOptions } from "@/hooks/use-mailboxes";
+import { queryClient } from "@/lib/query-client";
 import { paletteIcon } from "../registry/palette-icon";
 import { registerCommands } from "../registry/registry";
 import type { Command, CommandContext } from "../registry/types";
 
-const isComposerOpen = (ctx: CommandContext) => ctx.composerOpen;
+function isComposerAiAvailable(ctx: CommandContext): boolean {
+  if (!ctx.composerOpen) return false;
+  const mailboxId = ctx.activeMailboxId ?? ctx.defaultMailboxId;
+  if (mailboxId == null) return false;
+  const cached = queryClient.getQueryData(accountsQueryOptions.queryKey);
+  const account = cached?.accounts.find((a) => a.mailboxId === mailboxId);
+  return account?.aiEnabled ?? true;
+}
 
 const composerCommands: Command[] = COMPOSER_AI_ACTIONS.map((action) => ({
   id:
@@ -18,9 +27,10 @@ const composerCommands: Command[] = COMPOSER_AI_ACTIONS.map((action) => ({
   icon: paletteIcon(action.icon),
   group: "composer",
   keywords: action.keywords,
-  when: isComposerOpen,
-  perform: async (_ctx, services) => {
-    const applied = await runComposerAiAction(action.id);
+  when: isComposerAiAvailable,
+  perform: async (ctx, services) => {
+    const mailboxId = ctx.activeMailboxId ?? ctx.defaultMailboxId;
+    const applied = await runComposerAiAction(action.id, mailboxId);
     if (applied) {
       services.close();
     }

@@ -9,6 +9,7 @@ import type { AppRouteEnv } from "../types";
 const patchMailboxSchema = z.object({
   signature: z.string().max(50_000).optional(),
   templates: z.string().max(200_000).optional(),
+  aiEnabled: z.boolean().optional(),
 });
 
 export function registerPatchMailbox(api: Hono<AppRouteEnv>) {
@@ -23,7 +24,7 @@ export function registerPatchMailbox(api: Hono<AppRouteEnv>) {
       const db = c.get("db");
       const user = c.get("user")!;
       const { mailboxId } = c.req.valid("param");
-      const { signature, templates } = c.req.valid("json");
+      const { signature, templates, aiEnabled } = c.req.valid("json");
 
       const existing = await db
         .select({ id: mailboxes.id, email: mailboxes.email })
@@ -58,6 +59,7 @@ export function registerPatchMailbox(api: Hono<AppRouteEnv>) {
         .set({
           ...(signature !== undefined ? { signature } : {}),
           ...(templates !== undefined ? { templates } : {}),
+          ...(aiEnabled !== undefined ? { aiEnabled } : {}),
           updatedAt: Date.now(),
         })
         .where(

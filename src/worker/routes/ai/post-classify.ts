@@ -8,6 +8,7 @@ import {
 } from "ai";
 import type { Hono } from "hono";
 import { z } from "zod";
+import { resolveMailbox } from "../../lib/gmail/mailboxes";
 import type { AppRouteEnv } from "../types";
 
 const CATEGORY_VALUES = [
@@ -22,6 +23,7 @@ const CLASSIFY_MODEL = "gpt-5.4-mini";
 const CLASSIFY_MAX_OUTPUT_TOKENS = 900;
 
 const classifyThreadBodySchema = z.object({
+  mailboxId: z.number().int().positive(),
   thread: z.object({
     subject: z.string().max(998).nullable().optional(),
     fromAddr: z.string().trim().min(1).max(320),
@@ -444,7 +446,14 @@ export function registerPostClassifyThread(app: Hono<AppRouteEnv>) {
     "/classify",
     zValidator("json", classifyThreadBodySchema),
     async (c) => {
-      const { thread } = c.req.valid("json");
+      const { mailboxId, thread } = c.req.valid("json");
+      const db = c.get("db");
+      const user = c.get("user")!;
+      const mailbox = await resolveMailbox(db, user.id, mailboxId);
+      if (!mailbox) return c.json({ error: "Mailbox not found" }, 404);
+      if (!mailbox.aiEnabled) {
+        return c.json({ error: "AI features are disabled for this mailbox" }, 403);
+      }
       const openai = createOpenAI({ apiKey: c.env.OPENAI_API_KEY });
 
       try {
