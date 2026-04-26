@@ -30,8 +30,11 @@ const CALENDAR_BODY_MARKERS = [
 
 function extractAddress(headerValue: string | null): string {
   if (!headerValue) return "";
-  const match = headerValue.match(/<([^>]+)>/);
-  return (match?.[1] ?? headerValue).trim();
+  const normalized = headerValue.trim().toLowerCase();
+  const bracketMatch = normalized.match(/<([^>]+)>/);
+  const candidate = bracketMatch?.[1]?.trim() ?? normalized;
+  const emailMatch = candidate.match(/[^\s<>()"'`,;:]+@[^\s<>()"'`,;:]+/);
+  return emailMatch?.[0]?.toLowerCase() ?? "";
 }
 
 export type ParsedInlineAttachment = {

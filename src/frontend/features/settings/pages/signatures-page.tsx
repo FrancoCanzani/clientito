@@ -83,21 +83,28 @@ export default function SignaturesPage() {
   }
 
   return (
-    <section className="space-y-4">
+    <section className="min-w-0 space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <SettingsSectionHeader
           group="Mail"
           title="Signatures"
           description="Create rich email signatures and choose the default for this account."
         />
-        <div className="flex gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={addSignature}>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-nowrap">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={addSignature}
+            className="flex-1 sm:flex-none"
+          >
             <PlusIcon className="mr-1.5 size-3.5" />
             Add
           </Button>
           <Button
             type="button"
             size="sm"
+            className="flex-1 sm:flex-none"
             disabled={!isDirty || account?.mailboxId == null || signatureMutation.isPending}
             onClick={() => {
               if (account?.mailboxId == null) return;
@@ -112,8 +119,8 @@ export default function SignaturesPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 border-t border-border/60 pt-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <div className="space-y-2">
+      <div className="min-w-0 space-y-4 border-t border-border/60 pt-4">
+        <div className="min-w-0 space-y-2">
           {state.items.length === 0 ? (
             <p className="py-3 text-xs text-muted-foreground">
               No signatures yet.
@@ -149,15 +156,15 @@ export default function SignaturesPage() {
         </div>
 
         {selectedItem ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
+          <div className="min-w-0 space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Input
                 value={selectedItem.name}
                 onChange={(event) =>
                   updateItem(selectedItem.id, { name: event.target.value })
                 }
                 placeholder="Signature name"
-                className="h-8 text-xs"
+                className="h-8 w-full text-xs"
               />
               <Button
                 type="button"
@@ -175,13 +182,14 @@ export default function SignaturesPage() {
               </Button>
               <Button
                 type="button"
-                size="icon"
+                size="sm"
                 variant="ghost"
-                className="size-8 text-destructive hover:text-destructive"
+                className="text-destructive hover:text-destructive sm:size-8 sm:px-0"
                 onClick={() => deleteSignature(selectedItem.id)}
                 title="Delete signature"
               >
-                <TrashIcon className="size-3.5" />
+                <TrashIcon className="mr-1.5 size-3.5 sm:mr-0" />
+                <span className="sm:hidden">Delete</span>
               </Button>
             </div>
             <RichTextField

@@ -22,8 +22,12 @@ const TRUST_LOOKUP_CHUNK_SIZE = 80;
 
 function normalizeSender(raw: string): string | null {
   const normalized = raw.trim().toLowerCase();
-  if (!normalized || !normalized.includes("@")) return null;
-  return normalized;
+  if (!normalized) return null;
+  const bracketMatch = normalized.match(/<([^>]+)>/);
+  const candidate = bracketMatch?.[1]?.trim() ?? normalized;
+  const emailMatch = candidate.match(/[^\s<>()"'`,;:]+@[^\s<>()"'`,;:]+/);
+  if (!emailMatch) return null;
+  return emailMatch[0].toLowerCase();
 }
 
 function getDomain(fromAddr: string): string | null {

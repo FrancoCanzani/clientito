@@ -20,7 +20,7 @@ createRoot(document.getElementById("root")!).render(
             title: "!text-xs !font-medium",
             description: "!text-[11px] !text-muted-foreground",
             icon: "!size-3",
-            actionButton: "!h-6 !px-2 !text-[11px]",
+            actionButton: "!bg-transparent !border-0 !shadow-none !text-muted-foreground !px-1 !h-auto",
             cancelButton: "!h-6 !px-2 !text-[11px]",
           },
         }}

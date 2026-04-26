@@ -3,7 +3,6 @@ import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
 import { SettingsSectionHeader } from "@/features/settings/components/settings-shell";
 import { useSettingsMutations } from "@/features/settings/hooks/use-settings-mutations";
-import { getMailboxStatusCopy } from "@/features/settings/utils/sync-formatting";
 import {
   getMailboxDisplayEmail,
   useMailboxes,
@@ -97,7 +96,7 @@ function MailboxDetails({
   onReconnect: () => void;
   onReimport: (mailboxId: number) => void | Promise<void>;
 }) {
-  const statusCopy = getMailboxStatusCopy(account);
+  const needsReconnect = account.syncState === "needs_reconnect";
   const canReimport =
     account.mailboxId != null &&
     account.hasValidCredentials &&
@@ -112,20 +111,44 @@ function MailboxDetails({
           </p>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span
-              className={`inline-block size-1.5 rounded-full ${statusCopy.badgeTone}`}
+              className={`inline-block size-1.5 rounded-full ${
+                account.syncState === "needs_reconnect" || account.syncState === "error"
+                  ? "bg-amber-500"
+                  : account.hasSynced
+                    ? "bg-green-500"
+                    : "bg-zinc-400"
+              }`}
             />
-            {statusCopy.badge}
+            {account.syncState === "needs_reconnect"
+              ? "Reconnect Gmail"
+              : account.syncState === "error"
+                ? account.hasSynced
+                  ? "Sync needs attention"
+                  : "Import needs attention"
+                : account.hasSynced
+                  ? "Up to date"
+                  : "Connected"}
           </div>
-          <p className="text-xs text-muted-foreground">{statusCopy.detail}</p>
+          <p className="text-xs text-muted-foreground">
+            {account.syncState === "needs_reconnect"
+              ? "Google access expired. Reconnect this account to resume mailbox sync."
+              : account.syncState === "error"
+                ? account.error?.trim() || "Sync hit an unexpected error."
+                : account.hasSynced
+                  ? "Your mailbox is connected and syncing normally."
+                  : "Your account is connected. First sync starts automatically when you open Inbox."}
+          </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onReconnect}
-          disabled={isConnecting}
-        >
-          {isConnecting ? "Connecting..." : "Reconnect"}
-        </Button>
+        {needsReconnect ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onReconnect}
+            disabled={isConnecting}
+          >
+            {isConnecting ? "Connecting..." : "Reconnect Gmail"}
+          </Button>
+        ) : null}
       </div>
 
       <div className="border-t border-border/60">
@@ -133,28 +156,23 @@ function MailboxDetails({
           <div className="space-y-0.5">
             <p className="text-xs font-medium">Clear local cache</p>
             <p className="text-xs text-muted-foreground">
-              {statusCopy.reimportHint}
+              {needsReconnect
+                ? "Reconnect first, then clear cache only if the mailbox still looks incomplete."
+                : "Clear cache rebuilds local mailbox data from Gmail."}
             </p>
           </div>
-          {isBusy ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <SpinnerGapIcon className="size-4 animate-spin" />
-              <span>In progress</span>
-            </div>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (account.mailboxId == null) return;
-                void onReimport(account.mailboxId);
-              }}
-              disabled={!canReimport}
-            >
-              <ArrowClockwiseIcon className="mr-1.5 size-3.5" />
-              Clear cache
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (account.mailboxId == null) return;
+              void onReimport(account.mailboxId);
+            }}
+            disabled={!canReimport || isBusy}
+          >
+            <ArrowClockwiseIcon className="mr-1.5 size-3.5" />
+            {isBusy ? "In progress..." : "Clear cache"}
+          </Button>
         </div>
       </div>
     </div>

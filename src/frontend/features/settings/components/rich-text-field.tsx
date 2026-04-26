@@ -32,7 +32,7 @@ export function RichTextField({
   return (
     <div
       className={cn(
-        "rounded-md border border-border/70 bg-background focus-within:border-foreground/30",
+        "min-w-0 w-full overflow-hidden rounded-md border border-border/70 bg-background focus-within:border-foreground/30",
         className,
       )}
     >
@@ -40,7 +40,7 @@ export function RichTextField({
         editor={editor}
         className="mx-0 mb-0 border-b border-t-0 px-2"
       />
-      <div className="min-h-36 px-3 py-2">
+      <div className="min-h-36 min-w-0 px-3 py-2 [&_.ProseMirror]:max-w-full [&_.ProseMirror]:overflow-x-auto [&_.ProseMirror]:break-words [&_.ProseMirror]:[overflow-wrap:anywhere]">
         <EditorContent editor={editor} />
       </div>
     </div>

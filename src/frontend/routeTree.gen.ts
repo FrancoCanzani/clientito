@@ -9,6 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DocsRouteRouteImport } from './routes/docs/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
@@ -36,6 +38,16 @@ import { Route as DashboardMailboxIdFolderEmailEmailIdRouteImport } from './rout
 import { Route as DashboardMailboxIdInboxLabelsLabelIndexRouteImport } from './routes/_dashboard/$mailboxId/inbox/labels/$label/index'
 import { Route as DashboardMailboxIdInboxLabelsLabelEmailEmailIdRouteImport } from './routes/_dashboard/$mailboxId/inbox/labels/$label/email/$emailId'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -189,6 +201,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/docs': typeof DocsRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/$mailboxId': typeof DashboardMailboxIdRouteRouteWithChildren
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
@@ -215,6 +229,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/$mailboxId': typeof DashboardMailboxIdRouteRouteWithChildren
   '/docs/$slug': typeof DocsSlugRoute
   '/docs': typeof DocsIndexRoute
@@ -243,6 +259,8 @@ export interface FileRoutesById {
   '/_dashboard': typeof DashboardRouteRouteWithChildren
   '/docs': typeof DocsRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/_dashboard/$mailboxId': typeof DashboardMailboxIdRouteRouteWithChildren
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
@@ -272,6 +290,8 @@ export interface FileRouteTypes {
     | '/'
     | '/docs'
     | '/login'
+    | '/privacy'
+    | '/terms'
     | '/$mailboxId'
     | '/docs/$slug'
     | '/docs/'
@@ -298,6 +318,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/privacy'
+    | '/terms'
     | '/$mailboxId'
     | '/docs/$slug'
     | '/docs'
@@ -325,6 +347,8 @@ export interface FileRouteTypes {
     | '/_dashboard'
     | '/docs'
     | '/login'
+    | '/privacy'
+    | '/terms'
     | '/_dashboard/$mailboxId'
     | '/docs/$slug'
     | '/docs/'
@@ -354,10 +378,26 @@ export interface RootRouteChildren {
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
   DocsRouteRoute: typeof DocsRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -648,6 +688,8 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   DocsRouteRoute: DocsRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

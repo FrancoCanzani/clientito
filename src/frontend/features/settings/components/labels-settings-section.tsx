@@ -126,7 +126,7 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
 
           return (
             <div key={label.gmailId}>
-              <div className="flex items-center gap-3 py-2.5">
+              <div className="flex items-center gap-2.5 py-2">
                 {isEditing ? (
                   <>
                     <ColorDot bg={editing.bg} />
@@ -216,8 +216,8 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
         })}
 
         {creating ? (
-          <div className="space-y-3 py-3">
-            <div className="flex items-center gap-3">
+          <div className="space-y-2.5 py-2.5">
+            <div className="flex items-center gap-2.5">
               <ColorDot bg={newBg} />
               <Input
                 value={newName}
@@ -275,11 +275,11 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
 function ColorDot({ bg }: { bg: string }) {
   return (
     <span
-      className="flex size-5 shrink-0 items-center justify-center rounded-full"
+      className="flex size-4.5 shrink-0 items-center justify-center rounded-full"
       style={{ backgroundColor: `${bg}30` }}
     >
       <span
-        className="size-2.5 rounded-full"
+        className="size-2 rounded-full"
         style={{ backgroundColor: bg }}
       />
     </span>
@@ -300,12 +300,14 @@ function ColorPicker({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="size-6 shrink-0 rounded-full border-2 border-border transition-transform hover:scale-110"
+          aria-label="Pick label color"
+          title="Pick label color"
+          className="size-5 shrink-0 rounded-full border border-border"
           style={{ backgroundColor: value }}
         />
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-3" align="end" sideOffset={8}>
-        <div className="grid grid-cols-7 gap-2">
+      <PopoverContent className="w-auto p-2.5" align="end" sideOffset={8}>
+        <div className="grid grid-cols-7 gap-1.5">
           {GMAIL_LABEL_COLORS.slice(0, 21).map((color) => (
             <button
               key={color.bg}
@@ -314,7 +316,7 @@ function ColorPicker({
                 onChange(color.bg);
                 setOpen(false);
               }}
-              className={`size-6 rounded-full border-2 transition-transform hover:scale-110 ${value === color.bg ? "border-foreground" : "border-transparent"}`}
+              className={`size-5 rounded-full border ${value === color.bg ? "border-foreground" : "border-transparent"}`}
               style={{ backgroundColor: color.bg }}
             />
           ))}

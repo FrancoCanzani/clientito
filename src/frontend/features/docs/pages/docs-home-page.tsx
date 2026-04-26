@@ -17,7 +17,7 @@ export default function DocsHomePage() {
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold">Petit docs</h1>
+        <h1 className="text-2xl font-semibold">Duomo docs</h1>
         <p className="text-sm text-muted-foreground">
           Open command palette and run <code>&gt; docs</code> anytime.
         </p>

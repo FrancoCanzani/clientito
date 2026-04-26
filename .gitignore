@@ -12,3 +12,6 @@ coverage
 .claude
 .tanstack
 .agents
+
+.dev.local
+.dev.vars

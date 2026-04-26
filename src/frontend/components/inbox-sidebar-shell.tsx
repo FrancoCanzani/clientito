@@ -1,7 +1,15 @@
 import { Kbd } from "@/components/ui/kbd";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -13,12 +21,14 @@ import {
 } from "@/components/ui/sidebar";
 import { useGatekeeperPending } from "@/features/email/gatekeeper/queries";
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
+import { beginGmailConnection } from "@/features/onboarding/mutations";
 import { LabelSidebarSection } from "@/features/email/labels/components/label-sidebar-section";
 import { useAuth } from "@/hooks/use-auth";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import {
   CaretDownIcon,
+  CaretUpDownIcon,
   CheckIcon,
   ClockIcon,
   PaperPlaneTiltIcon,
@@ -37,6 +47,7 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
+const FEEDBACK_EMAIL = "rancocanzani@gmail.com";
 
 function formatDisplayName(
   name: string | null | undefined,
@@ -54,26 +65,72 @@ function formatDisplayName(
   return localPart.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function AccountHeader({ mailboxId }: { mailboxId: number }) {
+function AccountSwitcher({ mailboxId }: { mailboxId: number }) {
   const { user } = useAuth();
-  const accounts = useMailboxes().data?.accounts ?? [];
+  const accounts = (useMailboxes().data?.accounts ?? []).filter(
+    (a) => a.mailboxId != null,
+  );
+  const navigate = useNavigate();
 
-  const activeMailbox = accounts.find((a) => a.mailboxId === mailboxId) ?? null;
+  const activeAccount = accounts.find((a) => a.mailboxId === mailboxId) ?? null;
   const activeEmail =
-    (activeMailbox ? getMailboxDisplayEmail(activeMailbox) : null) ??
+    (activeAccount ? getMailboxDisplayEmail(activeAccount) : null) ??
     user?.email ??
     "Inbox";
   const displayName = formatDisplayName(user?.name, activeEmail);
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5">
-      <div className="grid flex-1 text-left text-sm leading-tight">
-        <span className="truncate font-medium">{displayName}</span>
-        <span className="truncate text-xs text-muted-foreground">
-          {activeEmail}
-        </span>
-      </div>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted"
+        >
+          <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
+            <span className="truncate font-medium">{displayName}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              {activeEmail}
+            </span>
+          </div>
+          <CaretUpDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        {accounts.map((account) => {
+          const email =
+            getMailboxDisplayEmail(account) ?? account.email ?? "";
+          const isActive = account.mailboxId === mailboxId;
+          return (
+            <DropdownMenuItem
+              key={account.accountId}
+              onSelect={() => {
+                if (!isActive && account.mailboxId != null) {
+                  void navigate({
+                    to: "/$mailboxId/inbox",
+                    params: { mailboxId: account.mailboxId },
+                  });
+                }
+              }}
+            >
+              <span className="min-w-0 flex-1 truncate text-sm">{email}</span>
+            </DropdownMenuItem>
+          );
+        })}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={() => {
+            void beginGmailConnection(`/${mailboxId}/settings`);
+          }}
+        >
+          Add account
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/$mailboxId/settings" params={{ mailboxId }}>
+            Settings
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -226,6 +283,10 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
     isScreenerRoute,
   } = useActiveSidebarState();
   const navigate = useNavigate();
+  const mailboxAccounts = (useMailboxes().data?.accounts ?? []).filter(
+    (account): account is typeof account & { mailboxId: number } =>
+      account.mailboxId != null,
+  );
   const { openCompose } = useInboxCompose();
   const [moreOpen, setMoreOpen] = useState(false);
   const screenerPendingQuery = useGatekeeperPending(mailboxId, true);
@@ -251,8 +312,37 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
       bindings[`$mod+${i + 1}`] = () =>
         navigate({ to: nav.to as string, params: nav.params });
     });
+
+    if (mailboxAccounts.length > 1) {
+      const currentIndex = mailboxAccounts.findIndex(
+        (account) => account.mailboxId === mailboxId,
+      );
+      if (currentIndex !== -1) {
+        bindings["$mod+shift+arrowdown"] = () => {
+          const nextIndex = (currentIndex + 1) % mailboxAccounts.length;
+          const nextAccount = mailboxAccounts[nextIndex];
+          if (!nextAccount) return;
+          navigate({
+            to: "/$mailboxId/inbox",
+            params: { mailboxId: nextAccount.mailboxId },
+          });
+        };
+        bindings["$mod+shift+arrowup"] = () => {
+          const prevIndex =
+            (currentIndex - 1 + mailboxAccounts.length) %
+            mailboxAccounts.length;
+          const prevAccount = mailboxAccounts[prevIndex];
+          if (!prevAccount) return;
+          navigate({
+            to: "/$mailboxId/inbox",
+            params: { mailboxId: prevAccount.mailboxId },
+          });
+        };
+      }
+    }
+
     return bindings;
-  }, [mailboxId, navigate]);
+  }, [mailboxAccounts, mailboxId, navigate]);
 
   useHotkeys(hotkeyBindings, { allowInEditable: true });
 
@@ -283,7 +373,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   return (
     <Sidebar className="border-none">
       <SidebarHeader className="space-y-2">
-        <AccountHeader mailboxId={mailboxId} />
+        <AccountSwitcher mailboxId={mailboxId} />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -385,6 +475,23 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
           activeLabelId={activeLabelId}
         />
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              className="text-sm"
+              onClick={() =>
+                openCompose({
+                  to: FEEDBACK_EMAIL,
+                  subject: "Feedback",
+                })
+              }
+            >
+              Feedback
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   );
 }

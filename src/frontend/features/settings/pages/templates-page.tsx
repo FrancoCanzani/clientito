@@ -74,21 +74,28 @@ export default function TemplatesPage() {
   }
 
   return (
-    <section className="space-y-4">
+    <section className="min-w-0 space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <SettingsSectionHeader
           group="Mail"
           title="Templates"
           description="Save reusable subject and body snippets for compose."
         />
-        <div className="flex gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={addTemplate}>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-nowrap">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={addTemplate}
+            className="flex-1 sm:flex-none"
+          >
             <PlusIcon className="mr-1.5 size-3.5" />
             Add
           </Button>
           <Button
             type="button"
             size="sm"
+            className="flex-1 sm:flex-none"
             disabled={!isDirty || account?.mailboxId == null || templatesMutation.isPending}
             onClick={() => {
               if (account?.mailboxId == null) return;
@@ -103,8 +110,8 @@ export default function TemplatesPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 border-t border-border/60 pt-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <div className="space-y-2">
+      <div className="min-w-0 space-y-4 border-t border-border/60 pt-4">
+        <div className="min-w-0 space-y-2">
           {state.items.length === 0 ? (
             <p className="py-3 text-xs text-muted-foreground">
               No templates yet.
@@ -133,25 +140,26 @@ export default function TemplatesPage() {
         </div>
 
         {selectedItem ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
+          <div className="min-w-0 space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Input
                 value={selectedItem.name}
                 onChange={(event) =>
                   updateItem(selectedItem.id, { name: event.target.value })
                 }
                 placeholder="Template name"
-                className="h-8 text-xs"
+                className="h-8 w-full text-xs"
               />
               <Button
                 type="button"
-                size="icon"
+                size="sm"
                 variant="ghost"
-                className="size-8 text-destructive hover:text-destructive"
+                className="text-destructive hover:text-destructive sm:size-8 sm:px-0"
                 onClick={() => deleteTemplate(selectedItem.id)}
                 title="Delete template"
               >
-                <TrashIcon className="size-3.5" />
+                <TrashIcon className="mr-1.5 size-3.5 sm:mr-0" />
+                <span className="sm:hidden">Delete</span>
               </Button>
             </div>
             <Input

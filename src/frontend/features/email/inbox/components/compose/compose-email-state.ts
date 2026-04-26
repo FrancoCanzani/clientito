@@ -121,6 +121,37 @@ function stripInsertedSignature(content: string): string {
   return doc.body.innerHTML.trim();
 }
 
+function stripInsertedTemplates(content: string): string {
+  if (!content.includes("data-petit-template-id")) return content;
+
+  if (typeof DOMParser === "undefined") {
+    return content
+      .replace(
+        /<p><br><\/p>\s*<div[^>]*data-petit-template-id="[^"]+"[^>]*>[\s\S]*?<\/div>\s*$/gi,
+        "",
+      )
+      .replace(
+        /<div[^>]*data-petit-template-id="[^"]+"[^>]*>[\s\S]*?<\/div>\s*$/gi,
+        "",
+      );
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(content, "text/html");
+  const templates = doc.body.querySelectorAll("[data-petit-template-id]");
+  templates.forEach((node) => {
+    const previous = node.previousElementSibling;
+    const previousHtml = previous?.outerHTML?.trim().toLowerCase();
+    const isSpacer =
+      previousHtml === "<p><br></p>" || previousHtml === "<p></p>";
+    if (isSpacer) {
+      previous?.remove();
+    }
+    node.remove();
+  });
+  return doc.body.innerHTML.trim();
+}
+
 function applySignatureToBody(
   content: string,
   signature: MailboxSignature | null,
@@ -130,7 +161,7 @@ function applySignatureToBody(
 
   const signatureBlock = `<div data-petit-signature-id="${signature.id}" style="margin-top:16px;border-top:1px solid #dadce0;padding-top:12px;color:#5f6368;font-size:13px;white-space:pre-wrap">${signature.body}</div>`;
   if (!withoutSignature.trim()) {
-    return signatureBlock;
+    return `<p><br></p>${signatureBlock}`;
   }
   return `${withoutSignature}<p><br></p>${signatureBlock}`;
 }
@@ -141,13 +172,15 @@ function appendTemplateToBody(
   signature: MailboxSignature | null,
 ): string {
   const bodyWithoutSignature = stripInsertedSignature(content);
+  const bodyWithoutTemplates = stripInsertedTemplates(bodyWithoutSignature);
   const templateBody = template.body.trim();
   if (!templateBody) {
-    return applySignatureToBody(bodyWithoutSignature, signature);
+    return applySignatureToBody(bodyWithoutTemplates, signature);
   }
-  const nextBody = bodyWithoutSignature.trim()
-    ? `${bodyWithoutSignature}<p><br></p>${templateBody}`
-    : templateBody;
+  const templateBlock = `<div data-petit-template-id="${template.id}">${templateBody}</div>`;
+  const nextBody = bodyWithoutTemplates.trim()
+    ? `${bodyWithoutTemplates}<p><br></p>${templateBlock}`
+    : templateBlock;
   return applySignatureToBody(nextBody, signature);
 }
 

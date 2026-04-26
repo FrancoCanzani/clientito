@@ -50,6 +50,8 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     shortcuts: [
       { key: "⌘ K", description: "Command palette" },
       { key: "⌘ B", description: "Toggle sidebar" },
+      { key: "⌘ ⇧ ↓", description: "Next account" },
+      { key: "⌘ ⇧ ↑", description: "Previous account" },
       { key: "?", description: "Keyboard shortcuts" },
     ],
   },

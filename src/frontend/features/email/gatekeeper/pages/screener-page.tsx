@@ -95,13 +95,13 @@ export default function ScreenerPage() {
         );
       } else if (result.requiresReconnect) {
         toast.warning(
-          `Blocked ${result.fromAddr} in Petit. Reconnect Gmail in Settings to enable Gmail blocking.`,
+          `Blocked ${result.fromAddr} in Duomo. Reconnect Gmail in Settings to enable Gmail blocking.`,
         );
       } else {
         toast.warning(
           result.providerError
-            ? `Blocked ${result.fromAddr} in Petit. Gmail block failed: ${result.providerError}`
-            : `Blocked ${result.fromAddr} in Petit`,
+            ? `Blocked ${result.fromAddr} in Duomo. Gmail block failed: ${result.providerError}`
+            : `Blocked ${result.fromAddr} in Duomo`,
         );
       }
     } catch (error) {

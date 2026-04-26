@@ -18,7 +18,9 @@ import { cn } from "@/lib/utils";
 import {
   CheckIcon,
   ClockIcon,
+  FilesIcon,
   PaperclipIcon,
+  SignatureIcon,
   SparkleIcon,
   SpinnerGapIcon,
   TextAaIcon,
@@ -483,11 +485,13 @@ export function ComposeEmailFields({
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   disabled={isReviewing}
-                  className="h-7 px-2 text-xs"
+                  className="h-7 w-7"
+                  title="Signatures"
+                  aria-label="Signatures"
                 >
-                  Sig
+                  <SignatureIcon className="size-3.5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-48">
@@ -526,11 +530,13 @@ export function ComposeEmailFields({
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   disabled={isReviewing}
-                  className="h-7 px-2 text-xs"
+                  className="h-7 w-7"
+                  title="Templates"
+                  aria-label="Templates"
                 >
-                  Tpl
+                  <FilesIcon className="size-3.5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">

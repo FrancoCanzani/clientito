@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 import {
-  Suspense,
   createContext,
-  lazy,
   useCallback,
   useContext,
   useEffect,
@@ -12,11 +10,7 @@ import {
 import { useRouter } from "@tanstack/react-router";
 import type { ComposeInitial } from "../../types";
 import { openCompose as emitOpenCompose, registerOpenComposeListener } from "./compose-events";
-
-const ComposePanel = lazy(async () => {
-  const mod = await import("./compose-panel");
-  return { default: mod.ComposePanel };
-});
+import { ComposePanel } from "./compose-panel";
 
 type InboxComposeContextValue = {
   openCompose: (initial?: ComposeInitial) => void;
@@ -69,17 +63,13 @@ export function InboxComposeProvider({ children }: { children: ReactNode }) {
   return (
     <InboxComposeContext.Provider value={value}>
       {children}
-      {isOpen ? (
-        <Suspense fallback={null}>
-          <ComposePanel
-            open={isOpen}
-            initial={initial}
-            onOpenChange={(open) => {
-              if (!open) closeCompose();
-            }}
-          />
-        </Suspense>
-      ) : null}
+      <ComposePanel
+        open={isOpen}
+        initial={initial}
+        onOpenChange={(open) => {
+          if (!open) closeCompose();
+        }}
+      />
     </InboxComposeContext.Provider>
   );
 }

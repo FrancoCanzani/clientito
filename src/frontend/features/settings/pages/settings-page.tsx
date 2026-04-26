@@ -8,8 +8,7 @@ import { getCurrentUserId } from "@/db/user";
 import { LabelsSettingsSection } from "@/features/settings/components/labels-settings-section";
 import { SignatureField } from "@/features/settings/components/signature-field";
 import { useSettingsMutations } from "@/features/settings/hooks/use-settings-mutations";
-import { getMailboxStatusCopy } from "@/features/settings/utils/sync-formatting";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, useLogout } from "@/hooks/use-auth";
 import {
   getMailboxDisplayEmail,
   useMailboxes,
@@ -43,6 +42,7 @@ const themeOptions: ThemeOption[] = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const logoutMutation = useLogout();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const [confirmText, setConfirmText] = useState("");
@@ -154,7 +154,7 @@ export default function SettingsPage() {
                     Account
                   </h2>
                   <p className="text-xs text-muted-foreground">
-                    Basic profile details for your Petit account.
+                    Basic profile details for your Duomo account.
                   </p>
                 </div>
                 <div className="mt-4 border-t border-border/60">
@@ -174,6 +174,21 @@ export default function SettingsPage() {
                     <p className="truncate text-xs text-foreground sm:text-right">
                       {user?.email ?? "—"}
                     </p>
+                  </div>
+                  <div className="border-t border-border/60" />
+                  <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium">Session</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={logoutMutation.isPending}
+                      onClick={() => logoutMutation.mutate()}
+                    >
+                      {logoutMutation.isPending ? "Signing out..." : "Sign out"}
+                    </Button>
                   </div>
                 </div>
               </section>
@@ -236,7 +251,7 @@ export default function SettingsPage() {
                     <div className="space-y-0.5">
                       <p className="text-xs font-medium">Theme</p>
                       <p className="text-xs text-muted-foreground">
-                        Choose how Petit looks.
+                        Choose how Duomo looks.
                       </p>
                     </div>
                     <div className="min-w-0 sm:max-w-[60%]">
@@ -327,7 +342,6 @@ function AccountRow({
   onSaveSignature: (mailboxId: number, signature: string) => void;
   isSavingSignature: boolean;
 }) {
-  const statusCopy = getMailboxStatusCopy(account);
   const canReimport =
     account.mailboxId != null &&
     account.hasValidCredentials &&
@@ -342,11 +356,33 @@ function AccountRow({
           </p>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span
-              className={`inline-block size-1.5 rounded-full ${statusCopy.badgeTone}`}
+              className={`inline-block size-1.5 rounded-full ${
+                account.syncState === "needs_reconnect" || account.syncState === "error"
+                  ? "bg-amber-500"
+                  : account.hasSynced
+                    ? "bg-green-500"
+                    : "bg-zinc-400"
+              }`}
             />
-            {statusCopy.badge}
+            {account.syncState === "needs_reconnect"
+              ? "Reconnect Gmail"
+              : account.syncState === "error"
+                ? account.hasSynced
+                  ? "Sync needs attention"
+                  : "Import needs attention"
+                : account.hasSynced
+                  ? "Up to date"
+                  : "Connected"}
           </div>
-          <p className="text-xs text-muted-foreground">{statusCopy.detail}</p>
+          <p className="text-xs text-muted-foreground">
+            {account.syncState === "needs_reconnect"
+              ? "Google access expired. Reconnect this account to resume mailbox sync."
+              : account.syncState === "error"
+                ? account.error?.trim() || "Sync hit an unexpected error."
+                : account.hasSynced
+                  ? "Your mailbox is connected and syncing normally."
+                  : "Your account is connected. First sync starts automatically when you open Inbox."}
+          </p>
         </div>
       </div>
 
@@ -355,29 +391,24 @@ function AccountRow({
           <div className="space-y-0.5">
             <p className="text-xs font-medium">Clear local cache</p>
             <p className="text-xs text-muted-foreground">
-              {statusCopy.reimportHint}
+              {account.syncState === "needs_reconnect"
+                ? "Reconnect first, then clear cache only if the mailbox still looks incomplete."
+                : "Clear cache rebuilds local mailbox data from Gmail."}
             </p>
           </div>
           <div className="min-w-0 sm:max-w-[60%]">
-            {isBusy ? (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <SpinnerGapIcon className="size-4 animate-spin" />
-                <span>In progress</span>
-              </div>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (account.mailboxId == null) return;
-                  void onReimport(account.mailboxId);
-                }}
-                disabled={!canReimport}
-              >
-                <ArrowClockwiseIcon className="mr-1.5 size-3.5" />
-                Clear cache
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (account.mailboxId == null) return;
+                void onReimport(account.mailboxId);
+              }}
+              disabled={!canReimport || isBusy}
+            >
+              <ArrowClockwiseIcon className="mr-1.5 size-3.5" />
+              {isBusy ? "In progress..." : "Clear cache"}
+            </Button>
           </div>
         </div>
       </div>

@@ -10,7 +10,7 @@ import {
   CaretRightIcon,
   PaperclipIcon,
 } from "@phosphor-icons/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   formatEmailDetailDate,
   formatEmailThreadDate,
@@ -119,11 +119,19 @@ export function EmailThread({
   const [expansionOverrides, setExpansionOverrides] = useState<
     Map<string, boolean>
   >(() => new Map());
+  const orderedThreadMessages = useMemo(
+    () =>
+      [...threadMessages].sort((left, right) => {
+        if (left.date !== right.date) return left.date - right.date;
+        return left.createdAt - right.createdAt;
+      }),
+    [threadMessages],
+  );
 
   const formattedDate = formatEmailDetailDate(email.date);
   const subject = email.subject ?? "(no subject)";
   const recipientRows = buildRecipientRows(email);
-  const showThread = Boolean(email.threadId && threadMessages.length > 1);
+  const showThread = Boolean(email.threadId && orderedThreadMessages.length > 1);
   const selectedReferencedCids = useMemo(
     () => collectReferencedCids(email.resolvedBodyHtml ?? email.bodyHtml),
     [email.resolvedBodyHtml, email.bodyHtml],
@@ -140,10 +148,14 @@ export function EmailThread({
 
   const defaultExpandedIds = useMemo(() => {
     const next = new Set<string>();
-    const selected = threadMessages.find((message) => message.id === email.id);
-    next.add(selected ? selected.id : email.id);
+    const latest = orderedThreadMessages[orderedThreadMessages.length - 1];
+    next.add(latest?.id ?? email.id);
     return next;
-  }, [email.id, threadMessages]);
+  }, [email.id, orderedThreadMessages]);
+
+  useEffect(() => {
+    setExpansionOverrides(new Map());
+  }, [email.id, email.threadId]);
 
   const isExpanded = (messageId: string) =>
     expansionOverrides.get(messageId) ?? defaultExpandedIds.has(messageId);
@@ -193,7 +205,7 @@ export function EmailThread({
 
       {showThread ? (
         <div className="space-y-3">
-          {threadMessages.map((threadEmail) => {
+          {orderedThreadMessages.map((threadEmail) => {
             const isSelected = threadEmail.id === email.id;
             const threadReferencedCids = collectReferencedCids(
               threadEmail.resolvedBodyHtml ?? threadEmail.bodyHtml,

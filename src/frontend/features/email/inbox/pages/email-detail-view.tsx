@@ -27,7 +27,7 @@ import {
 } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { toast } from "sonner";
+import { useUndoAction } from "@/features/email/inbox/hooks/use-undo-action";
 
 export function EmailDetailView({
   email,
@@ -189,6 +189,8 @@ export function EmailDetailView({
       patchEmail(emailIdentifier, payload),
   });
 
+  const undoAction = useUndoAction();
+
   const isInInbox = currentEmail.labelIds.includes("INBOX");
   const isStarred = currentEmail.labelIds.includes("STARRED");
 
@@ -235,26 +237,18 @@ export function EmailDetailView({
     c: () => openCompose(),
     f: () => handleForward(),
     e: () => {
-      emailPatchMutation.mutate(
-        { archived: isInInbox },
-        {
-          onSuccess: () => {
-            toast.success(isInInbox ? "Marked as done" : "Moved to inbox");
-            goBack();
-          },
-        },
-      );
+      undoAction({
+        action: () => patchEmail(emailIdentifier, { archived: isInInbox }),
+        onAction: goBack,
+        message: isInInbox ? "Marked as done" : "Moved to inbox",
+      });
     },
     "#": () => {
-      emailPatchMutation.mutate(
-        { trashed: true },
-        {
-          onSuccess: () => {
-            toast.success("Moved to trash");
-            goBack();
-          },
-        },
-      );
+      undoAction({
+        action: () => patchEmail(emailIdentifier, { trashed: true }),
+        onAction: goBack,
+        message: "Moved to trash",
+      });
     },
     s: () => {
       emailPatchMutation.mutate({ starred: !isStarred });

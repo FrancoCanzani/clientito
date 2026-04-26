@@ -26,7 +26,6 @@ import { LabelPicker } from "@/features/email/labels/components/label-picker";
 import { removeLabel } from "@/features/email/labels/mutations";
 import { fetchLabels } from "@/features/email/labels/queries";
 import { useAuth } from "@/hooks/use-auth";
-import { useMailboxes } from "@/hooks/use-mailboxes";
 import type { Icon } from "@phosphor-icons/react";
 import {
   ArrowBendDoubleUpLeftIcon,
@@ -49,6 +48,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useUndoAction } from "../../hooks/use-undo-action";
 import { unsubscribe } from "../../../subscriptions/queries";
 import { blockSender, patchEmail } from "../../mutations";
 import { invalidateInboxQueries } from "../../queries";
@@ -83,20 +83,15 @@ export function EmailActions({
   const queryClient = useQueryClient();
   const router = useRouter();
   const { user } = useAuth();
-  const mailboxesQuery = useMailboxes();
-
-  const availableMailboxes = (mailboxesQuery.data?.accounts ?? []).filter(
-    (account) => account.mailboxId != null,
-  );
-  const showReplyAll = availableMailboxes.length > 1;
+  const showReplyAll =
+    Boolean(email.ccAddr?.trim()) ||
+    (email.toAddr?.split(",").length ?? 0) > 1;
 
   const isStarred = email.labelIds.includes("STARRED");
   const isInInbox = email.labelIds.includes("INBOX");
   const isSnoozed =
     email.snoozedUntil != null && email.snoozedUntil > Date.now();
-  const hasUnsubscribe = Boolean(
-    email.unsubscribeUrl || email.unsubscribeEmail,
-  );
+  const hasUnsubscribe = Boolean(email.unsubscribeUrl || email.unsubscribeEmail);
   const hasAiDraftReply = Boolean(email.aiDraftReply?.trim());
   const mailboxId = email.mailboxId;
   const resolvedMailboxId = mailboxId ?? 0;
@@ -160,7 +155,6 @@ export function EmailActions({
   const removeLabelMutation = useMutation({
     mutationFn: (labelId: string) =>
       removeLabel([email.providerMessageId], labelId, resolvedMailboxId),
-    onSuccess: () => invalidateEmails(),
     onError: (error: Error) =>
       toast.error(error.message || "Failed to remove label"),
   });
@@ -178,13 +172,14 @@ export function EmailActions({
         toast.info("Opened unsubscribe page in a new tab");
         return;
       }
-
       toast.success("Unsubscribed successfully");
     },
     onError: (error) => toast.error(error.message),
   });
 
+  const undoAction = useUndoAction();
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
+  const [unsubscribeConfirmOpen, setUnsubscribeConfirmOpen] = useState(false);
 
   const blockSenderMutation = useMutation({
     mutationFn: () =>
@@ -195,8 +190,8 @@ export function EmailActions({
     onSuccess: (result) => {
       toast.success(
         result.trashedCount > 0
-          ? `Blocked ${result.fromAddr} \u2014 moved ${result.trashedCount} ${result.trashedCount === 1 ? "email" : "emails"} to trash. Manage filters in Gmail.`
-          : `Blocked ${result.fromAddr}. Manage filters in Gmail.`,
+          ? `Blocked — ${result.trashedCount} ${result.trashedCount === 1 ? "email" : "emails"} trashed`
+          : "Sender blocked",
       );
       invalidateEmails();
       onClose?.();
@@ -259,26 +254,18 @@ export function EmailActions({
     blockSenderMutation.isPending;
 
   const handleDone = () =>
-    runEmailPatch(
-      { archived: isInInbox },
-      {
-        successMessage: isInInbox ? "Marked as done" : "Moved to inbox",
-        errorMessage: isInInbox
-          ? "Failed to mark as done"
-          : "Failed to move to inbox",
-        closeAfter: true,
-      },
-    );
+    undoAction({
+      action: () => patchEmail(emailIdentifier, { archived: isInInbox }),
+      onAction: () => onClose?.(),
+      message: isInInbox ? "Marked as done" : "Moved to inbox",
+    });
 
   const handleTrash = () =>
-    runEmailPatch(
-      { trashed: true },
-      {
-        successMessage: "Moved to trash",
-        errorMessage: "Failed to delete",
-        closeAfter: true,
-      },
-    );
+    undoAction({
+      action: () => patchEmail(emailIdentifier, { trashed: true }),
+      onAction: () => onClose?.(),
+      message: "Moved to trash",
+    });
 
   type MenuAction = {
     icon: Icon;
@@ -306,14 +293,11 @@ export function EmailActions({
       icon: WarningIcon,
       label: "Move to spam",
       action: () =>
-        runEmailPatch(
-          { spam: true },
-          {
-            successMessage: "Moved to spam",
-            errorMessage: "Failed to move to spam",
-            closeAfter: true,
-          },
-        ),
+        undoAction({
+          action: () => patchEmail(emailIdentifier, { spam: true }),
+          onAction: () => onClose?.(),
+          message: "Moved to spam",
+        }),
     },
   ];
 
@@ -479,7 +463,10 @@ export function EmailActions({
           {hasUnsubscribe && (
             <DropdownMenuItem
               disabled={actionsPending}
-              onSelect={() => unsubscribeMutation.mutate()}
+              onSelect={(event) => {
+                event.preventDefault();
+                setUnsubscribeConfirmOpen(true);
+              }}
             >
               <BellSlashIcon className="size-3.5" />
               <span className="flex-1">Unsubscribe</span>
@@ -497,6 +484,28 @@ export function EmailActions({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <AlertDialog open={unsubscribeConfirmOpen} onOpenChange={setUnsubscribeConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsubscribe from {email.fromAddr}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will be removed from this mailing list. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setUnsubscribeConfirmOpen(false);
+                unsubscribeMutation.mutate();
+              }}
+            >
+              Unsubscribe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={blockConfirmOpen} onOpenChange={setBlockConfirmOpen}>
         <AlertDialogContent>

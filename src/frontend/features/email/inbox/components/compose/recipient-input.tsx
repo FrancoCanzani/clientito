@@ -1,7 +1,7 @@
-import { contactSuggestionQueryKeys } from "@/features/email/inbox/query-keys";
 import { fetchContactSuggestions } from "@/features/email/inbox/queries";
 import { XIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 import { z } from "zod";
@@ -94,6 +94,8 @@ function buildCollapsedPreview(labels: string[], containerWidth: number): string
   return hiddenCount > 0 ? `${base} +${hiddenCount} more` : base;
 }
 
+const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
+
 export function RecipientInput({
   value,
   onChange,
@@ -104,6 +106,7 @@ export function RecipientInput({
   onFocusField,
   onAdvanceFocus,
 }: RecipientInputProps) {
+  const { mailboxId } = mailboxRoute.useParams();
   const chips = useMemo(() => parseRecipients(value), [value]);
   const [inputValue, setInputValue] = useState("");
   const [open, setOpen] = useState(false);
@@ -118,12 +121,12 @@ export function RecipientInput({
   const editingInputRef = useRef<HTMLInputElement>(null);
 
   const [debouncedInput] = useDebounce(inputValue, 100);
-  const debouncedQuery = debouncedInput.length >= 2 ? debouncedInput : "";
+  const debouncedQuery = debouncedInput.trim();
 
   const { data } = useQuery({
-    queryKey: contactSuggestionQueryKeys.list(debouncedQuery),
-    queryFn: () => fetchContactSuggestions(debouncedQuery),
-    enabled: debouncedQuery.length >= 2,
+    queryKey: ["contact-suggestions", mailboxId ?? "all-mailboxes", debouncedQuery],
+    queryFn: () => fetchContactSuggestions(debouncedQuery, 8, mailboxId ?? undefined),
+    enabled: debouncedQuery.length >= 1,
     staleTime: 30_000,
     gcTime: 60_000,
   });
@@ -137,7 +140,7 @@ export function RecipientInput({
     open &&
     editingIndex === null &&
     suggestions.length > 0 &&
-    inputValue.length >= 2;
+    inputValue.trim().length >= 1;
 
   const chipLabels = useMemo(
     () => chips.map((email) => nameMap.get(email) ?? email),
@@ -266,7 +269,15 @@ export function RecipientInput({
         setSelectedIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
         return;
       }
-      if ((e.key === "Enter" || e.key === "Tab") && suggestions[activeIndex]) {
+      if (e.key === "Enter" && suggestions[activeIndex]) {
+        e.preventDefault();
+        commitEmail(
+          suggestions[activeIndex].email,
+          suggestions[activeIndex].name,
+        );
+        return;
+      }
+      if (e.key === "Tab" && suggestions[activeIndex]) {
         e.preventDefault();
         commitEmail(
           suggestions[activeIndex].email,
@@ -277,15 +288,15 @@ export function RecipientInput({
       }
     }
 
-    if ((e.key === "Enter" || e.key === "Tab") && inputValue.trim()) {
+    if (e.key === "Enter" && inputValue.trim()) {
       e.preventDefault();
       commitEmail(inputValue);
-      advanceFocus();
       return;
     }
 
-    if (e.key === "Enter" && inputValue === "" && chips.length > 0) {
+    if (e.key === "Tab" && inputValue.trim()) {
       e.preventDefault();
+      commitEmail(inputValue);
       advanceFocus();
       return;
     }
@@ -463,7 +474,6 @@ export function RecipientInput({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 commitEmail(suggestion.email, suggestion.name);
-                advanceFocus();
               }}
               onMouseEnter={() => setSelectedIndex(i)}
             >

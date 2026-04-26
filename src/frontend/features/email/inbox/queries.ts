@@ -210,8 +210,12 @@ function inferHasCalendar(email: PulledEmail): boolean {
 function normalizeSender(fromAddr: string | null | undefined): string | null {
   if (!fromAddr) return null;
   const normalized = fromAddr.trim().toLowerCase();
-  if (!normalized || !normalized.includes("@")) return null;
-  return normalized;
+  if (!normalized) return null;
+  const bracketMatch = normalized.match(/<([^>]+)>/);
+  const candidate = bracketMatch?.[1]?.trim() ?? normalized;
+  const emailMatch = candidate.match(/[^\s<>()"'`,;:]+@[^\s<>()"'`,;:]+/);
+  if (!emailMatch) return null;
+  return emailMatch[0].toLowerCase();
 }
 
 function gatekeeperActivatedAtKey(mailboxId: number): string {
@@ -975,10 +979,11 @@ export async function fetchEmailThread(
 export async function fetchContactSuggestions(
   q: string,
   limit = 8,
+  mailboxId?: number,
 ): Promise<ContactSuggestion[]> {
   const userId = await getCurrentUserId();
   if (!userId) return [];
-  return localDb.getContactSuggestions(userId, q, limit);
+  return localDb.getContactSuggestions(userId, q, mailboxId, limit);
 }
 
 export async function fetchSearchSuggestions(

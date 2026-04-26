@@ -25,7 +25,7 @@ export default function AppearancePage() {
           <div className="space-y-0.5">
             <p className="text-xs font-medium">Theme</p>
             <p className="text-xs text-muted-foreground">
-              Choose how Petit looks.
+              Choose how Duomo looks.
             </p>
           </div>
           <ButtonGroup className="w-full sm:w-auto">

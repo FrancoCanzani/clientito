@@ -26,6 +26,8 @@ const DOC_ORDER = [
   "email-sync",
 ] as const;
 
+const LEGAL_SLUGS = new Set(["privacy", "terms"]);
+
 function getOrderIndex(slug: string) {
   const index = DOC_ORDER.indexOf(slug as (typeof DOC_ORDER)[number]);
   return index === -1 ? Number.MAX_SAFE_INTEGER : index;
@@ -112,7 +114,7 @@ const docs = Object.entries(docsModules)
   });
 
 export function getAllDocs() {
-  return docs;
+  return docs.filter((doc) => !LEGAL_SLUGS.has(doc.slug));
 }
 
 export function getDocBySlug(slug: string) {
@@ -120,7 +122,8 @@ export function getDocBySlug(slug: string) {
 }
 
 export function getDocNeighbors(slug: string) {
-  const index = docs.findIndex((doc) => doc.slug === slug);
+  const list = docs.filter((doc) => !LEGAL_SLUGS.has(doc.slug));
+  const index = list.findIndex((doc) => doc.slug === slug);
 
   if (index === -1) {
     return {
@@ -130,8 +133,8 @@ export function getDocNeighbors(slug: string) {
   }
 
   return {
-    previous: docs[index - 1],
-    next: docs[index + 1],
+    previous: list[index - 1],
+    next: list[index + 1],
   };
 }
 

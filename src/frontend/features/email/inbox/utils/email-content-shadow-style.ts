@@ -47,4 +47,25 @@ export const EMAIL_CONTENT_SHADOW_STYLE = `
     max-width: 100%;
     overflow-x: auto;
   }
+
+  details[data-quoted-collapsible='true'] {
+    margin: 8px 0;
+  }
+
+  details[data-quoted-collapsible='true'] > summary {
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  details[data-quoted-collapsible='true'] > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  details[data-quoted-collapsible='true'][open] > summary {
+    margin-bottom: 8px;
+  }
 `;

@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /sdk/
+Disallow: /login
+
+Sitemap: https://duomo.email/sitemap.xml

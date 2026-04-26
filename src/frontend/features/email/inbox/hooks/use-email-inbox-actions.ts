@@ -18,6 +18,7 @@ import {
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { toast } from "sonner";
+import { useUndoAction } from "./use-undo-action";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
@@ -66,6 +67,15 @@ const LIST_CHANGING_ACTIONS = new Set<EmailInboxAction>([
   "delete-forever",
 ]);
 
+const UNDO_ACTIONS = new Set<EmailInboxAction>(["archive", "trash", "spam"]);
+
+const actionMessages: Partial<Record<EmailInboxAction, string>> = {
+  archive: "Marked as done",
+  "move-to-inbox": "Moved to inbox",
+  trash: "Moved to trash",
+  spam: "Moved to spam",
+};
+
 type EmailsCache = InfiniteData<EmailListPage> | undefined;
 
 type InboxMutationVars = {
@@ -100,6 +110,8 @@ export function useEmailInboxActions({
 }) {
   const navigate = mailboxRoute.useNavigate();
   const queryClient = useQueryClient();
+
+  const undoAction = useUndoAction();
 
   const openEmail = useCallback(
     (email: EmailListItem) => {
@@ -171,21 +183,27 @@ export function useEmailInboxActions({
 
       if (identifiers.length === 0) return;
 
-      if (LIST_CHANGING_ACTIONS.has(action)) {
-        const idSet = new Set(ids);
-        queryClient.setQueriesData<InfiniteData<EmailListPage> | undefined>(
-          { queryKey: emailQueryKeys.list(view, mailboxId) },
-          (current) => removeIdsFromInfiniteData(current, idSet),
-        );
-      }
+      const doAction = async () => {
+        if (LIST_CHANGING_ACTIONS.has(action)) {
+          queryClient.setQueriesData<InfiniteData<EmailListPage> | undefined>(
+            { queryKey: emailQueryKeys.list(view, mailboxId) },
+            (current) => removeIdsFromInfiniteData(current, idSet),
+          );
+        }
+        try {
+          await mutation.mutateAsync({ action, ids, identifiers });
+        } catch (error) {
+          console.warn("Inbox action failed", error);
+        }
+      };
 
-      try {
-        await mutation.mutateAsync({ action, ids, identifiers });
-      } catch (error) {
-        console.warn("Inbox action failed", error);
+      if (UNDO_ACTIONS.has(action)) {
+        undoAction({ action: doAction, message: actionMessages[action] ?? "Done" });
+      } else {
+        await doAction();
       }
     },
-    [mailboxId, mutation, queryClient, view],
+    [mailboxId, mutation, queryClient, undoAction, view],
   );
 
   return { openEmail, executeEmailAction };

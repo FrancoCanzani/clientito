@@ -35,7 +35,7 @@ function LoginRoute() {
       <div className="w-full max-w-md text-center space-y-8">
         <div className="space-y-2">
           <h1 className="text-3xl font-medium tracking-tight">
-            Welcome to Petit
+            Welcome to Duomo
           </h1>
           <p className="text-sm text-muted-foreground">
             Regain daily hours by delegating

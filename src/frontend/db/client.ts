@@ -91,6 +91,17 @@ const LEGACY_PARTIAL_CLASSIFICATION_REASON =
 const snakeToCamel = (s: string) =>
   s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
 
+function normalizeSender(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return null;
+  const bracketMatch = normalized.match(/<([^>]+)>/);
+  const candidate = bracketMatch?.[1]?.trim() ?? normalized;
+  const emailMatch = candidate.match(/[^\s<>()"'`,;:]+@[^\s<>()"'`,;:]+/);
+  if (!emailMatch) return null;
+  return emailMatch[0].toLowerCase();
+}
+
 function rowsToObjects<T>(res: ExecResult): T[] {
   const keys = res.columns.map(snakeToCamel);
   return res.rows.map((row) => {
@@ -789,17 +800,21 @@ export const localDb = {
     decision: "accept" | "reject";
   }): Promise<void> {
     const { userId, mailboxId, fromAddr, decision } = params;
-    const normalized = fromAddr.trim().toLowerCase();
+    const normalized = normalizeSender(fromAddr);
     if (!normalized) return;
 
     const res = await dbClient.exec(
-      `SELECT id, label_ids
+      `SELECT id, from_addr, label_ids
        FROM emails
-       WHERE user_id = ? AND mailbox_id = ? AND LOWER(from_addr) = ? AND is_gatekept = 1`,
-      [userId, mailboxId, normalized],
+       WHERE user_id = ? AND mailbox_id = ? AND is_gatekept = 1`,
+      [userId, mailboxId],
       "rows",
     );
-    const rows = rowsToObjects<{ id: number; labelIds: string | null }>(res);
+    const rows = rowsToObjects<{
+      id: number;
+      fromAddr: string | null;
+      labelIds: string | null;
+    }>(res).filter((row) => normalizeSender(row.fromAddr) === normalized);
     if (rows.length === 0) return;
 
     for (const row of rows) {
@@ -1205,32 +1220,133 @@ export const localDb = {
     };
   },
 
-  async getContactSuggestions(userId: string, query: string, limit?: number) {
-    const pattern = `%${query}%`;
+  async getContactSuggestions(
+    userId: string,
+    query: string,
+    mailboxId?: number,
+    limit?: number,
+  ) {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return [];
+
+    const maxResults = limit ?? 8;
+    const mailboxFilter = mailboxId ?? null;
+    const containsPattern = `%${normalizedQuery}%`;
+    const startsWithPattern = `${normalizedQuery}%`;
+
     const res = await dbClient.exec(
-      `SELECT from_addr, max(from_name) AS from_name, max(date) AS last_date, count(*) AS count
-       FROM emails
-       WHERE user_id = ? AND (from_addr LIKE ? OR from_name LIKE ?)
-       GROUP BY from_addr
-       ORDER BY count(*) DESC
+      `WITH contact_sources AS (
+         SELECT LOWER(from_addr) AS email, MAX(from_name) AS name, MAX(date) AS last_date, COUNT(*) AS interaction_count
+         FROM emails
+         WHERE user_id = ?
+           AND (? IS NULL OR mailbox_id = ?)
+           AND direction = 'received'
+           AND from_addr IS NOT NULL
+           AND TRIM(from_addr) <> ''
+         GROUP BY LOWER(from_addr)
+
+         UNION ALL
+
+         SELECT LOWER(to_addr) AS email, NULL AS name, MAX(date) AS last_date, COUNT(*) AS interaction_count
+         FROM emails
+         WHERE user_id = ?
+           AND (? IS NULL OR mailbox_id = ?)
+           AND direction = 'sent'
+           AND to_addr IS NOT NULL
+           AND TRIM(to_addr) <> ''
+         GROUP BY LOWER(to_addr)
+
+         UNION ALL
+
+         SELECT LOWER(cc_addr) AS email, NULL AS name, MAX(date) AS last_date, COUNT(*) AS interaction_count
+         FROM emails
+         WHERE user_id = ?
+           AND (? IS NULL OR mailbox_id = ?)
+           AND direction = 'sent'
+           AND cc_addr IS NOT NULL
+           AND TRIM(cc_addr) <> ''
+         GROUP BY LOWER(cc_addr)
+       ),
+       aggregated AS (
+         SELECT
+           email,
+           MAX(name) AS name,
+           MAX(last_date) AS last_date,
+           SUM(interaction_count) AS count
+         FROM contact_sources
+         WHERE email IS NOT NULL
+         GROUP BY email
+       )
+       SELECT email, name, last_date, count
+       FROM aggregated
+       WHERE INSTR(email, '@') > 1
+         AND (email LIKE ? OR COALESCE(LOWER(name), '') LIKE ?)
+       ORDER BY
+         CASE
+           WHEN email = ? THEN 0
+           WHEN email LIKE ? THEN 1
+           WHEN COALESCE(LOWER(name), '') LIKE ? THEN 2
+           ELSE 3
+         END,
+         count DESC,
+         last_date DESC
        LIMIT ?`,
-      [userId, pattern, pattern, limit ?? 8],
+      [
+        userId,
+        mailboxFilter,
+        mailboxFilter,
+        userId,
+        mailboxFilter,
+        mailboxFilter,
+        userId,
+        mailboxFilter,
+        mailboxFilter,
+        containsPattern,
+        containsPattern,
+        normalizedQuery,
+        startsWithPattern,
+        startsWithPattern,
+        maxResults * 3,
+      ],
       "rows",
     );
+
     const rows = rowsToObjects<{
-      fromAddr: string;
-      fromName: string | null;
+      email: string | null;
+      name: string | null;
       lastDate: number | null;
       count: number;
     }>(res);
 
-    return rows.map((r) => ({
-      email: r.fromAddr,
-      name: r.fromName,
-      avatarUrl: null as string | null,
-      lastInteractionAt: r.lastDate,
-      interactionCount: Number(r.count),
-    }));
+    const suggestions: Array<{
+      email: string;
+      name: string | null;
+      avatarUrl: string | null;
+      lastInteractionAt: number | null;
+      interactionCount: number;
+    }> = [];
+    const seen = new Set<string>();
+
+    for (const row of rows) {
+      const normalizedEmail = normalizeSender(row.email);
+      if (!normalizedEmail) continue;
+      if (seen.has(normalizedEmail)) continue;
+      seen.add(normalizedEmail);
+
+      suggestions.push({
+        email: normalizedEmail,
+        name: row.name,
+        avatarUrl: null,
+        lastInteractionAt: row.lastDate ?? null,
+        interactionCount: Number(row.count ?? 0),
+      });
+
+      if (suggestions.length >= maxResults) {
+        break;
+      }
+    }
+
+    return suggestions;
   },
 
   async getSearchSuggestions(params: {
@@ -1243,7 +1359,7 @@ export const localDb = {
     const normalized = query.trim();
 
     const contacts = normalized
-      ? await localDb.getContactSuggestions(userId, normalized, 6)
+      ? await localDb.getContactSuggestions(userId, normalized, mailboxId, 6)
       : [];
 
     const fragments: SqlFragment[] = [{ sql: "user_id = ?", params: [userId] }];

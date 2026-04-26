@@ -140,7 +140,9 @@ function EmailRowActions({
   onOpen: () => void;
   summary: string | null;
 }) {
-  const summaryText = summary?.trim() || null;
+  const summaryText = summary
+    ? summary.trim().replace(/\n{3,}/g, "\n\n")
+    : null;
 
   return (
     <div
@@ -184,7 +186,7 @@ function EmailRowActions({
           </HoverCardTrigger>
           <HoverCardContent
             align="end"
-            className="w-80 whitespace-pre-wrap text-xs leading-relaxed"
+            className="w-80 max-h-[70vh] overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed"
           >
             {summaryText}
           </HoverCardContent>

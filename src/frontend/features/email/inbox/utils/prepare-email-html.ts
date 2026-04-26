@@ -18,6 +18,37 @@ function stripTrackingPixels(root: ParentNode): void {
   });
 }
 
+const QUOTED_SELECTORS = [
+  "blockquote",
+  ".gmail_quote",
+  "[class*='gmail_quote']",
+  "blockquote.protonmail_quote",
+  "[class*='protonmail_quote']",
+  "blockquote.tutanota_quote",
+  "[class*='tutanota_quote']",
+  ".yahoo_quoted",
+  "[class*='yahoo_quoted']",
+  'div[id="divRplyFwdMsg"]',
+].join(", ");
+
+function collapseQuotedBlocks(doc: Document): void {
+  const quoted = doc.querySelectorAll<HTMLElement>(QUOTED_SELECTORS);
+  quoted.forEach((node) => {
+    if (node.closest("[data-quoted-collapsible='true']")) return;
+    if (!node.parentNode) return;
+
+    const details = doc.createElement("details");
+    details.setAttribute("data-quoted-collapsible", "true");
+
+    const summary = doc.createElement("summary");
+    summary.setAttribute("aria-label", "Show quoted text");
+    summary.textContent = "...";
+
+    node.parentNode.insertBefore(details, node);
+    details.append(summary, node);
+  });
+}
+
 export function prepareEmailHtml(
   html: string,
   inlineContext?: InlineImageContext | null,
@@ -42,6 +73,7 @@ export function prepareEmailHtml(
   rewriteCidImages(parsedDocument, inlineContext);
   rewriteInsecureImageUrls(parsedDocument);
   stripTrackingPixels(parsedDocument);
+  collapseQuotedBlocks(parsedDocument);
 
   const styleTag = parsedDocument.createElement("style");
   styleTag.textContent = EMAIL_CONTENT_SHADOW_STYLE;
