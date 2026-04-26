@@ -1,4 +1,3 @@
-import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,10 +16,11 @@ import { useInboxHotkeys } from "@/features/email/inbox/hooks/use-inbox-hotkeys"
 import type { EmailListItem } from "@/features/email/inbox/types";
 import { VIEW_LABELS } from "@/features/email/inbox/utils/inbox-filters";
 import { fetchLabels } from "@/features/email/labels/queries";
+import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { useIsScrolled } from "@/hooks/use-is-scrolled";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { CircleNotchIcon, FunnelSimpleIcon } from "@phosphor-icons/react";
+import { FunnelSimpleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -154,7 +154,7 @@ export function EmailList({
     headerSlot || extraActions || filterToggleButton || hasGatekeeperButton ? (
       <>
         {hasGatekeeperButton ? (
-          <Button asChild variant="outline" size="sm" className="text-xs">
+          <Button asChild variant="outline" size="sm">
             <Link
               to="/$mailboxId/screener"
               params={{ mailboxId: routeMailboxId }}
@@ -212,10 +212,6 @@ export function EmailList({
               );
             })}
           </div>
-        ) : isLoading ? (
-          <div className="flex min-h-56 flex-col items-center justify-center gap-3">
-            <CircleNotchIcon className="size-5 animate-spin text-muted-foreground" />
-          </div>
         ) : (
           <Empty className="min-h-56 justify-center">
             <EmptyHeader>
@@ -236,7 +232,6 @@ export function EmailList({
           </div>
         )}
       </div>
-
     </div>
   );
 }

@@ -131,7 +131,8 @@
   }
   html {
     @apply font-sans antialiased;
-    --reading-font: var(--font-sans);
+    scrollbar-width: thin;
+    scrollbar-color: gray transparent;
   }
   html[data-zen="on"] [data-zen-hide] {
     display: none !important;

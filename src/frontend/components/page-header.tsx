@@ -3,11 +3,13 @@ import { type ReactNode } from "react";
 
 export function PageHeader({
   title,
+  subtitle,
   actions,
   isScrolled = false,
   className,
 }: {
   title: ReactNode;
+  subtitle?: ReactNode;
   actions?: ReactNode;
   isScrolled?: boolean;
   className?: string;
@@ -24,6 +26,9 @@ export function PageHeader({
         <h1 className="truncate text-lg tracking-[-0.6px] sm:tracking-[-0.8px] md:tracking-[-1px]">
           {title}
         </h1>
+        {subtitle ? (
+          <p className="line-clamp-1 text-xs text-muted-foreground">{subtitle}</p>
+        ) : null}
       </div>
       {actions && (
         <div className="flex flex-1 items-center justify-end gap-2">

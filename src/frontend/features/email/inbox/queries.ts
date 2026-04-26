@@ -5,6 +5,7 @@ import type { EmailAICategory, SplitRule } from "@/db/schema";
 import { getCurrentUserId } from "@/db/user";
 import { queryClient } from "@/lib/query-client";
 import { asyncQueue } from "@tanstack/pacer/async-queuer";
+import { Throttler } from "@tanstack/pacer/throttler";
 import type {
   CalendarInvitePreview,
   ContactSuggestion,
@@ -143,6 +144,26 @@ const classificationDeferredRetryTimers = new Map<
   string,
   ReturnType<typeof setTimeout>
 >();
+
+const EMAIL_QUERY_INVALIDATION_THROTTLE_MS = 100;
+let needsEmailQueryInvalidation = false;
+const emailQueryInvalidationThrottler = new Throttler(
+  () => {
+    if (!needsEmailQueryInvalidation) return;
+    needsEmailQueryInvalidation = false;
+    void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+  },
+  {
+    wait: EMAIL_QUERY_INVALIDATION_THROTTLE_MS,
+    leading: false,
+    trailing: true,
+  },
+);
+
+function invalidateInboxQueriesThrottled(): void {
+  needsEmailQueryInvalidation = true;
+  emailQueryInvalidationThrottler.maybeExecute();
+}
 
 function cancelClassificationDeferredRetry(classificationKey: string): void {
   const existing = classificationDeferredRetryTimers.get(classificationKey);
@@ -490,7 +511,7 @@ async function processThreadClassificationTask(
       classifiedAt: Date.now(),
     });
 
-    queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+    invalidateInboxQueriesThrottled();
     return "classified";
   } catch {
     // Classification is best-effort and must never block inbox rendering.
@@ -1014,5 +1035,5 @@ export async function deleteDraft(id: number): Promise<void> {
 }
 
 export function invalidateInboxQueries() {
-  queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+  invalidateInboxQueriesThrottled();
 }

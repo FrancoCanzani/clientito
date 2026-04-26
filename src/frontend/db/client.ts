@@ -783,9 +783,11 @@ export const localDb = {
 
   async getGatekeeperPendingCount(userId: string, mailboxId: number): Promise<number> {
     const res = await dbClient.exec(
-      `SELECT count(*) AS count
+      `SELECT count(DISTINCT lower(trim(from_addr))) AS count
        FROM emails
-       WHERE user_id = ? AND mailbox_id = ? AND has_inbox = 1 AND is_gatekept = 1`,
+       WHERE user_id = ? AND mailbox_id = ? AND has_inbox = 1 AND is_gatekept = 1
+         AND from_addr IS NOT NULL
+         AND trim(from_addr) != ''`,
       [userId, mailboxId],
       "get",
     );

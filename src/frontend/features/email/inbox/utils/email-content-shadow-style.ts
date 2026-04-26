@@ -6,7 +6,7 @@ export const EMAIL_CONTENT_SHADOW_STYLE = `
     color: inherit;
     font-size: 12px;
     line-height: 1.45;
-    overflow-x: auto;
+    overflow-x: hidden;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
   }
@@ -35,6 +35,27 @@ export const EMAIL_CONTENT_SHADOW_STYLE = `
     border-collapse: collapse;
     table-layout: auto;
     max-width: 100% !important;
+  }
+
+  [data-transactional-table='true'] {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: auto !important;
+  }
+
+  [data-transactional-cell='true'] {
+    vertical-align: top;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  [data-transactional-tight='true'] {
+    padding: 6px 8px !important;
+  }
+
+  [data-transactional-image='true'] {
+    max-width: 100% !important;
+    height: auto !important;
   }
 
   img, video, iframe, svg, canvas {
@@ -67,5 +88,18 @@ export const EMAIL_CONTENT_SHADOW_STYLE = `
 
   details[data-quoted-collapsible='true'][open] > summary {
     margin-bottom: 8px;
+  }
+
+  @media (max-width: 640px) {
+    [data-transactional-stack='true'] tr {
+      display: block !important;
+      width: 100% !important;
+    }
+
+    [data-transactional-stack='true'] td,
+    [data-transactional-stack='true'] th {
+      display: block !important;
+      width: 100% !important;
+    }
   }
 `;
