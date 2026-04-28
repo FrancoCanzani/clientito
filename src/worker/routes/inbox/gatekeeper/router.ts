@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { trustEntities } from "../../../db/schema";
 import { GmailDriver } from "../../../lib/gmail/driver";
+import { senderHasGmailHistory } from "../../../lib/gmail/mailbox/filters";
 import { resolveMailbox } from "../../../lib/gmail/mailboxes";
 import type { AppRouteEnv } from "../../types";
 
@@ -19,6 +20,7 @@ const decisionBodySchema = z.object({
 });
 
 const TRUST_LOOKUP_CHUNK_SIZE = 80;
+const GMAIL_HISTORY_CONCURRENCY = 6;
 
 function normalizeSender(raw: string): string | null {
   const normalized = raw.trim().toLowerCase();
@@ -111,6 +113,57 @@ async function upsertTrustEntity(params: {
     });
 }
 
+async function resolveGmailHistoryForSenders(params: {
+  db: AppRouteEnv["Variables"]["db"];
+  env: AppRouteEnv["Bindings"];
+  userId: string;
+  mailboxId: number;
+  senders: string[];
+}): Promise<Set<string>> {
+  const known = new Set<string>();
+  if (params.senders.length === 0) return known;
+
+  const queue = [...params.senders];
+  const workers = Array.from(
+    { length: Math.min(GMAIL_HISTORY_CONCURRENCY, queue.length) },
+    async () => {
+      while (queue.length > 0) {
+        const sender = queue.shift();
+        if (!sender) break;
+        try {
+          const hasHistory = await senderHasGmailHistory(
+            params.db,
+            params.mailboxId,
+            params.env,
+            sender,
+          );
+          if (hasHistory) known.add(sender);
+        } catch {
+          // ignore; sender stays null and goes to screener
+        }
+      }
+    },
+  );
+  await Promise.all(workers);
+
+  if (known.size > 0) {
+    await Promise.all(
+      Array.from(known).map((sender) =>
+        upsertTrustEntity({
+          db: params.db,
+          userId: params.userId,
+          mailboxId: params.mailboxId,
+          entityType: "sender",
+          entityValue: sender,
+          trustLevel: "trusted",
+        }),
+      ),
+    );
+  }
+
+  return known;
+}
+
 const gatekeeperRoutes = new Hono<AppRouteEnv>();
 
 gatekeeperRoutes.post(
@@ -169,6 +222,21 @@ gatekeeperRoutes.post(
       }
     }
 
+    const unresolved = normalizedSenders.filter((sender) => {
+      const domain = getDomain(sender);
+      const senderLevel = senderTrust.get(sender) ?? null;
+      const domainLevel = domain ? (domainTrust.get(domain) ?? null) : null;
+      return senderLevel === null && domainLevel === null;
+    });
+
+    const historyKnown = await resolveGmailHistoryForSenders({
+      db,
+      env: c.env,
+      userId: user.id,
+      mailboxId: mailbox.id,
+      senders: unresolved,
+    });
+
     return c.json(
       {
         data: {
@@ -176,11 +244,16 @@ gatekeeperRoutes.post(
             const domain = getDomain(sender);
             const senderLevel = senderTrust.get(sender) ?? null;
             const domainLevel = domain ? (domainTrust.get(domain) ?? null) : null;
-            return {
-              sender,
-              trustLevel: senderLevel ?? domainLevel,
-              source: senderLevel ? "sender" : domainLevel ? "domain" : null,
-            };
+            const historyLevel = historyKnown.has(sender) ? "trusted" : null;
+            const trustLevel = senderLevel ?? domainLevel ?? historyLevel;
+            const source = senderLevel
+              ? "sender"
+              : domainLevel
+                ? "domain"
+                : historyLevel
+                  ? "history"
+                  : null;
+            return { sender, trustLevel, source };
           }),
         },
       },

@@ -496,36 +496,38 @@ export function ComposeEmailFields({
                   <SignatureIcon className="size-3.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuItem
-                  onSelect={() => applySignatureById(null)}
-                >
-                  {selectedSignatureId == null ? (
-                    <CheckIcon className="size-3" />
-                  ) : (
-                    <span className="size-3" />
-                  )}
-                  No signature
-                </DropdownMenuItem>
-                {signatures.length === 0 && (
-                  <DropdownMenuItem disabled>
-                    <span className="size-3" />
-                    No saved signatures
+              <DropdownMenuContent align="start" className="w-56">
+                {signatures.length === 0 ? (
+                  <DropdownMenuItem disabled className="justify-start text-left">
+                    <span className="min-w-0 truncate text-left">
+                      No saved signatures
+                    </span>
                   </DropdownMenuItem>
+                ) : (
+                  <>
+                    <DropdownMenuItem onSelect={() => applySignatureById(null)}>
+                      {selectedSignatureId == null ? (
+                        <CheckIcon className="size-3" />
+                      ) : (
+                        <span className="size-3" />
+                      )}
+                      No signature
+                    </DropdownMenuItem>
+                    {signatures.map((signature) => (
+                      <DropdownMenuItem
+                        key={signature.id}
+                        onSelect={() => applySignatureById(signature.id)}
+                      >
+                        {selectedSignatureId === signature.id ? (
+                          <CheckIcon className="size-3" />
+                        ) : (
+                          <span className="size-3" />
+                        )}
+                        <span className="min-w-0 truncate">{signature.name}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </>
                 )}
-                {signatures.map((signature) => (
-                  <DropdownMenuItem
-                    key={signature.id}
-                    onSelect={() => applySignatureById(signature.id)}
-                  >
-                    {selectedSignatureId === signature.id ? (
-                      <CheckIcon className="size-3" />
-                    ) : (
-                      <span className="size-3" />
-                    )}
-                    {signature.name}
-                  </DropdownMenuItem>
-                ))}
               </DropdownMenuContent>
             </DropdownMenu>
             <DropdownMenu>
@@ -543,9 +545,10 @@ export function ComposeEmailFields({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
                 {templates.length === 0 ? (
-                  <DropdownMenuItem disabled>
-                    <span className="size-3" />
-                    No saved templates
+                  <DropdownMenuItem disabled className="justify-start text-left">
+                    <span className="min-w-0 truncate text-left">
+                      No saved templates
+                    </span>
                   </DropdownMenuItem>
                 ) : (
                   templates.map((template) => (

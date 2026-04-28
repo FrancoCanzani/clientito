@@ -4,104 +4,50 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import type { EmailListItem } from "@/features/email/inbox/types";
-import { formatEmailSnippet } from "@/features/email/inbox/utils/formatters";
+import { groupEmailsByThread } from "@/features/email/inbox/utils/group-emails-by-thread";
+import { fetchLabels } from "@/features/email/labels/queries";
+import { labelQueryKeys } from "@/features/email/labels/query-keys";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { CalendarIcon, PaperclipIcon, StarIcon } from "@phosphor-icons/react";
-import { format, isThisYear, isToday } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import type { RefCallback } from "react";
-
-function formatSearchDate(timestamp: number) {
-  const date = new Date(timestamp);
-  if (isToday(date)) return format(date, "p");
-  if (isThisYear(date)) return format(date, "MMM d");
-  return format(date, "MMM d, yyyy");
-}
-
-function SearchResultRow({
-  email,
-  onSelect,
-}: {
-  email: EmailListItem;
-  onSelect: () => void;
-}) {
-  const isStarred = email.labelIds.includes("STARRED");
-  const participantLabel =
-    email.direction === "sent"
-      ? email.toAddr
-        ? `To: ${email.toAddr}`
-        : "To: (unknown recipient)"
-      : email.fromName || email.fromAddr;
-  const snippet = formatEmailSnippet(email.snippet);
-
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="group flex w-full cursor-default items-center gap-2 rounded-md px-2 py-2 text-left transition-[opacity,background-color] duration-200 ease-out hover:bg-muted/40"
-    >
-      <span
-        className={cn(
-          "size-1.5 shrink-0 rounded-full",
-          email.isRead ? "hidden" : "bg-blue-500",
-        )}
-      />
-
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-          <span className="min-w-0 max-w-[15rem] shrink truncate text-sm font-medium tracking-[-0.6px] text-foreground">
-            {participantLabel}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-sm tracking-[-0.2px] text-foreground/50">
-            {email.subject ?? "(no subject)"}
-          </span>
-        </div>
-        {snippet && (
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            {snippet}
-          </p>
-        )}
-      </div>
-
-      <div className="shrink-0">
-        <div className="relative flex min-w-20 justify-end text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            {isStarred && (
-              <StarIcon
-                className="size-3 text-yellow-500"
-                weight="fill"
-                aria-hidden
-              />
-            )}
-            {email.hasCalendar && <CalendarIcon className="size-3" aria-hidden />}
-            {email.hasAttachment && (
-              <PaperclipIcon className="size-3" aria-hidden />
-            )}
-            <span>{formatSearchDate(email.date)}</span>
-          </div>
-        </div>
-      </div>
-    </button>
-  );
-}
+import { DesktopEmailRow } from "../list/desktop-email-row";
+import { MobileEmailRow } from "../list/mobile-email-row";
 
 export function SearchResultsList({
   query,
   results,
+  mailboxId,
   isPending,
   hasNextPage,
   isFetchingNextPage,
   loadMoreRef,
   onOpenEmail,
+  onAction,
 }: {
   query: string;
   results: EmailListItem[];
+  mailboxId: number;
   isPending: boolean;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   loadMoreRef: RefCallback<HTMLDivElement>;
   onOpenEmail: (email: EmailListItem) => void;
+  onAction: (action: EmailInboxAction, ids?: string[]) => void;
 }) {
+  const isMobile = useIsMobile();
+  const RowComponent = isMobile ? MobileEmailRow : DesktopEmailRow;
+  const groups = useMemo(() => groupEmailsByThread(results), [results]);
+  const { data: allLabels } = useQuery({
+    queryKey: labelQueryKeys.list(mailboxId),
+    queryFn: () => fetchLabels(mailboxId),
+    staleTime: 60_000,
+  });
+
   if (query.length < 2) {
     return (
       <Empty className="h-full min-h-full flex-1 justify-center border-0 p-0">
@@ -117,18 +63,27 @@ export function SearchResultsList({
 
   if (isPending) {
     return (
-      <Empty className="h-full min-h-full flex-1 justify-center border-0 p-0">
-        <EmptyHeader>
-          <EmptyTitle>Searching</EmptyTitle>
-          <EmptyDescription>
-            {`Finding the best matches for "${query}".`}
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <div className="w-full" aria-label={`Searching for ${query}`}>
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div
+            key={index}
+            className={cn(
+              "flex w-full items-center gap-3",
+              isMobile
+                ? "h-14 border-b border-border/40 px-4"
+                : "h-10 rounded-md px-6",
+            )}
+          >
+            <Skeleton className="h-3.5 w-24 shrink-0 sm:w-32 lg:w-44" />
+            <Skeleton className="h-3.5 min-w-0 flex-1" />
+            <Skeleton className="h-3 w-14 shrink-0" />
+          </div>
+        ))}
+      </div>
     );
   }
 
-  if (results.length === 0) {
+  if (groups.length === 0) {
     return (
       <Empty className="h-full min-h-full flex-1 justify-center border-0 p-0">
         <EmptyHeader>
@@ -143,12 +98,15 @@ export function SearchResultsList({
   }
 
   return (
-    <div className="space-y-1.5">
-      {results.map((email) => (
-        <SearchResultRow
-          key={email.id}
-          email={email}
-          onSelect={() => onOpenEmail(email)}
+    <div className="w-full">
+      {groups.map((group) => (
+        <RowComponent
+          key={group.representative.id}
+          group={group}
+          view="inbox"
+          onOpen={onOpenEmail}
+          onAction={onAction}
+          allLabels={allLabels}
         />
       ))}
 

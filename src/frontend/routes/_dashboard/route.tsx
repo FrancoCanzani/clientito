@@ -1,9 +1,8 @@
-import { LoadingEmailsPending } from "@/components/loading-emails-pending";
 import { AppProviders } from "@/components/providers";
 import { InboxComposeProvider } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import { getDashboardGate } from "@/features/onboarding/dashboard-gate";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { Suspense, lazy } from "react";
+import { lazy, Suspense } from "react";
 
 const CommandPalette = lazy(async () => {
   const mod = await import("@/components/command-palette/command-palette");
@@ -22,8 +21,6 @@ export const Route = createFileRoute("/_dashboard")({
       throw redirect({ to: "/login" });
     }
   },
-  pendingComponent: LoadingEmailsPending,
-  pendingMs: 120,
   component: DashboardLayout,
 });
 
@@ -31,7 +28,7 @@ function DashboardLayout() {
   return (
     <AppProviders>
       <InboxComposeProvider>
-        <div className="relative flex h-dvh min-w-0 flex-col overflow-hidden bg-background bg-[url('/ascii-art.png')] bg-cover bg-center bg-no-repeat bg-fixed">
+        <div className="relative flex h-dvh min-w-0 flex-col overflow-hidden bg-background">
           <main className="liquid-glass relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
             <Outlet />
           </main>

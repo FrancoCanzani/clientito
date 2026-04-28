@@ -5,20 +5,19 @@ import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { SearchResultsList } from "@/features/email/inbox/components/search/search-results-list";
 import { SearchSuggestionsList } from "@/features/email/inbox/components/search/search-suggestions-list";
+import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import {
   fetchSearchEmails,
   fetchSearchSuggestions,
 } from "@/features/email/inbox/queries";
-import type { EmailListItem } from "@/features/email/inbox/types";
-import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
+import { useIsScrolled } from "@/hooks/use-is-scrolled";
 import {
   useInfiniteQuery,
   useQuery,
-  useQueryClient,
 } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
 
 const searchRoute = getRouteApi("/_dashboard/$mailboxId/inbox/search");
@@ -32,10 +31,15 @@ export default function InboxSearchPage() {
   const { suggestions, initialResults } = searchRoute.useLoaderData();
   const search = searchRoute.useSearch();
   const navigate = searchRoute.useNavigate();
-  const queryClient = useQueryClient();
   const routeQuery = search.q ?? "";
 
   const [query, setSearchQuery] = useState(routeQuery);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isScrolled = useIsScrolled(scrollRef);
+  const { openEmail, executeEmailAction } = useEmailInboxActions({
+    view: "inbox",
+    mailboxId,
+  });
 
   useEffect(() => {
     setSearchQuery(routeQuery);
@@ -107,6 +111,15 @@ export default function InboxSearchPage() {
     () => resultsQuery.data?.pages.flatMap((page) => page.emails) ?? [],
     [resultsQuery.data],
   );
+  const suggestionData = suggestionsQuery.data ?? {
+    filters: [],
+    contacts: [],
+    subjects: [],
+  };
+  const hasSearchSuggestions =
+    suggestionData.filters.length > 0 ||
+    (query.trim().length > 0 &&
+      (suggestionData.contacts.length > 0 || suggestionData.subjects.length > 0));
 
   const loadMoreRef = useIntersectionObserver<HTMLDivElement>({
     root: null,
@@ -143,92 +156,84 @@ export default function InboxSearchPage() {
     });
   }
 
-  function openEmail(email: EmailListItem) {
-    const routeMailboxId = email.mailboxId ?? mailboxId;
-    if (routeMailboxId == null) return;
-    openInboxEmail(queryClient, navigate, routeMailboxId, email);
-  }
-
   const canToggleJunk = true;
+  const headerTitle = (
+    <div className="flex items-center gap-2">
+      <SidebarTrigger className="md:hidden -ml-1 size-8" />
+      <span>Search</span>
+    </div>
+  );
+  const headerActions = (
+    <>
+      <div className="min-w-0 flex-1 sm:max-w-80">
+        <Input
+          className="h-8 text-sm"
+          value={query}
+          autoFocus
+          onChange={(event) => handleQueryChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commitQuery(query);
+            }
+          }}
+          placeholder="Search mail"
+          spellCheck={false}
+        />
+      </div>
+      {canToggleJunk ? (
+        <Button
+          type="button"
+          variant={search.includeJunk ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() =>
+            navigate({
+              search: (prev) => ({
+                ...prev,
+                includeJunk: prev.includeJunk ? undefined : true,
+              }),
+              replace: true,
+            })
+          }
+        >
+          {search.includeJunk ? "Hide junk" : "Show junk"}
+        </Button>
+      ) : null}
+    </>
+  );
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-1 flex-col gap-5">
-        <PageHeader
-          title={
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="md:hidden" />
-              <span>Search</span>
-            </div>
-          }
-          actions={
-            <div className="w-full max-w-72">
-              <Input
-                className="h-7 text-xs"
-                value={query}
-                autoFocus
-                onChange={(event) => handleQueryChange(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    commitQuery(query);
-                  }
-                }}
-                placeholder="Search"
-                spellCheck={false}
-              />
-            </div>
-          }
+    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+      <PageHeader
+        title={headerTitle}
+        actions={headerActions}
+        isScrolled={isScrolled}
+      />
+
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        {hasSearchSuggestions ? (
+          <div className="px-3 py-3 md:px-6">
+            <SearchSuggestionsList
+              query={query.trim()}
+              suggestions={suggestionData}
+              onSelectQuery={(nextQuery) => {
+                commitQuery(nextQuery);
+              }}
+            />
+          </div>
+        ) : null}
+
+        <SearchResultsList
+          query={routeQuery.trim()}
+          results={results}
+          mailboxId={mailboxId}
+          isPending={resultsQuery.isPending}
+          hasNextPage={resultsQuery.hasNextPage ?? false}
+          isFetchingNextPage={resultsQuery.isFetchingNextPage}
+          loadMoreRef={loadMoreRef}
+          onOpenEmail={openEmail}
+          onAction={executeEmailAction}
         />
-
-        <div className="flex min-h-0 flex-1 flex-col gap-4">
-          <SearchSuggestionsList
-            query={query.trim()}
-            suggestions={
-              suggestionsQuery.data ?? {
-                filters: [],
-                contacts: [],
-                subjects: [],
-              }
-            }
-            onSelectQuery={(nextQuery) => {
-              commitQuery(nextQuery);
-            }}
-          />
-
-          {canToggleJunk && (
-            <div className="flex">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      includeJunk: prev.includeJunk ? undefined : true,
-                    }),
-                    replace: true,
-                  })
-                }
-              >
-                {search.includeJunk
-                  ? "Hide spam and trash"
-                  : "Show spam and trash"}
-              </Button>
-            </div>
-          )}
-
-          <SearchResultsList
-            query={routeQuery.trim()}
-            results={results}
-            isPending={resultsQuery.isPending}
-            hasNextPage={resultsQuery.hasNextPage ?? false}
-            isFetchingNextPage={resultsQuery.isFetchingNextPage}
-            loadMoreRef={loadMoreRef}
-            onOpenEmail={openEmail}
-          />
-        </div>
       </div>
     </div>
   );

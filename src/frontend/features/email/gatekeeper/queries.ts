@@ -52,6 +52,35 @@ async function fetchGatekeeperPending(
     gatekeeperActivatedAt,
   });
 
+  const gatekeptSenders = await localDb.getGatekeptSenders(userId, mailboxId);
+  if (gatekeptSenders.length > 0) {
+    try {
+      const response = await fetch("/api/inbox/gatekeeper/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mailboxId, senders: gatekeptSenders }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            data?: {
+              trust?: Array<{
+                sender: string;
+                trustLevel: "trusted" | "blocked" | null;
+              }>;
+            };
+          }
+        | null;
+      const trusted = (payload?.data?.trust ?? [])
+        .filter((entry) => entry.trustLevel === "trusted")
+        .map((entry) => entry.sender);
+      if (trusted.length > 0) {
+        await localDb.clearGatekeptForSenders({ userId, mailboxId, senders: trusted });
+      }
+    } catch {
+      // ignore; local pile remains until next attempt
+    }
+  }
+
   const [pendingCount, items] = await Promise.all([
     localDb.getGatekeeperPendingCount(userId, mailboxId),
     localDb.getGatekeeperPending({ userId, mailboxId, limit }),

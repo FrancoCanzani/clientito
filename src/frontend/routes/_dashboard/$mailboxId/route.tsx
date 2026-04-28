@@ -1,5 +1,4 @@
 import { InboxSidebarShell } from "@/components/inbox-sidebar-shell";
-import { LoadingEmailsPending } from "@/components/loading-emails-pending";
 import { accountsQueryOptions } from "@/hooks/use-mailboxes";
 import {
   createFileRoute,
@@ -14,8 +13,6 @@ export const Route = createFileRoute("/_dashboard/$mailboxId")({
     mailboxId: z.coerce.number().int().positive().parse(raw.mailboxId),
   }),
   stringifyParams: ({ mailboxId }) => ({ mailboxId: String(mailboxId) }),
-  pendingComponent: LoadingEmailsPending,
-  pendingMs: 120,
   loader: async ({ context, params }) => {
     const accountsData =
       await context.queryClient.ensureQueryData(accountsQueryOptions);

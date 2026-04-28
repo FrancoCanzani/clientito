@@ -105,7 +105,6 @@ export const trustEntities = sqliteTable(
       table.entityValue,
     ),
     index("trust_entities_user_mailbox_idx").on(table.userId, table.mailboxId),
-    index("trust_entities_level_idx").on(table.trustLevel),
   ],
 );
 
@@ -160,7 +159,9 @@ export const drafts = sqliteTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     composeKey: text("compose_key").notNull(),
-    mailboxId: integer("mailbox_id"),
+    mailboxId: integer("mailbox_id").references(() => mailboxes.id, {
+      onDelete: "cascade",
+    }),
     toAddr: text("to_addr").notNull().default(""),
     ccAddr: text("cc_addr").notNull().default(""),
     bccAddr: text("bcc_addr").notNull().default(""),

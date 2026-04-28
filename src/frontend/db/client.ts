@@ -855,6 +855,41 @@ export const localDb = {
     }
   },
 
+  async getGatekeptSenders(userId: string, mailboxId: number): Promise<string[]> {
+    const res = await dbClient.exec(
+      `SELECT DISTINCT LOWER(TRIM(from_addr)) AS from_addr
+       FROM emails
+       WHERE user_id = ? AND mailbox_id = ? AND is_gatekept = 1
+         AND from_addr IS NOT NULL AND TRIM(from_addr) != ''`,
+      [userId, mailboxId],
+      "rows",
+    );
+    return rowsToObjects<{ fromAddr: string }>(res)
+      .map((row) => row.fromAddr)
+      .filter(Boolean);
+  },
+
+  async clearGatekeptForSenders(params: {
+    userId: string;
+    mailboxId: number;
+    senders: string[];
+  }): Promise<void> {
+    const { userId, mailboxId, senders } = params;
+    if (senders.length === 0) return;
+    const CHUNK = 80;
+    for (let i = 0; i < senders.length; i += CHUNK) {
+      const chunk = senders.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => "?").join(", ");
+      await dbClient.exec(
+        `UPDATE emails SET is_gatekept = 0
+         WHERE user_id = ? AND mailbox_id = ? AND is_gatekept = 1
+           AND LOWER(TRIM(from_addr)) IN (${placeholders})`,
+        [userId, mailboxId, ...chunk],
+        "run",
+      );
+    }
+  },
+
   async reconcileGatekeeperKnownSenders(params: {
     userId: string;
     mailboxId: number;
@@ -1576,6 +1611,29 @@ export const localDb = {
       const rows = rowsToObjects<{ fromAddr: string }>(res);
       for (const row of rows) {
         if (row.fromAddr) known.add(row.fromAddr);
+      }
+
+      const remaining = chunk.filter((sender) => !known.has(sender));
+      if (remaining.length === 0) continue;
+
+      const likeClauses = remaining
+        .map(() => "LOWER(to_addr || ' ' || COALESCE(cc_addr,'')) LIKE ?")
+        .join(" OR ");
+      const likeParams = remaining.map((sender) => `%${sender}%`);
+      const sentRes = await dbClient.exec(
+        `SELECT DISTINCT LOWER(to_addr || ' ' || COALESCE(cc_addr,'')) AS addrs
+         FROM emails
+         WHERE user_id = ? AND mailbox_id = ? AND direction = ?
+           AND (${likeClauses})`,
+        [userId, mailboxId, "sent", ...likeParams],
+        "rows",
+      );
+      const sentRows = rowsToObjects<{ addrs: string }>(sentRes);
+      for (const row of sentRows) {
+        if (!row.addrs) continue;
+        for (const sender of remaining) {
+          if (row.addrs.includes(sender)) known.add(sender);
+        }
       }
     }
 

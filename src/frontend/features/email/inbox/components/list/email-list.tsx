@@ -56,6 +56,7 @@ export function EmailList({
     threadGroups,
     hasNextPage,
     isFetchingNextPage,
+    isLoading,
     loadMoreRef,
     filters,
     setFilters,
@@ -211,6 +212,15 @@ export function EmailList({
               );
             })}
           </div>
+        ) : isLoading ? (
+          <Empty className="min-h-56 justify-center">
+            <EmptyHeader>
+              <EmptyTitle>Setting up your inbox…</EmptyTitle>
+              <EmptyDescription>
+                Fetching your messages. This only takes a moment.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
           <Empty className="min-h-56 justify-center">
             <EmptyHeader>

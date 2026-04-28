@@ -39,6 +39,32 @@ function normalizeSignatureState(
   };
 }
 
+function parseSignatureItem(
+  rawItem: unknown,
+  index: number,
+): MailboxSignatureItem | null {
+  if (!rawItem || typeof rawItem !== "object") return null;
+  const item = rawItem as Record<string, unknown>;
+  const bodyValue =
+    typeof item.body === "string"
+      ? item.body
+      : typeof item.html === "string"
+        ? item.html
+        : typeof item.content === "string"
+          ? item.content
+          : null;
+  if (bodyValue == null) return null;
+
+  const trimmedId = typeof item.id === "string" ? item.id.trim() : "";
+  const trimmedName = typeof item.name === "string" ? item.name.trim() : "";
+
+  return {
+    id: trimmedId || `sig_${index + 1}`,
+    name: trimmedName || `Signature ${index + 1}`,
+    body: bodyValue,
+  };
+}
+
 function parseSignatureState(
   raw: string | null | undefined,
 ): MailboxSignatureState {
@@ -50,23 +76,19 @@ function parseSignatureState(
   try {
     const parsed = JSON.parse(value) as {
       defaultId?: unknown;
-      items?: Array<{ id?: unknown; name?: unknown; body?: unknown }>;
+      items?: unknown;
     };
-    if (Array.isArray(parsed.items)) {
+    const rawItems = Array.isArray(parsed.items)
+      ? parsed.items
+      : Array.isArray(parsed)
+        ? parsed
+        : null;
+    if (rawItems) {
       return normalizeSignatureState({
         defaultId: typeof parsed.defaultId === "string" ? parsed.defaultId : null,
-        items: parsed.items
-          .filter(
-            (item) =>
-              typeof item?.id === "string" &&
-              typeof item?.name === "string" &&
-              typeof item?.body === "string",
-          )
-          .map((item) => ({
-            id: item.id as string,
-            name: item.name as string,
-            body: item.body as string,
-          })),
+        items: rawItems
+          .map((item, index) => parseSignatureItem(item, index))
+          .filter((item): item is MailboxSignatureItem => item != null),
       });
     }
   } catch {}

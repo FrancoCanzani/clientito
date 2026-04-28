@@ -88,7 +88,7 @@ function AccountSwitcher({ mailboxId }: { mailboxId: number }) {
         >
           <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
             <span className="truncate font-medium">{displayName}</span>
-            <span className="truncate text-xs text-muted-foreground">
+            <span className="truncate text-blue-900 dark:text-blue-50 text-xs">
               {activeEmail}
             </span>
           </div>
@@ -370,7 +370,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   };
 
   return (
-    <Sidebar className="border-none">
+    <Sidebar className="border-none *:dark:bg-background">
       <SidebarHeader className="space-y-2">
         <AccountSwitcher mailboxId={mailboxId} />
         <SidebarMenu>
@@ -504,7 +504,7 @@ export function InboxSidebarShell({ children }: { children: ReactNode }) {
  min-h-0 flex-1 overflow-hidden"
     >
       <InboxSidebar mailboxId={mailboxId} />
-      <main className="flex min-h-0 flex-1 overflow-hidden bg-sidebar p-2">
+      <main className="flex min-h-0 flex-1 overflow-hidden bg-sidebar dark:bg-background p-2">
         <div className="flex min-h-0 md:px-2 min-w-0 flex-1 flex-col overflow-hidden rounded bg-background">
           {children}
         </div>
