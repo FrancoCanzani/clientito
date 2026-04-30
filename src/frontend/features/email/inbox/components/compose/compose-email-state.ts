@@ -6,15 +6,17 @@ import {
   type MailboxTemplate,
 } from "@/hooks/use-mailboxes";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAttachmentUpload } from "../../hooks/use-attachment-upload";
 import { loadDraft, persistDraftNow, useDraft } from "../../hooks/use-draft";
 import { useUndoSend } from "../../hooks/use-undo-send";
 import { sendEmail } from "../../mutations";
-import { invalidateInboxQueries } from "../../queries";
+import { fetchViewPage, invalidateInboxQueries } from "../../queries";
 import type { ComposeInitial, DraftState } from "../../types";
 import { buildPlainForwardedHtml } from "../../utils/build-forwarded-html";
+import { openCompose } from "./compose-events";
 
 type UseComposeEmailOptions = {
   onSent?: () => void;
@@ -78,7 +80,27 @@ function splitForwardedContent(content: string) {
   };
 }
 
-type AttachmentKey = { key: string; filename: string; mimeType: string };
+type AttachmentKey = {
+  key: string;
+  filename: string;
+  mimeType: string;
+  size?: number;
+};
+
+type SendEmailResult = {
+  providerMessageId?: string;
+  threadId?: string;
+};
+
+function isSendEmailResult(value: unknown): value is SendEmailResult {
+  if (typeof value !== "object" || value === null) return false;
+  const providerMessageId = Reflect.get(value, "providerMessageId");
+  const threadId = Reflect.get(value, "threadId");
+  return (
+    (providerMessageId === undefined || typeof providerMessageId === "string") &&
+    (threadId === undefined || typeof threadId === "string")
+  );
+}
 
 function detectInsertedSignatureId(content: string): string | null {
   if (!content.includes("data-petit-signature-id")) return null;
@@ -256,12 +278,23 @@ export function useComposeEmail(
   options?: UseComposeEmailOptions,
 ) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const mailboxesQuery = useMailboxes();
   const composeKey = getComposePanelKey(initial);
   const initialDraft = useMemo(() => createComposeDraft(initial), [composeKey]);
   const [draft, setDraft] = useState(() => initialDraft);
   const [loadingDraft, setLoadingDraft] = useState(true);
-  const attachments = useAttachmentUpload();
+  const initialAttachments = useMemo(
+    () =>
+      (initial?.attachmentKeys ?? []).map((file) => ({
+        key: file.key,
+        filename: file.filename,
+        mimeType: file.mimeType,
+        size: file.size ?? 0,
+      })),
+    [composeKey],
+  );
+  const attachments = useAttachmentUpload(initialAttachments);
   const bodyRef = useRef(draft.body);
   const draftRef = useRef(draft);
   draftRef.current = draft;
@@ -273,6 +306,47 @@ export function useComposeEmail(
 
   const threadId = initial?.threadId;
   const { mailboxId, to, cc, bcc, subject, body, forwardedContent } = draft;
+
+  const viewSentEmail = useCallback(
+    async (result: unknown) => {
+      const targetMailboxId = draftSnapshotRef.current.mailboxId ?? mailboxId;
+      if (!targetMailboxId) return;
+
+      let sentEmailId: string | null = null;
+      if (isSendEmailResult(result)) {
+        const sentPage = await fetchViewPage({
+          mailboxId: targetMailboxId,
+          view: "sent",
+        });
+        const sentEmail = sentPage.emails.find((email) =>
+          result.providerMessageId
+            ? email.providerMessageId === result.providerMessageId
+            : result.threadId
+              ? email.threadId === result.threadId
+              : false,
+        );
+        sentEmailId = sentEmail?.id ?? null;
+      }
+
+      if (sentEmailId) {
+        navigate({
+          to: "/$mailboxId/$folder/email/$emailId",
+          params: {
+            mailboxId: targetMailboxId,
+            folder: "sent",
+            emailId: sentEmailId,
+          },
+        });
+        return;
+      }
+
+      navigate({
+        to: "/$mailboxId/$folder",
+        params: { mailboxId: targetMailboxId, folder: "sent" },
+      });
+    },
+    [mailboxId, navigate],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -454,8 +528,9 @@ export function useComposeEmail(
   // Snapshot draft state at trigger time so the undo-send closure captures
   // the values that were current when the user pressed Send.
   const draftSnapshotRef = useRef(draft);
+  const bodySnapshotRef = useRef(draft.body);
   const attachmentSnapshotRef = useRef<
-    ReturnType<typeof attachments.getAttachmentKeys> | undefined
+    AttachmentKey[] | undefined
   >(undefined);
 
   const undoSend = useUndoSend({
@@ -463,15 +538,32 @@ export function useComposeEmail(
       return sendEmail(
         buildEmailPayload(
           draftSnapshotRef.current,
-          bodyRef.current,
+          bodySnapshotRef.current,
           threadId ?? undefined,
           attachmentSnapshotRef.current,
         ),
       );
     },
+    onUndo: () => {
+      const snapshot = draftSnapshotRef.current;
+      openCompose({
+        mailboxId: snapshot.mailboxId,
+        to: snapshot.to,
+        cc: snapshot.cc,
+        bcc: snapshot.bcc,
+        subject: snapshot.subject,
+        bodyHtml: combineComposeBody(
+          bodySnapshotRef.current,
+          snapshot.forwardedContent,
+        ),
+        threadId: threadId ?? undefined,
+        composeKey: `undo_${Date.now().toString(36)}`,
+        attachmentKeys: attachmentSnapshotRef.current,
+      });
+    },
+    onView: viewSentEmail,
     onSuccess: () => {
       clearDraft();
-      toast.success("Email sent");
       invalidateInboxQueries();
       queryClient.invalidateQueries({
         queryKey: draftQueryKeys.list(draftSnapshotRef.current.mailboxId),
@@ -490,9 +582,10 @@ export function useComposeEmail(
   const send = useCallback(() => {
     // Snapshot current state before triggering
     draftSnapshotRef.current = { ...draft };
+    bodySnapshotRef.current = bodyRef.current;
     attachmentSnapshotRef.current =
       attachments.files.length > 0
-        ? attachments.getAttachmentKeys()
+        ? attachments.files.map((file) => ({ ...file }))
         : undefined;
     setSendPending(true);
     options?.onSent?.();

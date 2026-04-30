@@ -67,6 +67,7 @@ type EmailRowDb = {
   aiDraftReply: string | null;
   aiClassifiedAt: number | null;
   aiClassificationKey: string | null;
+  threadCount?: number | null;
   hasCalendar: number;
   isGatekept: number;
   bodyText?: string | null;
@@ -605,6 +606,7 @@ function toEmailListItem(row: EmailRowDb) {
     aiSummary: row.aiSummary ?? null,
     aiDraftReply: row.aiDraftReply ?? null,
     aiClassifiedAt: row.aiClassifiedAt ?? null,
+    threadCount: Number(row.threadCount ?? 1),
   };
 }
 
@@ -719,7 +721,22 @@ export const localDb = {
     const { where, params: whereParams } = composeWhere(fragments);
     const effectiveOffset = cursor != null ? 0 : offset;
 
-    const sql = `SELECT ${EMAIL_SUMMARY_SELECT} FROM emails ${where} ORDER BY date DESC, id DESC LIMIT ? OFFSET ?`;
+    const sql = `
+      SELECT ${EMAIL_SUMMARY_SELECT}, thread_count
+      FROM (
+        SELECT
+          ${EMAIL_SUMMARY_SELECT},
+          COUNT(*) OVER (PARTITION BY COALESCE(thread_id, provider_message_id)) AS thread_count,
+          ROW_NUMBER() OVER (
+            PARTITION BY COALESCE(thread_id, provider_message_id)
+            ORDER BY date DESC, id DESC
+          ) AS thread_rank
+        FROM emails
+        ${where}
+      )
+      WHERE thread_rank = 1
+      ORDER BY date DESC, id DESC
+      LIMIT ? OFFSET ?`;
     const allParams = [...whereParams, limit + 1, effectiveOffset];
     const res = await dbClient.exec(sql, allParams, "rows");
 
@@ -752,7 +769,7 @@ export const localDb = {
     fragments.push(...buildViewConditions(view as ViewFilter, Date.now()));
     const { where, params: whereParams } = composeWhere(fragments);
     const res = await dbClient.exec(
-      `SELECT COUNT(*) AS count, MIN(date) AS oldest FROM emails ${where}`,
+      `SELECT COUNT(DISTINCT COALESCE(thread_id, provider_message_id)) AS count, MIN(date) AS oldest FROM emails ${where}`,
       whereParams,
       "get",
     );
@@ -1086,6 +1103,24 @@ export const localDb = {
     }
   },
 
+  async updateThread(userId: string, threadId: string, patch: LocalEmailPatch): Promise<void> {
+    const res = await dbClient.exec(
+      `SELECT id, is_read, label_ids, snoozed_until FROM emails WHERE user_id = ? AND thread_id = ?`,
+      [userId, threadId],
+      "rows",
+    );
+    const rows = rowsToObjects<{ id: number; isRead: number; labelIds: string | null; snoozedUntil: number | null }>(res);
+    if (rows.length === 0) return;
+
+    for (const current of rows) {
+      const updates = applyEmailPatch(
+        { isRead: toBool(current.isRead), labelIds: current.labelIds, snoozedUntil: current.snoozedUntil },
+        patch,
+      );
+      await updateEmailByIds(userId, [current.id], updates);
+    }
+  },
+
   async insertEmails(rows: EmailInsert[]): Promise<void> {
     if (!rows.length) return;
     const CHUNK = 50;
@@ -1228,7 +1263,21 @@ export const localDb = {
 
     const { where, params: whereParams } = composeWhere(fragments);
     const res = await dbClient.exec(
-      `SELECT ${EMAIL_SUMMARY_SELECT} FROM emails ${where} ORDER BY date DESC LIMIT ? OFFSET ?`,
+      `SELECT ${EMAIL_SUMMARY_SELECT}, thread_count
+       FROM (
+         SELECT
+           ${EMAIL_SUMMARY_SELECT},
+           COUNT(*) OVER (PARTITION BY COALESCE(thread_id, provider_message_id)) AS thread_count,
+           ROW_NUMBER() OVER (
+             PARTITION BY COALESCE(thread_id, provider_message_id)
+             ORDER BY date DESC, id DESC
+           ) AS thread_rank
+         FROM emails
+         ${where}
+       )
+       WHERE thread_rank = 1
+       ORDER BY date DESC, id DESC
+       LIMIT ? OFFSET ?`,
       [...whereParams, limit + 1, offset],
       "rows",
     );

@@ -6,6 +6,7 @@ import emailsRoutes from "./emails/router";
 import gatekeeperRoutes from "./gatekeeper/router";
 import labelsRoutes from "./labels/router";
 import { registerInboxSearch } from "./search";
+import { registerInboxUnreadCount } from "./unread-count";
 import subscriptionsRoutes from "./subscriptions/router";
 import viewRoutes from "./view";
 
@@ -24,5 +25,6 @@ viewRoutes(viewSubRoutes);
 inboxRoutes.route("/view", viewSubRoutes);
 
 registerInboxSearch(inboxRoutes);
+registerInboxUnreadCount(inboxRoutes);
 
 export default inboxRoutes;

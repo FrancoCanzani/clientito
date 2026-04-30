@@ -4,10 +4,6 @@ import {
   parseEmailIdParam,
   parseInboxLabelParam,
 } from "@/features/email/inbox/utils/inbox-filters";
-import {
-  createEmailDetailLoader,
-  emailDetailRouteOptions,
-} from "@/lib/email-detail-loader";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute(
@@ -20,11 +16,6 @@ export const Route = createFileRoute(
     }),
   },
   skipRouteOnParseError: { params: true },
-  loader: async ({ context, params }) => {
-    const load = createEmailDetailLoader(params.label);
-    return load({ context, params });
-  },
-  ...emailDetailRouteOptions,
   errorComponent: RouteError,
   component: LabelEmailPage,
 });

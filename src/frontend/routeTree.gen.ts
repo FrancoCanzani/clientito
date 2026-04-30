@@ -18,6 +18,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsSlugRouteImport } from './routes/docs/$slug'
 import { Route as DashboardMailboxIdRouteRouteImport } from './routes/_dashboard/$mailboxId/route'
+import { Route as DashboardMailboxIdTriageRouteImport } from './routes/_dashboard/$mailboxId/triage'
 import { Route as DashboardMailboxIdScreenerRouteImport } from './routes/_dashboard/$mailboxId/screener'
 import { Route as DashboardMailboxIdSettingsRouteRouteImport } from './routes/_dashboard/$mailboxId/settings/route'
 import { Route as DashboardMailboxIdSettingsIndexRouteImport } from './routes/_dashboard/$mailboxId/settings/index'
@@ -83,6 +84,12 @@ const DashboardMailboxIdRouteRoute = DashboardMailboxIdRouteRouteImport.update({
   path: '/$mailboxId',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardMailboxIdTriageRoute =
+  DashboardMailboxIdTriageRouteImport.update({
+    id: '/triage',
+    path: '/triage',
+    getParentRoute: () => DashboardMailboxIdRouteRoute,
+  } as any)
 const DashboardMailboxIdScreenerRoute =
   DashboardMailboxIdScreenerRouteImport.update({
     id: '/screener',
@@ -215,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/docs/': typeof DocsIndexRoute
   '/$mailboxId/settings': typeof DashboardMailboxIdSettingsRouteRouteWithChildren
   '/$mailboxId/screener': typeof DashboardMailboxIdScreenerRoute
+  '/$mailboxId/triage': typeof DashboardMailboxIdTriageRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
@@ -243,6 +251,7 @@ export interface FileRoutesByTo {
   '/docs/$slug': typeof DocsSlugRoute
   '/docs': typeof DocsIndexRoute
   '/$mailboxId/screener': typeof DashboardMailboxIdScreenerRoute
+  '/$mailboxId/triage': typeof DashboardMailboxIdTriageRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
@@ -275,6 +284,7 @@ export interface FileRoutesById {
   '/docs/': typeof DocsIndexRoute
   '/_dashboard/$mailboxId/settings': typeof DashboardMailboxIdSettingsRouteRouteWithChildren
   '/_dashboard/$mailboxId/screener': typeof DashboardMailboxIdScreenerRoute
+  '/_dashboard/$mailboxId/triage': typeof DashboardMailboxIdTriageRoute
   '/_dashboard/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/_dashboard/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/_dashboard/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
@@ -307,6 +317,7 @@ export interface FileRouteTypes {
     | '/docs/'
     | '/$mailboxId/settings'
     | '/$mailboxId/screener'
+    | '/$mailboxId/triage'
     | '/$mailboxId/inbox/drafts'
     | '/$mailboxId/inbox/new'
     | '/$mailboxId/inbox/search'
@@ -335,6 +346,7 @@ export interface FileRouteTypes {
     | '/docs/$slug'
     | '/docs'
     | '/$mailboxId/screener'
+    | '/$mailboxId/triage'
     | '/$mailboxId/inbox/drafts'
     | '/$mailboxId/inbox/new'
     | '/$mailboxId/inbox/search'
@@ -366,6 +378,7 @@ export interface FileRouteTypes {
     | '/docs/'
     | '/_dashboard/$mailboxId/settings'
     | '/_dashboard/$mailboxId/screener'
+    | '/_dashboard/$mailboxId/triage'
     | '/_dashboard/$mailboxId/inbox/drafts'
     | '/_dashboard/$mailboxId/inbox/new'
     | '/_dashboard/$mailboxId/inbox/search'
@@ -459,6 +472,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/$mailboxId'
       preLoaderRoute: typeof DashboardMailboxIdRouteRouteImport
       parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/$mailboxId/triage': {
+      id: '/_dashboard/$mailboxId/triage'
+      path: '/triage'
+      fullPath: '/$mailboxId/triage'
+      preLoaderRoute: typeof DashboardMailboxIdTriageRouteImport
+      parentRoute: typeof DashboardMailboxIdRouteRoute
     }
     '/_dashboard/$mailboxId/screener': {
       id: '/_dashboard/$mailboxId/screener'
@@ -643,6 +663,7 @@ const DashboardMailboxIdSettingsRouteRouteWithChildren =
 interface DashboardMailboxIdRouteRouteChildren {
   DashboardMailboxIdSettingsRouteRoute: typeof DashboardMailboxIdSettingsRouteRouteWithChildren
   DashboardMailboxIdScreenerRoute: typeof DashboardMailboxIdScreenerRoute
+  DashboardMailboxIdTriageRoute: typeof DashboardMailboxIdTriageRoute
   DashboardMailboxIdInboxDraftsRoute: typeof DashboardMailboxIdInboxDraftsRoute
   DashboardMailboxIdInboxNewRoute: typeof DashboardMailboxIdInboxNewRoute
   DashboardMailboxIdInboxSearchRoute: typeof DashboardMailboxIdInboxSearchRoute
@@ -659,6 +680,7 @@ const DashboardMailboxIdRouteRouteChildren: DashboardMailboxIdRouteRouteChildren
     DashboardMailboxIdSettingsRouteRoute:
       DashboardMailboxIdSettingsRouteRouteWithChildren,
     DashboardMailboxIdScreenerRoute: DashboardMailboxIdScreenerRoute,
+    DashboardMailboxIdTriageRoute: DashboardMailboxIdTriageRoute,
     DashboardMailboxIdInboxDraftsRoute: DashboardMailboxIdInboxDraftsRoute,
     DashboardMailboxIdInboxNewRoute: DashboardMailboxIdInboxNewRoute,
     DashboardMailboxIdInboxSearchRoute: DashboardMailboxIdInboxSearchRoute,

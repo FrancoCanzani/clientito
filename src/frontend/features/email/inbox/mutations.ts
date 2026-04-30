@@ -12,6 +12,8 @@ import type {
   EmailDetailItem,
   EmailListItem,
   EmailListPage,
+  EmailThreadItem,
+  InboxUnreadCount,
 } from "./types";
 import type { InfiniteData } from "@tanstack/react-query";
 
@@ -51,11 +53,22 @@ export type EmailIdentifier = {
   labelIds?: string[];
 };
 
+export type ThreadIdentifier = {
+  threadId: string;
+  mailboxId: number;
+  labelIds?: string[];
+};
+
 const LABEL_UNREAD = "UNREAD";
 const LABEL_INBOX = "INBOX";
 const LABEL_TRASH = "TRASH";
 const LABEL_SPAM = "SPAM";
 const LABEL_STARRED = "STARRED";
+
+type InboxUnreadDelta = {
+  messagesUnread: number;
+  threadsUnread: number;
+};
 
 function toNumericIds(ids: string[]): number[] {
   return ids
@@ -114,6 +127,109 @@ function applyPatchToItem<
   };
 }
 
+function applyPatchToLabelIds(
+  labelIds: string[],
+  patch: EmailPatchPayload,
+): string[] {
+  return applyPatchToItem(
+    { isRead: !labelIds.includes(LABEL_UNREAD), labelIds, snoozedUntil: null },
+    patch,
+  ).labelIds;
+}
+
+function isUnreadInboxLabelSet(labelIds: string[]): boolean {
+  const labels = new Set(labelIds);
+  return labels.has(LABEL_INBOX) && labels.has(LABEL_UNREAD);
+}
+
+function computeEmailUnreadDelta(
+  labelIds: string[] | undefined,
+  patch: EmailPatchPayload,
+): number {
+  const before = labelIds ?? [];
+  const after = applyPatchToLabelIds(before, patch);
+  return Number(isUnreadInboxLabelSet(after)) - Number(isUnreadInboxLabelSet(before));
+}
+
+function computeUnreadDeltaForEmails(
+  emails: Array<Pick<EmailListItem, "labelIds">>,
+  patch: EmailPatchPayload,
+): InboxUnreadDelta {
+  let messagesUnread = 0;
+  for (const email of emails) {
+    messagesUnread += computeEmailUnreadDelta(email.labelIds, patch);
+  }
+  return {
+    messagesUnread,
+    threadsUnread: messagesUnread,
+  };
+}
+
+function computeUnreadDeltaForThread(
+  emails: Array<Pick<EmailListItem, "labelIds">>,
+  fallbackLabelIds: string[] | undefined,
+  patch: EmailPatchPayload,
+): InboxUnreadDelta {
+  const source =
+    emails.length > 0
+      ? emails
+      : [{ labelIds: fallbackLabelIds ?? [] }];
+  const beforeThreadUnread = source.some((email) =>
+    isUnreadInboxLabelSet(email.labelIds),
+  );
+  const afterThreadUnread = source.some((email) =>
+    isUnreadInboxLabelSet(applyPatchToLabelIds(email.labelIds, patch)),
+  );
+  let messagesUnread = 0;
+  for (const email of source) {
+    messagesUnread += computeEmailUnreadDelta(email.labelIds, patch);
+  }
+
+  return {
+    messagesUnread,
+    threadsUnread: Number(afterThreadUnread) - Number(beforeThreadUnread),
+  };
+}
+
+function applyInboxUnreadDelta(
+  mailboxId: number,
+  delta: InboxUnreadDelta,
+) {
+  if (delta.messagesUnread === 0 && delta.threadsUnread === 0) return;
+
+  queryClient.setQueryData<InboxUnreadCount | undefined>(
+    emailQueryKeys.inboxUnreadCount(mailboxId),
+    (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        messagesUnread: Math.max(
+          0,
+          current.messagesUnread + delta.messagesUnread,
+        ),
+        threadsUnread: Math.max(
+          0,
+          current.threadsUnread + delta.threadsUnread,
+        ),
+      };
+    },
+  );
+}
+
+function restoreInboxUnreadCount(
+  mailboxId: number,
+  snapshot: InboxUnreadCount | undefined,
+) {
+  if (!snapshot) return;
+  queryClient.setQueryData(emailQueryKeys.inboxUnreadCount(mailboxId), snapshot);
+}
+
+function invalidateInboxUnreadCount(mailboxId: number) {
+  void queryClient.invalidateQueries({
+    queryKey: emailQueryKeys.inboxUnreadCount(mailboxId),
+  });
+}
+
 function applyOptimisticCachePatch(
   emailIds: Set<string>,
   patch: EmailPatchPayload,
@@ -147,6 +263,45 @@ function applyOptimisticCachePatch(
         return applyPatchToItem(current, patch);
       },
     );
+  }
+}
+
+function applyOptimisticThreadPatch(
+  threadId: string,
+  patch: EmailPatchPayload,
+) {
+  queryClient.setQueriesData(
+    { queryKey: emailQueryKeys.all() },
+    (current) => {
+      if (!isEmailListInfiniteData(current)) return current;
+      let changed = false;
+      const pages = current.pages.map((page) => {
+        let pageChanged = false;
+        const emails = page.emails.map((entry) => {
+          if (entry.threadId !== threadId) return entry;
+          const next = applyPatchToItem(entry, patch);
+          pageChanged = true;
+          changed = true;
+          return next;
+        });
+        return pageChanged ? { ...page, emails } : page;
+      });
+      const next: InfiniteData<EmailListPage> = { ...current, pages };
+      return changed ? next : current;
+    },
+  );
+
+  queryClient.setQueryData<EmailThreadItem[] | undefined>(
+    emailQueryKeys.thread(threadId),
+    (current) => current?.map((entry) => applyPatchToItem(entry, patch)),
+  );
+
+  const detailSnapshots = queryClient.getQueriesData<EmailDetailItem>({
+    queryKey: ["email-detail"],
+  });
+  for (const [queryKey, detail] of detailSnapshots) {
+    if (detail?.threadId !== threadId) continue;
+    queryClient.setQueryData(queryKey, applyPatchToItem(detail, patch));
   }
 }
 
@@ -203,13 +358,32 @@ async function patchEmails(
   const emailIds = emails.map((e) => e.id);
   const emailIdSet = new Set(emailIds);
   const beforeLocal = await localDb.getEmailsByProviderMessageIds(userId, providerIds);
+  const beforeLocalByProviderId = new Map(
+    beforeLocal.map((email) => [email.providerMessageId, email]),
+  );
+  const unreadCountSnapshot = queryClient.getQueryData<InboxUnreadCount>(
+    emailQueryKeys.inboxUnreadCount(mailboxId),
+  );
+  const unreadDelta = computeUnreadDeltaForEmails(
+    emails.map(
+      (email) =>
+        beforeLocalByProviderId.get(email.providerMessageId) ?? {
+          labelIds: email.labelIds ?? [],
+        },
+    ),
+    data,
+  );
   await queryClient.cancelQueries({ queryKey: emailQueryKeys.all() });
+  await queryClient.cancelQueries({
+    queryKey: emailQueryKeys.inboxUnreadCount(mailboxId),
+  });
   await Promise.all(
     emailIds.map((id) =>
       queryClient.cancelQueries({ queryKey: emailQueryKeys.detail(id) }),
     ),
   );
   applyOptimisticCachePatch(emailIdSet, data);
+  applyInboxUnreadDelta(mailboxId, unreadDelta);
   const localPatchTask = applyLocalPatch(
     userId,
     toNumericIds(emailIds),
@@ -264,8 +438,70 @@ async function patchEmails(
     await localPatchTask;
     if (!requestSucceeded) {
       await rollbackLocalPatch(userId, beforeLocal);
+      restoreInboxUnreadCount(mailboxId, unreadCountSnapshot);
+    } else {
+      invalidateInboxUnreadCount(mailboxId);
     }
     clearPending(providerIds);
+  }
+}
+
+export async function patchThread(
+  thread: ThreadIdentifier,
+  data: EmailPatchPayload,
+): Promise<void> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("Not authenticated");
+
+  const beforeLocal = await localDb.getEmailThread(userId, thread.threadId);
+  const unreadCountSnapshot = queryClient.getQueryData<InboxUnreadCount>(
+    emailQueryKeys.inboxUnreadCount(thread.mailboxId),
+  );
+  const unreadDelta = computeUnreadDeltaForThread(
+    beforeLocal,
+    thread.labelIds,
+    data,
+  );
+  await queryClient.cancelQueries({ queryKey: emailQueryKeys.all() });
+  await queryClient.cancelQueries({
+    queryKey: emailQueryKeys.thread(thread.threadId),
+  });
+  await queryClient.cancelQueries({
+    queryKey: emailQueryKeys.inboxUnreadCount(thread.mailboxId),
+  });
+  applyOptimisticThreadPatch(thread.threadId, data);
+  applyInboxUnreadDelta(thread.mailboxId, unreadDelta);
+  const localPatchTask = localDb.updateThread(userId, thread.threadId, data);
+
+  let requestSucceeded = false;
+  try {
+    const response = await fetch(
+      `/api/inbox/emails/threads/${encodeURIComponent(thread.threadId)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mailboxId: thread.mailboxId,
+          labelIds: thread.labelIds ?? [],
+          ...data,
+        }),
+      },
+    );
+    if (!response.ok) throw await responseError(response, "Failed to update thread");
+    await localPatchTask;
+    requestSucceeded = true;
+  } finally {
+    await localPatchTask;
+    if (!requestSucceeded) {
+      await rollbackLocalPatch(userId, beforeLocal);
+      restoreInboxUnreadCount(thread.mailboxId, unreadCountSnapshot);
+      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      void queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.thread(thread.threadId),
+      });
+    } else {
+      invalidateInboxUnreadCount(thread.mailboxId);
+    }
   }
 }
 
@@ -282,6 +518,19 @@ export async function deleteEmailForever(
   const userId = await getCurrentUserId();
   if (!userId) throw new Error("Not authenticated");
 
+  const unreadCountSnapshot = queryClient.getQueryData<InboxUnreadCount>(
+    emailQueryKeys.inboxUnreadCount(email.mailboxId),
+  );
+  const unreadDelta = {
+    messagesUnread: isUnreadInboxLabelSet(email.labelIds ?? []) ? -1 : 0,
+    threadsUnread: isUnreadInboxLabelSet(email.labelIds ?? []) ? -1 : 0,
+  };
+  await queryClient.cancelQueries({
+    queryKey: emailQueryKeys.inboxUnreadCount(email.mailboxId),
+  });
+  applyInboxUnreadDelta(email.mailboxId, unreadDelta);
+
+  let requestSucceeded = false;
   try {
     await localDb.deleteEmailsByProviderMessageId([email.providerMessageId]);
   } catch (error) {
@@ -299,7 +548,13 @@ export async function deleteEmailForever(
       }),
     });
     if (!response.ok) throw await responseError(response, "Failed to delete email");
+    requestSucceeded = true;
   } finally {
+    if (requestSucceeded) {
+      invalidateInboxUnreadCount(email.mailboxId);
+    } else {
+      restoreInboxUnreadCount(email.mailboxId, unreadCountSnapshot);
+    }
     clearPending([email.providerMessageId]);
   }
 }

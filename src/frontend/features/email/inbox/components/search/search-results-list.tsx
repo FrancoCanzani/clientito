@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
+import type { ThreadIdentifier } from "@/features/email/inbox/mutations";
 import type { EmailListItem } from "@/features/email/inbox/types";
 import { groupEmailsByThread } from "@/features/email/inbox/utils/group-emails-by-thread";
 import { fetchLabels } from "@/features/email/labels/queries";
@@ -37,7 +38,11 @@ export function SearchResultsList({
   isFetchingNextPage: boolean;
   loadMoreRef: RefCallback<HTMLDivElement>;
   onOpenEmail: (email: EmailListItem) => void;
-  onAction: (action: EmailInboxAction, ids?: string[]) => void;
+  onAction: (
+    action: EmailInboxAction,
+    ids?: string[],
+    thread?: ThreadIdentifier,
+  ) => void;
 }) {
   const isMobile = useIsMobile();
   const RowComponent = isMobile ? MobileEmailRow : DesktopEmailRow;

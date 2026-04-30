@@ -1,12 +1,4 @@
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Kbd } from "@/components/ui/kbd";
-import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -17,121 +9,21 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarProvider,
 } from "@/components/ui/sidebar";
 import { useGatekeeperPending } from "@/features/email/gatekeeper/queries";
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
+import { fetchInboxUnreadCount } from "@/features/email/inbox/queries";
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { LabelSidebarSection } from "@/features/email/labels/components/label-sidebar-section";
-import { beginGmailConnection } from "@/features/onboarding/mutations";
-import { useAuth } from "@/hooks/use-auth";
 import { useHotkeys } from "@/hooks/use-hotkeys";
-import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
-import {
-  CaretDownIcon,
-  CaretUpDownIcon,
-  CheckIcon,
-  ClockIcon,
-  PaperPlaneTiltIcon,
-  PencilSimpleLineIcon,
-  StarIcon,
-  TrashIcon,
-  TrayIcon,
-  WarningIcon,
-} from "@phosphor-icons/react";
-import {
-  Link,
-  getRouteApi,
-  useNavigate,
-  useRouterState,
-} from "@tanstack/react-router";
-import { type ReactNode, useMemo, useState } from "react";
+import { useMailboxes } from "@/hooks/use-mailboxes";
+import { CaretDownIcon } from "@phosphor-icons/react";
+import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { AccountSwitcher } from "./account-switcher";
 
-const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
-const FEEDBACK_EMAIL = "rancocanzani@gmail.com";
-
-function formatDisplayName(
-  name: string | null | undefined,
-  email: string | null,
-) {
-  const normalizedName = name?.trim();
-  if (normalizedName) return normalizedName;
-
-  const localPart = email
-    ?.split("@")[0]
-    ?.replace(/[._-]+/g, " ")
-    ?.trim();
-  if (!localPart) return "Inbox";
-
-  return localPart.replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function AccountSwitcher({ mailboxId }: { mailboxId: number }) {
-  const { user } = useAuth();
-  const accounts = (useMailboxes().data?.accounts ?? []).filter(
-    (a) => a.mailboxId != null,
-  );
-  const navigate = useNavigate();
-
-  const activeAccount = accounts.find((a) => a.mailboxId === mailboxId) ?? null;
-  const activeEmail =
-    (activeAccount ? getMailboxDisplayEmail(activeAccount) : null) ??
-    user?.email ??
-    "Inbox";
-  const displayName = formatDisplayName(user?.name, activeEmail);
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted"
-        >
-          <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-medium">{displayName}</span>
-            <span className="truncate text-blue-900 dark:text-blue-50 text-xs">
-              {activeEmail}
-            </span>
-          </div>
-          <CaretUpDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        {accounts.map((account) => {
-          const email = getMailboxDisplayEmail(account) ?? account.email ?? "";
-          const isActive = account.mailboxId === mailboxId;
-          return (
-            <DropdownMenuItem
-              key={account.accountId}
-              onSelect={() => {
-                if (!isActive && account.mailboxId != null) {
-                  void navigate({
-                    to: "/$mailboxId/inbox",
-                    params: { mailboxId: account.mailboxId },
-                  });
-                }
-              }}
-            >
-              <span className="min-w-0 flex-1 truncate text-sm">{email}</span>
-            </DropdownMenuItem>
-          );
-        })}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onSelect={() => {
-            void beginGmailConnection(`/${mailboxId}/settings`);
-          }}
-        >
-          Add account
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/$mailboxId/settings" params={{ mailboxId }}>
-            Settings
-          </Link>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+const FEEDBACK_EMAIL = "francocanzani@gmail.com";
 
 type NavView =
   | "search"
@@ -151,6 +43,7 @@ function useActiveSidebarState(): {
   isSearchRoute: boolean;
   isSettingsRoute: boolean;
   isScreenerRoute: boolean;
+  isTriageRoute: boolean;
 } {
   return useRouterState({
     select: (state) => {
@@ -164,6 +57,9 @@ function useActiveSidebarState(): {
       const isScreenerRoute = matches.some(
         (match) => match.routeId === "/_dashboard/$mailboxId/screener",
       );
+      const isTriageRoute = matches.some(
+        (match) => match.routeId === "/_dashboard/$mailboxId/triage",
+      );
       const isDraftsRoute = matches.some(
         (match) => match.routeId === "/_dashboard/$mailboxId/inbox/drafts",
       );
@@ -175,37 +71,45 @@ function useActiveSidebarState(): {
             "/_dashboard/$mailboxId/inbox/labels/$label/email/$emailId",
       )?.params.label;
 
-      if (isSearchRoute)
+      if (isSearchRoute) {
         return {
           activeView: "search" as const,
           activeLabelId,
           isSearchRoute,
           isSettingsRoute,
           isScreenerRoute,
+          isTriageRoute,
         };
-      if (isDraftsRoute)
+      }
+
+      if (isDraftsRoute) {
         return {
           activeView: "drafts" as const,
           activeLabelId,
           isSearchRoute,
           isSettingsRoute,
           isScreenerRoute,
+          isTriageRoute,
         };
+      }
 
-      if (activeLabelId === "important")
+      if (activeLabelId === "important") {
         return {
           activeView: "important" as const,
           activeLabelId,
           isSearchRoute,
           isSettingsRoute,
           isScreenerRoute,
+          isTriageRoute,
         };
+      }
 
       const folder = matches.find(
         (match) =>
           match.routeId === "/_dashboard/$mailboxId/$folder/" ||
           match.routeId === "/_dashboard/$mailboxId/$folder/email/$emailId",
       )?.params.folder;
+
       if (
         folder === "archived" ||
         folder === "sent" ||
@@ -213,14 +117,16 @@ function useActiveSidebarState(): {
         folder === "starred" ||
         folder === "spam" ||
         folder === "trash"
-      )
+      ) {
         return {
           activeView: folder,
           activeLabelId,
           isSearchRoute,
           isSettingsRoute,
           isScreenerRoute,
+          isTriageRoute,
         };
+      }
 
       return {
         activeView: "inbox" as const,
@@ -228,6 +134,7 @@ function useActiveSidebarState(): {
         isSearchRoute,
         isSettingsRoute,
         isScreenerRoute,
+        isTriageRoute,
       };
     },
   });
@@ -263,23 +170,48 @@ function getNavTo(
 }
 
 const NAV_ITEMS = [
-  { view: "inbox", icon: TrayIcon, label: "Inbox" },
-  { view: "starred", icon: StarIcon, label: "Starred" },
-  { view: "archived", icon: CheckIcon, label: "Done" },
-  { view: "sent", icon: PaperPlaneTiltIcon, label: "Sent" },
-  { view: "drafts", icon: PencilSimpleLineIcon, label: "Drafts" },
-  { view: "snoozed", icon: ClockIcon, label: "Snoozed" },
-  { view: "spam", icon: WarningIcon, label: "Spam" },
-  { view: "trash", icon: TrashIcon, label: "Trash" },
-];
+  { view: "inbox", label: "Inbox" },
+  { view: "starred", label: "Starred" },
+  { view: "archived", label: "Done" },
+  { view: "sent", label: "Sent" },
+  { view: "drafts", label: "Drafts" },
+  { view: "snoozed", label: "Snoozed" },
+  { view: "spam", label: "Spam" },
+  { view: "trash", label: "Trash" },
+] as const;
 
-function InboxSidebar({ mailboxId }: { mailboxId: number }) {
+function formatSidebarCount(count: number): string {
+  return count > 999 ? "999+" : String(count);
+}
+
+function getPageTitle({
+  activeView,
+  isSearchRoute,
+  isSettingsRoute,
+  isScreenerRoute,
+  isTriageRoute,
+}: {
+  activeView: NavView;
+  isSearchRoute: boolean;
+  isSettingsRoute: boolean;
+  isScreenerRoute: boolean;
+  isTriageRoute: boolean;
+}): string {
+  if (isSearchRoute) return "Search";
+  if (isSettingsRoute) return "Settings";
+  if (isScreenerRoute) return "Screener";
+  if (isTriageRoute) return "Triage";
+  return NAV_ITEMS.find((item) => item.view === activeView)?.label ?? "Inbox";
+}
+
+export function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   const {
     activeView,
     activeLabelId,
     isSearchRoute,
     isSettingsRoute,
     isScreenerRoute,
+    isTriageRoute,
   } = useActiveSidebarState();
   const navigate = useNavigate();
   const mailboxAccounts = (useMailboxes().data?.accounts ?? []).filter(
@@ -290,6 +222,33 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const screenerPendingQuery = useGatekeeperPending(mailboxId, true);
   const screenerPendingCount = screenerPendingQuery.data?.pendingCount ?? 0;
+  const inboxUnreadCountQuery = useQuery({
+    queryKey: emailQueryKeys.inboxUnreadCount(mailboxId),
+    queryFn: () => fetchInboxUnreadCount(mailboxId),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+  const inboxUnreadCount = inboxUnreadCountQuery.data?.threadsUnread ?? 0;
+  const pageTitle = getPageTitle({
+    activeView,
+    isSearchRoute,
+    isSettingsRoute,
+    isScreenerRoute,
+    isTriageRoute,
+  });
+
+  useEffect(() => {
+    document.title =
+      inboxUnreadCount > 0
+        ? `(${inboxUnreadCount}) ${pageTitle} - Duomo`
+        : `${pageTitle} - Duomo`;
+
+    return () => {
+      document.title = "Duomo — A smaller inbox for Gmail.";
+    };
+  }, [inboxUnreadCount, pageTitle]);
+
   const hasStandaloneRouteSelection =
     isSearchRoute ||
     isSettingsRoute ||
@@ -306,9 +265,10 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
 
   const hotkeyBindings = useMemo(() => {
     const bindings: Record<string, () => void> = {};
-    NAV_ITEMS.forEach((item, i) => {
+
+    NAV_ITEMS.forEach((item, index) => {
       const nav = getNavTo(item.view, mailboxId);
-      bindings[`$mod+${i + 1}`] = () =>
+      bindings[`$mod+${index + 1}`] = () =>
         navigate({ to: nav.to as string, params: nav.params });
     });
 
@@ -316,6 +276,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
       const currentIndex = mailboxAccounts.findIndex(
         (account) => account.mailboxId === mailboxId,
       );
+
       if (currentIndex !== -1) {
         bindings["$mod+shift+arrowdown"] = () => {
           const nextIndex = (currentIndex + 1) % mailboxAccounts.length;
@@ -326,10 +287,10 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
             params: { mailboxId: nextAccount.mailboxId },
           });
         };
+
         bindings["$mod+shift+arrowup"] = () => {
           const prevIndex =
-            (currentIndex - 1 + mailboxAccounts.length) %
-            mailboxAccounts.length;
+            (currentIndex - 1 + mailboxAccounts.length) % mailboxAccounts.length;
           const prevAccount = mailboxAccounts[prevIndex];
           if (!prevAccount) return;
           navigate({
@@ -350,19 +311,22 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
     navIndex: number,
   ) => {
     const nav = getNavTo(item.view, mailboxId);
+    const count = item.view === "inbox" ? inboxUnreadCount : 0;
+
     return (
       <SidebarMenuItem key={item.view} className="group/nav">
         <SidebarMenuButton
           asChild
           isActive={!hasStandaloneRouteSelection && activeView === item.view}
-          tooltip={item.label}
-          className="text-sm"
+          tooltip={`${item.label} · ⌘${navIndex + 1}`}
         >
-          <Link to={nav.to} params={nav.params} preload="intent">
-            {item.label}
-            <Kbd className="ml-auto opacity-0 transition-opacity group-hover/nav:opacity-100">
-              ⌘{navIndex + 1}
-            </Kbd>
+          <Link to={nav.to} params={nav.params} preload="viewport">
+            <span className="min-w-0 truncate">{item.label}</span>
+            {count > 0 && (
+              <span className="ml-auto rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                {formatSidebarCount(count)}
+              </span>
+            )}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -370,27 +334,21 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
   };
 
   return (
-    <Sidebar className="border-none *:dark:bg-background">
+    <Sidebar className="border-none **:text-[13px] *:dark:bg-background">
       <SidebarHeader className="space-y-2">
         <AccountSwitcher mailboxId={mailboxId} />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              className="text-sm group"
+              className="group text-sm"
               onClick={() => openCompose()}
+              tooltip="Compose · C"
             >
               Compose
-              <Kbd className="ml-auto opacity-0 transition-opacity group-hover:opacity-100">
-                C
-              </Kbd>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              className="text-sm"
-              asChild
-              isActive={isSearchRoute}
-            >
+            <SidebarMenuButton className="text-sm" asChild isActive={isSearchRoute}>
               <Link
                 to="/$mailboxId/inbox/search"
                 params={{ mailboxId }}
@@ -401,16 +359,8 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              className="text-sm"
-              asChild
-              isActive={isScreenerRoute}
-            >
-              <Link
-                to="/$mailboxId/screener"
-                params={{ mailboxId }}
-                preload="intent"
-              >
+            <SidebarMenuButton className="text-sm" asChild isActive={isScreenerRoute}>
+              <Link to="/$mailboxId/screener" params={{ mailboxId }} preload="intent">
                 Screener
                 {screenerPendingCount > 0 && (
                   <span className="ml-auto rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
@@ -421,17 +371,9 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              className="text-sm"
-              asChild
-              isActive={isSettingsRoute}
-            >
-              <Link
-                to="/$mailboxId/settings"
-                params={{ mailboxId }}
-                preload="intent"
-              >
-                Settings
+            <SidebarMenuButton className="text-sm" asChild isActive={isTriageRoute}>
+              <Link to="/$mailboxId/triage" params={{ mailboxId }} preload="intent">
+                Triage
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -443,10 +385,10 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
           <SidebarGroupLabel>Mail</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {primaryItems.map((item, i) => renderNavItem(item, i))}
+              {primaryItems.map((item, index) => renderNavItem(item, index))}
               {showSecondary &&
-                secondaryItems.map((item, i) =>
-                  renderNavItem(item, primaryItems.length + i),
+                secondaryItems.map((item, index) =>
+                  renderNavItem(item, primaryItems.length + index),
                 )}
               {!hasActiveSecondary && secondaryItems.length > 0 && (
                 <SidebarMenuItem>
@@ -458,7 +400,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
                     className="justify-center"
                   >
                     <CaretDownIcon
-                      className={`size-2.5 shrink-0 text-foreground transition-transform ${
+                      className={`size-2 shrink-0 text-foreground transition-transform ${
                         moreOpen ? "rotate-180" : ""
                       }`}
                     />
@@ -469,10 +411,7 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <LabelSidebarSection
-          mailboxId={mailboxId}
-          activeLabelId={activeLabelId}
-        />
+        <LabelSidebarSection mailboxId={mailboxId} activeLabelId={activeLabelId} />
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
@@ -492,23 +431,5 @@ function InboxSidebar({ mailboxId }: { mailboxId: number }) {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  );
-}
-
-export function InboxSidebarShell({ children }: { children: ReactNode }) {
-  const { mailboxId } = mailboxRoute.useParams();
-
-  return (
-    <SidebarProvider
-      className="h-full overscroll-none
- min-h-0 flex-1 overflow-hidden"
-    >
-      <InboxSidebar mailboxId={mailboxId} />
-      <main className="flex min-h-0 flex-1 overflow-hidden bg-sidebar dark:bg-background p-2">
-        <div className="flex min-h-0 md:px-2 min-w-0 flex-1 flex-col overflow-hidden rounded bg-background">
-          {children}
-        </div>
-      </main>
-    </SidebarProvider>
   );
 }

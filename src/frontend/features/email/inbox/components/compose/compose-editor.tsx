@@ -91,7 +91,7 @@ export function ComposeEditor({
     <div
       role="group"
       aria-label="Message editor"
-      className={className}
+      className={cn("compose-editor", className)}
       onClick={() => onFocusField?.()}
       onKeyDown={(e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {

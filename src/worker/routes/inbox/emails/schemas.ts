@@ -35,6 +35,17 @@ export const batchPatchEmailsBodySchema = z.object({
   snoozedUntil: z.number().nullable().optional(),
 });
 
+export const patchThreadBodySchema = z.object({
+  mailboxId: z.number().int().positive(),
+  labelIds: z.array(z.string()).optional(),
+  isRead: z.boolean().optional(),
+  archived: z.boolean().optional(),
+  trashed: z.boolean().optional(),
+  spam: z.boolean().optional(),
+  starred: z.boolean().optional(),
+  snoozedUntil: z.number().nullable().optional(),
+});
+
 export const deleteEmailBodySchema = z.object({
   providerMessageId: z.string().trim().min(1),
   mailboxId: z.number().int().positive(),

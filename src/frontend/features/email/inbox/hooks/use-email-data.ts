@@ -63,7 +63,8 @@ export function useEmailData({
     placeholderData: (previousData) => previousData,
     staleTime: 5_000,
     gcTime: 2 * 60_000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
     refetchOnReconnect: true,
   });
 
@@ -106,6 +107,7 @@ export function useEmailData({
     isError: emailsQuery.isError,
     hasNextPage: hasNextPage ?? false,
     isFetchingNextPage,
+    fetchNextPage,
     loadMoreRef,
     filters,
     setFilters,

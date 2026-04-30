@@ -3,7 +3,9 @@ import {
   batchPatchEmails,
   deleteEmailForever,
   patchEmail,
+  patchThread,
   type EmailIdentifier,
+  type ThreadIdentifier,
 } from "@/features/email/inbox/mutations";
 import type {
   EmailListItem,
@@ -69,6 +71,16 @@ const LIST_CHANGING_ACTIONS = new Set<EmailInboxAction>([
 
 const UNDO_ACTIONS = new Set<EmailInboxAction>(["archive", "trash", "spam"]);
 
+const THREAD_LEVEL_ACTIONS = new Set<EmailInboxAction>([
+  "archive",
+  "move-to-inbox",
+  "trash",
+  "spam",
+  "not-spam",
+  "mark-read",
+  "mark-unread",
+]);
+
 const actionMessages: Partial<Record<EmailInboxAction, string>> = {
   archive: "Marked as done",
   "move-to-inbox": "Moved to inbox",
@@ -82,6 +94,7 @@ type InboxMutationVars = {
   action: EmailInboxAction;
   ids: string[];
   identifiers: EmailIdentifier[];
+  thread?: ThreadIdentifier;
 };
 
 function removeIdsFromInfiniteData(
@@ -124,7 +137,13 @@ export function useEmailInboxActions({
   );
 
   const mutation = useMutation<void, Error, InboxMutationVars>({
-    mutationFn: async ({ identifiers, action }) => {
+    mutationFn: async ({ identifiers, action, thread }) => {
+      if (thread) {
+        const data = actionPayloads[action];
+        if (!data) return;
+        await patchThread(thread, data);
+        return;
+      }
       if (identifiers.length === 0) return;
       if (action === "delete-forever") {
         await Promise.all(identifiers.map((id) => deleteEmailForever(id)));
@@ -151,7 +170,11 @@ export function useEmailInboxActions({
   });
 
   const executeEmailAction = useCallback(
-    async (action: EmailInboxAction, explicitIds?: string[]) => {
+    async (
+      action: EmailInboxAction,
+      explicitIds?: string[],
+      threadContext?: ThreadIdentifier,
+    ) => {
       const ids = explicitIds && explicitIds.length > 0 ? explicitIds : [];
       if (ids.length === 0) return;
 
@@ -181,7 +204,12 @@ export function useEmailInboxActions({
         })
         .filter((e): e is EmailIdentifier => e !== null);
 
-      if (identifiers.length === 0) return;
+      const thread =
+        threadContext && THREAD_LEVEL_ACTIONS.has(action)
+          ? threadContext
+          : undefined;
+
+      if (identifiers.length === 0 && !thread) return;
 
       const doAction = async () => {
         if (LIST_CHANGING_ACTIONS.has(action)) {
@@ -191,7 +219,7 @@ export function useEmailInboxActions({
           );
         }
         try {
-          await mutation.mutateAsync({ action, ids, identifiers });
+          await mutation.mutateAsync({ action, ids, identifiers, thread });
         } catch (error) {
           console.warn("Inbox action failed", error);
         }

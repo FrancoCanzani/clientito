@@ -1,10 +1,11 @@
+import { Button } from "@/components/ui/button";
 import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import {
   EmailDetailContent,
   type EmailDetailContentHandle,
 } from "@/features/email/inbox/components/thread/email-detail-content";
-import { patchEmail } from "@/features/email/inbox/mutations";
+import { patchEmail, patchThread } from "@/features/email/inbox/mutations";
 import {
   fetchEmailDetail,
   fetchEmailThread,
@@ -30,6 +31,66 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useUndoAction } from "@/features/email/inbox/hooks/use-undo-action";
 
 export function EmailDetailView({
+  mailboxId,
+  emailId,
+  view,
+  onNavigateToEmail,
+}: {
+  mailboxId: number;
+  emailId: string;
+  view: string;
+  onNavigateToEmail: (nextEmailId: string) => void;
+}) {
+  const emailQuery = useQuery({
+    queryKey: emailQueryKeys.detail(emailId),
+    queryFn: () =>
+      fetchEmailDetail(emailId, {
+        mailboxId,
+        view,
+      }),
+    staleTime: 60_000,
+    gcTime: 2 * 60_000,
+  });
+
+  if (emailQuery.isError) {
+    const message =
+      emailQuery.error instanceof Error
+        ? emailQuery.error.message
+        : "Unable to load email";
+
+    return (
+      <div className="flex h-full w-full items-center justify-center px-6">
+        <div className="space-y-3 text-center">
+          <p className="text-sm font-medium text-foreground">Unable to open email</p>
+          <p className="text-sm text-muted-foreground">{message}</p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void emailQuery.refetch()}
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!emailQuery.data) {
+    return <div className="h-full w-full" />;
+  }
+
+  return (
+    <EmailDetailPane
+      email={emailQuery.data}
+      mailboxId={mailboxId}
+      emailId={emailId}
+      view={view}
+      onNavigateToEmail={onNavigateToEmail}
+    />
+  );
+}
+
+function EmailDetailPane({
   email,
   mailboxId,
   emailId,
@@ -47,19 +108,7 @@ export function EmailDetailView({
   const queryClient = useQueryClient();
   const { openCompose } = useInboxCompose();
   const contentRef = useRef<EmailDetailContentHandle>(null);
-
-  const emailQuery = useQuery({
-    queryKey: emailQueryKeys.detail(emailId),
-    queryFn: () =>
-      fetchEmailDetail(emailId, {
-        mailboxId,
-        view,
-      }),
-    initialData: email,
-    staleTime: 60_000,
-    gcTime: 2 * 60_000,
-  });
-  const currentEmail = emailQuery.data ?? email;
+  const currentEmail = email;
 
   useEffect(() => {
     setFocusedEmail({
@@ -98,9 +147,13 @@ export function EmailDetailView({
     return containingCurrent ?? candidateLists[0] ?? [];
   }, [queryClient, mailboxId, view, emailId]);
 
-  const orderedIds = orderedEmails.map((item) => item.id);
-  const orderedEmailById = new Map(
-    orderedEmails.map((item) => [item.id, item]),
+  const orderedIds = useMemo(
+    () => orderedEmails.map((item) => item.id),
+    [orderedEmails],
+  );
+  const orderedEmailById = useMemo(
+    () => new Map(orderedEmails.map((item) => [item.id, item])),
+    [orderedEmails],
   );
 
   const currentIndex = orderedIds.indexOf(emailId);
@@ -183,10 +236,25 @@ export function EmailDetailView({
     mailboxId: currentEmail.mailboxId ?? mailboxId,
     labelIds: currentEmail.labelIds,
   };
+  const threadIdentifier = currentEmail.threadId
+    ? {
+        threadId: currentEmail.threadId,
+        mailboxId: currentEmail.mailboxId ?? mailboxId,
+        labelIds: currentEmail.labelIds,
+      }
+    : null;
+  const patchThreadOrEmail = (payload: Parameters<typeof patchEmail>[1]) =>
+    threadIdentifier
+      ? patchThread(threadIdentifier, payload)
+      : patchEmail(emailIdentifier, payload);
 
   const emailPatchMutation = useMutation({
     mutationFn: (payload: Parameters<typeof patchEmail>[1]) =>
       patchEmail(emailIdentifier, payload),
+  });
+  const threadPatchMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof patchEmail>[1]) =>
+      patchThreadOrEmail(payload),
   });
 
   const undoAction = useUndoAction();
@@ -238,14 +306,14 @@ export function EmailDetailView({
     f: () => handleForward(),
     e: () => {
       undoAction({
-        action: () => patchEmail(emailIdentifier, { archived: isInInbox }),
+        action: () => patchThreadOrEmail({ archived: isInInbox }),
         onAction: goBack,
         message: isInInbox ? "Marked as done" : "Moved to inbox",
       });
     },
     "#": () => {
       undoAction({
-        action: () => patchEmail(emailIdentifier, { trashed: true }),
+        action: () => patchThreadOrEmail({ trashed: true }),
         onAction: goBack,
         message: "Moved to trash",
       });
@@ -254,7 +322,7 @@ export function EmailDetailView({
       emailPatchMutation.mutate({ starred: !isStarred });
     },
     u: () => {
-      emailPatchMutation.mutate({ isRead: !currentEmail.isRead });
+      threadPatchMutation.mutate({ isRead: !currentEmail.isRead });
     },
     Escape: () => router.history.back(),
   });

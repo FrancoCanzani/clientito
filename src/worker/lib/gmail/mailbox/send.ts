@@ -261,6 +261,28 @@ export async function batchModifyGmailMessages(
   });
 }
 
+export async function modifyGmailThread(
+  db: Database,
+  mailboxId: number,
+  env: GoogleOAuthConfig,
+  gmailThreadId: string,
+  addLabelIds?: string[],
+  removeLabelIds?: string[],
+): Promise<void> {
+  if (!gmailThreadId) return;
+  const accessToken = await getGmailTokenForMailbox(db, mailboxId, env);
+  await postGmailModify(
+    accessToken,
+    `/threads/${encodeURIComponent(gmailThreadId)}/modify`,
+    {
+      addLabelIds: addLabelIds?.length ? Array.from(new Set(addLabelIds)) : [],
+      removeLabelIds: removeLabelIds?.length
+        ? Array.from(new Set(removeLabelIds))
+        : [],
+    },
+  );
+}
+
 export async function hardDeleteGmailMessage(
   db: Database,
   mailboxId: number,

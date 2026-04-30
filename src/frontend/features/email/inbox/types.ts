@@ -58,6 +58,12 @@ export type InboxSearchSuggestionsResponse = {
   subjects: InboxSearchSubjectSuggestion[];
 };
 
+export type InboxUnreadCount = {
+  messagesUnread: number;
+  threadsUnread: number;
+  syncedAt: number;
+};
+
 export type EmailListItem = {
   id: string;
   mailboxId: number | null;
@@ -86,6 +92,7 @@ export type EmailListItem = {
   aiSummary: string | null;
   aiDraftReply: string | null;
   aiClassifiedAt: number | null;
+  threadCount?: number;
 };
 
 export type EmailInlineAttachment = {
@@ -186,4 +193,10 @@ export type ComposeInitial = {
   bodyHtml?: string;
   threadId?: string;
   composeKey?: string;
+  attachmentKeys?: Array<{
+    key: string;
+    filename: string;
+    mimeType: string;
+    size?: number;
+  }>;
 };

@@ -5,12 +5,10 @@ const route = getRouteApi("/_dashboard/$mailboxId/inbox/email/$emailId");
 
 export default function InboxEmailPage() {
   const { mailboxId, emailId } = route.useParams();
-  const { email } = route.useLoaderData();
   const navigate = route.useNavigate();
 
   return (
     <EmailDetailView
-      email={email}
       mailboxId={mailboxId}
       emailId={emailId}
       view="inbox"

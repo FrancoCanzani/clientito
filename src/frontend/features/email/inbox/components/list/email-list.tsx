@@ -12,6 +12,7 @@ import { useGatekeeperPending } from "@/features/email/gatekeeper/queries";
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
+import type { ThreadIdentifier } from "@/features/email/inbox/mutations";
 import { useInboxHotkeys } from "@/features/email/inbox/hooks/use-inbox-hotkeys";
 import type { EmailListItem } from "@/features/email/inbox/types";
 import { VIEW_LABELS } from "@/features/email/inbox/utils/inbox-filters";
@@ -44,7 +45,11 @@ export function EmailList({
 }: {
   emailData: ReturnType<typeof useEmailData>;
   onOpen: (email: EmailListItem) => void;
-  onAction: (action: EmailInboxAction, ids?: string[]) => void;
+  onAction: (
+    action: EmailInboxAction,
+    ids?: string[],
+    thread?: ThreadIdentifier,
+  ) => void;
   pageTitle?: string;
   headerSlot?: React.ReactNode;
   extraActions?: React.ReactNode;

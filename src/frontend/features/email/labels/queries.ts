@@ -22,12 +22,14 @@ export async function fetchLabels(mailboxId: number): Promise<Label[]> {
   if (!userId) return [];
 
   const localLabels = await localDb.getLabels(userId, mailboxId);
-  if (localLabels.length > 0) return localLabels;
+  const localUserLabels = localLabels.filter((label) => label.type === "user");
+  const hasSystemLabels = localLabels.some((label) => label.type !== "user");
+  if (localUserLabels.length > 0 && !hasSystemLabels) return localUserLabels;
 
   try {
     return await syncLabelsOnce(mailboxId);
   } catch {
-    return localLabels;
+    return localUserLabels;
   }
 }
 
@@ -39,7 +41,7 @@ export async function syncLabelsFromServer(mailboxId: number): Promise<Label[]> 
   });
   if (!response.ok) throw new Error("Failed to sync labels");
   const result: { data?: Label[] } = await response.json();
-  const labels = result.data ?? [];
+  const labels = (result.data ?? []).filter((label) => label.type === "user");
 
   const userId = await getCurrentUserId();
   if (userId) {

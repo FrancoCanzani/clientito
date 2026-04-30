@@ -39,9 +39,9 @@ export function LabelSidebarSection({
       numeric: true,
       sensitivity: "base",
     });
-    return [...(labelsQuery.data ?? [])].sort((a, b) =>
-      collator.compare(a.name, b.name),
-    );
+    return [...(labelsQuery.data ?? [])]
+      .filter((label) => label.type === "user")
+      .sort((a, b) => collator.compare(a.name, b.name));
   }, [labelsQuery.data]);
 
   if (labels.length === 0) return null;

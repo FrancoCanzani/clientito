@@ -10,7 +10,7 @@ import {
   CaretRightIcon,
   PaperclipIcon,
 } from "@phosphor-icons/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   formatEmailDetailDate,
   formatEmailThreadDate,
@@ -119,6 +119,7 @@ export function EmailThread({
   const [expansionOverrides, setExpansionOverrides] = useState<
     Map<string, boolean>
   >(() => new Map());
+  const latestMessageRef = useRef<HTMLDivElement | null>(null);
   const orderedThreadMessages = useMemo(
     () =>
       [...threadMessages].sort((left, right) => {
@@ -156,6 +157,15 @@ export function EmailThread({
   useEffect(() => {
     setExpansionOverrides(new Map());
   }, [email.id, email.threadId]);
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      latestMessageRef.current?.scrollIntoView({
+        block: "center",
+        behavior: "auto",
+      });
+    });
+  }, [email.id, orderedThreadMessages.length]);
 
   const isExpanded = (messageId: string) =>
     expansionOverrides.get(messageId) ?? defaultExpandedIds.has(messageId);
@@ -211,30 +221,39 @@ export function EmailThread({
               threadEmail.resolvedBodyHtml ?? threadEmail.bodyHtml,
             );
             return (
-              <ThreadMessage
+              <div
                 key={threadEmail.id}
-                email={threadEmail}
-                body={isSelected ? email : threadEmail}
-                expanded={isExpanded(threadEmail.id)}
-                onToggle={() => toggleMessage(threadEmail.id)}
-                attachments={
-                  isSelected
-                    ? visibleAttachments
-                    : (threadEmail.attachments ?? []).filter(
-                        (attachment) =>
-                          !shouldHideInlineImageAttachment(
-                            attachment,
-                            threadReferencedCids,
-                          ),
-                      )
+                ref={
+                  threadEmail.id ===
+                  orderedThreadMessages[orderedThreadMessages.length - 1]?.id
+                    ? latestMessageRef
+                    : undefined
                 }
-                readingMode={readingMode}
-              />
+              >
+                <ThreadMessage
+                  email={threadEmail}
+                  body={isSelected ? email : threadEmail}
+                  expanded={isExpanded(threadEmail.id)}
+                  onToggle={() => toggleMessage(threadEmail.id)}
+                  attachments={
+                    isSelected
+                      ? visibleAttachments
+                      : (threadEmail.attachments ?? []).filter(
+                          (attachment) =>
+                            !shouldHideInlineImageAttachment(
+                              attachment,
+                              threadReferencedCids,
+                            ),
+                        )
+                  }
+                  readingMode={readingMode}
+                />
+              </div>
             );
           })}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-md border border-white/30 bg-background/75 shadow-xs backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-background/60">
+        <div className="overflow-x-auto rounded-md border border-white/30 bg-background/75 shadow-xs backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-background/60">
           <div className="p-5">
             <MessageBody detail={email} readingMode={readingMode} />
           </div>
@@ -269,7 +288,7 @@ function ThreadMessage({
   const hasAttachments = attachments.length > 0;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/30 bg-background/75 shadow-sm backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-background/60">
+    <div className="overflow-x-auto rounded-xl border border-white/30 bg-background/75 shadow-sm backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-background/60">
       <button
         type="button"
         onClick={onToggle}

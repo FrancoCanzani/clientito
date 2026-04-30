@@ -12,6 +12,7 @@ import type {
   ContactSuggestion,
   DraftItem,
   EmailDetailItem,
+  InboxUnreadCount,
   EmailListItem,
   EmailListPage,
   EmailThreadItem,
@@ -701,7 +702,7 @@ async function persistEmails(
   enqueueClassificationTasks(pulled, userId, mailboxId);
   return providerIds
     .map((id) => byProviderId.get(id))
-    .filter((e): e is EmailListItem => e !== undefined);
+    .filter((e): e is NonNullable<typeof e> => e !== undefined);
 }
 
 type LocalCursor = { type: "local"; beforeDate: number; beforeId: number };
@@ -728,7 +729,13 @@ function decodeViewCursor(cursor: string | undefined): DecodedCursor | null {
 
 const refreshInFlight = new Map<string, Promise<void>>();
 const refreshLastRunAt = new Map<string, number>();
-const VIEW_BACKGROUND_REFRESH_COOLDOWN_MS = 60_000;
+const VIEW_BACKGROUND_REFRESH_COOLDOWN_MS = 10_000;
+const searchRefreshInFlight = new Map<string, Promise<void>>();
+const searchRefreshLastRunAt = new Map<string, number>();
+const SEARCH_BACKGROUND_REFRESH_COOLDOWN_MS = 15_000;
+const contactSuggestionRefreshInFlight = new Map<string, Promise<void>>();
+const contactSuggestionRefreshLastRunAt = new Map<string, number>();
+const CONTACT_SUGGESTION_REFRESH_COOLDOWN_MS = 60_000;
 
 function refreshKey(mailboxId: number, view: string): string {
   return `${mailboxId}:${view}`;
@@ -736,6 +743,39 @@ function refreshKey(mailboxId: number, view: string): string {
 
 function viewSyncedKey(mailboxId: number, view: string): string {
   return `viewSynced:${mailboxId}:${view}`;
+}
+
+function searchRefreshKey(params: InboxSearchScope): string {
+  return [
+    params.mailboxId ?? "none",
+    params.view ?? "all",
+    params.includeJunk ? "junk" : "nojunk",
+    params.q.trim().replace(/\s+/g, " ").toLowerCase(),
+  ].join(":");
+}
+
+function contactSuggestionRefreshKey(q: string, mailboxId: number): string {
+  return `${mailboxId}:${q.trim().toLowerCase()}`;
+}
+
+function buildContactSuggestionSearchQuery(q: string): string {
+  const cleaned = q.trim().replace(/["\\]/g, " ").replace(/\s+/g, " ");
+  if (!cleaned) return q;
+  return `${cleaned} OR from:${cleaned} OR to:${cleaned} OR cc:${cleaned}`;
+}
+
+function mergeContactSuggestions(
+  primary: ContactSuggestion[],
+  secondary: ContactSuggestion[],
+  limit: number,
+): ContactSuggestion[] {
+  const byEmail = new Map<string, ContactSuggestion>();
+  for (const item of [...primary, ...secondary]) {
+    const key = item.email.trim().toLowerCase();
+    if (!key || byEmail.has(key)) continue;
+    byEmail.set(key, item);
+  }
+  return Array.from(byEmail.values()).slice(0, limit);
 }
 
 async function markViewSynced(mailboxId: number, view: string): Promise<void> {
@@ -751,13 +791,10 @@ async function refreshViewFromServer(
   const existing = refreshInFlight.get(key);
   if (existing) return existing;
 
-  const now = Date.now();
   const lastRunAt = refreshLastRunAt.get(key) ?? 0;
-  if (now - lastRunAt < VIEW_BACKGROUND_REFRESH_COOLDOWN_MS) {
+  if (Date.now() - lastRunAt < VIEW_BACKGROUND_REFRESH_COOLDOWN_MS) {
     return;
   }
-  // Mark before starting to avoid immediate invalidate->refetch->refresh loops.
-  refreshLastRunAt.set(key, now);
 
   const task = (async () => {
     try {
@@ -781,6 +818,7 @@ async function refreshViewFromServer(
       /* background refresh failure is non-fatal */
     }
   })().finally(() => {
+    refreshLastRunAt.set(key, Date.now());
     refreshInFlight.delete(key);
   });
 
@@ -939,6 +977,99 @@ export async function fetchSearchEmails(
 
   await alignActiveUser(userId);
 
+  const normalizedQuery = params.q.trim().replace(/\s+/g, " ");
+  if (!normalizedQuery) return { emails: [], cursor: null };
+
+  const fetchRemote = async (pageToken?: string): Promise<ViewPage> => {
+    const res = await fetch("/api/inbox/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mailboxId: params.mailboxId,
+        q: normalizedQuery,
+        pageToken,
+        includeJunk: params.includeJunk ?? false,
+      }),
+    });
+    if (!res.ok) throw new Error(`Search failed: ${res.status}`);
+
+    const body = (await res.json()) as {
+      emails: PulledEmail[];
+      cursor: string | null;
+    };
+    const emails = await persistEmails(body.emails, userId, params.mailboxId!);
+    return { emails, cursor: body.cursor };
+  };
+
+  if (params.cursor) {
+    return fetchRemote(params.cursor);
+  }
+
+  const local = await localDb.searchEmails({
+    userId,
+    query: normalizedQuery,
+    mailboxId: params.mailboxId,
+    view: params.view,
+    includeJunk: params.includeJunk ?? false,
+  });
+
+  const key = searchRefreshKey({ ...params, q: normalizedQuery });
+  const lastRunAt = searchRefreshLastRunAt.get(key) ?? 0;
+  const existing = searchRefreshInFlight.get(key);
+  if (!existing && Date.now() - lastRunAt > SEARCH_BACKGROUND_REFRESH_COOLDOWN_MS) {
+    const task = fetchRemote()
+      .then(() => {
+        queryClient.invalidateQueries({
+          queryKey: emailQueryKeys.search.results(
+            normalizedQuery,
+            params.mailboxId!,
+            params.view ?? "inbox",
+            params.includeJunk ?? false,
+          ),
+        });
+      })
+      .catch(() => {
+        /* background search failure is non-fatal */
+      })
+      .finally(() => {
+        searchRefreshLastRunAt.set(key, Date.now());
+        searchRefreshInFlight.delete(key);
+      });
+    searchRefreshInFlight.set(key, task);
+  }
+
+  if (local.data.length > 0) {
+    return {
+      emails: local.data,
+      cursor: null,
+    };
+  }
+
+  if (existing) await existing;
+  else await searchRefreshInFlight.get(key);
+
+  const seeded = await localDb.searchEmails({
+    userId,
+    query: normalizedQuery,
+    mailboxId: params.mailboxId,
+    view: params.view,
+    includeJunk: params.includeJunk ?? false,
+  });
+  if (seeded.data.length > 0) {
+    return { emails: seeded.data, cursor: null };
+  }
+
+  return fetchRemote();
+}
+
+export async function fetchRemoteSearchEmails(
+  params: InboxSearchScope & { cursor?: string },
+): Promise<ViewPage> {
+  const userId = await getCurrentUserId();
+  if (!userId || !params.mailboxId) return { emails: [], cursor: null };
+
+  await alignActiveUser(userId);
+
   const res = await fetch("/api/inbox/search", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1014,7 +1145,63 @@ export async function fetchContactSuggestions(
 ): Promise<ContactSuggestion[]> {
   const userId = await getCurrentUserId();
   if (!userId) return [];
-  return localDb.getContactSuggestions(userId, q, mailboxId, limit);
+  const normalizedQuery = q.trim();
+  const local = await localDb.getContactSuggestions(
+    userId,
+    normalizedQuery,
+    mailboxId,
+    limit,
+  );
+  if (!mailboxId || normalizedQuery.length < 2) return local;
+
+  const key = contactSuggestionRefreshKey(normalizedQuery, mailboxId);
+  const lastRunAt = contactSuggestionRefreshLastRunAt.get(key) ?? 0;
+  const existing = contactSuggestionRefreshInFlight.get(key);
+  const shouldRefresh =
+    !existing &&
+    Date.now() - lastRunAt >= CONTACT_SUGGESTION_REFRESH_COOLDOWN_MS;
+
+  if (shouldRefresh) {
+    const task = (async () => {
+      const response = await fetch("/api/inbox/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mailboxId,
+          q: buildContactSuggestionSearchQuery(normalizedQuery),
+          includeJunk: true,
+        }),
+      });
+      if (!response.ok) return;
+      const body = (await response.json()) as {
+        emails?: PulledEmail[];
+      };
+      if (body.emails?.length) {
+        await persistEmails(body.emails, userId, mailboxId);
+      }
+    })()
+      .catch(() => {
+        /* Remote contact hydration is opportunistic. */
+      })
+      .finally(() => {
+        contactSuggestionRefreshLastRunAt.set(key, Date.now());
+        contactSuggestionRefreshInFlight.delete(key);
+      });
+    contactSuggestionRefreshInFlight.set(key, task);
+  }
+
+  if (local.length >= limit) {
+    return local;
+  }
+
+  await contactSuggestionRefreshInFlight.get(key);
+  const refreshed = await localDb.getContactSuggestions(
+    userId,
+    normalizedQuery,
+    mailboxId,
+    limit,
+  );
+  return mergeContactSuggestions(local, refreshed, limit);
 }
 
 export async function fetchSearchSuggestions(
@@ -1042,6 +1229,22 @@ export async function deleteDraft(id: number): Promise<void> {
   const userId = await getCurrentUserId();
   if (!userId) throw new Error("Not authenticated");
   await localDb.deleteDraft(id, userId);
+}
+
+export async function fetchInboxUnreadCount(
+  mailboxId: number,
+): Promise<InboxUnreadCount> {
+  const params = new URLSearchParams({ mailboxId: String(mailboxId) });
+  const response = await fetch(`/api/inbox/unread-count?${params.toString()}`);
+  const result = (await response.json().catch(() => null)) as
+    | { data?: InboxUnreadCount; error?: string }
+    | null;
+
+  if (!response.ok || !result?.data) {
+    throw new Error(result?.error ?? "Failed to fetch inbox unread count");
+  }
+
+  return result.data;
 }
 
 export function invalidateInboxQueries() {

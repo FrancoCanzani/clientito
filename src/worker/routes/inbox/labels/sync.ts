@@ -31,14 +31,14 @@ export function registerSyncLabels(api: Hono<AppRouteEnv>) {
     const data = gmailLabels
       .filter((label) => label.type === "user")
       .map((label) => ({
-      gmailId: label.id,
-      name: label.name,
-      type: label.type?.toLowerCase() ?? "user",
-      textColor: label.color?.textColor ?? null,
-      backgroundColor: label.color?.backgroundColor ?? null,
-      messagesTotal: label.messagesTotal ?? 0,
-      messagesUnread: label.messagesUnread ?? 0,
-    }));
+        gmailId: label.id,
+        name: label.name,
+        type: label.type?.toLowerCase() ?? "user",
+        textColor: label.color?.textColor ?? null,
+        backgroundColor: label.color?.backgroundColor ?? null,
+        messagesTotal: label.messagesTotal ?? 0,
+        messagesUnread: label.messagesUnread ?? 0,
+      }));
 
     return c.json({ data }, 200);
   });

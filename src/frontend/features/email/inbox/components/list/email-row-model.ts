@@ -1,6 +1,7 @@
 import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import type { EmailAICategory } from "@/db/schema";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
+import type { ThreadIdentifier } from "@/features/email/inbox/mutations";
 import { fetchEmailDetail } from "@/features/email/inbox/queries";
 import {
   getRowActions,
@@ -49,7 +50,11 @@ export type EmailRowProps = {
   group: ThreadGroup;
   view: string;
   onOpen: (email: EmailListItem) => void;
-  onAction: (action: EmailInboxAction, ids?: string[]) => void;
+  onAction: (
+    action: EmailInboxAction,
+    ids?: string[],
+    thread?: ThreadIdentifier,
+  ) => void;
   isFocused?: boolean;
   allLabels?: Label[];
 };
@@ -135,6 +140,18 @@ export function useEmailRowModel({
   };
 
   const runAction = (rowAction: RowAction) => {
+    if (group.threadId && email.mailboxId) {
+      onAction(
+        rowAction.action,
+        group.emails.map((entry) => entry.id),
+        {
+          threadId: group.threadId,
+          mailboxId: email.mailboxId,
+          labelIds: email.labelIds,
+        },
+      );
+      return;
+    }
     onAction(rowAction.action, [email.id]);
   };
 

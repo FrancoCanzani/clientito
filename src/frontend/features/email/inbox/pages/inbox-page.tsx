@@ -1,21 +1,29 @@
-import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { Button } from "@/components/ui/button";
+import type { SplitViewRow } from "@/db/schema";
 import { EmailList } from "@/features/email/inbox/components/list/email-list";
 import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
 import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
 import { fetchViewPage } from "@/features/email/inbox/queries";
-import type { SplitViewRow } from "@/db/schema";
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { InboxSplitTabs } from "@/features/email/splits/components/inbox-split-tabs";
 import { useSplitViews } from "@/features/email/splits/queries";
 import { SlidersIcon } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 const route = getRouteApi("/_dashboard/$mailboxId/inbox/");
 
 const ManageSplitsModal = lazy(async () => {
-  const mod = await import("@/features/email/splits/components/manage-splits-modal");
+  const mod =
+    await import("@/features/email/splits/components/manage-splits-modal");
   return { default: mod.ManageSplitsModal };
 });
 
@@ -77,14 +85,15 @@ export default function InboxPage() {
     </Button>
   );
 
-  const splitTabs = splits && splits.some((s) => s.visible) ? (
-    <InboxSplitTabs
-      splits={splits}
-      activeSplitId={activeSplitId}
-      onSelect={setActiveSplitId}
-      onPrefetch={prefetchSplit}
-    />
-  ) : null;
+  const splitTabs =
+    splits && splits.some((s) => s.visible) ? (
+      <InboxSplitTabs
+        splits={splits}
+        activeSplitId={activeSplitId}
+        onSelect={setActiveSplitId}
+        onPrefetch={prefetchSplit}
+      />
+    ) : null;
 
   return (
     <>

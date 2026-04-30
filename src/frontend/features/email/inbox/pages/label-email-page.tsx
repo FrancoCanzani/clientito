@@ -5,12 +5,10 @@ const route = getRouteApi("/_dashboard/$mailboxId/inbox/labels/$label/email/$ema
 
 export default function LabelEmailPage() {
   const { mailboxId, label, emailId } = route.useParams();
-  const { email } = route.useLoaderData();
   const navigate = route.useNavigate();
 
   return (
     <EmailDetailView
-      email={email}
       mailboxId={mailboxId}
       emailId={emailId}
       view={label}

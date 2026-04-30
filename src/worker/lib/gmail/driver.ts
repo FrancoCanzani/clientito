@@ -9,6 +9,7 @@ import {
 import {
   sendGmailMessage,
   batchModifyGmailMessages,
+  modifyGmailThread,
   hardDeleteGmailMessage,
 } from "./mailbox/send";
 import {
@@ -82,6 +83,21 @@ export class GmailDriver {
       this.mailboxId,
       this.env,
       messageIds,
+      addLabelIds,
+      removeLabelIds,
+    );
+  }
+
+  async modifyThreadLabels(
+    threadId: string,
+    addLabelIds: string[],
+    removeLabelIds: string[],
+  ): Promise<void> {
+    await modifyGmailThread(
+      this.db,
+      this.mailboxId,
+      this.env,
+      threadId,
       addLabelIds,
       removeLabelIds,
     );

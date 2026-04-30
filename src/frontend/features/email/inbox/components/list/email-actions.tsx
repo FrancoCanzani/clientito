@@ -50,7 +50,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useUndoAction } from "../../hooks/use-undo-action";
 import { unsubscribe } from "../../../subscriptions/queries";
-import { blockSender, patchEmail } from "../../mutations";
+import { blockSender, patchEmail, patchThread } from "../../mutations";
 import { invalidateInboxQueries } from "../../queries";
 import type { ComposeInitial, EmailDetailItem } from "../../types";
 import { buildForwardedEmailHtml } from "../../utils/build-forwarded-html";
@@ -122,10 +122,24 @@ export function EmailActions({
     mailboxId: resolvedMailboxId,
     labelIds: email.labelIds,
   };
+  const threadIdentifier = email.threadId
+    ? {
+        threadId: email.threadId,
+        mailboxId: resolvedMailboxId,
+        labelIds: email.labelIds,
+      }
+    : null;
+  const patchThreadOrEmail = (payload: EmailPatchPayload) =>
+    threadIdentifier
+      ? patchThread(threadIdentifier, payload)
+      : patchEmail(emailIdentifier, payload);
 
   const emailPatchMutation = useMutation({
     mutationFn: (payload: EmailPatchPayload) =>
       patchEmail(emailIdentifier, payload),
+  });
+  const threadPatchMutation = useMutation({
+    mutationFn: (payload: EmailPatchPayload) => patchThreadOrEmail(payload),
   });
 
   const runEmailPatch = (
@@ -133,6 +147,21 @@ export function EmailActions({
     opts: EmailPatchOptions = {},
   ) => {
     emailPatchMutation.mutate(payload, {
+      onSuccess: () => {
+        if (opts.successMessage) toast.success(opts.successMessage);
+        if (opts.closeAfter) onClose?.();
+      },
+      onError: () => {
+        toast.error(opts.errorMessage ?? "Failed to update");
+      },
+    });
+  };
+
+  const runThreadPatch = (
+    payload: EmailPatchPayload,
+    opts: EmailPatchOptions = {},
+  ) => {
+    threadPatchMutation.mutate(payload, {
       onSuccess: () => {
         if (opts.successMessage) toast.success(opts.successMessage);
         if (opts.closeAfter) onClose?.();
@@ -249,20 +278,21 @@ export function EmailActions({
 
   const actionsPending =
     emailPatchMutation.isPending ||
+    threadPatchMutation.isPending ||
     snoozeMutation.isPending ||
     unsubscribeMutation.isPending ||
     blockSenderMutation.isPending;
 
   const handleDone = () =>
     undoAction({
-      action: () => patchEmail(emailIdentifier, { archived: isInInbox }),
+      action: () => patchThreadOrEmail({ archived: isInInbox }),
       onAction: () => onClose?.(),
       message: isInInbox ? "Marked as done" : "Moved to inbox",
     });
 
   const handleTrash = () =>
     undoAction({
-      action: () => patchEmail(emailIdentifier, { trashed: true }),
+      action: () => patchThreadOrEmail({ trashed: true }),
       onAction: () => onClose?.(),
       message: "Moved to trash",
     });
@@ -287,14 +317,14 @@ export function EmailActions({
       icon: email.isRead ? EnvelopeSimpleIcon : EnvelopeSimpleOpenIcon,
       label: email.isRead ? "Mark as unread" : "Mark as read",
       shortcut: "U",
-      action: () => runEmailPatch({ isRead: !email.isRead }),
+      action: () => runThreadPatch({ isRead: !email.isRead }),
     },
     {
       icon: WarningIcon,
       label: "Move to spam",
       action: () =>
         undoAction({
-          action: () => patchEmail(emailIdentifier, { spam: true }),
+          action: () => patchThreadOrEmail({ spam: true }),
           onAction: () => onClose?.(),
           message: "Moved to spam",
         }),

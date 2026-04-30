@@ -117,12 +117,11 @@ export default function ScreenerPage() {
     <div className="flex w-full min-h-0 min-w-0 flex-1 flex-col">
       <PageHeader
         title={headerTitle}
-        subtitle="Accept first contacts you trust. Reject senders you don't want reaching your inbox — they'll be moved to trash and blocked in Gmail."
         isScrolled={isScrolled}
       />
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6">
+        <div className="w-full px-3 py-3 md:px-6">
           {pendingQuery.isLoading ? (
             <div className="flex items-center justify-center py-16 text-muted-foreground">
               <SpinnerGapIcon className="size-4 animate-spin" />

@@ -15,6 +15,16 @@ export async function listGmailLabels(
   return response.labels ?? [];
 }
 
+export async function getGmailLabel(
+  accessToken: string,
+  labelId: string,
+): Promise<GmailLabel> {
+  return gmailRequest<GmailLabel>(accessToken, `/labels/${labelId}`, {
+    fields:
+      "id,name,type,messagesTotal,messagesUnread,threadsTotal,threadsUnread",
+  });
+}
+
 export async function createGmailLabel(
   accessToken: string,
   params: { name: string; color?: GmailLabelColor },

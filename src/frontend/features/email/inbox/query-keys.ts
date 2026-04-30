@@ -6,6 +6,8 @@ export const emailQueryKeys = {
     ["emails", view, mailboxId, scope] as const,
   listBase: (view: string, mailboxId: number) =>
     ["emails", view, mailboxId, "__base__"] as const,
+  inboxUnreadCount: (mailboxId: number) =>
+    ["emails", "inbox-unread-count", mailboxId] as const,
   detail: (emailId: string) => ["email-detail", emailId] as const,
   thread: (threadId: string) => ["email-thread", threadId] as const,
   calendarInvitePreview: (mailboxId: number, providerMessageId: string) =>

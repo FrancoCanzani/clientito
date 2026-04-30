@@ -42,7 +42,7 @@ export function groupEmailsByThread(emails: EmailListItem[]): ThreadGroup[] {
 
       return {
         representative: emailsByMostRecent[0]!,
-        threadCount: emailsByMostRecent.length,
+        threadCount: emailsByMostRecent[0]?.threadCount ?? emailsByMostRecent.length,
         threadId,
         emails: emailsByMostRecent,
       };

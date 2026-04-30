@@ -1,4 +1,6 @@
 import { ArrowBendUpLeftIcon, XIcon } from "@phosphor-icons/react";
+import { useAuth } from "@/hooks/use-auth";
+import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import {
   useEffect,
   forwardRef,
@@ -7,7 +9,12 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ComposeInitial, EmailDetailItem, EmailListItem } from "../../types";
+import type {
+  ComposeInitial,
+  EmailDetailItem,
+  EmailListItem,
+  EmailThreadItem,
+} from "../../types";
 import { formatQuotedDate } from "../../utils/formatters";
 import { ComposeEmailFields } from "../compose/compose-email-fields";
 import { useComposeEmail } from "../compose/compose-email-state";
@@ -41,10 +48,30 @@ function buildReplyInitial(
   };
 }
 
+function pickReplySource(
+  fallback: EmailListItem,
+  threadMessages: EmailThreadItem[],
+  selfEmails: Set<string>,
+): EmailListItem {
+  const sorted = [...threadMessages].sort((left, right) => {
+    if (right.date !== left.date) return right.date - left.date;
+    return right.createdAt - left.createdAt;
+  });
+  return (
+    sorted.find((message) => !selfEmails.has(message.fromAddr.toLowerCase())) ??
+    sorted[0] ??
+    fallback
+  );
+}
+
 export const QuickReply = forwardRef<
   QuickReplyHandle,
-  { email: EmailListItem; detail?: EmailDetailItem | null }
->(function QuickReply({ email, detail }, ref) {
+  {
+    email: EmailListItem;
+    detail?: EmailDetailItem | null;
+    threadMessages?: EmailThreadItem[];
+  }
+>(function QuickReply({ email, detail, threadMessages = [] }, ref) {
   const [open, setOpen] = useState(false);
   const [pendingDraft, setPendingDraft] = useState<{
     id: number;
@@ -63,7 +90,7 @@ export const QuickReply = forwardRef<
       setOpen(true);
       requestAnimationFrame(() => {
         containerRef.current?.scrollIntoView({
-          behavior: "instant",
+          behavior: "auto",
           block: "end",
         });
       });
@@ -89,6 +116,7 @@ export const QuickReply = forwardRef<
       <QuickReplyComposer
         email={email}
         detail={detail}
+        threadMessages={threadMessages}
         pendingDraft={pendingDraft}
         onDraftApplied={() => setPendingDraft(null)}
         onClose={() => setOpen(false)}
@@ -100,19 +128,38 @@ export const QuickReply = forwardRef<
 function QuickReplyComposer({
   email,
   detail,
+  threadMessages,
   pendingDraft,
   onDraftApplied,
   onClose,
 }: {
   email: EmailListItem;
   detail?: EmailDetailItem | null;
+  threadMessages: EmailThreadItem[];
   pendingDraft: { id: number; text: string } | null;
   onDraftApplied: () => void;
   onClose: () => void;
 }) {
+  const { user } = useAuth();
+  const mailboxesQuery = useMailboxes();
+  const selfEmails = useMemo(() => {
+    const emails = new Set<string>();
+    if (user?.email) emails.add(user.email.toLowerCase());
+    for (const account of mailboxesQuery.data?.accounts ?? []) {
+      const displayEmail = getMailboxDisplayEmail(account);
+      if (displayEmail) emails.add(displayEmail.toLowerCase());
+      if (account.email) emails.add(account.email.toLowerCase());
+      if (account.gmailEmail) emails.add(account.gmailEmail.toLowerCase());
+    }
+    return emails;
+  }, [mailboxesQuery.data?.accounts, user?.email]);
+  const replySource = useMemo(
+    () => pickReplySource(email, threadMessages, selfEmails),
+    [email, selfEmails, threadMessages],
+  );
   const initial = useMemo(
-    () => buildReplyInitial(email, detail),
-    [email, detail],
+    () => buildReplyInitial(replySource, replySource.id === detail?.id ? detail : null),
+    [replySource, detail],
   );
   const compose = useComposeEmail(initial, {
     onSent: onClose,

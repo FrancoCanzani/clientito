@@ -5,6 +5,7 @@ import { registerGetAttachment } from "./get-attachment";
 import { registerGetScheduledEmails } from "./get-scheduled";
 import { registerPatchEmail } from "./patch";
 import { registerBatchPatchEmails } from "./patch-batch";
+import { registerPatchThread } from "./patch-thread";
 import { registerPostEmail } from "./post";
 import { registerUploadAttachments } from "./post-attachments";
 
@@ -14,6 +15,7 @@ registerBatchPatchEmails(emailsRoutes);
 registerGetAttachment(emailsRoutes);
 registerUploadAttachments(emailsRoutes);
 registerGetScheduledEmails(emailsRoutes);
+registerPatchThread(emailsRoutes);
 registerPatchEmail(emailsRoutes);
 registerDeleteEmail(emailsRoutes);
 registerPostEmail(emailsRoutes);

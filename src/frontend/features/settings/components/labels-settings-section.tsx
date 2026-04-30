@@ -43,7 +43,7 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
     staleTime: 60_000,
   });
 
-  const labels = labelsQuery.data ?? [];
+  const labels = (labelsQuery.data ?? []).filter((label) => label.type === "user");
 
   async function handleCreate() {
     const name = newName.trim();

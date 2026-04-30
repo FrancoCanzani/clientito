@@ -8,8 +8,8 @@ export type AttachmentFile = {
   size: number;
 };
 
-export function useAttachmentUpload() {
-  const [files, setFiles] = useState<AttachmentFile[]>([]);
+export function useAttachmentUpload(initialFiles: AttachmentFile[] = []) {
+  const [files, setFiles] = useState<AttachmentFile[]>(initialFiles);
   const [uploading, setUploading] = useState(false);
 
   const addFiles = useCallback(async (inputFiles: FileList | File[]) => {

@@ -6,7 +6,7 @@ export const EMAIL_CONTENT_SHADOW_STYLE = `
     color: inherit;
     font-size: 12px;
     line-height: 1.45;
-    overflow-x: hidden;
+    overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
   }
@@ -22,31 +22,35 @@ export const EMAIL_CONTENT_SHADOW_STYLE = `
   :host {
     color: inherit;
     font-family: inherit;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  p, div, span, li, blockquote, pre {
     overflow-wrap: anywhere;
     word-break: break-word;
   }
 
-  p, div, span, td, th, li, blockquote, pre {
-    overflow-wrap: anywhere;
-    word-break: break-word;
+  td, th {
+    overflow-wrap: normal;
+    word-break: normal;
   }
 
   table {
     border-collapse: collapse;
     table-layout: auto;
-    max-width: 100% !important;
+    max-width: none !important;
   }
 
   [data-transactional-table='true'] {
-    width: 100% !important;
-    max-width: 100% !important;
+    max-width: none !important;
     table-layout: auto !important;
   }
 
   [data-transactional-cell='true'] {
     vertical-align: top;
-    overflow-wrap: anywhere;
-    word-break: break-word;
+    overflow-wrap: normal;
+    word-break: normal;
   }
 
   [data-transactional-tight='true'] {
@@ -91,15 +95,8 @@ export const EMAIL_CONTENT_SHADOW_STYLE = `
   }
 
   @media (max-width: 640px) {
-    [data-transactional-stack='true'] tr {
-      display: block !important;
-      width: 100% !important;
-    }
-
-    [data-transactional-stack='true'] td,
-    [data-transactional-stack='true'] th {
-      display: block !important;
-      width: 100% !important;
+    :host {
+      overflow-x: auto;
     }
   }
 `;

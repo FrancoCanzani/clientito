@@ -1,5 +1,6 @@
 import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import type { EmailInboxAction } from "@/features/email/inbox/hooks/use-email-inbox-actions";
+import type { ThreadIdentifier } from "@/features/email/inbox/mutations";
 import { fetchEmailDetail } from "@/features/email/inbox/queries";
 import type { EmailListItem } from "@/features/email/inbox/types";
 import type { ThreadGroup } from "@/features/email/inbox/utils/group-emails-by-thread";
@@ -15,7 +16,11 @@ type InboxHotkeysOptions = {
   groups: ThreadGroup[];
   view: string;
   onOpen: (email: EmailListItem) => void;
-  onAction: (action: EmailInboxAction, ids?: string[]) => void;
+  onAction: (
+    action: EmailInboxAction,
+    ids?: string[],
+    thread?: ThreadIdentifier,
+  ) => void;
   onCompose: () => void;
   onSearch: () => void;
   onFocusChange?: (emailId: string | null) => void;
@@ -46,6 +51,7 @@ export function useInboxHotkeys({
 
   lastIndexRef.current = focusedIndex;
   const focusedEmail = groups[focusedIndex]?.representative ?? null;
+  const focusedGroup = groups[focusedIndex] ?? null;
 
   const moveFocus = (next: number) => {
     const clamped = Math.max(0, Math.min(next, groups.length - 1));
@@ -79,7 +85,14 @@ export function useInboxHotkeys({
             view === "archived" || view === "trash"
               ? "move-to-inbox"
               : "archive",
-            [focusedEmail.id],
+            focusedGroup?.emails.map((email) => email.id) ?? [focusedEmail.id],
+            focusedGroup?.threadId && focusedEmail.mailboxId
+              ? {
+                  threadId: focusedGroup.threadId,
+                  mailboxId: focusedEmail.mailboxId,
+                  labelIds: focusedEmail.labelIds,
+                }
+              : undefined,
           );
         }
       },
@@ -90,7 +103,14 @@ export function useInboxHotkeys({
         if (focusedEmail) {
           onAction(
             focusedEmail.isRead ? "mark-unread" : "mark-read",
-            [focusedEmail.id],
+            focusedGroup?.emails.map((email) => email.id) ?? [focusedEmail.id],
+            focusedGroup?.threadId && focusedEmail.mailboxId
+              ? {
+                  threadId: focusedGroup.threadId,
+                  mailboxId: focusedEmail.mailboxId,
+                  labelIds: focusedEmail.labelIds,
+                }
+              : undefined,
           );
         }
       },
