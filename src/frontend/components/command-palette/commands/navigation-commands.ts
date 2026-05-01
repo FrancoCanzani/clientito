@@ -1,6 +1,8 @@
 import {
   BookOpenIcon,
+  BookmarkSimpleIcon,
   CheckIcon,
+  ClockIcon,
   FileDashedIcon,
   FlagIcon,
   GearIcon,
@@ -90,7 +92,10 @@ function navigateToMailboxPath(
   mailboxId: number,
   to:
     | "/$mailboxId/inbox/drafts"
-    | "/$mailboxId/inbox/search",
+    | "/$mailboxId/inbox/search"
+    | "/$mailboxId/focus"
+    | "/$mailboxId/todo"
+    | "/$mailboxId/reminders",
   services: CommandServices,
 ) {
   services.navigate({
@@ -108,6 +113,30 @@ const navigationCommands: Command[] = [
     keywords: ["inbox", "home"],
     when: (ctx) => ctx.currentView !== "inbox",
     perform: (mailboxId, services) => navigateToInbox(mailboxId, services),
+  }),
+  makeNavCommand({
+    id: "nav:focus",
+    label: "Focus",
+    icon: paletteIcon(FlagIcon),
+    keywords: ["focus", "process"],
+    perform: (mailboxId, services) =>
+      navigateToMailboxPath(mailboxId, "/$mailboxId/focus", services),
+  }),
+  makeNavCommand({
+    id: "nav:todo",
+    label: "To do",
+    icon: paletteIcon(BookmarkSimpleIcon),
+    keywords: ["todo", "to-do", "task"],
+    perform: (mailboxId, services) =>
+      navigateToMailboxPath(mailboxId, "/$mailboxId/todo", services),
+  }),
+  makeNavCommand({
+    id: "nav:reminders",
+    label: "Reminders",
+    icon: paletteIcon(ClockIcon),
+    keywords: ["reminders", "snoozed", "later"],
+    perform: (mailboxId, services) =>
+      navigateToMailboxPath(mailboxId, "/$mailboxId/reminders", services),
   }),
   makeNavCommand({
     id: "nav:important",

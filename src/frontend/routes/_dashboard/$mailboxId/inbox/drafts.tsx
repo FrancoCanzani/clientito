@@ -1,6 +1,6 @@
 import { draftQueryKeys } from "@/features/email/inbox/query-keys";
 import { Error as RouteError } from "@/components/error";
-import DraftsPage from "@/features/email/inbox/pages/drafts-page";
+import DraftsPage from "@/features/email/drafts/pages/drafts-page";
 import { fetchDrafts } from "@/features/email/inbox/queries";
 import { createFileRoute } from "@tanstack/react-router";
 

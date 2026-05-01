@@ -12,6 +12,7 @@ import type {
   EmailListPage,
 } from "@/features/email/inbox/types";
 import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
+import { unsubscribe } from "@/features/email/subscriptions/queries";
 import {
   useMutation,
   useQueryClient,
@@ -20,6 +21,7 @@ import {
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { toast } from "sonner";
+import { useTodoLabel } from "@/features/email/todo/hooks/use-todo-label";
 import { useUndoAction } from "./use-undo-action";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
@@ -234,5 +236,51 @@ export function useEmailInboxActions({
     [mailboxId, mutation, queryClient, undoAction, view],
   );
 
-  return { openEmail, executeEmailAction };
+  const todo = useTodoLabel(mailboxId);
+
+  const snooze = useCallback(
+    async (
+      target:
+        | { kind: "email"; identifier: EmailIdentifier }
+        | { kind: "thread"; thread: ThreadIdentifier },
+      timestamp: number | null,
+    ) => {
+      try {
+        if (target.kind === "thread") {
+          await patchThread(target.thread, { snoozedUntil: timestamp });
+        } else {
+          await patchEmail(target.identifier, { snoozedUntil: timestamp });
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to snooze");
+      }
+    },
+    [],
+  );
+
+  const unsubscribeMutation = useMutation({
+    mutationFn: (email: EmailListItem) =>
+      unsubscribe({
+        fromAddr: email.fromAddr,
+        unsubscribeUrl: email.unsubscribeUrl ?? undefined,
+        unsubscribeEmail: email.unsubscribeEmail ?? undefined,
+      }),
+    onSuccess: (result) => {
+      if (result.method === "manual" && result.url) {
+        window.open(result.url, "_blank", "noopener,noreferrer");
+        toast.info("Opened unsubscribe page");
+        return;
+      }
+      toast.success("Unsubscribed");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  return {
+    openEmail,
+    executeEmailAction,
+    snooze,
+    todo,
+    unsubscribe: unsubscribeMutation,
+  };
 }

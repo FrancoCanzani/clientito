@@ -20,7 +20,7 @@ import type {
   InboxSearchSuggestionsResponse,
 } from "./types";
 
-const VIEW_PAGE_SIZE = 100;
+const VIEW_PAGE_SIZE = 50;
 
 const ACTIVE_USER_KEY = "active-user-id";
 const CLASSIFICATION_MAX_CONCURRENCY = 2;
@@ -569,10 +569,10 @@ const enqueueThreadClassification = asyncQueue<ThreadClassificationTask>(
   },
 );
 
-function isMailboxAiEnabled(mailboxId: number): boolean {
+function isMailboxClassificationEnabled(mailboxId: number): boolean {
   const cached = queryClient.getQueryData(accountsQueryOptions.queryKey);
   const account = cached?.accounts.find((a) => a.mailboxId === mailboxId);
-  return account?.aiEnabled ?? true;
+  return account?.aiClassificationEnabled ?? false;
 }
 
 function enqueueClassificationTasks(
@@ -580,7 +580,7 @@ function enqueueClassificationTasks(
   userId: string,
   mailboxId: number,
 ): void {
-  if (!isMailboxAiEnabled(mailboxId)) return;
+  if (!isMailboxClassificationEnabled(mailboxId)) return;
   const tasks = buildClassificationTasks(pulled, userId, mailboxId);
   if (tasks.length === 0) return;
 
@@ -901,11 +901,6 @@ export async function fetchViewPage(params: {
     splitRule,
   });
 
-  // On first page, refresh from server in background to catch new mail.
-  if (!decoded) {
-    void refreshViewFromServer(userId, params.mailboxId, params.view);
-  }
-
   if (local.data.length === 0) {
     if (splitScoped) {
       // Seed local cache from provider, then re-run the split-filtered local query.
@@ -940,6 +935,10 @@ export async function fetchViewPage(params: {
     });
   }
 
+  if (!decoded) {
+    void refreshViewFromServer(userId, params.mailboxId, params.view);
+  }
+
   const lastDate =
     local.pagination.cursor?.date ??
     local.data[local.data.length - 1]?.date;
@@ -959,7 +958,6 @@ export async function fetchViewPage(params: {
     return { emails: local.data, cursor: null };
   }
 
-  // Local exhausted — next page switches to server, anchored at oldest local row.
   return {
     emails: local.data,
     cursor: encodeViewCursor({
@@ -967,6 +965,77 @@ export async function fetchViewPage(params: {
       beforeMs: lastDate ?? undefined,
     }),
   };
+}
+
+export async function fetchLocalViewPage(params: {
+  mailboxId: number;
+  view: string;
+  cursor?: string;
+  limit?: number;
+  splitRule?: SplitRule | null;
+}): Promise<ViewPage> {
+  const userId = await getCurrentUserId();
+  if (!userId) return { emails: [], cursor: null };
+
+  await alignActiveUser(userId);
+
+  const decoded = decodeViewCursor(params.cursor);
+  const localCursor =
+    decoded?.type === "local"
+      ? "beforeDate" in decoded
+        ? {
+            date: decoded.beforeDate,
+            id: decoded.beforeId,
+          }
+        : typeof decoded.beforeMs === "number"
+          ? { date: decoded.beforeMs }
+          : undefined
+      : undefined;
+
+  const local = await localDb.getEmails({
+    userId,
+    mailboxId: params.mailboxId,
+    view: params.view,
+    limit: params.limit ?? VIEW_PAGE_SIZE,
+    cursor: localCursor,
+    splitRule: params.splitRule ?? null,
+  });
+
+  if (local.pagination.hasMore && local.pagination.cursor) {
+    return {
+      emails: local.data,
+      cursor: encodeViewCursor({
+        type: "local",
+        beforeDate: local.pagination.cursor.date,
+        beforeId: local.pagination.cursor.id,
+      }),
+    };
+  }
+
+  return { emails: local.data, cursor: null };
+}
+
+export async function fetchAllLocalViewEmails(params: {
+  mailboxId: number;
+  view: string;
+  pageSize?: number;
+}): Promise<ViewPage> {
+  const emails: EmailListItem[] = [];
+  let cursor: string | undefined;
+  const pageSize = params.pageSize ?? VIEW_PAGE_SIZE;
+
+  do {
+    const page = await fetchLocalViewPage({
+      mailboxId: params.mailboxId,
+      view: params.view,
+      cursor,
+      limit: pageSize,
+    });
+    emails.push(...page.emails);
+    cursor = page.cursor ?? undefined;
+  } while (cursor);
+
+  return { emails, cursor: null };
 }
 
 export async function fetchSearchEmails(

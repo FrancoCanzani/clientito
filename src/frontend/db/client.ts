@@ -420,7 +420,7 @@ function buildViewConditions(view: ViewFilter, now: number): SqlFragment[] {
         { sql: "has_inbox = 1", params: [] },
         { sql: "(snoozed_until IS NULL OR snoozed_until <= ?)", params: [now] },
         {
-          sql: "EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value = ?)",
+          sql: "EXISTS (SELECT 1 FROM email_labels WHERE email_labels.email_id = emails.id AND email_labels.label_id = ?)",
           params: ["IMPORTANT"],
         },
       ];
@@ -428,7 +428,7 @@ function buildViewConditions(view: ViewFilter, now: number): SqlFragment[] {
       if (typeof view === "string" && view.startsWith("Label_")) {
         return [
           {
-            sql: "EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value = ?)",
+            sql: "EXISTS (SELECT 1 FROM email_labels WHERE email_labels.email_id = emails.id AND email_labels.label_id = ?)",
             params: [view],
           },
         ];
@@ -496,12 +496,12 @@ function buildSplitRuleConditions(rule: SplitRule): SqlFragment[] {
 
   if (rule.hasAttachment === true) {
     fragments.push({
-      sql: "EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value = ?)",
+      sql: "EXISTS (SELECT 1 FROM email_labels WHERE email_labels.email_id = emails.id AND email_labels.label_id = ?)",
       params: [HAS_ATTACHMENT_LABEL],
     });
   } else if (rule.hasAttachment === false) {
     fragments.push({
-      sql: "NOT EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value = ?)",
+      sql: "NOT EXISTS (SELECT 1 FROM email_labels WHERE email_labels.email_id = emails.id AND email_labels.label_id = ?)",
       params: [HAS_ATTACHMENT_LABEL],
     });
   }
@@ -523,7 +523,7 @@ function buildSplitRuleConditions(rule: SplitRule): SqlFragment[] {
     if (labels.length) {
       const placeholders = labels.map(() => "?").join(", ");
       fragments.push({
-        sql: `EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value IN (${placeholders}))`,
+        sql: `EXISTS (SELECT 1 FROM email_labels WHERE email_labels.email_id = emails.id AND email_labels.label_id IN (${placeholders}))`,
         params: labels,
       });
     }
@@ -646,6 +646,76 @@ async function updateEmailByIds(
     [...update.params, userId, ...emailIds],
     "run",
   );
+  if (set.labelIds !== undefined) {
+    await replaceEmailLabelRowsByIds(userId, emailIds);
+  }
+}
+
+async function replaceEmailLabelRowsByIds(
+  userId: string,
+  emailIds: number[],
+): Promise<void> {
+  if (emailIds.length === 0) return;
+  const placeholders = emailIds.map(() => "?").join(", ");
+  const res = await dbClient.exec(
+    `SELECT id, user_id, mailbox_id, label_ids, date FROM emails WHERE user_id = ? AND id IN (${placeholders})`,
+    [userId, ...emailIds],
+    "rows",
+  );
+  const rows = rowsToObjects<{
+    id: number;
+    userId: string;
+    mailboxId: number | null;
+    labelIds: string | null;
+    date: number;
+  }>(res);
+  await replaceEmailLabelRows(rows);
+}
+
+async function replaceEmailLabelRowsByProviderIds(
+  providerMessageIds: string[],
+): Promise<void> {
+  if (providerMessageIds.length === 0) return;
+  const placeholders = providerMessageIds.map(() => "?").join(", ");
+  const res = await dbClient.exec(
+    `SELECT id, user_id, mailbox_id, label_ids, date FROM emails WHERE provider_message_id IN (${placeholders})`,
+    providerMessageIds,
+    "rows",
+  );
+  const rows = rowsToObjects<{
+    id: number;
+    userId: string;
+    mailboxId: number | null;
+    labelIds: string | null;
+    date: number;
+  }>(res);
+  await replaceEmailLabelRows(rows);
+}
+
+async function replaceEmailLabelRows(
+  rows: Array<{
+    id: number;
+    userId: string;
+    mailboxId: number | null;
+    labelIds: string | null;
+    date: number;
+  }>,
+): Promise<void> {
+  if (rows.length === 0) return;
+  const steps: Array<{ sql: string; params?: BindParam[]; mode?: "run" }> = [];
+  for (const row of rows) {
+    steps.push({
+      sql: "DELETE FROM email_labels WHERE email_id = ?",
+      params: [row.id],
+    });
+    for (const labelId of parseLabelIds(row.labelIds)) {
+      steps.push({
+        sql: "INSERT OR IGNORE INTO email_labels (email_id, user_id, mailbox_id, label_id, date) VALUES (?, ?, ?, ?, ?)",
+        params: [row.id, row.userId, row.mailboxId ?? null, labelId, row.date],
+      });
+    }
+  }
+  await dbClient.batch(steps);
 }
 
 export const localDb = {
@@ -688,7 +758,7 @@ export const localDb = {
     if (starred) fragments.push({ sql: "has_starred = 1", params: [] });
     if (hasAttachment)
       fragments.push({
-        sql: "EXISTS (SELECT 1 FROM json_each(label_ids) WHERE value = ?)",
+        sql: "EXISTS (SELECT 1 FROM email_labels WHERE email_labels.email_id = emails.id AND email_labels.label_id = ?)",
         params: [HAS_ATTACHMENT_LABEL],
       });
 
@@ -870,6 +940,7 @@ export const localDb = {
         "run",
       );
     }
+    await replaceEmailLabelRowsByIds(userId, rows.map((row) => row.id));
   },
 
   async getGatekeptSenders(userId: string, mailboxId: number): Promise<string[]> {
@@ -1230,6 +1301,7 @@ export const localDb = {
       await insertBatch(free, true);
       await insertBatch(pending, false);
     }
+    await replaceEmailLabelRowsByProviderIds(rows.map((row) => row.providerMessageId));
   },
 
   async searchEmails(params: {
@@ -1808,11 +1880,17 @@ export const localDb = {
       const chunk = providerMessageIds.slice(i, i + CHUNK);
       const placeholders = chunk.map(() => "?").join(", ");
       await dbClient.exec(
+        `DELETE FROM email_labels WHERE email_id IN (SELECT id FROM emails WHERE provider_message_id IN (${placeholders}))`,
+        chunk,
+        "run",
+      );
+      await dbClient.exec(
         `DELETE FROM emails WHERE provider_message_id IN (${placeholders})`,
         chunk,
         "run",
       );
     }
+    await replaceEmailLabelRowsByProviderIds(providerMessageIds);
   },
 
   async addLabelToEmails(providerMessageIds: string[], labelId: string): Promise<void> {
@@ -1835,6 +1913,7 @@ export const localDb = {
         "run",
       );
     }
+    await replaceEmailLabelRowsByProviderIds(providerMessageIds);
   },
 
   async removeLabelFromEmails(providerMessageIds: string[], labelId: string): Promise<void> {
@@ -1857,6 +1936,7 @@ export const localDb = {
         "run",
       );
     }
+    await replaceEmailLabelRowsByProviderIds(providerMessageIds);
   },
 
   async listSplitViews(userId: string): Promise<SplitViewRow[]> {

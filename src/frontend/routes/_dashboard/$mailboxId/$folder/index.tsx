@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/$folder/")({
   skipRouteOnParseError: { params: true },
   loader: async ({ context, params }) => {
     await context.queryClient.ensureInfiniteQueryData({
-      queryKey: emailQueryKeys.listBase(params.folder, params.mailboxId),
+      queryKey: emailQueryKeys.list(params.folder, params.mailboxId),
       queryFn: ({ pageParam }) =>
         fetchViewPage({
           view: params.folder,

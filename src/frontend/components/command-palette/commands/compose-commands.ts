@@ -19,6 +19,22 @@ const composeCommands: Command[] = [
     },
   },
   {
+    id: "compose:feedback",
+    label: "Send feedback",
+    icon: paletteIcon(PencilSimpleIcon),
+    group: "email",
+    keywords: ["feedback", "bug", "support", "franco"],
+    when: (ctx) => ctx.defaultMailboxId != null && !ctx.composerOpen,
+    perform: (ctx, services) => {
+      openCompose({
+        mailboxId: ctx.defaultMailboxId ?? undefined,
+        to: "francocanzani@gmail.com",
+        subject: "Feedback",
+      });
+      services.close();
+    },
+  },
+  {
     id: "compose:reply",
     label: "Reply to email",
     icon: paletteIcon(ArrowBendUpLeftIcon),

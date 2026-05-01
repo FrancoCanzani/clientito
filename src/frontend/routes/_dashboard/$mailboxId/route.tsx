@@ -1,4 +1,4 @@
-import { InboxSidebarShell } from "@/features/email/inbox/sidebar/inbox-sidebar-shell";
+import { InboxHeaderShell } from "@/features/email/inbox/components/sidebar/inbox-header-shell";
 import { accountsQueryOptions } from "@/hooks/use-mailboxes";
 import {
   createFileRoute,
@@ -30,8 +30,8 @@ export const Route = createFileRoute("/_dashboard/$mailboxId")({
     }
   },
   component: () => (
-    <InboxSidebarShell>
+    <InboxHeaderShell>
       <Outlet />
-    </InboxSidebarShell>
+    </InboxHeaderShell>
   ),
 });

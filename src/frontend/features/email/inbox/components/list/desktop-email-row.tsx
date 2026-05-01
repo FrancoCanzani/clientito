@@ -28,6 +28,7 @@ export const DesktopEmailRow = memo(function DesktopEmailRow({
     participantLabel,
     subject,
     snippet,
+    aiSummary,
     aiCategoryLabel,
     handleMouseEnter,
     handleOpen,
@@ -121,7 +122,7 @@ export const DesktopEmailRow = memo(function DesktopEmailRow({
             rowActions={rowActions}
             onRunAction={runAction}
             onOpen={handleOpen}
-            summary={email.aiSummary}
+            summary={aiSummary}
           />
         )}
       </div>
@@ -140,10 +141,6 @@ function EmailRowActions({
   onOpen: () => void;
   summary: string | null;
 }) {
-  const summaryText = summary
-    ? summary.trim().replace(/\n{3,}/g, "\n\n")
-    : null;
-
   return (
     <div
       className="absolute right-0 top-1/2 flex h-8 -translate-y-1/2 items-center gap-0.5 rounded-md bg-muted px-1 shadow ring-1 ring-border/40 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
@@ -168,7 +165,7 @@ function EmailRowActions({
           </IconButton>
         );
       })}
-      {summaryText && (
+      {summary ? (
         <HoverCard openDelay={120}>
           <HoverCardTrigger asChild>
             <Button
@@ -188,10 +185,10 @@ function EmailRowActions({
             align="end"
             className="w-80 max-h-[70vh] overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed"
           >
-            {summaryText}
+            {summary}
           </HoverCardContent>
         </HoverCard>
-      )}
+      ) : null}
       <IconButton
         label="Open"
         shortcut="Enter"

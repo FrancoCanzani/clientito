@@ -24,6 +24,7 @@ type InboxHotkeysOptions = {
   onCompose: () => void;
   onSearch: () => void;
   onFocusChange?: (emailId: string | null) => void;
+  enabled?: boolean;
 };
 
 export function useInboxHotkeys({
@@ -34,6 +35,7 @@ export function useInboxHotkeys({
   onCompose,
   onSearch,
   onFocusChange,
+  enabled = true,
 }: InboxHotkeysOptions) {
   const queryClient = useQueryClient();
   const [focusedId, setFocusedId] = useState<string | null>(null);
@@ -62,15 +64,15 @@ export function useInboxHotkeys({
 
   useHotkeys({
     j: {
-      enabled: groups.length > 0,
+      enabled: enabled && groups.length > 0,
       onKeyDown: () => moveFocus(focusedIndex < 0 ? 0 : focusedIndex + 1),
     },
     k: {
-      enabled: groups.length > 0,
+      enabled: enabled && groups.length > 0,
       onKeyDown: () => moveFocus(focusedIndex < 0 ? 0 : focusedIndex - 1),
     },
     Enter: {
-      enabled: Boolean(focusedEmail),
+      enabled: enabled && Boolean(focusedEmail),
       onKeyDown: () => {
         if (focusedEmail) {
           onOpen(focusedEmail);
@@ -78,7 +80,7 @@ export function useInboxHotkeys({
       },
     },
     e: {
-      enabled: Boolean(focusedEmail),
+      enabled: enabled && Boolean(focusedEmail),
       onKeyDown: () => {
         if (focusedEmail) {
           onAction(
@@ -98,7 +100,7 @@ export function useInboxHotkeys({
       },
     },
     u: {
-      enabled: Boolean(focusedEmail),
+      enabled: enabled && Boolean(focusedEmail),
       onKeyDown: () => {
         if (focusedEmail) {
           onAction(
@@ -115,8 +117,12 @@ export function useInboxHotkeys({
         }
       },
     },
-    c: () => onCompose(),
+    c: {
+      enabled,
+      onKeyDown: () => onCompose(),
+    },
     "/": (e) => {
+      if (!enabled) return;
       e.preventDefault();
       onSearch();
     },
@@ -124,7 +130,7 @@ export function useInboxHotkeys({
 
   // Prefetch adjacent email details for instant navigation.
   useEffect(() => {
-    if (focusedIndex < 0) return;
+    if (!enabled || focusedIndex < 0) return;
     const neighbors = [focusedIndex - 1, focusedIndex + 1];
     for (const idx of neighbors) {
       const email = groups[idx]?.representative;
@@ -141,11 +147,13 @@ export function useInboxHotkeys({
         gcTime: 120_000,
       });
     }
-  }, [focusedIndex, groups, queryClient]);
+  }, [enabled, focusedIndex, groups, queryClient]);
 
   // Sync focused email to the global store for the command palette.
   useEffect(() => {
-    if (focusedEmail) {
+    if (!enabled) {
+      clearFocusedEmail();
+    } else if (focusedEmail) {
       setFocusedEmail({
         id: focusedEmail.id,
         fromAddr: focusedEmail.fromAddr,
@@ -157,7 +165,7 @@ export function useInboxHotkeys({
     } else {
       clearFocusedEmail();
     }
-  }, [focusedEmail]);
+  }, [enabled, focusedEmail]);
 
   // Clear on unmount.
   useEffect(() => {
@@ -166,8 +174,8 @@ export function useInboxHotkeys({
 
   // Reset focus when the list is fully swapped out (e.g. view change → empty).
   useEffect(() => {
-    if (groups.length === 0) setFocusedId(null);
-  }, [groups.length]);
+    if (!enabled || groups.length === 0) setFocusedId(null);
+  }, [enabled, groups.length]);
 
-  return { focusedIndex, setFocusedId };
+  return { focusedIndex: enabled ? focusedIndex : -1, setFocusedId };
 }

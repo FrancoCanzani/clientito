@@ -1,6 +1,6 @@
 # Inbox and Search
 
-Use this page to work faster in daily triage.
+Use this page to work faster in daily focus sessions.
 
 ## Inbox model
 
@@ -13,7 +13,7 @@ Petit splits mail into focused views:
 - Drafts: unsent work.
 - Spam/Trash: low-signal or deleted content.
 
-## Triage routine
+## Focus routine
 
 1. Start in Inbox.
 2. Open thread and act: reply, archive, or move.
@@ -36,7 +36,7 @@ For better results, use 2-4 specific words from subject or sender.
 - Filters automate labeling/handling.
 - Subscriptions view helps clean newsletter noise.
 
-Use both to reduce manual triage volume.
+Use both to reduce manual focus work.
 
 ## Keyboard and command palette
 

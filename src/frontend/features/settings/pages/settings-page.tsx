@@ -2,7 +2,6 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
 import { LabelsSettingsSection } from "@/features/settings/components/labels-settings-section";
@@ -84,7 +83,6 @@ export default function SettingsPage() {
       <PageHeader
         title={
           <div className="flex items-center gap-2">
-            <SidebarTrigger className="md:hidden" />
             <span>Settings</span>
           </div>
         }

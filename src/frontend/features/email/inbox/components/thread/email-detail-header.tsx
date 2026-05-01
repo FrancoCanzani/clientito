@@ -1,5 +1,4 @@
 import { IconButton } from "@/components/ui/icon-button";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import type { EmailDetailItem } from "@/features/email/inbox/types";
 import { cn } from "@/lib/utils";
 import {
@@ -48,7 +47,6 @@ export function EmailDetailHeader({
     >
       <div className="flex w-full items-center justify-between gap-2">
         <div className="flex items-center gap-0.5">
-          <SidebarTrigger className="md:hidden" />
           <IconButton
             label="Back"
             shortcut="Esc"

@@ -1,5 +1,4 @@
 import { PageHeader } from "@/components/page-header";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { Link, useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -53,7 +52,6 @@ export function SettingsShell({ children }: { children: ReactNode }) {
       <PageHeader
         title={
           <div className="flex items-center gap-2">
-            <SidebarTrigger className="md:hidden" />
             <span>Settings</span>
           </div>
         }

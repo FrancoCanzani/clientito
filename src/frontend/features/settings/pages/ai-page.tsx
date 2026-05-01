@@ -1,7 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { SettingsSectionHeader } from "@/features/settings/components/settings-shell";
-import { updateMailboxAiEnabled } from "@/features/settings/mutations";
+import {
+  updateMailboxAiClassificationEnabled,
+  updateMailboxAiEnabled,
+} from "@/features/settings/mutations";
 import { accountQueryKeys } from "@/features/settings/query-keys";
 import { useMailboxes } from "@/hooks/use-mailboxes";
 import { SpinnerGapIcon } from "@phosphor-icons/react";
@@ -18,19 +21,34 @@ export default function AiPage() {
     accountsQuery.data?.accounts.find((entry) => entry.mailboxId === mailboxId) ??
     null;
 
-  const mutation = useMutation({
+  const composerMutation = useMutation({
     mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
       updateMailboxAiEnabled(id, enabled),
     onSuccess: async (_, variables) => {
       await queryClient.invalidateQueries({ queryKey: accountQueryKeys.all() });
       toast.success(
-        variables.enabled ? "AI features enabled" : "AI features disabled",
+        variables.enabled ? "Composer AI enabled" : "Composer AI disabled",
+      );
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const classificationMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
+      updateMailboxAiClassificationEnabled(id, enabled),
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: accountQueryKeys.all() });
+      toast.success(
+        variables.enabled
+          ? "Inbox classification enabled"
+          : "Inbox classification disabled",
       );
     },
     onError: (error) => toast.error(error.message),
   });
 
   const aiEnabled = account?.aiEnabled ?? true;
+  const aiClassificationEnabled = account?.aiClassificationEnabled ?? false;
 
   return (
     <section className="space-y-3">
@@ -47,23 +65,24 @@ export default function AiPage() {
         ) : !account || account.mailboxId == null ? (
           <p className="py-3 text-xs text-muted-foreground">Mailbox not found.</p>
         ) : (
-          <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-5 py-3">
             <div className="space-y-0.5">
-              <p className="text-xs font-medium">AI features</p>
+              <p className="text-xs font-medium">Composer AI</p>
               <p className="max-w-md text-xs text-muted-foreground">
-                Inbox classification, summaries, draft replies, and composer
-                writing tools (grammar, rewrite, tone). When off, none of these
-                run and no email content is sent to the AI provider.
+                Grammar, rewrite, tone, and other writing tools in compose.
               </p>
             </div>
-            <ButtonGroup className="w-full sm:w-auto">
+            <ButtonGroup className="w-full sm:w-fit">
               <Button
                 type="button"
                 size="sm"
                 variant={aiEnabled ? "default" : "outline"}
-                disabled={mutation.isPending || aiEnabled}
+                disabled={composerMutation.isPending || aiEnabled}
                 onClick={() =>
-                  mutation.mutate({ id: account.mailboxId!, enabled: true })
+                  composerMutation.mutate({
+                    id: account.mailboxId!,
+                    enabled: true,
+                  })
                 }
               >
                 On
@@ -72,9 +91,54 @@ export default function AiPage() {
                 type="button"
                 size="sm"
                 variant={!aiEnabled ? "default" : "outline"}
-                disabled={mutation.isPending || !aiEnabled}
+                disabled={composerMutation.isPending || !aiEnabled}
                 onClick={() =>
-                  mutation.mutate({ id: account.mailboxId!, enabled: false })
+                  composerMutation.mutate({
+                    id: account.mailboxId!,
+                    enabled: false,
+                  })
+                }
+              >
+                Off
+              </Button>
+            </ButtonGroup>
+
+            <div className="space-y-0.5">
+              <p className="text-xs font-medium">Inbox classification</p>
+              <p className="max-w-md text-xs text-muted-foreground">
+                Background inbox classification, summaries, and draft-reply
+                suggestions.
+              </p>
+            </div>
+            <ButtonGroup className="w-full sm:w-fit">
+              <Button
+                type="button"
+                size="sm"
+                variant={aiClassificationEnabled ? "default" : "outline"}
+                disabled={
+                  classificationMutation.isPending || aiClassificationEnabled
+                }
+                onClick={() =>
+                  classificationMutation.mutate({
+                    id: account.mailboxId!,
+                    enabled: true,
+                  })
+                }
+              >
+                On
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={!aiClassificationEnabled ? "default" : "outline"}
+                disabled={
+                  classificationMutation.isPending || !aiClassificationEnabled
+                }
+                onClick={() =>
+                  classificationMutation.mutate({
+                    id: account.mailboxId!,
+                    enabled: false,
+                  })
                 }
               >
                 Off

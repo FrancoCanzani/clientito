@@ -6,14 +6,13 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
 import { TrashIcon } from "@phosphor-icons/react";
 import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
-import { deleteDraft } from "../queries";
-import type { ComposeInitial, DraftItem } from "../types";
-import { htmlToPlainText } from "../utils/html-to-plain-text";
+import { deleteDraft } from "@/features/email/inbox/queries";
+import type { ComposeInitial, DraftItem } from "@/features/email/inbox/types";
+import { htmlToPlainText } from "@/features/email/inbox/utils/html-to-plain-text";
 
 const route = getRouteApi("/_dashboard/$mailboxId/inbox/drafts");
 
@@ -49,10 +48,9 @@ export default function DraftsPage() {
     <>
       <PageHeader
         title={
-          <div className="flex items-center gap-2">
-            <SidebarTrigger className="md:hidden" />
+          <span className="flex min-w-0 items-center gap-2">
             <span>Drafts</span>
-          </div>
+          </span>
         }
       />
 

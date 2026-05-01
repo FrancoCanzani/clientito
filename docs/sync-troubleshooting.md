@@ -2,7 +2,7 @@
 
 Use this page when mailbox data looks stale, missing, or broken.
 
-## Quick triage
+## Quick focus checks
 
 1. Confirm correct mailbox selected.
 2. Check network and refresh app.

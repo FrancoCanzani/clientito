@@ -1,46 +1,43 @@
 import { SnoozePicker } from "@/components/snooze-picker";
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
+import { TriageActionButton } from "@/features/email/components/triage-action-button";
+import { MessageBody } from "@/features/email/inbox/components/renderer/message-body";
 import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
 import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
-import {
-  patchEmail,
-  patchThread,
-  sendEmail,
-} from "@/features/email/inbox/mutations";
-import { MessageBody } from "@/features/email/inbox/components/renderer/message-body";
-import { emailQueryKeys } from "@/features/email/inbox/query-keys";
+import { sendEmail } from "@/features/email/inbox/mutations";
 import { fetchEmailDetail } from "@/features/email/inbox/queries";
+import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import type { EmailListItem } from "@/features/email/inbox/types";
-import type { ThreadGroup } from "@/features/email/inbox/utils/group-emails-by-thread";
 import { formatEmailDetailDate } from "@/features/email/inbox/utils/formatters";
+import type { ThreadGroup } from "@/features/email/inbox/utils/group-emails-by-thread";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { cn } from "@/lib/utils";
-import {
-  ArrowBendUpLeftIcon,
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  CheckIcon,
-  ClockIcon,
-} from "@phosphor-icons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, getRouteApi } from "@tanstack/react-router";
+import { getRouteApi } from "@tanstack/react-router";
 import {
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type RefObject,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { toast } from "sonner";
 
-const route = getRouteApi("/_dashboard/$mailboxId/triage");
+const route = getRouteApi("/_dashboard/$mailboxId/focus");
 
 const QUICK_REPLY_LIMIT = 140;
 const PREFETCH_THRESHOLD = 5;
@@ -73,7 +70,7 @@ function getThreadContext(group: ThreadGroup) {
   };
 }
 
-export default function TriagePage() {
+export default function FocusPage() {
   const { mailboxId } = route.useParams();
   const navigate = route.useNavigate();
   const queryClient = useQueryClient();
@@ -89,15 +86,12 @@ export default function TriagePage() {
     mailboxId,
   });
 
-  // Triage processes the unread set you arrived with. Emails get marked read as
-  // you walk through them, but they stay in the queue so you can re-visit until
-  // you Done/Snooze them. New unread emails fetched mid-session are appended.
   const seenIdsRef = useRef<Set<string>>(new Set());
-  const [triageIds, setTriageIds] = useState<Set<string>>(new Set());
+  const [focusIds, setFocusIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let changed = false;
-    const next = new Set(triageIds);
+    const next = new Set(focusIds);
     for (const group of threadGroups) {
       const id = group.representative.id;
       if (seenIdsRef.current.has(id)) continue;
@@ -107,23 +101,23 @@ export default function TriagePage() {
         changed = true;
       }
     }
-    if (changed) setTriageIds(next);
-  }, [threadGroups, triageIds]);
+    if (changed) setFocusIds(next);
+  }, [threadGroups, focusIds]);
 
   const queue = useMemo(
-    () =>
-      threadGroups.filter((group) =>
-        triageIds.has(group.representative.id),
-      ),
-    [threadGroups, triageIds],
+    () => threadGroups.filter((group) => focusIds.has(group.representative.id)),
+    [threadGroups, focusIds],
   );
 
   const [cursorId, setCursorId] = useState<string | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
+  const [unsubscribeConfirmOpen, setUnsubscribeConfirmOpen] = useState(false);
 
   const cursorIndex = useMemo(() => {
     if (!cursorId) return 0;
-    const idx = queue.findIndex((group) => group.representative.id === cursorId);
+    const idx = queue.findIndex(
+      (group) => group.representative.id === cursorId,
+    );
     return idx === -1 ? 0 : idx;
   }, [cursorId, queue]);
 
@@ -168,7 +162,12 @@ export default function TriagePage() {
     if (prev) setCursorId(prev.id);
   }, [cursorIndex, queue]);
 
-  const { executeEmailAction } = useEmailInboxActions({
+  const {
+    executeEmailAction,
+    snooze,
+    todo,
+    unsubscribe: unsubscribeMutation,
+  } = useEmailInboxActions({
     view: "inbox",
     mailboxId,
   });
@@ -183,33 +182,43 @@ export default function TriagePage() {
     advance();
   }, [advance, current, currentGroup, executeEmailAction]);
 
+  const handleTodo = useCallback(() => {
+    if (!currentGroup) return;
+    void todo
+      .add(currentGroup.emails)
+      .catch((error: Error) =>
+        toast.error(error.message || "Failed to mark to-do"),
+      );
+    advance();
+  }, [advance, currentGroup, todo]);
+
   const handleSnooze = useCallback(
     (timestamp: number) => {
       if (!current || current.mailboxId == null) return;
-      const mutation =
+      void snooze(
         current.threadId != null
-          ? patchThread(
-              {
+          ? {
+              kind: "thread",
+              thread: {
                 threadId: current.threadId,
                 mailboxId: current.mailboxId,
                 labelIds: current.labelIds,
               },
-              { snoozedUntil: timestamp },
-            )
-          : patchEmail(
-              {
+            }
+          : {
+              kind: "email",
+              identifier: {
                 id: current.id,
                 providerMessageId: current.providerMessageId,
                 mailboxId: current.mailboxId,
                 labelIds: current.labelIds,
               },
-              { snoozedUntil: timestamp },
-            );
-      mutation.catch(() => toast.error("Failed to snooze"));
-      toast.success("Snoozed");
+            },
+        timestamp,
+      );
       advance();
     },
-    [advance, current],
+    [advance, current, snooze],
   );
 
   const exitToInbox = useCallback(() => {
@@ -219,7 +228,7 @@ export default function TriagePage() {
     });
   }, [mailboxId, navigate]);
 
-  // Mark unread emails as read when they become the current triage email.
+  // Mark unread emails as read when they become the current focus email.
   useEffect(() => {
     if (!current || current.isRead) return;
     void executeEmailAction("mark-read", [current.id]);
@@ -231,7 +240,13 @@ export default function TriagePage() {
     if (cursorIndex >= queue.length - PREFETCH_THRESHOLD) {
       void fetchNextPage();
     }
-  }, [cursorIndex, fetchNextPage, hasNextPage, isFetchingNextPage, queue.length]);
+  }, [
+    cursorIndex,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    queue.length,
+  ]);
 
   useHotkeys(
     {
@@ -242,6 +257,7 @@ export default function TriagePage() {
       s: () => {
         snoozeButtonRef.current?.click();
       },
+      t: () => handleTodo(),
       j: () => advance(),
       ArrowDown: () => advance(),
       ArrowRight: () => advance(),
@@ -257,16 +273,13 @@ export default function TriagePage() {
   );
 
   if (isLoading) {
-    return (
-      <TriageShell mailboxId={mailboxId} body={null} footer={null} />
-    );
+    return <FocusShell body={null} footer={null} />;
   }
 
   if (!current) {
     return (
-      <TriageShell
-        mailboxId={mailboxId}
-        body={<TriageDone processed={triageIds.size} onExit={exitToInbox} />}
+      <FocusShell
+        body={<FocusDone processed={focusIds.size} onExit={exitToInbox} />}
         footer={null}
       />
     );
@@ -274,74 +287,93 @@ export default function TriagePage() {
 
   return (
     <>
-      <TriageShell
-        mailboxId={mailboxId}
+      <FocusShell
         progress={{
           index: cursorIndex,
           total: queue.length,
           hasMore: hasNextPage,
         }}
-        body={<TriageEmail key={current.id} email={current} />}
+        body={<FocusEmail key={current.id} email={current} />}
         footer={
-          <TriageActionBar
+          <FocusActionBar
             onDone={handleDone}
             onSnooze={handleSnooze}
             snoozeButtonRef={snoozeButtonRef}
             onKeep={advance}
             onReply={() => setReplyOpen(true)}
+            onTodo={handleTodo}
+            isTodo={todo.isTodo(current)}
+            onUnsubscribe={() => setUnsubscribeConfirmOpen(true)}
+            canUnsubscribe={Boolean(
+              current.unsubscribeUrl || current.unsubscribeEmail,
+            )}
+            actionsPending={todo.isPending || unsubscribeMutation.isPending}
           />
         }
       />
-      <TriageQuickReply
+      <FocusQuickReply
         email={current}
         open={replyOpen}
         onOpenChange={setReplyOpen}
         onSent={handleDone}
       />
+      <AlertDialog
+        open={unsubscribeConfirmOpen}
+        onOpenChange={setUnsubscribeConfirmOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Unsubscribe from {current.fromAddr}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You will be removed from this mailing list when a one-click or
+              mailto unsubscribe method is available.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setUnsubscribeConfirmOpen(false);
+                unsubscribeMutation.mutate(current, {
+                  onSuccess: (result) => {
+                    if (result.method !== "manual") handleDone();
+                  },
+                });
+              }}
+            >
+              Unsubscribe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
 
-function TriageShell({
-  mailboxId,
+function FocusShell({
   progress,
   body,
   footer,
 }: {
-  mailboxId: number;
   progress?: { index: number; total: number; hasMore: boolean };
   body: ReactNode;
   footer: ReactNode;
 }) {
   return (
-    <div className="grid h-dvh w-full grid-rows-[auto_1fr_auto] bg-background">
-      <header className="flex h-12 items-center justify-between border-b border-border/40 px-4 text-xs text-muted-foreground">
-        <Link
-          to="/$mailboxId/inbox"
-          params={{ mailboxId }}
-          className="flex items-center gap-1.5 transition-colors hover:text-foreground"
-        >
-          <ArrowLeftIcon className="size-3.5" />
-          <span>Inbox</span>
-        </Link>
-        <span className="font-medium tracking-wide uppercase text-foreground/50">
-          Triage
-        </span>
-        <div className="flex items-center gap-3 tabular-nums">
-          {progress && progress.total > 0 ? (
-            <span>
-              {progress.index + 1}
-              <span className="text-foreground/30">
-                {" "}
-                / {progress.total}
-                {progress.hasMore ? "+" : ""}
-              </span>
+    <div className="grid h-full w-full grid-rows-[auto_1fr_auto] bg-background">
+      <header className="flex h-7 items-center justify-end px-4 text-xs text-muted-foreground tabular-nums">
+        {progress && progress.total > 0 ? (
+          <span>
+            {progress.index + 1}
+            <span className="text-foreground/30">
+              {" "}
+              / {progress.total}
+              {progress.hasMore ? "+" : ""}
             </span>
-          ) : (
-            <span className="opacity-0">0 / 0</span>
-          )}
-          <Kbd>Esc</Kbd>
-        </div>
+          </span>
+        ) : null}
       </header>
       <main className="min-h-0 overflow-y-auto">{body}</main>
       {footer}
@@ -349,7 +381,7 @@ function TriageShell({
   );
 }
 
-function TriageEmail({ email }: { email: EmailListItem }) {
+function FocusEmail({ email }: { email: EmailListItem }) {
   const { data: detail } = useQuery({
     queryKey: emailQueryKeys.detail(email.id),
     queryFn: () =>
@@ -372,9 +404,7 @@ function TriageEmail({ email }: { email: EmailListItem }) {
               {sender}
             </span>
             {senderEmail && (
-              <span className="truncate text-foreground/35">
-                {senderEmail}
-              </span>
+              <span className="truncate text-foreground/35">{senderEmail}</span>
             )}
           </div>
           <time className="shrink-0 tabular-nums">
@@ -401,94 +431,66 @@ function TriageEmail({ email }: { email: EmailListItem }) {
   );
 }
 
-function TriageActionBar({
+function FocusActionBar({
   onDone,
   onSnooze,
   snoozeButtonRef,
   onKeep,
   onReply,
+  onTodo,
+  isTodo,
+  onUnsubscribe,
+  canUnsubscribe,
+  actionsPending,
 }: {
   onDone: () => void;
   onSnooze: (timestamp: number) => void;
   snoozeButtonRef: RefObject<HTMLButtonElement | null>;
   onKeep: () => void;
   onReply: () => void;
+  onTodo: () => void;
+  isTodo: boolean;
+  onUnsubscribe: () => void;
+  canUnsubscribe: boolean;
+  actionsPending: boolean;
 }) {
   return (
     <footer className="border-t border-border/40 bg-background/85 backdrop-blur-md">
-      <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-3 px-4 py-3 sm:px-10">
-        <TriageActionButton
-          shortcut="R"
-          label="Reply"
-          icon={<ArrowBendUpLeftIcon className="size-3.5" />}
-          onClick={onReply}
-          accent
-        />
-        <TriageActionButton
-          shortcut="E"
-          label="Done"
-          icon={<CheckIcon className="size-3.5" />}
-          onClick={onDone}
-        />
+      <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-center gap-1.5 px-3 py-2 sm:px-10 sm:py-3">
+        <TriageActionButton label="Reply" shortcut="R" onClick={onReply} />
+        <TriageActionButton label="Done" shortcut="E" onClick={onDone} />
         <SnoozePicker onSnooze={onSnooze}>
-          <button
+          <Button
             ref={snoozeButtonRef}
+            variant="secondary"
+            size="sm"
             type="button"
-            className={triageActionClass()}
-            aria-label="Snooze"
           >
-            <span className="flex items-center gap-1.5">
-              <ClockIcon className="size-3.5" />
-              Snooze
-            </span>
+            <span>Snooze</span>
             <Kbd>S</Kbd>
-          </button>
+          </Button>
         </SnoozePicker>
         <TriageActionButton
-          shortcut="→"
-          label="Keep"
-          icon={<ArrowRightIcon className="size-3.5" />}
-          onClick={onKeep}
+          shortcut="T"
+          label={isTodo ? "To-do*" : "To-do"}
+          onClick={onTodo}
+          disabled={actionsPending}
         />
+        {canUnsubscribe && (
+          <TriageActionButton
+            shortcut="U"
+            label="Unsubscribe"
+            onClick={onUnsubscribe}
+            disabled={actionsPending}
+          />
+        )}
+        <TriageActionButton shortcut="J" label="Keep" onClick={onKeep} />
       </div>
     </footer>
   );
 }
 
-function triageActionClass(accent = false) {
-  return cn(
-    "group flex flex-1 min-w-0 items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs transition-[transform,color,background-color,border-color,opacity] duration-[140ms] ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]",
-    accent
-      ? "border-foreground/15 bg-foreground/5 text-foreground hover:border-foreground/30 hover:bg-foreground/8"
-      : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground",
-  );
-}
-
-function TriageActionButton({
-  shortcut,
-  label,
-  icon,
-  onClick,
-  accent = false,
-}: {
-  shortcut: string;
-  label: string;
-  icon: ReactNode;
-  onClick: () => void;
-  accent?: boolean;
-}) {
-  return (
-    <button type="button" onClick={onClick} className={triageActionClass(accent)}>
-      <span className="flex items-center gap-1.5">
-        {icon}
-        {label}
-      </span>
-      <Kbd>{shortcut}</Kbd>
-    </button>
-  );
-}
-
-function TriageQuickReply({
+function FocusQuickReply({
   email,
   open,
   onOpenChange,
@@ -544,7 +546,9 @@ function TriageQuickReply({
           textareaRef.current?.focus();
         }}
       >
-        <DialogTitle className="sr-only">Quick reply to {recipient}</DialogTitle>
+        <DialogTitle className="sr-only">
+          Quick reply to {recipient}
+        </DialogTitle>
         <div className="border-b border-border/40 px-5 py-3 text-xs text-muted-foreground">
           <span className="text-foreground/60">Reply to</span>{" "}
           <span className="font-medium text-foreground/80">{recipient}</span>
@@ -604,7 +608,7 @@ function TriageQuickReply({
   );
 }
 
-function TriageDone({
+function FocusDone({
   processed,
   onExit,
 }: {
@@ -622,7 +626,7 @@ function TriageDone({
       <p className="max-w-sm text-sm text-muted-foreground">
         {processed === 0
           ? "No unread mail. All caught up."
-          : `You triaged ${processed} ${processed === 1 ? "email" : "emails"}.`}
+          : `You focused ${processed} ${processed === 1 ? "email" : "emails"}.`}
       </p>
       <button
         type="button"

@@ -441,6 +441,14 @@ async function patchEmails(
       restoreInboxUnreadCount(mailboxId, unreadCountSnapshot);
     } else {
       invalidateInboxUnreadCount(mailboxId);
+      if (data.snoozedUntil !== undefined) {
+        void queryClient.invalidateQueries({
+          queryKey: emailQueryKeys.list("inbox", mailboxId),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: emailQueryKeys.list("snoozed", mailboxId),
+        });
+      }
     }
     clearPending(providerIds);
   }
@@ -501,6 +509,14 @@ export async function patchThread(
       });
     } else {
       invalidateInboxUnreadCount(thread.mailboxId);
+      if (data.snoozedUntil !== undefined) {
+        void queryClient.invalidateQueries({
+          queryKey: emailQueryKeys.list("inbox", thread.mailboxId),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: emailQueryKeys.list("snoozed", thread.mailboxId),
+        });
+      }
     }
   }
 }

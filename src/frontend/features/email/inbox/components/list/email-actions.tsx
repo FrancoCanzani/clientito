@@ -45,7 +45,7 @@ import {
   WarningIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useUndoAction } from "../../hooks/use-undo-action";
@@ -82,6 +82,7 @@ export function EmailActions({
 }: EmailActionsProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const showReplyAll =
     Boolean(email.ccAddr?.trim()) ||
@@ -177,6 +178,9 @@ export function EmailActions({
       patchEmail(emailIdentifier, { snoozedUntil: timestamp }),
     onSuccess: (_data, timestamp) => {
       toast.success(timestamp ? "Snoozed" : "Unsnoozed");
+      if (timestamp && mailboxId != null) {
+        void navigate({ to: "/$mailboxId/inbox", params: { mailboxId } });
+      }
     },
     onError: () => toast.error("Failed to snooze"),
   });

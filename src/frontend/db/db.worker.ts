@@ -57,6 +57,18 @@ CREATE INDEX IF NOT EXISTS emails_subject ON emails(subject COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS emails_from_name ON emails(from_name COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS emails_from_addr ON emails(from_addr COLLATE NOCASE);
 
+CREATE TABLE IF NOT EXISTS email_labels (
+  email_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  mailbox_id INTEGER,
+  label_id TEXT NOT NULL,
+  date INTEGER NOT NULL,
+  PRIMARY KEY (email_id, label_id)
+);
+
+CREATE INDEX IF NOT EXISTS email_labels_view
+  ON email_labels(user_id, mailbox_id, label_id, date DESC, email_id DESC);
+
 CREATE TABLE IF NOT EXISTS labels (
   gmail_id TEXT PRIMARY KEY NOT NULL,
   user_id TEXT NOT NULL,

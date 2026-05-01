@@ -2,7 +2,6 @@ import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { SearchResultsList } from "@/features/email/inbox/components/search/search-results-list";
 import { SearchSuggestionsList } from "@/features/email/inbox/components/search/search-suggestions-list";
 import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
@@ -157,12 +156,6 @@ export default function InboxSearchPage() {
   }
 
   const canToggleJunk = true;
-  const headerTitle = (
-    <div className="flex items-center gap-2">
-      <SidebarTrigger className="md:hidden -ml-1 size-8" />
-      <span>Search</span>
-    </div>
-  );
   const headerActions = (
     <>
       <div className="min-w-0 flex-1 sm:max-w-80">
@@ -205,7 +198,11 @@ export default function InboxSearchPage() {
   return (
     <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
       <PageHeader
-        title={headerTitle}
+        title={
+          <span className="flex min-w-0 items-center gap-2">
+            <span>Search</span>
+          </span>
+        }
         actions={headerActions}
         isScrolled={isScrolled}
       />

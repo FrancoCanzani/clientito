@@ -1,118 +1,93 @@
 import { Button } from "@/components/ui/button";
-import type { SplitViewRow } from "@/db/schema";
+import { useGatekeeperPending } from "@/features/email/gatekeeper/queries";
 import { EmailList } from "@/features/email/inbox/components/list/email-list";
-import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
+import { InboxFilterBar } from "@/features/email/inbox/components/list/inbox-filter-bar";
 import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
-import { fetchViewPage } from "@/features/email/inbox/queries";
-import { emailQueryKeys } from "@/features/email/inbox/query-keys";
-import { InboxSplitTabs } from "@/features/email/splits/components/inbox-split-tabs";
-import { useSplitViews } from "@/features/email/splits/queries";
-import { SlidersIcon } from "@phosphor-icons/react";
-import { useQueryClient } from "@tanstack/react-query";
-import { getRouteApi } from "@tanstack/react-router";
-import {
-  Suspense,
-  lazy,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useInboxData } from "@/features/email/inbox/hooks/use-inbox-data";
+import { cn } from "@/lib/utils";
+import { FunnelSimpleIcon } from "@phosphor-icons/react";
+import { Link, getRouteApi } from "@tanstack/react-router";
+import { useState } from "react";
 
 const route = getRouteApi("/_dashboard/$mailboxId/inbox/");
 
-const ManageSplitsModal = lazy(async () => {
-  const mod =
-    await import("@/features/email/splits/components/manage-splits-modal");
-  return { default: mod.ManageSplitsModal };
-});
-
 export default function InboxPage() {
   const { mailboxId } = route.useParams();
-  const queryClient = useQueryClient();
-  const [activeSplitId, setActiveSplitId] = useState<string | null>(null);
-  const [manageOpen, setManageOpen] = useState(false);
-  const { data: splits } = useSplitViews();
-  const activeSplit = useMemo(
-    () => splits?.find((s) => s.id === activeSplitId) ?? null,
-    [splits, activeSplitId],
-  );
-  const emailData = useEmailData({
-    view: "inbox",
-    mailboxId,
-    activeSplit,
-  });
+  const [showFilters, setShowFilters] = useState(false);
+  const emailData = useInboxData({ mailboxId });
   const { openEmail, executeEmailAction } = useEmailInboxActions({
     view: "inbox",
     mailboxId,
   });
 
-  const prefetchSplit = useCallback(
-    (split: Pick<SplitViewRow, "id" | "rules">) => {
-      void queryClient.prefetchInfiniteQuery({
-        queryKey: emailQueryKeys.listScoped("inbox", mailboxId, split.id),
-        queryFn: ({ pageParam }) =>
-          fetchViewPage({
-            view: "inbox",
-            mailboxId,
-            cursor: pageParam || undefined,
-            splitRule: split.rules ?? null,
-          }),
-        initialPageParam: "",
-        pages: 1,
-        getNextPageParam: (lastPage) => lastPage?.cursor ?? undefined,
-      });
-    },
-    [mailboxId, queryClient],
-  );
+  const gatekeeperPendingQuery = useGatekeeperPending(mailboxId, true);
+  const pendingSendersCount = gatekeeperPendingQuery.data?.pendingCount ?? 0;
 
-  useEffect(() => {
-    const visibleSplits = (splits ?? []).filter((split) => split.visible);
-    for (const split of visibleSplits) {
-      prefetchSplit(split);
-    }
-  }, [splits, prefetchSplit]);
-
-  const manageSplitsButton = (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={() => setManageOpen(true)}
-      className="gap-1.5"
-    >
-      <SlidersIcon className="size-3.5" />
-      <span>Splits</span>
-    </Button>
-  );
-
-  const splitTabs =
-    splits && splits.some((s) => s.visible) ? (
-      <InboxSplitTabs
-        splits={splits}
-        activeSplitId={activeSplitId}
-        onSelect={setActiveSplitId}
-        onPrefetch={prefetchSplit}
-      />
-    ) : null;
+  const showFilterControls = emailData.hasEmails || emailData.hasActiveFilters;
+  const filterBarVisible = showFilters || emailData.hasActiveFilters;
 
   return (
     <>
+      <div className="flex min-h-10 shrink-0 items-center justify-between gap-3 border-b border-border/40 px-3 py-1.5 md:px-6">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <h1 className="shrink-0 text-sm font-medium text-foreground">
+            Inbox
+          </h1>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {showFilterControls && filterBarVisible ? (
+            <InboxFilterBar
+              filters={emailData.filters}
+              onChange={emailData.setFilters}
+              view={emailData.view}
+              className="hidden md:flex"
+            />
+          ) : null}
+          <Button asChild variant="outline" size="sm">
+            <Link
+              to="/$mailboxId/screener"
+              params={{ mailboxId }}
+              preload="viewport"
+              className="inline-flex items-center gap-1.5"
+            >
+              <span>Screener</span>
+              {pendingSendersCount > 0 ? (
+                <span className="text-xs text-muted-foreground">
+                  {pendingSendersCount}
+                </span>
+              ) : null}
+            </Link>
+          </Button>
+          {showFilterControls ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowFilters((visible) => !visible)}
+              aria-pressed={filterBarVisible}
+              className={cn("gap-1.5", filterBarVisible && "bg-muted")}
+            >
+              <FunnelSimpleIcon className="size-3.5" />
+              <span>Filter</span>
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      {showFilterControls && filterBarVisible ? (
+        <InboxFilterBar
+          filters={emailData.filters}
+          onChange={emailData.setFilters}
+          view={emailData.view}
+          className="flex px-3 pb-1.5 md:hidden"
+        />
+      ) : null}
       <EmailList
         emailData={emailData}
         onOpen={openEmail}
         onAction={executeEmailAction}
-        headerSlot={splitTabs}
-        extraActions={manageSplitsButton}
+        filterBarOpen={showFilters}
+        onFilterBarOpenChange={setShowFilters}
+        hideFilterControls
       />
-      {manageOpen ? (
-        <Suspense fallback={null}>
-          <ManageSplitsModal
-            open={manageOpen}
-            onOpenChange={setManageOpen}
-            onCreated={(id) => setActiveSplitId(id)}
-          />
-        </Suspense>
-      ) : null}
     </>
   );
 }

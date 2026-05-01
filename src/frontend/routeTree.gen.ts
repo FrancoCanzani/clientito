@@ -18,8 +18,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsSlugRouteImport } from './routes/docs/$slug'
 import { Route as DashboardMailboxIdRouteRouteImport } from './routes/_dashboard/$mailboxId/route'
-import { Route as DashboardMailboxIdTriageRouteImport } from './routes/_dashboard/$mailboxId/triage'
+import { Route as DashboardMailboxIdIndexRouteImport } from './routes/_dashboard/$mailboxId/index'
+import { Route as DashboardMailboxIdTodoRouteImport } from './routes/_dashboard/$mailboxId/todo'
 import { Route as DashboardMailboxIdScreenerRouteImport } from './routes/_dashboard/$mailboxId/screener'
+import { Route as DashboardMailboxIdRemindersRouteImport } from './routes/_dashboard/$mailboxId/reminders'
+import { Route as DashboardMailboxIdFocusRouteImport } from './routes/_dashboard/$mailboxId/focus'
 import { Route as DashboardMailboxIdSettingsRouteRouteImport } from './routes/_dashboard/$mailboxId/settings/route'
 import { Route as DashboardMailboxIdSettingsIndexRouteImport } from './routes/_dashboard/$mailboxId/settings/index'
 import { Route as DashboardMailboxIdInboxIndexRouteImport } from './routes/_dashboard/$mailboxId/inbox/index'
@@ -84,18 +87,33 @@ const DashboardMailboxIdRouteRoute = DashboardMailboxIdRouteRouteImport.update({
   path: '/$mailboxId',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
-const DashboardMailboxIdTriageRoute =
-  DashboardMailboxIdTriageRouteImport.update({
-    id: '/triage',
-    path: '/triage',
-    getParentRoute: () => DashboardMailboxIdRouteRoute,
-  } as any)
+const DashboardMailboxIdIndexRoute = DashboardMailboxIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardMailboxIdRouteRoute,
+} as any)
+const DashboardMailboxIdTodoRoute = DashboardMailboxIdTodoRouteImport.update({
+  id: '/todo',
+  path: '/todo',
+  getParentRoute: () => DashboardMailboxIdRouteRoute,
+} as any)
 const DashboardMailboxIdScreenerRoute =
   DashboardMailboxIdScreenerRouteImport.update({
     id: '/screener',
     path: '/screener',
     getParentRoute: () => DashboardMailboxIdRouteRoute,
   } as any)
+const DashboardMailboxIdRemindersRoute =
+  DashboardMailboxIdRemindersRouteImport.update({
+    id: '/reminders',
+    path: '/reminders',
+    getParentRoute: () => DashboardMailboxIdRouteRoute,
+  } as any)
+const DashboardMailboxIdFocusRoute = DashboardMailboxIdFocusRouteImport.update({
+  id: '/focus',
+  path: '/focus',
+  getParentRoute: () => DashboardMailboxIdRouteRoute,
+} as any)
 const DashboardMailboxIdSettingsRouteRoute =
   DashboardMailboxIdSettingsRouteRouteImport.update({
     id: '/settings',
@@ -221,8 +239,11 @@ export interface FileRoutesByFullPath {
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
   '/$mailboxId/settings': typeof DashboardMailboxIdSettingsRouteRouteWithChildren
+  '/$mailboxId/focus': typeof DashboardMailboxIdFocusRoute
+  '/$mailboxId/reminders': typeof DashboardMailboxIdRemindersRoute
   '/$mailboxId/screener': typeof DashboardMailboxIdScreenerRoute
-  '/$mailboxId/triage': typeof DashboardMailboxIdTriageRoute
+  '/$mailboxId/todo': typeof DashboardMailboxIdTodoRoute
+  '/$mailboxId/': typeof DashboardMailboxIdIndexRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
@@ -247,11 +268,13 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
-  '/$mailboxId': typeof DashboardMailboxIdRouteRouteWithChildren
   '/docs/$slug': typeof DocsSlugRoute
   '/docs': typeof DocsIndexRoute
+  '/$mailboxId/focus': typeof DashboardMailboxIdFocusRoute
+  '/$mailboxId/reminders': typeof DashboardMailboxIdRemindersRoute
   '/$mailboxId/screener': typeof DashboardMailboxIdScreenerRoute
-  '/$mailboxId/triage': typeof DashboardMailboxIdTriageRoute
+  '/$mailboxId/todo': typeof DashboardMailboxIdTodoRoute
+  '/$mailboxId': typeof DashboardMailboxIdIndexRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
@@ -283,8 +306,11 @@ export interface FileRoutesById {
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
   '/_dashboard/$mailboxId/settings': typeof DashboardMailboxIdSettingsRouteRouteWithChildren
+  '/_dashboard/$mailboxId/focus': typeof DashboardMailboxIdFocusRoute
+  '/_dashboard/$mailboxId/reminders': typeof DashboardMailboxIdRemindersRoute
   '/_dashboard/$mailboxId/screener': typeof DashboardMailboxIdScreenerRoute
-  '/_dashboard/$mailboxId/triage': typeof DashboardMailboxIdTriageRoute
+  '/_dashboard/$mailboxId/todo': typeof DashboardMailboxIdTodoRoute
+  '/_dashboard/$mailboxId/': typeof DashboardMailboxIdIndexRoute
   '/_dashboard/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/_dashboard/$mailboxId/inbox/new': typeof DashboardMailboxIdInboxNewRoute
   '/_dashboard/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
@@ -316,8 +342,11 @@ export interface FileRouteTypes {
     | '/docs/$slug'
     | '/docs/'
     | '/$mailboxId/settings'
+    | '/$mailboxId/focus'
+    | '/$mailboxId/reminders'
     | '/$mailboxId/screener'
-    | '/$mailboxId/triage'
+    | '/$mailboxId/todo'
+    | '/$mailboxId/'
     | '/$mailboxId/inbox/drafts'
     | '/$mailboxId/inbox/new'
     | '/$mailboxId/inbox/search'
@@ -342,11 +371,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/privacy'
     | '/terms'
-    | '/$mailboxId'
     | '/docs/$slug'
     | '/docs'
+    | '/$mailboxId/focus'
+    | '/$mailboxId/reminders'
     | '/$mailboxId/screener'
-    | '/$mailboxId/triage'
+    | '/$mailboxId/todo'
+    | '/$mailboxId'
     | '/$mailboxId/inbox/drafts'
     | '/$mailboxId/inbox/new'
     | '/$mailboxId/inbox/search'
@@ -377,8 +408,11 @@ export interface FileRouteTypes {
     | '/docs/$slug'
     | '/docs/'
     | '/_dashboard/$mailboxId/settings'
+    | '/_dashboard/$mailboxId/focus'
+    | '/_dashboard/$mailboxId/reminders'
     | '/_dashboard/$mailboxId/screener'
-    | '/_dashboard/$mailboxId/triage'
+    | '/_dashboard/$mailboxId/todo'
+    | '/_dashboard/$mailboxId/'
     | '/_dashboard/$mailboxId/inbox/drafts'
     | '/_dashboard/$mailboxId/inbox/new'
     | '/_dashboard/$mailboxId/inbox/search'
@@ -473,11 +507,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardMailboxIdRouteRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
-    '/_dashboard/$mailboxId/triage': {
-      id: '/_dashboard/$mailboxId/triage'
-      path: '/triage'
-      fullPath: '/$mailboxId/triage'
-      preLoaderRoute: typeof DashboardMailboxIdTriageRouteImport
+    '/_dashboard/$mailboxId/': {
+      id: '/_dashboard/$mailboxId/'
+      path: '/'
+      fullPath: '/$mailboxId/'
+      preLoaderRoute: typeof DashboardMailboxIdIndexRouteImport
+      parentRoute: typeof DashboardMailboxIdRouteRoute
+    }
+    '/_dashboard/$mailboxId/todo': {
+      id: '/_dashboard/$mailboxId/todo'
+      path: '/todo'
+      fullPath: '/$mailboxId/todo'
+      preLoaderRoute: typeof DashboardMailboxIdTodoRouteImport
       parentRoute: typeof DashboardMailboxIdRouteRoute
     }
     '/_dashboard/$mailboxId/screener': {
@@ -485,6 +526,20 @@ declare module '@tanstack/react-router' {
       path: '/screener'
       fullPath: '/$mailboxId/screener'
       preLoaderRoute: typeof DashboardMailboxIdScreenerRouteImport
+      parentRoute: typeof DashboardMailboxIdRouteRoute
+    }
+    '/_dashboard/$mailboxId/reminders': {
+      id: '/_dashboard/$mailboxId/reminders'
+      path: '/reminders'
+      fullPath: '/$mailboxId/reminders'
+      preLoaderRoute: typeof DashboardMailboxIdRemindersRouteImport
+      parentRoute: typeof DashboardMailboxIdRouteRoute
+    }
+    '/_dashboard/$mailboxId/focus': {
+      id: '/_dashboard/$mailboxId/focus'
+      path: '/focus'
+      fullPath: '/$mailboxId/focus'
+      preLoaderRoute: typeof DashboardMailboxIdFocusRouteImport
       parentRoute: typeof DashboardMailboxIdRouteRoute
     }
     '/_dashboard/$mailboxId/settings': {
@@ -662,8 +717,11 @@ const DashboardMailboxIdSettingsRouteRouteWithChildren =
 
 interface DashboardMailboxIdRouteRouteChildren {
   DashboardMailboxIdSettingsRouteRoute: typeof DashboardMailboxIdSettingsRouteRouteWithChildren
+  DashboardMailboxIdFocusRoute: typeof DashboardMailboxIdFocusRoute
+  DashboardMailboxIdRemindersRoute: typeof DashboardMailboxIdRemindersRoute
   DashboardMailboxIdScreenerRoute: typeof DashboardMailboxIdScreenerRoute
-  DashboardMailboxIdTriageRoute: typeof DashboardMailboxIdTriageRoute
+  DashboardMailboxIdTodoRoute: typeof DashboardMailboxIdTodoRoute
+  DashboardMailboxIdIndexRoute: typeof DashboardMailboxIdIndexRoute
   DashboardMailboxIdInboxDraftsRoute: typeof DashboardMailboxIdInboxDraftsRoute
   DashboardMailboxIdInboxNewRoute: typeof DashboardMailboxIdInboxNewRoute
   DashboardMailboxIdInboxSearchRoute: typeof DashboardMailboxIdInboxSearchRoute
@@ -679,8 +737,11 @@ const DashboardMailboxIdRouteRouteChildren: DashboardMailboxIdRouteRouteChildren
   {
     DashboardMailboxIdSettingsRouteRoute:
       DashboardMailboxIdSettingsRouteRouteWithChildren,
+    DashboardMailboxIdFocusRoute: DashboardMailboxIdFocusRoute,
+    DashboardMailboxIdRemindersRoute: DashboardMailboxIdRemindersRoute,
     DashboardMailboxIdScreenerRoute: DashboardMailboxIdScreenerRoute,
-    DashboardMailboxIdTriageRoute: DashboardMailboxIdTriageRoute,
+    DashboardMailboxIdTodoRoute: DashboardMailboxIdTodoRoute,
+    DashboardMailboxIdIndexRoute: DashboardMailboxIdIndexRoute,
     DashboardMailboxIdInboxDraftsRoute: DashboardMailboxIdInboxDraftsRoute,
     DashboardMailboxIdInboxNewRoute: DashboardMailboxIdInboxNewRoute,
     DashboardMailboxIdInboxSearchRoute: DashboardMailboxIdInboxSearchRoute,

@@ -1,7 +1,7 @@
 import { fetchThreadsBatch } from "../client";
 import { parseGmailMessage, type ParsedEmail } from "./parse";
 
-const THREAD_FETCH_CONCURRENCY = 5;
+const THREAD_FETCH_CONCURRENCY = 10;
 
 export async function fetchThreadsAndParse(
   accessToken: string,

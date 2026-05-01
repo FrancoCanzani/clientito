@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useQuery } from "@tanstack/react-query";
 import { fetchLabels } from "@/features/email/labels/queries";
 import { createLabel, updateLabel, deleteLabel } from "@/features/email/labels/mutations";
+import { isInternalLabelName } from "@/features/email/labels/internal-labels";
 import { GMAIL_LABEL_COLORS, type Label } from "@/features/email/labels/types";
 import { PencilSimpleIcon, TrashIcon, PlusIcon, CheckIcon, XIcon } from "@phosphor-icons/react";
 import { useState } from "react";
@@ -43,7 +44,9 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
     staleTime: 60_000,
   });
 
-  const labels = (labelsQuery.data ?? []).filter((label) => label.type === "user");
+  const labels = (labelsQuery.data ?? []).filter(
+    (label) => label.type === "user" && !isInternalLabelName(label.name),
+  );
 
   async function handleCreate() {
     const name = newName.trim();

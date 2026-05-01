@@ -1,4 +1,3 @@
-import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import {
   Collapsible,
   CollapsibleContent,
@@ -12,6 +11,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { isInternalLabelName } from "@/features/email/labels/internal-labels";
+import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { CaretDownIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -40,7 +41,9 @@ export function LabelSidebarSection({
       sensitivity: "base",
     });
     return [...(labelsQuery.data ?? [])]
-      .filter((label) => label.type === "user")
+      .filter(
+        (label) => label.type === "user" && !isInternalLabelName(label.name),
+      )
       .sort((a, b) => collator.compare(a.name, b.name));
   }, [labelsQuery.data]);
 
@@ -79,7 +82,7 @@ export function LabelSidebarSection({
                     <Link
                       to="/$mailboxId/inbox/labels/$label"
                       params={{ mailboxId, label: label.gmailId }}
-                      preload="intent"
+                      preload="viewport"
                     >
                       <span
                         className="flex size-2.5 shrink-0 items-center justify-center rounded-full"

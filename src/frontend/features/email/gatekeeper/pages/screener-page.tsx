@@ -6,7 +6,6 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   useGatekeeperDecision,
   useGatekeeperPending,
@@ -108,7 +107,6 @@ export default function ScreenerPage() {
 
   const headerTitle = (
     <div className="flex items-center gap-2">
-      <SidebarTrigger className="md:hidden -ml-1 size-8" />
       <span>Screener</span>
     </div>
   );

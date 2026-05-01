@@ -552,8 +552,8 @@ export default function LandingPage() {
             </Link>
             {isAuthenticated && preferredMailboxId ? (
               <Link
-                to="/$mailboxId/inbox"
-                params={{ mailboxId: String(preferredMailboxId) } as never}
+                to="/$mailboxId/focus"
+                params={{ mailboxId: preferredMailboxId }}
                 className="text-foreground hover:underline underline-offset-4"
               >
                 Open Duomo

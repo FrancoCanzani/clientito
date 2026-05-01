@@ -60,6 +60,7 @@ export function registerGetSettings(api: Hono<AppRouteEnv>) {
           (mailbox?.syncWindowMonths as 3 | 6 | 12 | null | undefined) ?? null,
         syncCutoffAt: mailbox?.syncCutoffAt ?? null,
         aiEnabled: mailbox?.aiEnabled ?? true,
+        aiClassificationEnabled: mailbox?.aiClassificationEnabled ?? false,
         syncState,
         error: mailbox?.lastErrorMessage ?? null,
         createdAt:

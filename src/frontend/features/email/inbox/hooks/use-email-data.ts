@@ -2,7 +2,6 @@ import { emailQueryKeys } from "@/features/email/inbox/query-keys";
 import { fetchViewPage } from "@/features/email/inbox/queries";
 import type { EmailListPage } from "@/features/email/inbox/types";
 import { groupEmailsByThread } from "@/features/email/inbox/utils/group-emails-by-thread";
-import type { SplitViewRow } from "@/db/schema";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -29,12 +28,10 @@ export function useEmailData({
   view,
   mailboxId,
   initialPage,
-  activeSplit,
 }: {
   view: string;
   mailboxId: number;
   initialPage?: EmailListPage;
-  activeSplit?: SplitViewRow | null;
 }) {
   const [filters, setFilters] = useState<InboxListFilters>({});
   useEffect(() => {
@@ -44,16 +41,14 @@ export function useEmailData({
   const hasActiveFilters = Boolean(
     filters.unread || filters.starred || filters.hasAttachment,
   );
-  const splitScopeKey = activeSplit?.id ?? emailQueryKeys.baseScope;
 
   const emailsQuery = useInfiniteQuery({
-    queryKey: emailQueryKeys.listScoped(view, mailboxId, splitScopeKey),
+    queryKey: emailQueryKeys.list(view, mailboxId),
     queryFn: ({ pageParam }) =>
       fetchViewPage({
         view,
         mailboxId,
         cursor: pageParam || undefined,
-        splitRule: activeSplit?.rules ?? null,
       }),
     initialPageParam: "" as string,
     ...(initialPage
@@ -63,9 +58,6 @@ export function useEmailData({
     placeholderData: (previousData) => previousData,
     staleTime: 5_000,
     gcTime: 2 * 60_000,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
   });
 
   const allEmails = useMemo(

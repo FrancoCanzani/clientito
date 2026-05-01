@@ -8,6 +8,7 @@ import {
   type RowAction,
 } from "@/features/email/inbox/utils/row-actions";
 import type { Label } from "@/features/email/labels/types";
+import { isInternalLabelName } from "@/features/email/labels/internal-labels";
 import { useQueryClient } from "@tanstack/react-query";
 import { type KeyboardEvent, useMemo, useRef, useState } from "react";
 import type { EmailListItem } from "../../types";
@@ -80,7 +81,7 @@ export function useEmailRowModel({
     for (const id of email.labelIds) {
       if (!id.startsWith("Label_")) continue;
       const label = byGmailId.get(id);
-      if (label) resolved.push(label);
+      if (label && !isInternalLabelName(label.name)) resolved.push(label);
     }
     return resolved;
   }, [allLabels, email.labelIds]);
@@ -97,6 +98,9 @@ export function useEmailRowModel({
 
   const subject = email.subject?.trim() || "(no subject)";
   const snippet = formatEmailSnippet(email.snippet);
+  const aiSummary = email.aiSummary?.trim()
+    ? email.aiSummary.trim().replace(/\n{3,}/g, "\n\n")
+    : null;
 
   const aiCategoryLabel = useMemo<Label | null>(() => {
     if (!email.aiCategory) return null;
@@ -165,6 +169,7 @@ export function useEmailRowModel({
     participantLabel,
     subject,
     snippet,
+    aiSummary,
     aiCategoryLabel,
     handleMouseEnter,
     handleOpen,

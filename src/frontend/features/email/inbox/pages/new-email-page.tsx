@@ -1,6 +1,5 @@
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ComposeEmailFields } from "@/features/email/inbox/components/compose/compose-email-fields";
 import { useComposeEmail } from "@/features/email/inbox/components/compose/compose-email-state";
 import { XIcon } from "@phosphor-icons/react";
@@ -51,7 +50,6 @@ export default function NewEmailPage() {
       <PageHeader
         title={
           <div className="flex items-center gap-2">
-            <SidebarTrigger className="md:hidden" />
             <span>New Email</span>
           </div>
         }

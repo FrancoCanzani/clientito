@@ -10,7 +10,7 @@ import { fetchThreadsAndParse } from "../../lib/gmail/sync/threads";
 import { viewToGmailFilter } from "../../lib/gmail/view-filter";
 import type { AppRouteEnv } from "../types";
 
-const VIEW_PAGE_DEFAULT_THREADS = 100;
+const VIEW_PAGE_DEFAULT_THREADS = 50;
 const VIEW_PAGE_MAX_THREADS = 200;
 
 const viewPageRequestSchema = z.object({

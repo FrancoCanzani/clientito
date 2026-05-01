@@ -1,11 +1,6 @@
 export const emailQueryKeys = {
-  baseScope: "__base__",
   all: () => ["emails"] as const,
   list: (view: string, mailboxId: number) => ["emails", view, mailboxId] as const,
-  listScoped: (view: string, mailboxId: number, scope: string) =>
-    ["emails", view, mailboxId, scope] as const,
-  listBase: (view: string, mailboxId: number) =>
-    ["emails", view, mailboxId, "__base__"] as const,
   inboxUnreadCount: (mailboxId: number) =>
     ["emails", "inbox-unread-count", mailboxId] as const,
   detail: (emailId: string) => ["email-detail", emailId] as const,

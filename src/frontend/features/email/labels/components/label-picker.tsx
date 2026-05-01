@@ -12,6 +12,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { applyLabel, createLabel, removeLabel } from "../mutations";
+import { isInternalLabelName } from "../internal-labels";
 import { fetchLabels } from "../queries";
 import type { Label } from "../types";
 
@@ -82,7 +83,9 @@ export function LabelPicker({
     },
   });
 
-  const labels = labelsQuery.data ?? [];
+  const labels = (labelsQuery.data ?? []).filter(
+    (label) => !isInternalLabelName(label.name),
+  );
   const filtered = search
     ? labels.filter((l) => l.name.toLowerCase().includes(search.toLowerCase()))
     : labels;

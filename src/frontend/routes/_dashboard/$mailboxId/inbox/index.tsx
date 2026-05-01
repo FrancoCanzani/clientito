@@ -7,7 +7,7 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/")({
   loader: async ({ context, params }) => {
     await context.queryClient.ensureInfiniteQueryData({
-      queryKey: emailQueryKeys.listBase("inbox", params.mailboxId),
+      queryKey: emailQueryKeys.list("inbox", params.mailboxId),
       queryFn: ({ pageParam }) =>
         fetchViewPage({
           view: "inbox",

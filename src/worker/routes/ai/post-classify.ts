@@ -451,8 +451,11 @@ export function registerPostClassifyThread(app: Hono<AppRouteEnv>) {
       const user = c.get("user")!;
       const mailbox = await resolveMailbox(db, user.id, mailboxId);
       if (!mailbox) return c.json({ error: "Mailbox not found" }, 404);
-      if (!mailbox.aiEnabled) {
-        return c.json({ error: "AI features are disabled for this mailbox" }, 403);
+      if (!mailbox.aiClassificationEnabled) {
+        return c.json(
+          { error: "AI classification is disabled for this mailbox" },
+          403,
+        );
       }
       const openai = createOpenAI({ apiKey: c.env.OPENAI_API_KEY });
 
@@ -470,7 +473,7 @@ export function registerPostClassifyThread(app: Hono<AppRouteEnv>) {
           output: Output.object({
             name: "inbox_thread_classification",
             description:
-              "Focused inbox triage result with category, confidence, reason, summary, and optional draft reply.",
+              "Focused inbox result with category, confidence, reason, summary, and optional draft reply.",
             schema: classifyThreadOutputSchema,
           }),
           maxOutputTokens: CLASSIFY_MAX_OUTPUT_TOKENS,

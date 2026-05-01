@@ -23,10 +23,12 @@ export function InboxFilterBar({
   filters,
   onChange,
   view,
+  className,
 }: {
   filters: InboxListFilters;
   onChange: (next: InboxListFilters) => void;
   view: string;
+  className?: string;
 }) {
   const toggle = (key: FilterKey) => {
     onChange({ ...filters, [key]: !filters[key] || undefined });
@@ -37,7 +39,7 @@ export function InboxFilterBar({
   const visible = FILTERS.filter((f) => !(f.key === "starred" && view === "starred"));
 
   return (
-    <div className="flex items-center gap-1 px-6 pb-1.5 text-xs">
+    <div className={cn("flex items-center gap-1 text-xs", className)}>
       {visible.map((f) => {
         const active = Boolean(filters[f.key]);
         const Icon = f.icon;
