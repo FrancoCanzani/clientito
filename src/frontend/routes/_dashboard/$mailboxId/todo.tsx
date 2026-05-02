@@ -17,10 +17,5 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/todo")({
     });
   },
   errorComponent: RouteError,
-  component: TodoRoute,
+  component: TodoPage,
 });
-
-function TodoRoute() {
-  const { mailboxId } = Route.useParams();
-  return <TodoPage mailboxId={mailboxId} />;
-}

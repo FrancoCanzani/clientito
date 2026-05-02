@@ -58,7 +58,7 @@ export function SettingsShell({ children }: { children: ReactNode }) {
         className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
       />
 
-      <div className="mx-auto w-full max-w-6xl px-4 pb-12">
+      <div className="w-full px-4 pb-12 md:px-6">
         <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="hidden lg:block">
             <nav className="sticky top-20 p-1">

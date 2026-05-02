@@ -1,8 +1,8 @@
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
-import { fetchAllLocalViewEmails } from "@/features/email/inbox/queries";
-import type { EmailListPage } from "@/features/email/inbox/types";
-import { groupEmailsByThread } from "@/features/email/inbox/utils/group-emails-by-thread";
+import { fetchAllLocalViewEmails } from "@/features/email/mail/queries";
+import type { EmailListPage } from "@/features/email/mail/types";
+import { groupEmailsByThread } from "@/features/email/mail/utils/group-emails-by-thread";
 import { TODO_LABEL_NAME } from "@/features/email/labels/internal-labels";
 import type { Label } from "@/features/email/labels/types";
 import { useInfiniteQuery } from "@tanstack/react-query";

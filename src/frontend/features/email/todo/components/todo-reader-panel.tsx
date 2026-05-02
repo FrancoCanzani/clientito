@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { EmailThread } from "@/features/email/inbox/components/thread/email-thread";
+import { EmailThread } from "@/features/email/mail/thread/email-thread";
 import type {
   EmailDetailItem,
   EmailThreadItem,
-} from "@/features/email/inbox/types";
+} from "@/features/email/mail/types";
 
 export function TodoReaderPanel({
   currentEmail,

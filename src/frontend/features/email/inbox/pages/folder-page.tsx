@@ -1,11 +1,14 @@
-import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { EmailList } from "@/features/email/inbox/components/list/email-list";
-import { InboxFilterBar } from "@/features/email/inbox/components/list/inbox-filter-bar";
+import { EmailList } from "@/features/email/mail/list/email-list";
+import { MailFilterBar } from "@/features/email/mail/list/mail-filter-bar";
 import { useArchivedData } from "@/features/email/inbox/hooks/use-archived-data";
-import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
-import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
-import { VIEW_LABELS } from "@/features/email/inbox/utils/inbox-filters";
+import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
+import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
+import { VIEW_LABELS } from "@/features/email/mail/views";
+import {
+  MailboxPage,
+  MailboxPageHeader,
+} from "@/features/email/shell/mailbox-page";
 import { cn } from "@/lib/utils";
 import { FunnelSimpleIcon } from "@phosphor-icons/react";
 import { getRouteApi } from "@tanstack/react-router";
@@ -35,7 +38,7 @@ function GenericFolderPage({
   mailboxId: number;
   folder: string;
 }) {
-  const emailData = useEmailData({ view: folder, mailboxId });
+  const emailData = useMailViewData({ view: folder, mailboxId });
   return <FolderView mailboxId={mailboxId} folder={folder} emailData={emailData} />;
 }
 
@@ -46,10 +49,10 @@ function FolderView({
 }: {
   mailboxId: number;
   folder: string;
-  emailData: ReturnType<typeof useEmailData>;
+  emailData: ReturnType<typeof useMailViewData>;
 }) {
   const [showFilters, setShowFilters] = useState(false);
-  const { openEmail, executeEmailAction } = useEmailInboxActions({
+  const { openEmail, executeEmailAction } = useMailActions({
     view: folder,
     mailboxId,
   });
@@ -59,18 +62,14 @@ function FolderView({
   const filterBarVisible = showFilters || emailData.hasActiveFilters;
 
   return (
-    <>
-      <PageHeader
-        title={
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate">{title}</span>
-          </span>
-        }
+    <MailboxPage>
+      <MailboxPageHeader
+        title={title}
         actions={
           showFilterControls ? (
             <>
               {filterBarVisible ? (
-                <InboxFilterBar
+                <MailFilterBar
                   filters={emailData.filters}
                   onChange={emailData.setFilters}
                   view={emailData.view}
@@ -92,7 +91,7 @@ function FolderView({
         }
       />
       {showFilterControls && filterBarVisible ? (
-        <InboxFilterBar
+        <MailFilterBar
           filters={emailData.filters}
           onChange={emailData.setFilters}
           view={emailData.view}
@@ -107,6 +106,6 @@ function FolderView({
         onFilterBarOpenChange={setShowFilters}
         hideFilterControls
       />
-    </>
+    </MailboxPage>
   );
 }

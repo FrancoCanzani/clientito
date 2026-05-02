@@ -17,8 +17,8 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "sticky top-0 z-20 flex min-h-14 shrink-0 items-center justify-between gap-3 border-b px-3 transition-colors duration-300 md:px-6",
-        isScrolled ? "border-border/40" : "border-transparent",
+        "sticky top-0 z-20 flex min-h-14 shrink-0 items-center justify-between gap-3 px-3 transition-colors duration-300 md:px-6",
+        isScrolled ? "border-border/40 border" : "border-transparent",
         className,
       )}
     >
@@ -27,7 +27,9 @@ export function PageHeader({
           {title}
         </h1>
         {subtitle ? (
-          <p className="line-clamp-1 text-xs text-muted-foreground">{subtitle}</p>
+          <p className="line-clamp-1 text-xs text-muted-foreground">
+            {subtitle}
+          </p>
         ) : null}
       </div>
       {actions && (

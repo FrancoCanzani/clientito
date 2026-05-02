@@ -28,7 +28,6 @@ type ViewFilter =
   | "sent"
   | "spam"
   | "trash"
-  | "snoozed"
   | "archived"
   | "starred"
   | "important"
@@ -404,8 +403,6 @@ function buildViewConditions(view: ViewFilter, now: number): SqlFragment[] {
       return [{ sql: "has_spam = 1", params: [] }];
     case "trash":
       return [{ sql: "has_trash = 1", params: [] }];
-    case "snoozed":
-      return [{ sql: "snoozed_until > ?", params: [now] }];
     case "archived":
       return [
         { sql: "has_inbox = 0", params: [] },
@@ -837,6 +834,9 @@ export const localDb = {
       { sql: "mailbox_id = ?", params: [mailboxId] },
     ];
     fragments.push(...buildViewConditions(view as ViewFilter, Date.now()));
+    if (view === "inbox" || view === "important") {
+      fragments.push({ sql: "is_gatekept = 0", params: [] });
+    }
     const { where, params: whereParams } = composeWhere(fragments);
     const res = await dbClient.exec(
       `SELECT COUNT(DISTINCT COALESCE(thread_id, provider_message_id)) AS count, MIN(date) AS oldest FROM emails ${where}`,

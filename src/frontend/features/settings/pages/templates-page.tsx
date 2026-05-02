@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TEMPLATE_VARIABLES } from "@/features/email/mail/compose/template-interpolation";
 import { RichTextField } from "@/features/settings/components/rich-text-field";
 import { SettingsSectionHeader } from "@/features/settings/components/settings-shell";
 import { useSettingsMutations } from "@/features/settings/hooks/use-settings-mutations";
@@ -29,6 +30,7 @@ export default function TemplatesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(
     initialState.items[0]?.id ?? null,
   );
+  const [focusedField, setFocusedField] = useState<"subject" | "body">("body");
   const { templatesMutation } = useSettingsMutations({ navigate });
 
   useEffect(() => {
@@ -71,6 +73,22 @@ export default function TemplatesPage() {
     if (selectedId === id) {
       setSelectedId(state.items.find((item) => item.id !== id)?.id ?? null);
     }
+  }
+
+  function insertVariable(token: string) {
+    if (!selectedItem) return;
+    if (focusedField === "subject") {
+      const next = selectedItem.subject
+        ? `${selectedItem.subject} ${token}`
+        : token;
+      updateItem(selectedItem.id, { subject: next });
+      return;
+    }
+    const trimmedBody = selectedItem.body.trim();
+    const next = trimmedBody
+      ? `${selectedItem.body}<p>${token}</p>`
+      : `<p>${token}</p>`;
+    updateItem(selectedItem.id, { body: next });
   }
 
   return (
@@ -167,13 +185,35 @@ export default function TemplatesPage() {
               onChange={(event) =>
                 updateItem(selectedItem.id, { subject: event.target.value })
               }
+              onFocus={() => setFocusedField("subject")}
               placeholder="Subject"
               className="h-8 text-xs"
             />
-            <RichTextField
-              value={selectedItem.body}
-              onChange={(body) => updateItem(selectedItem.id, { body })}
-            />
+            <div onFocus={() => setFocusedField("body")}>
+              <RichTextField
+                value={selectedItem.body}
+                onChange={(body) => updateItem(selectedItem.id, { body })}
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-[11px] text-muted-foreground">
+                Click a variable to insert it into the {focusedField}. Variables
+                resolve when the template is inserted into a draft.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {TEMPLATE_VARIABLES.map((variable) => (
+                  <button
+                    key={variable.token}
+                    type="button"
+                    onClick={() => insertVariable(variable.token)}
+                    title={variable.description}
+                    className="rounded border border-border/60 bg-muted/40 px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+                  >
+                    {variable.token}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="rounded-md border border-dashed border-border/70 p-6 text-xs text-muted-foreground">

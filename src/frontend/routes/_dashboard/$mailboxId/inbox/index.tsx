@@ -1,15 +1,23 @@
 import { Error as RouteError } from "@/components/error";
 import InboxPage from "@/features/email/inbox/pages/inbox-page";
-import { fetchViewPage } from "@/features/email/inbox/queries";
-import { emailQueryKeys } from "@/features/email/inbox/query-keys";
+import { fetchLocalViewPage } from "@/features/email/mail/queries";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { enqueueMailboxRouteViewSync } from "@/features/email/shell/route-sync";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/")({
+  beforeLoad: ({ params, preload }) => {
+    enqueueMailboxRouteViewSync({
+      view: "inbox",
+      mailboxId: params.mailboxId,
+      preload,
+    });
+  },
   loader: async ({ context, params }) => {
     await context.queryClient.ensureInfiniteQueryData({
       queryKey: emailQueryKeys.list("inbox", params.mailboxId),
       queryFn: ({ pageParam }) =>
-        fetchViewPage({
+        fetchLocalViewPage({
           view: "inbox",
           mailboxId: params.mailboxId,
           cursor: pageParam || undefined,

@@ -13,6 +13,11 @@ export function createGmailRateLimitError(message: string): Error {
   return taggedError(message, GMAIL_RATE_LIMIT_ERROR);
 }
 
+export function isGmailRateLimitError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.name === GMAIL_RATE_LIMIT_ERROR;
+}
+
 export function isGmailReconnectRequiredError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return error.message === GOOGLE_RECONNECT_REQUIRED_MESSAGE;

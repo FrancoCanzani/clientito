@@ -2,7 +2,6 @@ import {
   BookOpenIcon,
   BookmarkSimpleIcon,
   CheckIcon,
-  ClockIcon,
   FileDashedIcon,
   FlagIcon,
   GearIcon,
@@ -17,7 +16,7 @@ import {
 import type {
   EmailFolderView,
   InboxLabelView,
-} from "@/features/email/inbox/utils/inbox-filters";
+} from "@/features/email/mail/views";
 import { paletteIcon } from "../registry/palette-icon";
 import { registerCommands } from "../registry/registry";
 import type { Command, CommandServices } from "../registry/types";
@@ -94,8 +93,7 @@ function navigateToMailboxPath(
     | "/$mailboxId/inbox/drafts"
     | "/$mailboxId/inbox/search"
     | "/$mailboxId/focus"
-    | "/$mailboxId/todo"
-    | "/$mailboxId/reminders",
+    | "/$mailboxId/todo",
   services: CommandServices,
 ) {
   services.navigate({
@@ -129,14 +127,6 @@ const navigationCommands: Command[] = [
     keywords: ["todo", "to-do", "task"],
     perform: (mailboxId, services) =>
       navigateToMailboxPath(mailboxId, "/$mailboxId/todo", services),
-  }),
-  makeNavCommand({
-    id: "nav:reminders",
-    label: "Reminders",
-    icon: paletteIcon(ClockIcon),
-    keywords: ["reminders", "snoozed", "later"],
-    perform: (mailboxId, services) =>
-      navigateToMailboxPath(mailboxId, "/$mailboxId/reminders", services),
   }),
   makeNavCommand({
     id: "nav:important",

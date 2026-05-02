@@ -1,5 +1,5 @@
-import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
-import type { EmailListPage } from "@/features/email/inbox/types";
+import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
+import type { EmailListPage } from "@/features/email/mail/types";
 
 export function useArchivedData({
   mailboxId,
@@ -8,5 +8,5 @@ export function useArchivedData({
   mailboxId: number;
   initialPage?: EmailListPage;
 }) {
-  return useEmailData({ view: "archived", mailboxId, initialPage });
+  return useMailViewData({ view: "archived", mailboxId, initialPage });
 }

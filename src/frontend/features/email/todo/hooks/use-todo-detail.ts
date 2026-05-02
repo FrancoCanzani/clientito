@@ -3,13 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import {
   fetchEmailDetail,
   fetchEmailThread,
-} from "@/features/email/inbox/queries";
-import { emailQueryKeys } from "@/features/email/inbox/query-keys";
+} from "@/features/email/mail/queries";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import type {
   EmailDetailItem,
   EmailListItem,
   EmailThreadItem,
-} from "@/features/email/inbox/types";
+} from "@/features/email/mail/types";
 
 export function useTodoDetail({
   selectedEmail,

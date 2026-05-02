@@ -1,5 +1,5 @@
 import LandingPage from "@/components/landing-page";
-import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
+import { getPreferredMailboxId } from "@/features/email/mail/utils/mailbox";
 import { accountsQueryOptions } from "@/hooks/use-mailboxes";
 import { authClient } from "@/lib/auth-client";
 import { createFileRoute, redirect } from "@tanstack/react-router";

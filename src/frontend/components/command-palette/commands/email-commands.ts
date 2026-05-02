@@ -1,8 +1,8 @@
-import { emailQueryKeys } from "@/features/email/inbox/query-keys";
-import { invalidateInboxQueries } from "@/features/email/inbox/queries";
-import { patchEmail, type EmailIdentifier } from "@/features/email/inbox/mutations";
-import type { EmailListItem, EmailListPage } from "@/features/email/inbox/types";
-import { isEmailListInfiniteData } from "@/features/email/inbox/utils/email-list-cache";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { invalidateInboxQueries } from "@/features/email/mail/queries";
+import { patchEmail, type EmailIdentifier } from "@/features/email/mail/mutations";
+import type { EmailListItem, EmailListPage } from "@/features/email/mail/types";
+import { isEmailListInfiniteData } from "@/features/email/mail/utils/email-list-cache";
 import {
   CheckIcon,
   ClockIcon,

@@ -1,8 +1,9 @@
-import { emailQueryKeys } from "@/features/email/inbox/query-keys";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { Error as RouteError } from "@/components/error";
 import LabelPage from "@/features/email/inbox/pages/label-page";
-import { fetchViewPage } from "@/features/email/inbox/queries";
-import { parseInboxLabelParam } from "@/features/email/inbox/utils/inbox-filters";
+import { fetchLocalViewPage } from "@/features/email/mail/queries";
+import { parseInboxLabelParam } from "@/features/email/mail/views";
+import { enqueueMailboxRouteViewSync } from "@/features/email/shell/route-sync";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute(
@@ -12,11 +13,18 @@ export const Route = createFileRoute(
     parse: (raw) => ({ label: parseInboxLabelParam(raw.label) }),
   },
   skipRouteOnParseError: { params: true },
+  beforeLoad: ({ params, preload }) => {
+    enqueueMailboxRouteViewSync({
+      view: params.label,
+      mailboxId: params.mailboxId,
+      preload,
+    });
+  },
   loader: async ({ context, params }) => {
     await context.queryClient.ensureInfiniteQueryData({
       queryKey: emailQueryKeys.list(params.label, params.mailboxId),
       queryFn: ({ pageParam }) =>
-        fetchViewPage({
+        fetchLocalViewPage({
           view: params.label,
           mailboxId: params.mailboxId,
           cursor: pageParam || undefined,

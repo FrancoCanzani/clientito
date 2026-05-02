@@ -1,12 +1,15 @@
-import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { EmailList } from "@/features/email/inbox/components/list/email-list";
-import { InboxFilterBar } from "@/features/email/inbox/components/list/inbox-filter-bar";
-import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
-import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
+import { EmailList } from "@/features/email/mail/list/email-list";
+import { MailFilterBar } from "@/features/email/mail/list/mail-filter-bar";
+import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
+import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import { isInternalLabelName } from "@/features/email/labels/internal-labels";
 import { fetchLabels } from "@/features/email/labels/queries";
 import { labelQueryKeys } from "@/features/email/labels/query-keys";
+import {
+  MailboxPage,
+  MailboxPageHeader,
+} from "@/features/email/shell/mailbox-page";
 import { cn } from "@/lib/utils";
 import { FunnelSimpleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
@@ -17,7 +20,7 @@ const route = getRouteApi("/_dashboard/$mailboxId/inbox/labels/$label/");
 
 export default function LabelPage() {
   const { mailboxId, label } = route.useParams();
-  const emailData = useEmailData({ view: label, mailboxId });
+  const emailData = useMailViewData({ view: label, mailboxId });
   const [showFilters, setShowFilters] = useState(false);
   const labelsQuery = useQuery({
     queryKey: labelQueryKeys.list(mailboxId),
@@ -28,7 +31,7 @@ export default function LabelPage() {
     labelsQuery.data
       ?.filter((label) => !isInternalLabelName(label.name))
       .find((l) => l.gmailId === label)?.name ?? label;
-  const { openEmail, executeEmailAction } = useEmailInboxActions({
+  const { openEmail, executeEmailAction } = useMailActions({
     view: label,
     mailboxId,
   });
@@ -36,18 +39,14 @@ export default function LabelPage() {
   const filterBarVisible = showFilters || emailData.hasActiveFilters;
 
   return (
-    <>
-      <PageHeader
-        title={
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate">{labelName}</span>
-          </span>
-        }
+    <MailboxPage>
+      <MailboxPageHeader
+        title={labelName}
         actions={
           showFilterControls ? (
             <>
               {filterBarVisible ? (
-                <InboxFilterBar
+                <MailFilterBar
                   filters={emailData.filters}
                   onChange={emailData.setFilters}
                   view={emailData.view}
@@ -69,7 +68,7 @@ export default function LabelPage() {
         }
       />
       {showFilterControls && filterBarVisible ? (
-        <InboxFilterBar
+        <MailFilterBar
           filters={emailData.filters}
           onChange={emailData.setFilters}
           view={emailData.view}
@@ -84,6 +83,6 @@ export default function LabelPage() {
         onFilterBarOpenChange={setShowFilters}
         hideFilterControls
       />
-    </>
+    </MailboxPage>
   );
 }

@@ -1,4 +1,4 @@
-import { openCompose as triggerOpenCompose } from "@/features/email/inbox/components/compose/compose-events";
+import { openCompose as triggerOpenCompose } from "@/features/email/mail/compose/compose-events";
 import { Command as Cmdk } from "cmdk";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";

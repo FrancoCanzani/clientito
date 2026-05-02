@@ -2,7 +2,7 @@ import {
   isEmailView,
   isEmailFolderView,
   type EmailView,
-} from "@/features/email/inbox/utils/inbox-filters";
+} from "@/features/email/mail/views";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import { AtIcon } from "@phosphor-icons/react";
 import { useRouter } from "@tanstack/react-router";

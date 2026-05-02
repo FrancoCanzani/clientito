@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
-import { formatInboxRowDate } from "@/features/email/inbox/utils/formatters";
-import type { ThreadGroup } from "@/features/email/inbox/utils/group-emails-by-thread";
+import { formatInboxRowDate } from "@/features/email/mail/utils/formatters";
+import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
 
 export function TodoQueuePanel({
   groups,

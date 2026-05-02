@@ -135,6 +135,7 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
                     <ColorDot bg={editing.bg} />
                     <Input
                       value={editing.name}
+                      aria-label="Label name"
                       onChange={(e) =>
                         setEditing({ ...editing, name: e.target.value })
                       }
@@ -155,6 +156,7 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
                       className="size-7"
                       onClick={handleSave}
                       disabled={saving || !editing.name.trim()}
+                      aria-label="Save label"
                     >
                       <CheckIcon className="size-3.5" />
                     </Button>
@@ -163,6 +165,7 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
                       size="icon"
                       className="size-7"
                       onClick={() => setEditing(null)}
+                      aria-label="Cancel editing"
                     >
                       <XIcon className="size-3.5" />
                     </Button>
@@ -178,6 +181,7 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
                           size="icon"
                           className="size-7"
                           onClick={() => startEditing(label)}
+                          aria-label={`Edit label ${label.name}`}
                         >
                           <PencilSimpleIcon className="size-3.5" />
                         </Button>
@@ -188,6 +192,7 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
                               size="icon"
                               className="size-7 text-destructive hover:text-destructive"
                               disabled={saving}
+                              aria-label={`Delete label ${label.name}`}
                             >
                               <TrashIcon className="size-3.5" />
                             </Button>
@@ -226,6 +231,7 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Label name"
+                aria-label="Label name"
                 className="h-7 flex-1 text-xs"
                 autoFocus
                 onKeyDown={(e) => {

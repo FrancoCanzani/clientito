@@ -1,8 +1,8 @@
-import { emailQueryKeys } from "@/features/email/inbox/query-keys";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { gatekeeperQueryKeys } from "@/features/email/gatekeeper/query-keys";
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
-import type { EmailListItem } from "@/features/email/inbox/types";
+import type { EmailListItem } from "@/features/email/mail/types";
 import { queryClient } from "@/lib/query-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 

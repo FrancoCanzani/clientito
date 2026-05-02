@@ -10,16 +10,26 @@ import { TodoReaderPanel } from "@/features/email/todo/components/todo-reader-pa
 import { useTodoData } from "@/features/email/todo/hooks/use-todo-data";
 import { useTodoDetail } from "@/features/email/todo/hooks/use-todo-detail";
 import { useTodoSelection } from "@/features/email/todo/hooks/use-todo-selection";
+import {
+  MailboxPage,
+  MailboxPageBody,
+} from "@/features/email/shell/mailbox-page";
+import { getRouteApi } from "@tanstack/react-router";
 import { useMemo } from "react";
 
-export function TodoPage({ mailboxId }: { mailboxId: number }) {
+const route = getRouteApi("/_dashboard/$mailboxId/todo");
+
+export function TodoPage() {
+  const { mailboxId } = route.useParams();
   const todoData = useTodoData({ mailboxId });
 
   if (!todoData.labelId && !todoData.isLoading) {
     return (
-      <div className="flex h-full items-center justify-center px-6 text-sm text-muted-foreground">
-        Could not load the To-do label.
-      </div>
+      <MailboxPage className="max-w-none">
+        <MailboxPageBody className="flex items-center justify-center px-6 text-sm text-muted-foreground">
+          Could not load the To-do label.
+        </MailboxPageBody>
+      </MailboxPage>
     );
   }
 
@@ -60,42 +70,48 @@ function TodoView({
 
   if (!todoData.hasEmails && !todoData.isLoading) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center">
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>Empty.</EmptyTitle>
-            <EmptyDescription>
-              Mark an email as to-do to fill this in.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      </div>
+      <MailboxPage className="max-w-none">
+        <MailboxPageBody className="flex items-center justify-center">
+          <Empty>
+            <EmptyHeader>
+              <EmptyTitle>Empty.</EmptyTitle>
+              <EmptyDescription>
+                Mark an email as to-do to fill this in.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        </MailboxPageBody>
+      </MailboxPage>
     );
   }
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col gap-2 md:flex-row">
-      <TodoQueuePanel
-        groups={groups}
-        selectedId={selectedId}
-        onSelect={setSelectedId}
-      />
-      <TodoReaderPanel
-        currentEmail={currentEmail}
-        threadMessages={threadMessages}
-        hasDetailError={detailQuery.isError}
-        hasThreadError={threadQuery.isError}
-        onRetry={() => void detailQuery.refetch()}
-      />
-      {selectedEmail ? (
-        <TodoActionsPanel
-          selectedEmail={selectedEmail}
-          detail={currentEmail}
-          mailboxId={mailboxId}
-          view={todoLabelId}
-          hasThreadError={threadQuery.isError}
-        />
-      ) : null}
-    </div>
+    <MailboxPage className="max-w-none">
+      <MailboxPageBody className="p-2">
+        <div className="flex min-h-0 w-full flex-1 flex-col gap-2 md:flex-row">
+          <TodoQueuePanel
+            groups={groups}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />
+          <TodoReaderPanel
+            currentEmail={currentEmail}
+            threadMessages={threadMessages}
+            hasDetailError={detailQuery.isError}
+            hasThreadError={threadQuery.isError}
+            onRetry={() => void detailQuery.refetch()}
+          />
+          {selectedEmail ? (
+            <TodoActionsPanel
+              selectedEmail={selectedEmail}
+              detail={currentEmail}
+              mailboxId={mailboxId}
+              view={todoLabelId}
+              hasThreadError={threadQuery.isError}
+            />
+          ) : null}
+        </div>
+      </MailboxPageBody>
+    </MailboxPage>
   );
 }

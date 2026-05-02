@@ -1,7 +1,11 @@
-import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { ComposeEmailFields } from "@/features/email/inbox/components/compose/compose-email-fields";
-import { useComposeEmail } from "@/features/email/inbox/components/compose/compose-email-state";
+import { ComposeEmailFields } from "@/features/email/mail/compose/compose-email-fields";
+import { useComposeEmail } from "@/features/email/mail/compose/compose-email-state";
+import {
+  MailboxPage,
+  MailboxPageBody,
+  MailboxPageHeader,
+} from "@/features/email/shell/mailbox-page";
 import { XIcon } from "@phosphor-icons/react";
 import { getRouteApi } from "@tanstack/react-router";
 import { useMemo } from "react";
@@ -46,13 +50,9 @@ export default function NewEmailPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
-      <PageHeader
-        title={
-          <div className="flex items-center gap-2">
-            <span>New Email</span>
-          </div>
-        }
+    <MailboxPage>
+      <MailboxPageHeader
+        title="New Email"
         actions={
           <Button
             type="button"
@@ -66,18 +66,20 @@ export default function NewEmailPage() {
         }
       />
 
-      <div className="mx-auto w-full max-w-4xl min-h-0 flex-1 flex-col flex">
-        <ComposeEmailFields
-          compose={compose}
-          bodyClassName="flex-1 text-sm leading-relaxed"
-          onEscape={navigateBack}
-          onDiscard={() => {
-            void handleDiscard();
-          }}
-          recipientAutoFocus={compose.to.trim().length === 0}
-          editorAutoFocus={compose.to.trim().length > 0}
-        />
-      </div>
-    </div>
+      <MailboxPageBody className="overflow-y-auto">
+        <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col">
+          <ComposeEmailFields
+            compose={compose}
+            bodyClassName="flex-1 text-sm leading-relaxed"
+            onEscape={navigateBack}
+            onDiscard={() => {
+              void handleDiscard();
+            }}
+            recipientAutoFocus={compose.to.trim().length === 0}
+            editorAutoFocus={compose.to.trim().length > 0}
+          />
+        </div>
+      </MailboxPageBody>
+    </MailboxPage>
   );
 }

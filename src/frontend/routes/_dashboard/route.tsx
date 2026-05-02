@@ -1,5 +1,5 @@
 import { AppProviders } from "@/components/providers";
-import { InboxComposeProvider } from "@/features/email/inbox/components/compose/inbox-compose-provider";
+import { MailComposeProvider } from "@/features/email/mail/compose/compose-provider";
 import { getDashboardGate } from "@/features/onboarding/dashboard-gate";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
@@ -27,9 +27,18 @@ export const Route = createFileRoute("/_dashboard")({
 function DashboardLayout() {
   return (
     <AppProviders>
-      <InboxComposeProvider>
+      <MailComposeProvider>
         <div className="relative flex h-dvh min-w-0 flex-col overflow-hidden bg-background">
-          <main className="liquid-glass relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-1.5 focus:text-xs focus:font-medium focus:shadow focus:ring-2 focus:ring-ring"
+          >
+            Skip to main content
+          </a>
+          <main
+            id="main-content"
+            className="liquid-glass relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden"
+          >
             <Outlet />
           </main>
           <Suspense fallback={null}>
@@ -37,7 +46,7 @@ function DashboardLayout() {
             <KeyboardShortcutsDialog />
           </Suspense>
         </div>
-      </InboxComposeProvider>
+      </MailComposeProvider>
     </AppProviders>
   );
 }

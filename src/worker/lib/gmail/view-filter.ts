@@ -19,8 +19,6 @@ export function viewToGmailFilter(view: string): GmailViewFilter | null {
       return { labelIds: ["IMPORTANT"] };
     case "archived":
       return { query: "-in:inbox -in:trash -in:spam -in:drafts" };
-    case "snoozed":
-      return { query: "in:snoozed" };
     default:
       if (view.startsWith("Label_") || /^[A-Z_]+$/.test(view)) {
         return { labelIds: [view] };

@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/page-container";
 import { SnoozePicker } from "@/components/snooze-picker";
 import {
   AlertDialog,
@@ -12,16 +13,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
-import { TriageActionButton } from "@/features/email/components/triage-action-button";
-import { MessageBody } from "@/features/email/inbox/components/renderer/message-body";
-import { useEmailData } from "@/features/email/inbox/hooks/use-email-data";
-import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
-import { sendEmail } from "@/features/email/inbox/mutations";
-import { fetchEmailDetail } from "@/features/email/inbox/queries";
-import { emailQueryKeys } from "@/features/email/inbox/query-keys";
-import type { EmailListItem } from "@/features/email/inbox/types";
-import { formatEmailDetailDate } from "@/features/email/inbox/utils/formatters";
-import type { ThreadGroup } from "@/features/email/inbox/utils/group-emails-by-thread";
+import { MailActionButton } from "@/features/email/mail/mail-action-button";
+import { MessageBody } from "@/features/email/mail/render/message-body";
+import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
+import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
+import { sendEmail } from "@/features/email/mail/mutations";
+import { fetchEmailDetail } from "@/features/email/mail/queries";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import type { EmailListItem } from "@/features/email/mail/types";
+import { formatEmailDetailDate } from "@/features/email/mail/utils/formatters";
+import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -81,7 +82,7 @@ export default function FocusPage() {
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
-  } = useEmailData({
+  } = useMailViewData({
     view: "inbox",
     mailboxId,
   });
@@ -134,7 +135,6 @@ export default function FocusPage() {
     }
   }, [current, cursorId, queue]);
 
-  // Pre-fetch the next email's body so `j` feels instant.
   useEffect(() => {
     const next = queue[cursorIndex + 1]?.representative;
     if (!next) return;
@@ -150,12 +150,17 @@ export default function FocusPage() {
 
   const advance = useCallback(() => {
     const nextEmail = queue[cursorIndex + 1]?.representative;
+    const nearEnd = cursorIndex + 1 >= queue.length - PREFETCH_THRESHOLD;
+    if (hasNextPage && !isFetchingNextPage && nearEnd) {
+      void fetchNextPage();
+    }
     if (nextEmail) {
       setCursorId(nextEmail.id);
-    } else {
-      setCursorId(null);
+      return;
     }
-  }, [cursorIndex, queue]);
+    if (hasNextPage) return;
+    setCursorId(null);
+  }, [cursorIndex, fetchNextPage, hasNextPage, isFetchingNextPage, queue]);
 
   const goPrev = useCallback(() => {
     const prev = queue[cursorIndex - 1]?.representative;
@@ -167,7 +172,7 @@ export default function FocusPage() {
     snooze,
     todo,
     unsubscribe: unsubscribeMutation,
-  } = useEmailInboxActions({
+  } = useMailActions({
     view: "inbox",
     mailboxId,
   });
@@ -228,25 +233,10 @@ export default function FocusPage() {
     });
   }, [mailboxId, navigate]);
 
-  // Mark unread emails as read when they become the current focus email.
   useEffect(() => {
     if (!current || current.isRead) return;
     void executeEmailAction("mark-read", [current.id]);
   }, [current, executeEmailAction]);
-
-  // Auto-fetch next page when cursor approaches the end of the loaded queue.
-  useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage) return;
-    if (cursorIndex >= queue.length - PREFETCH_THRESHOLD) {
-      void fetchNextPage();
-    }
-  }, [
-    cursorIndex,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    queue.length,
-  ]);
 
   useHotkeys(
     {
@@ -362,6 +352,7 @@ function FocusShell({
   footer: ReactNode;
 }) {
   return (
+    <PageContainer>
     <div className="grid h-full w-full grid-rows-[auto_1fr_auto] bg-background">
       <header className="flex h-7 items-center justify-end px-4 text-xs text-muted-foreground tabular-nums">
         {progress && progress.total > 0 ? (
@@ -378,6 +369,7 @@ function FocusShell({
       <main className="min-h-0 overflow-y-auto">{body}</main>
       {footer}
     </div>
+    </PageContainer>
   );
 }
 
@@ -457,8 +449,8 @@ function FocusActionBar({
   return (
     <footer className="border-t border-border/40 bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-center gap-1.5 px-3 py-2 sm:px-10 sm:py-3">
-        <TriageActionButton label="Reply" shortcut="R" onClick={onReply} />
-        <TriageActionButton label="Done" shortcut="E" onClick={onDone} />
+        <MailActionButton label="Reply" shortcut="R" onClick={onReply} />
+        <MailActionButton label="Done" shortcut="E" onClick={onDone} />
         <SnoozePicker onSnooze={onSnooze}>
           <Button
             ref={snoozeButtonRef}
@@ -470,21 +462,21 @@ function FocusActionBar({
             <Kbd>S</Kbd>
           </Button>
         </SnoozePicker>
-        <TriageActionButton
+        <MailActionButton
           shortcut="T"
           label={isTodo ? "To-do*" : "To-do"}
           onClick={onTodo}
           disabled={actionsPending}
         />
         {canUnsubscribe && (
-          <TriageActionButton
+          <MailActionButton
             shortcut="U"
             label="Unsubscribe"
             onClick={onUnsubscribe}
             disabled={actionsPending}
           />
         )}
-        <TriageActionButton shortcut="J" label="Keep" onClick={onKeep} />
+        <MailActionButton shortcut="J" label="Keep" onClick={onKeep} />
       </div>
     </footer>
   );

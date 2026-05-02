@@ -1,22 +1,25 @@
-import { emailQueryKeys } from "@/features/email/inbox/query-keys";
-import { PageHeader } from "@/components/page-header";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SearchResultsList } from "@/features/email/inbox/components/search/search-results-list";
-import { SearchSuggestionsList } from "@/features/email/inbox/components/search/search-suggestions-list";
-import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
+import { SearchResultsList } from "@/features/email/mail/search/search-results-list";
+import { SearchSuggestionsList } from "@/features/email/mail/search/search-suggestions-list";
+import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
+import {
+  MailboxPage,
+  MailboxPageBody,
+  MailboxPageHeader,
+} from "@/features/email/shell/mailbox-page";
 import {
   fetchSearchEmails,
   fetchSearchSuggestions,
-} from "@/features/email/inbox/queries";
+} from "@/features/email/mail/queries";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
-import { useIsScrolled } from "@/hooks/use-is-scrolled";
 import {
   useInfiniteQuery,
   useQuery,
 } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
 
 const searchRoute = getRouteApi("/_dashboard/$mailboxId/inbox/search");
@@ -33,9 +36,7 @@ export default function InboxSearchPage() {
   const routeQuery = search.q ?? "";
 
   const [query, setSearchQuery] = useState(routeQuery);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const isScrolled = useIsScrolled(scrollRef);
-  const { openEmail, executeEmailAction } = useEmailInboxActions({
+  const { openEmail, executeEmailAction } = useMailActions({
     view: "inbox",
     mailboxId,
   });
@@ -196,18 +197,13 @@ export default function InboxSearchPage() {
   );
 
   return (
-    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
-      <PageHeader
-        title={
-          <span className="flex min-w-0 items-center gap-2">
-            <span>Search</span>
-          </span>
-        }
+    <MailboxPage>
+      <MailboxPageHeader
+        title="Search"
         actions={headerActions}
-        isScrolled={isScrolled}
       />
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+      <MailboxPageBody className="overflow-y-auto">
         {hasSearchSuggestions ? (
           <div className="px-3 py-3 md:px-6">
             <SearchSuggestionsList
@@ -231,7 +227,7 @@ export default function InboxSearchPage() {
           onOpenEmail={openEmail}
           onAction={executeEmailAction}
         />
-      </div>
-    </div>
+      </MailboxPageBody>
+    </MailboxPage>
   );
 }

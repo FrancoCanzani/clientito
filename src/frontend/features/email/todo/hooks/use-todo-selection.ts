@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ThreadGroup } from "@/features/email/inbox/utils/group-emails-by-thread";
+import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
 
 export function useTodoSelection(groups: ThreadGroup[]) {
   const [selectedId, setSelectedId] = useState<string | null>(null);

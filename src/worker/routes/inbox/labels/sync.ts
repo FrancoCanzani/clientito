@@ -4,6 +4,7 @@ import type { Hono } from "hono";
 import { z } from "zod";
 import { mailboxes } from "../../../db/schema";
 import { getGmailTokenForMailbox } from "../../../lib/gmail/client";
+import { isGmailRateLimitError } from "../../../lib/gmail/errors";
 import { listGmailLabels } from "../../../lib/gmail/mailbox/labels";
 import type { AppRouteEnv } from "../../types";
 
@@ -27,19 +28,27 @@ export function registerSyncLabels(api: Hono<AppRouteEnv>) {
       GOOGLE_CLIENT_SECRET: c.env.GOOGLE_CLIENT_SECRET,
     });
 
-    const gmailLabels = await listGmailLabels(accessToken);
-    const data = gmailLabels
-      .filter((label) => label.type === "user")
-      .map((label) => ({
-        gmailId: label.id,
-        name: label.name,
-        type: label.type?.toLowerCase() ?? "user",
-        textColor: label.color?.textColor ?? null,
-        backgroundColor: label.color?.backgroundColor ?? null,
-        messagesTotal: label.messagesTotal ?? 0,
-        messagesUnread: label.messagesUnread ?? 0,
-      }));
+    try {
+      const gmailLabels = await listGmailLabels(accessToken);
+      const data = gmailLabels
+        .filter((label) => label.type === "user")
+        .map((label) => ({
+          gmailId: label.id,
+          name: label.name,
+          type: label.type?.toLowerCase() ?? "user",
+          textColor: label.color?.textColor ?? null,
+          backgroundColor: label.color?.backgroundColor ?? null,
+          messagesTotal: label.messagesTotal ?? 0,
+          messagesUnread: label.messagesUnread ?? 0,
+        }));
 
-    return c.json({ data }, 200);
+      return c.json({ data }, 200);
+    } catch (error) {
+      if (isGmailRateLimitError(error)) {
+        c.header("Retry-After", "60");
+        return c.json({ error: "gmail_rate_limited" }, 429);
+      }
+      throw error;
+    }
   });
 }

@@ -1,5 +1,5 @@
-import { emailQueryKeys } from "@/features/email/inbox/query-keys";
-import type { EmailListItem } from "@/features/email/inbox/types";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import type { EmailListItem } from "@/features/email/mail/types";
 import { TODO_LABEL_NAME } from "@/features/email/labels/internal-labels";
 import { applyLabel, createLabel, removeLabel } from "@/features/email/labels/mutations";
 import { fetchLabels } from "@/features/email/labels/queries";

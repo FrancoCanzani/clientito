@@ -2,7 +2,7 @@ import {
   COMPOSER_AI_ACTIONS,
   getComposerAiLabel,
   runComposerAiAction,
-} from "@/features/email/inbox/components/compose/compose-ai-actions";
+} from "@/features/email/mail/compose/compose-ai-actions";
 import { accountsQueryOptions } from "@/hooks/use-mailboxes";
 import { queryClient } from "@/lib/query-client";
 import { paletteIcon } from "../registry/palette-icon";

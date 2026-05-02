@@ -5,13 +5,14 @@ import {
   getGmailTokenForMailbox,
   listThreadsPage,
 } from "../../lib/gmail/client";
+import { isGmailRateLimitError } from "../../lib/gmail/errors";
 import { resolveMailbox } from "../../lib/gmail/mailboxes";
 import { fetchThreadsAndParse } from "../../lib/gmail/sync/threads";
 import { viewToGmailFilter } from "../../lib/gmail/view-filter";
 import type { AppRouteEnv } from "../types";
 
-const VIEW_PAGE_DEFAULT_THREADS = 50;
-const VIEW_PAGE_MAX_THREADS = 200;
+const VIEW_PAGE_DEFAULT_THREADS = 25;
+const VIEW_PAGE_MAX_THREADS = 100;
 
 const viewPageRequestSchema = z.object({
   mailboxId: z.number().int().positive(),
@@ -49,20 +50,28 @@ const viewRoutes = (api: Hono<AppRouteEnv>) => {
     const effectiveQuery =
       beforeMs != null ? appendBeforeClause(filter.query, beforeMs) : filter.query;
 
-    const page = await listThreadsPage(accessToken, {
-      pageToken: cursor,
-      query: effectiveQuery,
-      labelIds: filter.labelIds,
-      maxResults: limit ?? VIEW_PAGE_DEFAULT_THREADS,
-    });
+    try {
+      const page = await listThreadsPage(accessToken, {
+        pageToken: cursor,
+        query: effectiveQuery,
+        labelIds: filter.labelIds,
+        maxResults: limit ?? VIEW_PAGE_DEFAULT_THREADS,
+      });
 
-    const threadIds = (page.threads ?? []).map((t) => t.id);
-    const emails = await fetchThreadsAndParse(accessToken, threadIds, null);
+      const threadIds = (page.threads ?? []).map((t) => t.id);
+      const emails = await fetchThreadsAndParse(accessToken, threadIds, null);
 
-    return c.json({
-      emails,
-      cursor: page.nextPageToken ?? null,
-    });
+      return c.json({
+        emails,
+        cursor: page.nextPageToken ?? null,
+      });
+    } catch (error) {
+      if (isGmailRateLimitError(error)) {
+        c.header("Retry-After", "60");
+        return c.json({ error: "gmail_rate_limited" }, 429);
+      }
+      throw error;
+    }
   });
 };
 

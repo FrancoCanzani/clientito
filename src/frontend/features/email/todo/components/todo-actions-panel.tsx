@@ -1,16 +1,16 @@
 import { SnoozePicker } from "@/components/snooze-picker";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-import { TriageActionButton } from "@/features/email/components/triage-action-button";
-import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
-import { useEmailInboxActions } from "@/features/email/inbox/hooks/use-email-inbox-actions";
+import { MailActionButton } from "@/features/email/mail/mail-action-button";
+import { useMailCompose } from "@/features/email/mail/compose/compose-context";
+import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import type {
   ComposeInitial,
   EmailDetailItem,
   EmailListItem,
-} from "@/features/email/inbox/types";
-import { buildForwardedEmailHtml } from "@/features/email/inbox/utils/build-forwarded-html";
-import { formatQuotedDate } from "@/features/email/inbox/utils/formatters";
+} from "@/features/email/mail/types";
+import { buildForwardedEmailHtml } from "@/features/email/mail/utils/build-forwarded-html";
+import { formatQuotedDate } from "@/features/email/mail/utils/formatters";
 
 export function TodoActionsPanel({
   selectedEmail,
@@ -25,8 +25,8 @@ export function TodoActionsPanel({
   view: string;
   hasThreadError: boolean;
 }) {
-  const { openCompose } = useInboxCompose();
-  const { executeEmailAction, snooze, todo } = useEmailInboxActions({
+  const { openCompose } = useMailCompose();
+  const { executeEmailAction, snooze, todo } = useMailActions({
     view,
     mailboxId,
   });
@@ -97,14 +97,14 @@ export function TodoActionsPanel({
   return (
     <aside className="min-h-0 md:w-40 md:shrink-0">
       <div className="flex flex-col gap-1 md:sticky md:top-2">
-        <TriageActionButton
+        <MailActionButton
           label="Reply"
           shortcut="R"
           onClick={handleReply}
           disabled={busy}
           className="w-full justify-between"
         />
-        <TriageActionButton
+        <MailActionButton
           label="Forward"
           shortcut="F"
           onClick={handleForward}
@@ -123,21 +123,21 @@ export function TodoActionsPanel({
             <Kbd>S</Kbd>
           </Button>
         </SnoozePicker>
-        <TriageActionButton
+        <MailActionButton
           label="Done"
           shortcut="E"
           onClick={handleRemove}
           disabled={busy}
           className="w-full justify-between"
         />
-        <TriageActionButton
+        <MailActionButton
           label="Archive"
           shortcut="A"
           onClick={() => void handleArchive()}
           disabled={busy}
           className="w-full justify-between"
         />
-        <TriageActionButton
+        <MailActionButton
           label="Remove"
           shortcut="Del"
           onClick={handleRemove}

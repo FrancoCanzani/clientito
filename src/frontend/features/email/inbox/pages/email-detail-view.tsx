@@ -1,23 +1,24 @@
 import { Button } from "@/components/ui/button";
-import { emailQueryKeys } from "@/features/email/inbox/query-keys";
-import { useInboxCompose } from "@/features/email/inbox/components/compose/inbox-compose-provider";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { useMailCompose } from "@/features/email/mail/compose/compose-context";
 import {
   EmailDetailContent,
   type EmailDetailContentHandle,
-} from "@/features/email/inbox/components/thread/email-detail-content";
-import { patchEmail, patchThread } from "@/features/email/inbox/mutations";
+} from "@/features/email/mail/thread/email-detail-content";
+import { patchEmail, patchThread } from "@/features/email/mail/mutations";
 import {
   fetchEmailDetail,
   fetchEmailThread,
-} from "@/features/email/inbox/queries";
+} from "@/features/email/mail/queries";
 import type {
   ComposeInitial,
   EmailDetailItem,
   EmailListPage,
-} from "@/features/email/inbox/types";
-import { buildForwardedEmailHtml } from "@/features/email/inbox/utils/build-forwarded-html";
-import { openEmail as openInboxEmail } from "@/features/email/inbox/utils/open-email";
-import { isEmailListInfiniteData } from "@/features/email/inbox/utils/email-list-cache";
+} from "@/features/email/mail/types";
+import { buildForwardedEmailHtml } from "@/features/email/mail/utils/build-forwarded-html";
+import { openEmail as openInboxEmail } from "@/features/email/mail/utils/open-email";
+import { isEmailListInfiniteData } from "@/features/email/mail/utils/email-list-cache";
+import { MailboxPage } from "@/features/email/shell/mailbox-page";
 import { clearFocusedEmail, setFocusedEmail } from "@/hooks/use-focused-email";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import {
@@ -28,7 +29,7 @@ import {
 } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useUndoAction } from "@/features/email/inbox/hooks/use-undo-action";
+import { useUndoAction } from "@/features/email/mail/hooks/use-undo-action";
 
 export function EmailDetailView({
   mailboxId,
@@ -106,7 +107,7 @@ function EmailDetailPane({
   const navigate = useNavigate();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { openCompose } = useInboxCompose();
+  const { openCompose } = useMailCompose();
   const contentRef = useRef<EmailDetailContentHandle>(null);
   const currentEmail = email;
 
@@ -328,7 +329,7 @@ function EmailDetailPane({
   });
 
   return (
-    <div className="flex h-full w-full min-w-0 flex-col">
+    <MailboxPage>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <EmailDetailContent
           ref={contentRef}
@@ -344,6 +345,6 @@ function EmailDetailPane({
           onForward={handleForward}
         />
       </div>
-    </div>
+    </MailboxPage>
   );
 }

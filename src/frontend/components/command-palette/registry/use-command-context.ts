@@ -1,8 +1,8 @@
-import { isComposerOpen } from "@/features/email/inbox/components/compose/compose-editor-ref";
+import { isComposerOpen } from "@/features/email/mail/compose/compose-editor-ref";
 import {
   isEmailView,
-} from "@/features/email/inbox/utils/inbox-filters";
-import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
+} from "@/features/email/mail/views";
+import { getPreferredMailboxId } from "@/features/email/mail/utils/mailbox";
 import { useFocusedEmail } from "@/hooks/use-focused-email";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMailboxes } from "@/hooks/use-mailboxes";

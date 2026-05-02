@@ -1,6 +1,6 @@
 import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { localDb } from "@/db/client";
-import { invalidateInboxQueries } from "@/features/email/inbox/queries";
+import { invalidateInboxQueries } from "@/features/email/mail/queries";
 import { queryClient } from "@/lib/query-client";
 import { syncLabelsFromServer } from "./queries";
 import type { CreateLabelInput, Label, UpdateLabelInput } from "./types";

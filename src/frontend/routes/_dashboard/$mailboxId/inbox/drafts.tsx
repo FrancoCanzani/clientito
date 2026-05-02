@@ -1,7 +1,7 @@
-import { draftQueryKeys } from "@/features/email/inbox/query-keys";
+import { draftQueryKeys } from "@/features/email/mail/query-keys";
 import { Error as RouteError } from "@/components/error";
 import DraftsPage from "@/features/email/drafts/pages/drafts-page";
-import { fetchDrafts } from "@/features/email/inbox/queries";
+import { fetchDrafts } from "@/features/email/mail/queries";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/drafts")({

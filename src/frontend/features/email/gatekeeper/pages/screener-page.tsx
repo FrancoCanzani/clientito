@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -10,12 +9,16 @@ import {
   useGatekeeperDecision,
   useGatekeeperPending,
 } from "@/features/email/gatekeeper/queries";
-import { formatInboxRowDate } from "@/features/email/inbox/utils/formatters";
-import type { EmailListItem } from "@/features/email/inbox/types";
-import { useIsScrolled } from "@/hooks/use-is-scrolled";
+import { formatInboxRowDate } from "@/features/email/mail/utils/formatters";
+import type { EmailListItem } from "@/features/email/mail/types";
+import {
+  MailboxPage,
+  MailboxPageBody,
+  MailboxPageHeader,
+} from "@/features/email/shell/mailbox-page";
 import { SpinnerGapIcon } from "@phosphor-icons/react";
 import { getRouteApi } from "@tanstack/react-router";
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { toast } from "sonner";
 
 const screenerRoute = getRouteApi("/_dashboard/$mailboxId/screener");
@@ -65,9 +68,6 @@ export default function ScreenerPage() {
   const pendingQuery = useGatekeeperPending(mailboxId, true);
   const decisionMutation = useGatekeeperDecision(mailboxId);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const isScrolled = useIsScrolled(scrollRef);
-
   const pendingSenders = useMemo(
     () => buildPendingSenders(pendingQuery.data?.items),
     [pendingQuery.data],
@@ -105,20 +105,11 @@ export default function ScreenerPage() {
     }
   }
 
-  const headerTitle = (
-    <div className="flex items-center gap-2">
-      <span>Screener</span>
-    </div>
-  );
-
   return (
-    <div className="flex w-full min-h-0 min-w-0 flex-1 flex-col">
-      <PageHeader
-        title={headerTitle}
-        isScrolled={isScrolled}
-      />
+    <MailboxPage>
+      <MailboxPageHeader title="Screener" />
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+      <MailboxPageBody className="overflow-y-auto">
         <div className="w-full px-3 py-3 md:px-6">
           {pendingQuery.isLoading ? (
             <div className="flex items-center justify-center py-16 text-muted-foreground">
@@ -192,7 +183,7 @@ export default function ScreenerPage() {
             </ul>
           )}
         </div>
-      </div>
-    </div>
+      </MailboxPageBody>
+    </MailboxPage>
   );
 }

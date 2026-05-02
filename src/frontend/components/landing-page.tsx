@@ -1,4 +1,4 @@
-import { getPreferredMailboxId } from "@/features/email/inbox/utils/mailbox";
+import { getPreferredMailboxId } from "@/features/email/mail/utils/mailbox";
 import { useAuth } from "@/hooks/use-auth";
 import { useMailboxes } from "@/hooks/use-mailboxes";
 import { CaretDownIcon, CheckIcon } from "@phosphor-icons/react";
