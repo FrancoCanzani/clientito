@@ -127,11 +127,11 @@ export function CalendarInviteCard({ email }: { email: EmailDetailItem }) {
             <p className="mt-1 text-xs font-medium text-muted-foreground">
               This event was canceled
             </p>
-          ) : responseStatus ? (
+          ) : responseStatus && (
             <p className="mt-1 text-xs font-medium text-muted-foreground">
               Status: {responseStatus}
             </p>
-          ) : null}
+          )}
         </div>
       </div>
 

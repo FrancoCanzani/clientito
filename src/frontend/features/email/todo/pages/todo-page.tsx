@@ -101,7 +101,7 @@ function TodoView({
             hasThreadError={threadQuery.isError}
             onRetry={() => void detailQuery.refetch()}
           />
-          {selectedEmail ? (
+          {selectedEmail && (
             <TodoActionsPanel
               selectedEmail={selectedEmail}
               detail={currentEmail}
@@ -109,7 +109,7 @@ function TodoView({
               view={todoLabelId}
               hasThreadError={threadQuery.isError}
             />
-          ) : null}
+          )}
         </div>
       </MailboxPageBody>
     </MailboxPage>

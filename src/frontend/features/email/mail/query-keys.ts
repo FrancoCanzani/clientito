@@ -1,6 +1,8 @@
 export const emailQueryKeys = {
   all: () => ["emails"] as const,
   list: (view: string, mailboxId: number) => ["emails", view, mailboxId] as const,
+  viewSyncState: (view: string, mailboxId: number) =>
+    ["emails", "view-sync-state", view, mailboxId] as const,
   inboxUnreadCount: (mailboxId: number) =>
     ["emails", "inbox-unread-count", mailboxId] as const,
   detail: (emailId: string) => ["email-detail", emailId] as const,

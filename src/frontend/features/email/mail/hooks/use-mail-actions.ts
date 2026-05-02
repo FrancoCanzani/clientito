@@ -119,9 +119,11 @@ function removeIdsFromInfiniteData(
 export function useMailActions({
   view,
   mailboxId,
+  presentation = "route",
 }: {
   view: string;
   mailboxId: number;
+  presentation?: "route" | "panel";
 }) {
   const navigate = mailboxRoute.useNavigate();
   const queryClient = useQueryClient();
@@ -133,9 +135,10 @@ export function useMailActions({
       const routeMailboxId = email.mailboxId ?? mailboxId;
       openInboxEmail(queryClient, navigate, routeMailboxId, email, {
         context: view,
+        presentation,
       });
     },
-    [mailboxId, navigate, queryClient, view],
+    [mailboxId, navigate, presentation, queryClient, view],
   );
 
   const mutation = useMutation<void, Error, InboxMutationVars>({

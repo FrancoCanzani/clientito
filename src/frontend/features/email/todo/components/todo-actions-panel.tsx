@@ -144,11 +144,11 @@ export function TodoActionsPanel({
           disabled={busy}
           className="w-full justify-between"
         />
-        {hasThreadError ? (
+        {hasThreadError && (
           <p className="pt-2 text-[11px] text-muted-foreground">
             Thread unavailable.
           </p>
-        ) : null}
+        )}
       </div>
     </aside>
   );

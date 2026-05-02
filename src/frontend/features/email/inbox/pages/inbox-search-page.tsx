@@ -175,7 +175,7 @@ export default function InboxSearchPage() {
           spellCheck={false}
         />
       </div>
-      {canToggleJunk ? (
+      {canToggleJunk && (
         <Button
           type="button"
           variant={search.includeJunk ? "secondary" : "ghost"}
@@ -192,7 +192,7 @@ export default function InboxSearchPage() {
         >
           {search.includeJunk ? "Hide junk" : "Show junk"}
         </Button>
-      ) : null}
+      )}
     </>
   );
 
@@ -204,7 +204,7 @@ export default function InboxSearchPage() {
       />
 
       <MailboxPageBody className="overflow-y-auto">
-        {hasSearchSuggestions ? (
+        {hasSearchSuggestions && (
           <div className="px-3 py-3 md:px-6">
             <SearchSuggestionsList
               query={query.trim()}
@@ -214,7 +214,7 @@ export default function InboxSearchPage() {
               }}
             />
           </div>
-        ) : null}
+        )}
 
         <SearchResultsList
           query={routeQuery.trim()}

@@ -1,9 +1,12 @@
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
-import { fetchViewPage } from "@/features/email/mail/queries";
+import {
+  fetchViewPage,
+  fetchViewSyncState,
+} from "@/features/email/mail/queries";
 import type { EmailListPage } from "@/features/email/mail/types";
 import { groupEmailsByThread } from "@/features/email/mail/utils/group-emails-by-thread";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 const LOAD_MORE_ROOT_MARGIN = "800px 0px";
@@ -56,9 +59,16 @@ export function useMailViewData({
       : {}),
     getNextPageParam: (lastPage) => lastPage?.cursor ?? undefined,
     placeholderData: (previousData) => previousData,
-    staleTime: 5_000,
+    staleTime: 0,
     gcTime: 2 * 60_000,
     retry: false,
+  });
+
+  const viewSyncQuery = useQuery({
+    queryKey: emailQueryKeys.viewSyncState(view, mailboxId),
+    queryFn: () => fetchViewSyncState({ view, mailboxId }),
+    staleTime: 60_000,
+    gcTime: 2 * 60_000,
   });
 
   const allEmails = useMemo(
@@ -77,6 +87,11 @@ export function useMailViewData({
     [displayEmails],
   );
   const hasEmails = threadGroups.length > 0;
+  const isInitialViewSyncing =
+    !hasEmails &&
+    !hasActiveFilters &&
+    viewSyncQuery.data === false &&
+    emailsQuery.isFetching;
 
   const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } =
     emailsQuery;
@@ -96,7 +111,7 @@ export function useMailViewData({
     mailboxId,
     hasEmails,
     threadGroups,
-    isLoading: emailsQuery.isLoading,
+    isLoading: emailsQuery.isLoading || isInitialViewSyncing,
     isError: emailsQuery.isError,
     hasNextPage: hasNextPage ?? false,
     isFetchingNextPage,

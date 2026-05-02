@@ -124,7 +124,7 @@ export function MailboxMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64 p-0" forceMount>
         <AnimatePresence initial={false}>
-          {open ? (
+          {open && (
             <motion.div
               key="mailbox-menu-body"
               initial={{ opacity: 0, y: -4 }}
@@ -157,11 +157,11 @@ export function MailboxMenu() {
                     <span className="min-w-0 flex-1 truncate text-sm">
                       {email}
                     </span>
-                    {isActive ? (
+                    {isActive && (
                       <span className="text-[10px] text-muted-foreground">
                         Current
                       </span>
-                    ) : null}
+                    )}
                   </DropdownMenuItem>
                 );
               })}
@@ -240,7 +240,7 @@ export function MailboxMenu() {
                   Trash
                 </Link>
               </DropdownMenuItem>
-              {labels.length > 0 ? (
+              {labels.length > 0 && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-[11px]">
@@ -256,17 +256,17 @@ export function MailboxMenu() {
                           className="justify-between"
                         >
                           <span className="min-w-0 truncate">{label.name}</span>
-                          {label.messagesUnread > 0 ? (
+                          {label.messagesUnread > 0 && (
                             <span className="text-[10px] text-muted-foreground">
                               {label.messagesUnread}
                             </span>
-                          ) : null}
+                          )}
                         </Link>
                       </DropdownMenuItem>
                     ))}
                   </div>
                 </>
-              ) : null}
+              )}
 
               <DropdownMenuSeparator />
               <DropdownMenuLabel className="text-[11px]">
@@ -282,7 +282,7 @@ export function MailboxMenu() {
                 </Link>
               </DropdownMenuItem>
             </motion.div>
-          ) : null}
+          )}
         </AnimatePresence>
       </DropdownMenuContent>
     </DropdownMenu>

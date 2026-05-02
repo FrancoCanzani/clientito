@@ -36,11 +36,15 @@ export function EmailDetailView({
   emailId,
   view,
   onNavigateToEmail,
+  onClose,
+  embedded = false,
 }: {
   mailboxId: number;
   emailId: string;
   view: string;
   onNavigateToEmail: (nextEmailId: string) => void;
+  onClose?: () => void;
+  embedded?: boolean;
 }) {
   const emailQuery = useQuery({
     queryKey: emailQueryKeys.detail(emailId),
@@ -87,6 +91,8 @@ export function EmailDetailView({
       emailId={emailId}
       view={view}
       onNavigateToEmail={onNavigateToEmail}
+      onClose={onClose}
+      embedded={embedded}
     />
   );
 }
@@ -97,12 +103,16 @@ function EmailDetailPane({
   emailId,
   view,
   onNavigateToEmail,
+  onClose,
+  embedded,
 }: {
   email: EmailDetailItem;
   mailboxId: number;
   emailId: string;
   view: string;
   onNavigateToEmail: (nextEmailId: string) => void;
+  onClose?: () => void;
+  embedded: boolean;
 }) {
   const navigate = useNavigate();
   const router = useRouter();
@@ -175,7 +185,11 @@ function EmailDetailPane({
           navigate,
           nextEmail.mailboxId ?? mailboxId,
           nextEmail,
-          { context: view, replace: true },
+          {
+            context: view,
+            presentation: embedded ? "panel" : "route",
+            replace: true,
+          },
         );
         return;
       }
@@ -191,12 +205,11 @@ function EmailDetailPane({
       mailboxId,
       view,
       onNavigateToEmail,
+      embedded,
     ],
   );
 
-  const goBack = () => {
-    router.history.back();
-  };
+  const goBack = onClose ?? (() => router.history.back());
 
   useEffect(() => {
     const previousId = currentIndex > 0 ? orderedIds[currentIndex - 1] : null;
@@ -325,26 +338,26 @@ function EmailDetailPane({
     u: () => {
       threadPatchMutation.mutate({ isRead: !currentEmail.isRead });
     },
-    Escape: () => router.history.back(),
+    Escape: () => goBack(),
   });
 
-  return (
-    <MailboxPage>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <EmailDetailContent
-          ref={contentRef}
-          email={currentEmail}
-          threadMessages={threadMessages}
-          threadError={threadQuery.isError}
-          onClose={goBack}
-          onBack={goBack}
-          onPrev={() => goToEmail("prev")}
-          onNext={() => goToEmail("next")}
-          hasPrev={hasPrev}
-          hasNext={hasNext}
-          onForward={handleForward}
-        />
-      </div>
-    </MailboxPage>
+  const content = (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <EmailDetailContent
+        ref={contentRef}
+        email={currentEmail}
+        threadMessages={threadMessages}
+        threadError={threadQuery.isError}
+        onClose={goBack}
+        onBack={goBack}
+        onPrev={() => goToEmail("prev")}
+        onNext={() => goToEmail("next")}
+        hasPrev={hasPrev}
+        hasNext={hasNext}
+        onForward={handleForward}
+      />
+    </div>
   );
+
+  return embedded ? content : <MailboxPage>{content}</MailboxPage>;
 }

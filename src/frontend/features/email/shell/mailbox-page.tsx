@@ -1,11 +1,6 @@
 import { PageContainer } from "@/components/page-container";
 import { cn } from "@/lib/utils";
-import {
-  useContext,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useContext, useRef, useState, type ReactNode } from "react";
 import {
   MailboxScrolledContext,
   MailboxSetScrolledContext,
@@ -47,21 +42,19 @@ export function MailboxPageHeader({
   return (
     <header
       className={cn(
-        "flex min-h-10 shrink-0 items-center justify-between gap-3 border-b bg-background px-3 py-1.5 transition-colors duration-200 md:px-6",
+        "flex min-h-10 shrink-0 items-center justify-between gap-3 border-b bg-background px-3 py-1.5 transition-colors duration-200 md:px-4",
         isScrolled ? "border-border/40" : "border-transparent",
         className,
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <h1 className="shrink-0 truncate text-sm font-medium text-foreground">
-          {title}
-        </h1>
+        <h1 className="shrink-0 truncate">{title}</h1>
       </div>
-      {actions ? (
+      {actions && (
         <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
           {actions}
         </div>
-      ) : null}
+      )}
     </header>
   );
 }

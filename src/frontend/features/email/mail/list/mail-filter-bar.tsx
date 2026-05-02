@@ -1,5 +1,6 @@
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import type { MailListFilters } from "@/features/email/mail/hooks/use-mail-view-data";
+import { cn } from "@/lib/utils";
 import {
   EnvelopeSimpleIcon,
   PaperclipIcon,
@@ -36,7 +37,9 @@ export function MailFilterBar({
 
   const activeCount = Object.values(filters).filter(Boolean).length;
 
-  const visible = FILTERS.filter((f) => !(f.key === "starred" && view === "starred"));
+  const visible = FILTERS.filter(
+    (f) => !(f.key === "starred" && view === "starred"),
+  );
 
   return (
     <div className={cn("flex items-center gap-1 text-xs", className)}>
@@ -44,23 +47,20 @@ export function MailFilterBar({
         const active = Boolean(filters[f.key]);
         const Icon = f.icon;
         return (
-          <button
+          <Button
             key={f.key}
             type="button"
+            variant={"secondary"}
+            size={"sm"}
             onClick={() => toggle(f.key)}
-            className={cn(
-              "inline-flex h-6 items-center gap-1 rounded-full border px-2 transition-colors",
-              active
-                ? "border-primary/50 bg-primary/10 text-foreground"
-                : "border-white/30 bg-background/50 text-muted-foreground backdrop-blur-md hover:text-foreground hover:border-foreground/30 dark:border-white/10 dark:bg-background/40",
-            )}
+            className={cn("", active && "bg-muted")}
           >
             <Icon
               className="size-3"
               weight={active && f.key === "starred" ? "fill" : "regular"}
             />
             <span>{f.label}</span>
-          </button>
+          </Button>
         );
       })}
       {activeCount > 0 && (

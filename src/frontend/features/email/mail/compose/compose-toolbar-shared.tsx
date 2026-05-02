@@ -146,7 +146,7 @@ export function LinkEditor({
       >
         Apply
       </button>
-      {currentLink ? (
+      {currentLink && (
         <button
           type="button"
           onMouseDown={(event) => event.preventDefault()}
@@ -155,7 +155,7 @@ export function LinkEditor({
         >
           Unlink
         </button>
-      ) : null}
+      )}
       <button
         type="button"
         onMouseDown={(event) => event.preventDefault()}

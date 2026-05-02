@@ -9,15 +9,12 @@ import type { MailAction } from "@/features/email/mail/hooks/use-mail-actions";
 import type { ThreadIdentifier } from "@/features/email/mail/mutations";
 import type { EmailListItem } from "@/features/email/mail/types";
 import { groupEmailsByThread } from "@/features/email/mail/utils/group-emails-by-thread";
-import { fetchLabels } from "@/features/email/labels/queries";
-import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { RefCallback } from "react";
-import { DesktopEmailRow } from "../list/desktop-email-row";
 import { MobileEmailRow } from "../list/mobile-email-row";
+import { SplitEmailRow } from "../list/split-email-row";
 
 export function SearchResultsList({
   query,
@@ -44,14 +41,10 @@ export function SearchResultsList({
     thread?: ThreadIdentifier,
   ) => void;
 }) {
+  void mailboxId;
   const isMobile = useIsMobile();
-  const RowComponent = isMobile ? MobileEmailRow : DesktopEmailRow;
+  const RowComponent = isMobile ? MobileEmailRow : SplitEmailRow;
   const groups = useMemo(() => groupEmailsByThread(results), [results]);
-  const { data: allLabels } = useQuery({
-    queryKey: labelQueryKeys.list(mailboxId),
-    queryFn: () => fetchLabels(mailboxId),
-    staleTime: 60_000,
-  });
 
   if (query.length < 2) {
     return (
@@ -76,7 +69,7 @@ export function SearchResultsList({
               "flex w-full items-center gap-3",
               isMobile
                 ? "h-14 border-b border-border/40 px-4"
-                : "h-10 rounded-md px-6",
+                : "h-[84px] px-6",
             )}
           >
             <Skeleton className="h-3.5 w-24 shrink-0 sm:w-32 lg:w-44" />
@@ -105,14 +98,17 @@ export function SearchResultsList({
   return (
     <div className="w-full">
       {groups.map((group) => (
-        <RowComponent
+        <div
           key={group.representative.id}
-          group={group}
-          view="inbox"
-          onOpen={onOpenEmail}
-          onAction={onAction}
-          allLabels={allLabels}
-        />
+          className={isMobile ? undefined : "h-[84px]"}
+        >
+          <RowComponent
+            group={group}
+            view="inbox"
+            onOpen={onOpenEmail}
+            onAction={onAction}
+          />
+        </div>
       ))}
 
       {hasNextPage && (

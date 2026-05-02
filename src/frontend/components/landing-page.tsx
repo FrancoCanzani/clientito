@@ -490,9 +490,9 @@ function AiToneComposerPreview() {
               >
                 {option.label}
               </span>
-              {option.selected ? (
+              {option.selected && (
                 <CheckIcon className="ml-auto size-3 text-foreground" />
-              ) : null}
+              )}
             </div>
           ))}
         </div>

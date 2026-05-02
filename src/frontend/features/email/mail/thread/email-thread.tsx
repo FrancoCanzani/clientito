@@ -109,12 +109,10 @@ export function EmailThread({
   email,
   threadMessages,
   threadError,
-  readingMode = "original",
 }: {
   email: EmailDetailItem;
   threadMessages: EmailThreadItem[];
   threadError: boolean;
-  readingMode?: "detox" | "original";
 }) {
   const [expansionOverrides, setExpansionOverrides] = useState<
     Map<string, boolean>
@@ -246,7 +244,6 @@ export function EmailThread({
                             ),
                         )
                   }
-                  readingMode={readingMode}
                 />
               </div>
             );
@@ -255,7 +252,7 @@ export function EmailThread({
       ) : (
         <div className="overflow-x-auto rounded-md border border-white/30 bg-background/75 shadow-xs backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-background/60">
           <div className="p-5">
-            <MessageBody detail={email} readingMode={readingMode} />
+            <MessageBody detail={email} />
           </div>
 
           {hasAttachments && (
@@ -273,14 +270,12 @@ function ThreadMessage({
   expanded,
   onToggle,
   attachments,
-  readingMode = "original",
 }: {
   email: EmailThreadItem;
   body?: EmailBodySource | null;
   expanded: boolean;
   onToggle: () => void;
   attachments: EmailAttachment[];
-  readingMode?: "detox" | "original";
 }) {
   const formattedDate = formatEmailThreadDate(email.date);
   const senderName = formatSenderLabel(email);
@@ -317,7 +312,7 @@ function ThreadMessage({
       {expanded && (
         <>
           <div className="border-t border-border/60 px-5 pb-5 pt-4">
-            <MessageBody detail={body ?? email} readingMode={readingMode} />
+            <MessageBody detail={body ?? email} />
           </div>
 
           {hasAttachments && <AttachmentsSection attachments={attachments} />}

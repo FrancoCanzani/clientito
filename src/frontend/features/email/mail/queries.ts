@@ -783,6 +783,22 @@ function mergeContactSuggestions(
 
 async function markViewSynced(mailboxId: number, view: string): Promise<void> {
   await localDb.setMeta(viewSyncedKey(mailboxId, view), "1");
+  void queryClient.invalidateQueries({
+    queryKey: emailQueryKeys.viewSyncState(view, mailboxId),
+  });
+}
+
+export async function fetchViewSyncState(params: {
+  mailboxId: number;
+  view: string;
+}): Promise<boolean> {
+  const userId = await getCurrentUserId();
+  if (!userId) return true;
+
+  await alignActiveUser(userId);
+  return (
+    (await localDb.getMeta(viewSyncedKey(params.mailboxId, params.view))) === "1"
+  );
 }
 
 async function refreshViewFromServer(

@@ -4,8 +4,14 @@ import { fetchLocalViewPage } from "@/features/email/mail/queries";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { enqueueMailboxRouteViewSync } from "@/features/email/shell/route-sync";
 import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+
+const inboxPageSearchSchema = z.object({
+  emailId: z.string().min(1).optional(),
+});
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/")({
+  validateSearch: inboxPageSearchSchema,
   beforeLoad: ({ params, preload }) => {
     enqueueMailboxRouteViewSync({
       view: "inbox",

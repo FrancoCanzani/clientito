@@ -49,7 +49,6 @@ export function TodoReaderPanel({
             email={currentEmail}
             threadMessages={threadMessages}
             threadError={hasThreadError}
-            readingMode="detox"
           />
         </div>
       </div>

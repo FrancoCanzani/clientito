@@ -19,6 +19,12 @@ type NavigateToEmail = (
         replace?: boolean;
       }
     | {
+        to: "/$mailboxId/inbox";
+        params: { mailboxId: number };
+        search: { emailId?: string };
+        replace?: boolean;
+      }
+    | {
         to: "/$mailboxId/$folder/email/$emailId";
         params: { mailboxId: number; folder: EmailFolderView; emailId: string };
         replace?: boolean;
@@ -81,7 +87,11 @@ export function openEmail(
   navigate: NavigateToEmail,
   routeMailboxId: number,
   email: Pick<EmailListItem, "id" | "isRead" | "providerMessageId" | "mailboxId" | "labelIds">,
-  options?: { replace?: boolean; context?: string },
+  options?: {
+    replace?: boolean;
+    context?: string;
+    presentation?: "route" | "panel";
+  },
 ) {
   const emailState = resolveLatestEmailState(queryClient, email);
   const mutationMailboxId = emailState.mailboxId ?? routeMailboxId;
@@ -98,7 +108,14 @@ export function openEmail(
   });
 
   const context = options?.context ?? "inbox";
-  if (isInboxLabelView(context)) {
+  if (context === "inbox" && options?.presentation === "panel") {
+    navigate({
+      to: "/$mailboxId/inbox",
+      params: { mailboxId: routeMailboxId },
+      search: { emailId: emailState.id },
+      replace: options?.replace,
+    });
+  } else if (isInboxLabelView(context)) {
     navigate({
       to: "/$mailboxId/inbox/labels/$label/email/$emailId",
       params: {

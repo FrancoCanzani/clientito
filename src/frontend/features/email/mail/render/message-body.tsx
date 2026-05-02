@@ -1,8 +1,6 @@
 import { DetoxRenderer } from "./detox-renderer";
 import { useState } from "react";
 import type { EmailBodySource } from "../types";
-import { prepareEmailHtml } from "../utils/prepare-email-html";
-import { EmailHtmlRenderer } from "./email-html-renderer";
 
 type PlainTextSections = {
   visibleText: string;
@@ -83,10 +81,8 @@ function PlainTextEmailRenderer({ text }: { text: string }) {
 
 export function MessageBody({
   detail,
-  readingMode = "original",
 }: {
   detail?: EmailBodySource | null;
-  readingMode?: "detox" | "original";
 }) {
   const bodyHtml = detail?.resolvedBodyHtml ?? detail?.bodyHtml;
   const bodyText = detail?.resolvedBodyText ?? detail?.bodyText;
@@ -104,19 +100,14 @@ export function MessageBody({
       : null;
 
   if (bodyHtml) {
-    if (readingMode === "detox") {
-      return (
-        <DetoxRenderer
-          html={bodyHtml}
-          fontSize="base"
-          defaultShowImages={false}
-          defaultShowQuoted={false}
-          inlineContext={inlineContext}
-        />
-      );
-    }
-    const preparedHtml = prepareEmailHtml(bodyHtml, inlineContext);
-    return <EmailHtmlRenderer html={preparedHtml} />;
+    return (
+      <DetoxRenderer
+        html={bodyHtml}
+        fontSize="base"
+        defaultShowImages={false}
+        inlineContext={inlineContext}
+      />
+    );
   }
 
   if (!bodyText) {

@@ -355,7 +355,7 @@ function FocusShell({
     <PageContainer>
     <div className="grid h-full w-full grid-rows-[auto_1fr_auto] bg-background">
       <header className="flex h-7 items-center justify-end px-4 text-xs text-muted-foreground tabular-nums">
-        {progress && progress.total > 0 ? (
+        {progress && progress.total > 0 && (
           <span>
             {progress.index + 1}
             <span className="text-foreground/30">
@@ -364,7 +364,7 @@ function FocusShell({
               {progress.hasMore ? "+" : ""}
             </span>
           </span>
-        ) : null}
+        )}
       </header>
       <main className="min-h-0 overflow-y-auto">{body}</main>
       {footer}
@@ -416,7 +416,7 @@ function FocusEmail({ email }: { email: EmailListItem }) {
           className="text-[0.95rem] leading-relaxed text-foreground/85"
           style={{ fontFamily: "var(--reading-font)" }}
         >
-          <MessageBody detail={detail ?? null} readingMode="detox" />
+          <MessageBody detail={detail ?? null} />
         </div>
       </div>
     </article>

@@ -6,6 +6,7 @@ import { type EmailRowProps, useEmailRowModel } from "./email-row-model";
 
 export const MobileEmailRow = memo(function MobileEmailRow({
   isFocused = false,
+  isSelected = false,
   ...props
 }: EmailRowProps) {
   const {
@@ -26,77 +27,73 @@ export const MobileEmailRow = memo(function MobileEmailRow({
       role="button"
       tabIndex={0}
       className={cn(
-        "flex h-14 w-full cursor-default items-center border-b border-border/40 px-4 text-left text-sm transition-colors hover:bg-muted",
+        "flex h-16 w-full cursor-default flex-col justify-center gap-0.5 overflow-hidden border-b border-border/40 px-3 py-1.5 text-left text-sm transition-colors hover:bg-muted",
         isFocused && "bg-muted",
+        isSelected && "bg-muted",
       )}
       onMouseEnter={handleMouseEnter}
       onFocus={handleMouseEnter}
       onClick={handleOpen}
       onKeyDown={handleKeyDown}
     >
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          {!email.isRead && <span className="sr-only">Unread.</span>}
+      <div className="flex w-full min-w-0 items-center gap-1.5">
+        {!email.isRead && <span className="sr-only">Unread.</span>}
+        <span
+          className={cn(
+            "min-w-0 truncate text-sm font-medium text-foreground",
+            !email.isRead && "font-semibold",
+          )}
+        >
+          {participantLabel}
+        </span>
+        {!email.isRead && (
           <span
-            className={cn(
-              "truncate text-sm",
-              !email.isRead && "font-semibold text-foreground",
-            )}
-          >
-            {participantLabel}
-          </span>
-          {!email.isRead && (
-            <span
-              className="size-1.5 shrink-0 rounded-full bg-blue-500"
-              aria-hidden
-            />
+            className="size-1.5 shrink-0 rounded-full bg-blue-500"
+            aria-hidden
+          />
+        )}
+
+        <div className="ml-auto flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+          {hasMetaIcons && (
+            <div className="flex shrink-0 items-center gap-1">
+              {isStarred && (
+                <StarIcon
+                  className="size-3 text-yellow-400"
+                  weight="fill"
+                  aria-hidden
+                />
+              )}
+              {email.hasCalendar && (
+                <CalendarIcon className="size-3" aria-hidden />
+              )}
+              {email.hasAttachment && (
+                <PaperclipIcon className="size-3" aria-hidden />
+              )}
+            </div>
           )}
           {threadCount > 1 && (
-            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-              [{threadCount}]
-            </span>
+            <span className="text-[11px] tabular-nums">[{threadCount}]</span>
           )}
-        </div>
-
-        <div className="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden">
-          <span
-            className={cn(
-              "max-w-[60%] shrink-0 truncate",
-              !email.isRead && "font-medium text-foreground",
-            )}
-          >
-            {subject}
+          <span className="whitespace-nowrap tabular-nums">
+            {formatInboxRowDate(email.date)}
           </span>
-          {snippet && (
-            <span className="min-w-0 truncate text-muted-foreground">
-              {snippet}
-            </span>
-          )}
         </div>
       </div>
 
-      <div className="ml-2 flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-        {hasMetaIcons && (
-          <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-            {isStarred && (
-              <StarIcon
-                className="size-3 text-yellow-400"
-                weight="fill"
-                aria-hidden
-              />
-            )}
-            {email.hasCalendar && (
-              <CalendarIcon className="size-3" aria-hidden />
-            )}
-            {email.hasAttachment && (
-              <PaperclipIcon className="size-3" aria-hidden />
-            )}
-          </div>
+      <div
+        className={cn(
+          "w-full truncate text-xs leading-4",
+          !email.isRead && "font-medium text-foreground",
         )}
-        <span className="whitespace-nowrap tabular-nums">
-          {formatInboxRowDate(email.date)}
-        </span>
+      >
+        {subject}
       </div>
+
+      {snippet && (
+        <div className="line-clamp-1 w-full min-w-0 overflow-hidden text-xs text-muted-foreground">
+          {snippet}
+        </div>
+      )}
     </div>
   );
 });

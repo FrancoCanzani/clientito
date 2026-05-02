@@ -152,11 +152,11 @@ export default function ScreenerPage() {
                         <p className="truncate text-sm text-foreground/90">
                           {latestSubject}
                         </p>
-                        {latestSnippet ? (
+                        {latestSnippet && (
                           <p className="line-clamp-2 text-xs text-muted-foreground">
                             {latestSnippet}
                           </p>
-                        ) : null}
+                        )}
                       </div>
                       <div className="flex shrink-0 items-center gap-2 sm:pl-3">
                         <Button

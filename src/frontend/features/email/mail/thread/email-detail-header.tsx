@@ -20,8 +20,6 @@ export function EmailDetailHeader({
   onForward,
   onReply,
   onDraftReply,
-  readingMode,
-  onReadingModeChange,
   isScrolled = false,
 }: {
   email: EmailDetailItem;
@@ -34,8 +32,6 @@ export function EmailDetailHeader({
   onForward: (initial: ComposeInitial) => void;
   onReply: () => void;
   onDraftReply?: () => void;
-  readingMode: "original" | "detox";
-  onReadingModeChange: (mode: "original" | "detox") => void;
   isScrolled?: boolean;
 }) {
   return (
@@ -73,45 +69,13 @@ export function EmailDetailHeader({
           </IconButton>
         </div>
 
-        <div className="flex items-center gap-1">
-          <div
-            role="group"
-            aria-label="Reading mode"
-            className="flex items-center rounded-md border border-border/40 bg-muted/50 p-0.5 text-xs"
-          >
-            <button
-              type="button"
-              aria-pressed={readingMode === "original"}
-              className={`rounded-md px-2 py-0.5 ${
-                readingMode === "original"
-                  ? "bg-background text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              onClick={() => onReadingModeChange("original")}
-            >
-              Original
-            </button>
-            <button
-              type="button"
-              aria-pressed={readingMode === "detox"}
-              className={`rounded-md px-2 py-0.5 ${
-                readingMode === "detox"
-                  ? "bg-background text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              onClick={() => onReadingModeChange("detox")}
-            >
-              Simplified
-            </button>
-          </div>
-          <EmailActions
-            email={email}
-            onClose={onClose}
-            onForward={onForward}
-            onReply={onReply}
-            onDraftReply={onDraftReply}
-          />
-        </div>
+        <EmailActions
+          email={email}
+          onClose={onClose}
+          onForward={onForward}
+          onReply={onReply}
+          onDraftReply={onDraftReply}
+        />
       </div>
     </div>
   );

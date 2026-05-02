@@ -10,24 +10,21 @@ import type { MailAction } from "@/features/email/mail/hooks/use-mail-actions";
 import { useMailHotkeys } from "@/features/email/mail/hooks/use-mail-hotkeys";
 import type { ThreadIdentifier } from "@/features/email/mail/mutations";
 import type { EmailListItem } from "@/features/email/mail/types";
-import { fetchLabels } from "@/features/email/labels/queries";
-import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { useMailboxPageScrollState } from "@/features/email/shell/mailbox-scroll-state";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef, useState } from "react";
-import { DesktopEmailRow } from "./desktop-email-row";
 import { MailFilterBar } from "./mail-filter-bar";
 import { MobileEmailRow } from "./mobile-email-row";
+import { SplitEmailRow } from "./split-email-row";
 import { TaskEmailRow } from "./task-email-row";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
-const DESKTOP_ROW_HEIGHT = 40;
-const MOBILE_ROW_HEIGHT = 56;
+const MOBILE_ROW_HEIGHT = 64;
+const DESKTOP_ROW_HEIGHT = 84;
 const TASK_ROW_HEIGHT = 56;
 
 export function EmailList({
@@ -41,6 +38,7 @@ export function EmailList({
   hideFilterControls = false,
   enableKeyboardNavigation = true,
   listVariant = "mail",
+  selectedEmailId,
 }: {
   emailData: ReturnType<typeof useMailViewData>;
   onOpen: (email: EmailListItem) => void;
@@ -56,10 +54,10 @@ export function EmailList({
   hideFilterControls?: boolean;
   enableKeyboardNavigation?: boolean;
   listVariant?: "mail" | "task";
+  selectedEmailId?: string | null;
 }) {
   const {
     view,
-    mailboxId,
     hasEmails,
     threadGroups,
     hasNextPage,
@@ -84,12 +82,6 @@ export function EmailList({
       : isMobile
         ? MOBILE_ROW_HEIGHT
         : DESKTOP_ROW_HEIGHT;
-
-  const { data: allLabels } = useQuery({
-    queryKey: labelQueryKeys.list(mailboxId),
-    queryFn: () => fetchLabels(mailboxId),
-    staleTime: 60_000,
-  });
 
   const goToSearch = () =>
     navigate({
@@ -134,12 +126,10 @@ export function EmailList({
   const loadMoreLabel = isFetchingNextPage
     ? "Loading more..."
     : "Scroll for more";
-  const RowComponent =
-    listVariant === "task"
-      ? TaskEmailRow
-      : isMobile
-        ? MobileEmailRow
-        : DesktopEmailRow;
+  const RowComponent = getRowComponent({
+    listVariant,
+    isMobile,
+  });
 
   const showFilterControls = hasEmails || hasActiveFilters;
 
@@ -188,7 +178,9 @@ export function EmailList({
                     onOpen={onOpen}
                     onAction={onAction}
                     isFocused={virtualItem.index === focusedIndex}
-                    allLabels={allLabels}
+                    isSelected={group.emails.some(
+                      (email) => email.id === selectedEmailId,
+                    )}
                   />
                 </div>
               );
@@ -226,4 +218,16 @@ export function EmailList({
       </div>
     </div>
   );
+}
+
+function getRowComponent({
+  listVariant,
+  isMobile,
+}: {
+  listVariant: "mail" | "task";
+  isMobile: boolean;
+}) {
+  if (listVariant === "task") return TaskEmailRow;
+  if (isMobile) return MobileEmailRow;
+  return SplitEmailRow;
 }

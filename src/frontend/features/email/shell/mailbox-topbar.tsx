@@ -53,7 +53,7 @@ export function MailboxTopbar() {
   }, [activeTab]);
 
   return (
-    <header className="flex shrink-0 items-center gap-1 bg-background p-2">
+    <header className="flex shrink-0 items-center gap-1 border-b border-border/40 bg-background p-2">
       <MailboxMenu />
 
       <nav className="relative flex h-8 items-center" aria-label="Primary">

@@ -23,14 +23,14 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0">
-        <h1 className="truncate text-lg tracking-[-0.6px] sm:tracking-[-0.8px] md:tracking-[-1px]">
+        <h1 className="truncate tracking-[-0.6px] sm:tracking-[-0.8px] md:tracking-[-1px]">
           {title}
         </h1>
-        {subtitle ? (
+        {subtitle && (
           <p className="line-clamp-1 text-xs text-muted-foreground">
             {subtitle}
           </p>
-        ) : null}
+        )}
       </div>
       {actions && (
         <div className="flex flex-1 items-center justify-end gap-2">

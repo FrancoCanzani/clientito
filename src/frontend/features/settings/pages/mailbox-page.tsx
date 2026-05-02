@@ -139,7 +139,7 @@ function MailboxDetails({
                   : "Your account is connected. First sync starts automatically when you open Inbox."}
           </p>
         </div>
-        {needsReconnect ? (
+        {needsReconnect && (
           <Button
             variant="outline"
             size="sm"
@@ -148,7 +148,7 @@ function MailboxDetails({
           >
             {isConnecting ? "Connecting..." : "Reconnect Gmail"}
           </Button>
-        ) : null}
+        )}
       </div>
 
       <div className="border-t border-border/60">

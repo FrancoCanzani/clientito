@@ -6,6 +6,7 @@ import { type EmailRowProps, useEmailRowModel } from "./email-row-model";
 
 export const TaskEmailRow = memo(function TaskEmailRow({
   isFocused = false,
+  isSelected = false,
   ...props
 }: EmailRowProps) {
   const {
@@ -28,6 +29,7 @@ export const TaskEmailRow = memo(function TaskEmailRow({
       className={cn(
         "mx-3 my-1 flex h-12 cursor-default items-center gap-3 rounded-lg border border-border/40 bg-card/50 px-3 text-left transition-colors hover:bg-muted/70 md:mx-6",
         isFocused && "bg-muted",
+        isSelected && "bg-muted ring-1 ring-border/70",
       )}
       onMouseEnter={handleMouseEnter}
       onFocus={handleMouseEnter}
@@ -52,28 +54,28 @@ export const TaskEmailRow = memo(function TaskEmailRow({
           >
             {subject}
           </span>
-          {threadCount > 1 ? (
+          {threadCount > 1 && (
             <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
               [{threadCount}]
             </span>
-          ) : null}
+          )}
         </div>
         <div className="mt-0.5 truncate text-xs text-muted-foreground">
           {participantLabel}
           {snippet ? ` · ${snippet}` : null}
         </div>
       </div>
-      {hasMetaIcons ? (
+      {hasMetaIcons && (
         <div className="hidden shrink-0 items-center gap-1.5 text-muted-foreground sm:flex">
-          {isStarred ? (
+          {isStarred && (
             <StarIcon className="size-3.5 text-yellow-400" weight="fill" aria-hidden />
-          ) : null}
-          {email.hasCalendar ? <CalendarIcon className="size-3.5" aria-hidden /> : null}
-          {email.hasAttachment ? (
+          )}
+          {email.hasCalendar && <CalendarIcon className="size-3.5" aria-hidden />}
+          {email.hasAttachment && (
             <PaperclipIcon className="size-3.5" aria-hidden />
-          ) : null}
+          )}
         </div>
-      ) : null}
+      )}
       <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
         {formatInboxRowDate(email.date)}
       </span>
