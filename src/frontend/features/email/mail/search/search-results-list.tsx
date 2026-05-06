@@ -4,15 +4,13 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
 import type { MailAction } from "@/features/email/mail/hooks/use-mail-actions";
 import type { ThreadIdentifier } from "@/features/email/mail/mutations";
 import type { EmailListItem } from "@/features/email/mail/types";
 import { groupEmailsByThread } from "@/features/email/mail/utils/group-emails-by-thread";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
-import { useMemo } from "react";
 import type { RefCallback } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { MobileEmailRow } from "../list/mobile-email-row";
 import { SplitEmailRow } from "../list/split-email-row";
 
@@ -26,6 +24,8 @@ export function SearchResultsList({
   loadMoreRef,
   onOpenEmail,
   onAction,
+  focusedIndex = -1,
+  highlightTerms = [],
 }: {
   query: string;
   results: EmailListItem[];
@@ -40,11 +40,22 @@ export function SearchResultsList({
     ids?: string[],
     thread?: ThreadIdentifier,
   ) => void;
+  focusedIndex?: number;
+  highlightTerms?: string[];
 }) {
   void mailboxId;
   const isMobile = useIsMobile();
   const RowComponent = isMobile ? MobileEmailRow : SplitEmailRow;
   const groups = useMemo(() => groupEmailsByThread(results), [results]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (focusedIndex < 0 || !containerRef.current) return;
+    const target = containerRef.current.querySelector<HTMLElement>(
+      `[data-search-row-index="${focusedIndex}"]`,
+    );
+    target?.scrollIntoView({ block: "nearest", behavior: "auto" });
+  }, [focusedIndex]);
 
   if (query.length < 2) {
     return (
@@ -60,25 +71,7 @@ export function SearchResultsList({
   }
 
   if (isPending) {
-    return (
-      <div className="w-full" aria-label={`Searching for ${query}`}>
-        {Array.from({ length: 6 }).map((_, index) => (
-          <div
-            key={index}
-            className={cn(
-              "flex w-full items-center gap-3",
-              isMobile
-                ? "h-14 border-b border-border/40 px-4"
-                : "h-[84px] px-6",
-            )}
-          >
-            <Skeleton className="h-3.5 w-24 shrink-0 sm:w-32 lg:w-44" />
-            <Skeleton className="h-3.5 min-w-0 flex-1" />
-            <Skeleton className="h-3 w-14 shrink-0" />
-          </div>
-        ))}
-      </div>
-    );
+    return null;
   }
 
   if (groups.length === 0) {
@@ -96,17 +89,20 @@ export function SearchResultsList({
   }
 
   return (
-    <div className="w-full">
-      {groups.map((group) => (
+    <div ref={containerRef} className="w-full">
+      {groups.map((group, index) => (
         <div
           key={group.representative.id}
-          className={isMobile ? undefined : "h-[84px]"}
+          data-search-row-index={index}
+          className={isMobile ? undefined : "h-21"}
         >
           <RowComponent
             group={group}
             view="inbox"
             onOpen={onOpenEmail}
             onAction={onAction}
+            isFocused={index === focusedIndex}
+            highlightTerms={highlightTerms}
           />
         </div>
       ))}
@@ -114,7 +110,7 @@ export function SearchResultsList({
       {hasNextPage && (
         <div
           ref={loadMoreRef}
-          className="pt-2 text-center text-xs text-muted-foreground"
+          className="p-6 text-center text-xs text-muted-foreground"
         >
           {isFetchingNextPage ? "Loading more…" : "Scroll for more results"}
         </div>

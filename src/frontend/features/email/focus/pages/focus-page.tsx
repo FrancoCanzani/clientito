@@ -11,20 +11,39 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Kbd } from "@/components/ui/kbd";
+import { AttachmentBar } from "@/features/email/mail/compose/attachment-bar";
+import { ComposeEditor } from "@/features/email/mail/compose/compose-editor";
+import { getComposerEditor } from "@/features/email/mail/compose/compose-editor-ref";
+import { useComposeEmail } from "@/features/email/mail/compose/compose-email-state";
+import { RecipientInput } from "@/features/email/mail/compose/recipient-input";
 import { MailActionButton } from "@/features/email/mail/mail-action-button";
 import { MessageBody } from "@/features/email/mail/render/message-body";
 import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
-import { sendEmail } from "@/features/email/mail/mutations";
 import { fetchEmailDetail } from "@/features/email/mail/queries";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
-import type { EmailListItem } from "@/features/email/mail/types";
+import type {
+  EmailDetailItem,
+  EmailListItem,
+} from "@/features/email/mail/types";
 import { formatEmailDetailDate } from "@/features/email/mail/utils/formatters";
 import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
+import {
+  buildReplyInitial,
+  pickReplySource,
+} from "@/features/email/mail/utils/reply-compose";
+import { useAuth } from "@/hooks/use-auth";
 import { useHotkeys } from "@/hooks/use-hotkeys";
+import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import { cn } from "@/lib/utils";
+import { PaperclipIcon, XIcon } from "@phosphor-icons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import {
@@ -39,27 +58,6 @@ import {
 import { toast } from "sonner";
 
 const route = getRouteApi("/_dashboard/$mailboxId/focus");
-
-const QUICK_REPLY_LIMIT = 140;
-const PREFETCH_THRESHOLD = 5;
-
-function buildReplySubject(subject: string | null): string {
-  if (!subject) return "Re:";
-  return `Re: ${subject.replace(/^Re:\s*/i, "")}`;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-function textToReplyHtml(text: string): string {
-  const escaped = escapeHtml(text.trim());
-  if (!escaped) return "";
-  return `<p>${escaped.replace(/\n/g, "<br>")}</p>`;
-}
 
 function getThreadContext(group: ThreadGroup) {
   const email = group.representative;
@@ -76,34 +74,26 @@ export default function FocusPage() {
   const navigate = route.useNavigate();
   const queryClient = useQueryClient();
   const snoozeButtonRef = useRef<HTMLButtonElement>(null);
-  const {
-    threadGroups,
-    isLoading,
-    hasNextPage,
-    isFetchingNextPage,
-    fetchNextPage,
-  } = useMailViewData({
+  const { threadGroups, isLoading } = useMailViewData({
     view: "inbox",
     mailboxId,
   });
 
-  const seenIdsRef = useRef<Set<string>>(new Set());
+  const hasSeededRef = useRef(false);
   const [focusIds, setFocusIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    let changed = false;
-    const next = new Set(focusIds);
+    if (hasSeededRef.current) return;
+    if (isLoading) return;
+    const next = new Set<string>();
     for (const group of threadGroups) {
-      const id = group.representative.id;
-      if (seenIdsRef.current.has(id)) continue;
-      seenIdsRef.current.add(id);
       if (group.emails.some((email) => !email.isRead)) {
-        next.add(id);
-        changed = true;
+        next.add(group.representative.id);
       }
     }
-    if (changed) setFocusIds(next);
-  }, [threadGroups, focusIds]);
+    setFocusIds(next);
+    hasSeededRef.current = true;
+  }, [isLoading, threadGroups]);
 
   const queue = useMemo(
     () => threadGroups.filter((group) => focusIds.has(group.representative.id)),
@@ -124,6 +114,19 @@ export default function FocusPage() {
 
   const currentGroup = queue[cursorIndex] ?? null;
   const current = currentGroup?.representative ?? null;
+  const currentDetailQuery = useQuery({
+    queryKey: current
+      ? emailQueryKeys.detail(current.id)
+      : ["email", "focus", "detail", "none"],
+    queryFn: () =>
+      fetchEmailDetail(current!.id, {
+        mailboxId: current!.mailboxId ?? undefined,
+        view: "inbox",
+      }),
+    enabled: Boolean(current),
+    staleTime: 30_000,
+  });
+  const currentDetail = currentDetailQuery.data ?? null;
 
   useEffect(() => {
     if (!current && queue[0]) {
@@ -150,17 +153,12 @@ export default function FocusPage() {
 
   const advance = useCallback(() => {
     const nextEmail = queue[cursorIndex + 1]?.representative;
-    const nearEnd = cursorIndex + 1 >= queue.length - PREFETCH_THRESHOLD;
-    if (hasNextPage && !isFetchingNextPage && nearEnd) {
-      void fetchNextPage();
-    }
     if (nextEmail) {
       setCursorId(nextEmail.id);
       return;
     }
-    if (hasNextPage) return;
     setCursorId(null);
-  }, [cursorIndex, fetchNextPage, hasNextPage, isFetchingNextPage, queue]);
+  }, [cursorIndex, queue]);
 
   const goPrev = useCallback(() => {
     const prev = queue[cursorIndex - 1]?.representative;
@@ -177,15 +175,24 @@ export default function FocusPage() {
     mailboxId,
   });
 
-  const handleDone = useCallback(() => {
+  const archiveCurrent = useCallback(() => {
     if (!current || !currentGroup) return;
     void executeEmailAction(
       "archive",
       currentGroup.emails.map((email) => email.id),
       getThreadContext(currentGroup),
     );
+  }, [current, currentGroup, executeEmailAction]);
+
+  const handleDone = useCallback(() => {
+    archiveCurrent();
     advance();
-  }, [advance, current, currentGroup, executeEmailAction]);
+  }, [advance, archiveCurrent]);
+
+  const handleReplyQueued = useCallback(() => {
+    setReplyOpen(false);
+    advance();
+  }, [advance]);
 
   const handleTodo = useCallback(() => {
     if (!currentGroup) return;
@@ -238,12 +245,21 @@ export default function FocusPage() {
     void executeEmailAction("mark-read", [current.id]);
   }, [current, executeEmailAction]);
 
+  const focusComposerEditor = useCallback(() => {
+    if (!current) return;
+    const isMobile =
+      typeof window !== "undefined" &&
+      !window.matchMedia("(min-width: 1024px)").matches;
+    if (isMobile) setReplyOpen(true);
+    requestAnimationFrame(() => {
+      getComposerEditor()?.commands.focus();
+    });
+  }, [current]);
+
   useHotkeys(
     {
       e: () => handleDone(),
-      r: () => {
-        if (current) setReplyOpen(true);
-      },
+      r: () => focusComposerEditor(),
       s: () => {
         snoozeButtonRef.current?.click();
       },
@@ -255,11 +271,14 @@ export default function FocusPage() {
       ArrowUp: () => goPrev(),
       ArrowLeft: () => goPrev(),
       Escape: () => {
-        if (replyOpen) return;
+        if (replyOpen) {
+          setReplyOpen(false);
+          return;
+        }
         exitToInbox();
       },
     },
-    { enabled: Boolean(current) && !replyOpen },
+    { enabled: Boolean(current) },
   );
 
   if (isLoading) {
@@ -278,19 +297,32 @@ export default function FocusPage() {
   return (
     <>
       <FocusShell
-        progress={{
-          index: cursorIndex,
-          total: queue.length,
-          hasMore: hasNextPage,
-        }}
-        body={<FocusEmail key={current.id} email={current} />}
+        body={
+          <FocusEmail
+            key={current.id}
+            email={current}
+            detail={currentDetail}
+          />
+        }
+        side={
+          <FocusReplyComposer
+            key={current.id}
+            email={current}
+            detail={currentDetail}
+            group={currentGroup}
+            mobileOpen={replyOpen}
+            onClose={() => setReplyOpen(false)}
+            onQueued={handleReplyQueued}
+          />
+        }
+        sideOpen={replyOpen}
         footer={
           <FocusActionBar
             onDone={handleDone}
             onSnooze={handleSnooze}
             snoozeButtonRef={snoozeButtonRef}
             onKeep={advance}
-            onReply={() => setReplyOpen(true)}
+            onReply={focusComposerEditor}
             onTodo={handleTodo}
             isTodo={todo.isTodo(current)}
             onUnsubscribe={() => setUnsubscribeConfirmOpen(true)}
@@ -300,12 +332,6 @@ export default function FocusPage() {
             actionsPending={todo.isPending || unsubscribeMutation.isPending}
           />
         }
-      />
-      <FocusQuickReply
-        email={current}
-        open={replyOpen}
-        onOpenChange={setReplyOpen}
-        onSent={handleDone}
       />
       <AlertDialog
         open={unsubscribeConfirmOpen}
@@ -317,13 +343,14 @@ export default function FocusPage() {
               Unsubscribe from {current.fromAddr}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              You will be removed from this mailing list when a one-click or
-              mailto unsubscribe method is available.
+              You'll be removed from this mailing list. Existing emails from{" "}
+              {current.fromAddr} will also be moved to Archive.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
               onClick={() => {
                 setUnsubscribeConfirmOpen(false);
                 unsubscribeMutation.mutate(current, {
@@ -343,47 +370,48 @@ export default function FocusPage() {
 }
 
 function FocusShell({
-  progress,
   body,
+  side,
+  sideOpen = false,
   footer,
 }: {
-  progress?: { index: number; total: number; hasMore: boolean };
   body: ReactNode;
+  side?: ReactNode;
+  sideOpen?: boolean;
   footer: ReactNode;
 }) {
   return (
-    <PageContainer>
-    <div className="grid h-full w-full grid-rows-[auto_1fr_auto] bg-background">
-      <header className="flex h-7 items-center justify-end px-4 text-xs text-muted-foreground tabular-nums">
-        {progress && progress.total > 0 && (
-          <span>
-            {progress.index + 1}
-            <span className="text-foreground/30">
-              {" "}
-              / {progress.total}
-              {progress.hasMore ? "+" : ""}
-            </span>
-          </span>
+    <PageContainer className="max-w-none">
+      <div className="flex min-h-0 w-full flex-1 flex-col bg-background lg:flex-row">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
+          {footer}
+        </div>
+        {side && (
+          <aside
+            className={cn(
+              "min-h-0",
+              sideOpen
+                ? "fixed inset-2 z-40 flex flex-col rounded border border-border/40 bg-background"
+                : "hidden",
+              "lg:static lg:inset-auto lg:flex lg:w-2/5 lg:shrink-0 lg:flex-col lg:rounded-none lg:border-0 lg:border-l lg:border-border/40 lg:bg-background",
+            )}
+          >
+            {side}
+          </aside>
         )}
-      </header>
-      <main className="min-h-0 overflow-y-auto">{body}</main>
-      {footer}
-    </div>
+      </div>
     </PageContainer>
   );
 }
 
-function FocusEmail({ email }: { email: EmailListItem }) {
-  const { data: detail } = useQuery({
-    queryKey: emailQueryKeys.detail(email.id),
-    queryFn: () =>
-      fetchEmailDetail(email.id, {
-        mailboxId: email.mailboxId ?? undefined,
-        view: "inbox",
-      }),
-    staleTime: 30_000,
-  });
-
+function FocusEmail({
+  email,
+  detail,
+}: {
+  email: EmailListItem;
+  detail: EmailDetailItem | null;
+}) {
   const sender = email.fromName?.trim() || email.fromAddr;
   const senderEmail = email.fromName ? email.fromAddr : null;
 
@@ -404,7 +432,7 @@ function FocusEmail({ email }: { email: EmailListItem }) {
           </time>
         </div>
         <h1
-          className="text-2xl leading-tight tracking-[-0.01em] text-foreground"
+          className="truncate text-sm font-medium text-foreground"
           style={{ fontFamily: "var(--reading-font)" }}
         >
           {email.subject?.trim() || "(no subject)"}
@@ -447,9 +475,8 @@ function FocusActionBar({
   actionsPending: boolean;
 }) {
   return (
-    <footer className="border-t border-border/40 bg-background/85 backdrop-blur-md">
-      <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-center gap-1.5 px-3 py-2 sm:px-10 sm:py-3">
-        <MailActionButton label="Reply" shortcut="R" onClick={onReply} />
+    <div className="flex h-12 shrink-0 items-center border-t border-border/40">
+      <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-1.5 px-6 sm:px-10">
         <MailActionButton label="Done" shortcut="E" onClick={onDone} />
         <SnoozePicker onSnooze={onSnooze}>
           <Button
@@ -477,126 +504,181 @@ function FocusActionBar({
           />
         )}
         <MailActionButton shortcut="J" label="Keep" onClick={onKeep} />
+        <MailActionButton
+          label="Reply"
+          shortcut="R"
+          onClick={onReply}
+          className="lg:hidden"
+        />
       </div>
-    </footer>
+    </div>
   );
 }
 
-function FocusQuickReply({
+function FocusReplyComposer({
   email,
-  open,
-  onOpenChange,
-  onSent,
+  detail,
+  group,
+  mobileOpen,
+  onClose,
+  onQueued,
 }: {
   email: EmailListItem;
-  open: boolean;
-  onOpenChange: (next: boolean) => void;
-  onSent: () => void;
+  detail: EmailDetailItem | null;
+  group: ThreadGroup | null;
+  mobileOpen: boolean;
+  onClose: () => void;
+  onQueued: () => void;
 }) {
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (!open) {
-      setText("");
-      setSending(false);
+  const { user } = useAuth();
+  const mailboxesQuery = useMailboxes();
+  const selfEmails = useMemo(() => {
+    const emails = new Set<string>();
+    if (user?.email) emails.add(user.email.toLowerCase());
+    for (const account of mailboxesQuery.data?.accounts ?? []) {
+      const displayEmail = getMailboxDisplayEmail(account);
+      if (displayEmail) emails.add(displayEmail.toLowerCase());
+      if (account.email) emails.add(account.email.toLowerCase());
+      if (account.gmailEmail) emails.add(account.gmailEmail.toLowerCase());
     }
-  }, [open]);
+    return emails;
+  }, [mailboxesQuery.data?.accounts, user?.email]);
+  const replySource = useMemo(
+    () => pickReplySource(email, group?.emails ?? [email], selfEmails),
+    [email, group?.emails, selfEmails],
+  );
+  const initial = useMemo(
+    () =>
+      buildReplyInitial(
+        replySource,
+        replySource.id === detail?.id ? detail : null,
+      ),
+    [detail, replySource],
+  );
+  const compose = useComposeEmail(initial, {
+    onQueued,
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fromLabel = useMemo(() => {
+    const activeMailbox = compose.availableMailboxes.find(
+      (account) => account.mailboxId === compose.mailboxId,
+    );
+    return activeMailbox ? getMailboxDisplayEmail(activeMailbox) : null;
+  }, [compose.availableMailboxes, compose.mailboxId]);
 
-  const remaining = QUICK_REPLY_LIMIT - text.length;
-  const trimmed = text.trim();
-  const canSend = trimmed.length > 0 && !sending && email.mailboxId != null;
-  const recipient = email.fromName?.trim() || email.fromAddr;
-
-  const send = async () => {
-    if (!canSend) return;
-    setSending(true);
-    try {
-      await sendEmail({
-        mailboxId: email.mailboxId ?? undefined,
-        to: email.fromAddr,
-        subject: buildReplySubject(email.subject),
-        body: textToReplyHtml(text),
-        threadId: email.threadId ?? undefined,
-      });
-      toast.success("Reply sent");
-      onSent();
-      onOpenChange(false);
-    } catch (error) {
-      setSending(false);
-      toast.error(error instanceof Error ? error.message : "Failed to send");
-    }
-  };
+  const showFromRow = compose.availableMailboxes.length > 1;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="gap-0 border-border/60 bg-background p-0 sm:max-w-lg"
-        onOpenAutoFocus={(event) => {
-          event.preventDefault();
-          textareaRef.current?.focus();
-        }}
-      >
-        <DialogTitle className="sr-only">
-          Quick reply to {recipient}
-        </DialogTitle>
-        <div className="border-b border-border/40 px-5 py-3 text-xs text-muted-foreground">
-          <span className="text-foreground/60">Reply to</span>{" "}
-          <span className="font-medium text-foreground/80">{recipient}</span>
-        </div>
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(event) =>
-            setText(event.target.value.slice(0, QUICK_REPLY_LIMIT))
-          }
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-              event.preventDefault();
-              void send();
-            }
-            if (event.key === "Escape") {
-              event.preventDefault();
-              onOpenChange(false);
-            }
-          }}
-          placeholder={`A short reply to ${recipient}...`}
-          rows={4}
-          maxLength={QUICK_REPLY_LIMIT}
-          className="w-full resize-none bg-transparent px-5 py-5 text-lg leading-snug outline-none placeholder:text-muted-foreground/50"
-          style={{ fontFamily: "var(--reading-font)" }}
-        />
-        <footer className="flex items-center justify-between border-t border-border/40 px-5 py-2.5 text-xs text-muted-foreground">
-          <span
-            className={cn(
-              "font-mono tabular-nums transition-colors duration-150",
-              remaining <= 20 && "text-foreground",
-            )}
-          >
-            {remaining}
+    <section className="flex h-full min-h-0 w-full flex-col bg-background">
+      <div className="flex shrink-0 items-center justify-between border-b border-border/40 px-4 py-2 lg:hidden">
+        <span className="text-xs text-muted-foreground">Reply</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          aria-label="Close reply composer"
+        >
+          <XIcon className="size-3.5" />
+        </Button>
+      </div>
+      <div className="shrink-0 space-y-0.5 px-5 pt-6 pb-3 lg:pt-9">
+        <div className="flex items-start gap-3 px-1 py-1.5">
+          <span className="shrink-0 pt-1 text-xs text-muted-foreground/70">
+            To
           </span>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={!canSend}
-              onClick={() => void send()}
-              className="flex items-center gap-1.5 rounded-md bg-foreground px-2.5 py-1 text-background transition-[transform,opacity] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-90 active:scale-[0.97] disabled:opacity-40"
-            >
-              {sending ? "Sending..." : "Send"}
-              <Kbd className="bg-transparent text-background/70">⌘↵</Kbd>
-            </button>
+          <div className="min-w-0 flex-1">
+            <RecipientInput value={compose.to} onChange={compose.setTo} />
           </div>
-        </footer>
-      </DialogContent>
-    </Dialog>
+        </div>
+        {showFromRow && (
+          <FocusComposerRow label="From">
+            <span className="block min-w-0 truncate text-sm text-foreground/80">
+              {fromLabel ?? "Current mailbox"}
+            </span>
+          </FocusComposerRow>
+        )}
+        <FocusComposerRow label="Subject">
+          <input
+            value={compose.subject}
+            onChange={(event) => compose.setSubject(event.target.value)}
+            aria-label="Subject"
+            className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+          />
+        </FocusComposerRow>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto border-t border-border/40 px-5 py-4">
+        <ComposeEditor
+          initialContent={compose.body}
+          onChange={compose.setBody}
+          onSend={() => {
+            if (compose.canSend) compose.send();
+          }}
+          className="min-h-80 text-sm leading-relaxed"
+          autoFocus={mobileOpen}
+        />
+      </div>
+      {(compose.attachments.files.length > 0 ||
+        compose.attachments.uploading) && (
+        <div className="shrink-0 border-t border-border/40 px-5 pt-2">
+          <AttachmentBar
+            files={compose.attachments.files}
+            uploading={compose.attachments.uploading}
+            onAddFiles={(files) => compose.attachments.addFiles(files)}
+            onRemoveFile={compose.attachments.removeFile}
+          />
+        </div>
+      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          if (event.target.files && event.target.files.length > 0) {
+            compose.attachments.addFiles(event.target.files);
+            event.target.value = "";
+          }
+        }}
+      />
+      <div className="flex h-12 shrink-0 items-center justify-between border-t border-border/40 px-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={compose.attachments.uploading}
+          aria-label="Attach files"
+          title="Attach files"
+        >
+          <PaperclipIcon className="size-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => compose.send()}
+          disabled={!compose.canSend || compose.isPending}
+        >
+          {compose.isPending ? "Sending..." : "Send"}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function FocusComposerRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-baseline gap-3 px-1 py-1.5">
+      <span className="shrink-0 text-xs text-muted-foreground/70">{label}</span>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
   );
 }
 
@@ -608,25 +690,22 @@ function FocusDone({
   onExit: () => void;
 }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-6 pb-20 text-center">
-      <p
-        className="text-3xl tracking-[-0.015em] text-foreground"
-        style={{ fontFamily: "var(--reading-font)" }}
-      >
-        Quiet.
-      </p>
-      <p className="max-w-sm text-sm text-muted-foreground">
-        {processed === 0
-          ? "No unread mail. All caught up."
-          : `You focused ${processed} ${processed === 1 ? "email" : "emails"}.`}
-      </p>
+    <Empty className="pb-20">
+      <EmptyHeader>
+        <EmptyTitle>No emails</EmptyTitle>
+        <EmptyDescription>
+          {processed === 0
+            ? "No unread mail. All caught up."
+            : `You focused ${processed} ${processed === 1 ? "email" : "emails"}.`}
+        </EmptyDescription>
+      </EmptyHeader>
       <button
         type="button"
         onClick={onExit}
-        className="mt-4 text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+        className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
       >
         Back to inbox
       </button>
-    </div>
+    </Empty>
   );
 }

@@ -1,23 +1,31 @@
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
+import {
+  fetchSearchEmails,
+  fetchSearchSuggestions,
+} from "@/features/email/mail/queries";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { extractHighlightTerms } from "@/features/email/mail/search/highlight-terms";
+import {
+  parseSearchOperators,
+  removeOperator,
+} from "@/features/email/mail/search/parse-query-operators";
+import {
+  pushRecentSearch,
+  readRecentSearches,
+} from "@/features/email/mail/search/recent-searches";
 import { SearchResultsList } from "@/features/email/mail/search/search-results-list";
 import { SearchSuggestionsList } from "@/features/email/mail/search/search-suggestions-list";
-import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import {
   MailboxPage,
   MailboxPageBody,
   MailboxPageHeader,
 } from "@/features/email/shell/mailbox-page";
-import {
-  fetchSearchEmails,
-  fetchSearchSuggestions,
-} from "@/features/email/mail/queries";
+import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
-import {
-  useInfiniteQuery,
-  useQuery,
-} from "@tanstack/react-query";
+import { XIcon } from "@phosphor-icons/react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
@@ -36,6 +44,10 @@ export default function InboxSearchPage() {
   const routeQuery = search.q ?? "";
 
   const [query, setSearchQuery] = useState(routeQuery);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() =>
+    readRecentSearches(),
+  );
   const { openEmail, executeEmailAction } = useMailActions({
     view: "inbox",
     mailboxId,
@@ -43,6 +55,10 @@ export default function InboxSearchPage() {
 
   useEffect(() => {
     setSearchQuery(routeQuery);
+  }, [routeQuery]);
+
+  useEffect(() => {
+    setFocusedIndex(-1);
   }, [routeQuery]);
 
   const updateQuery = useDebouncedCallback((nextQuery: string) => {
@@ -53,7 +69,7 @@ export default function InboxSearchPage() {
       }),
       replace: true,
     });
-  }, 220);
+  }, 120);
 
   const scope = useMemo(
     () => ({
@@ -119,11 +135,25 @@ export default function InboxSearchPage() {
   const hasSearchSuggestions =
     suggestionData.filters.length > 0 ||
     (query.trim().length > 0 &&
-      (suggestionData.contacts.length > 0 || suggestionData.subjects.length > 0));
+      (suggestionData.contacts.length > 0 ||
+        suggestionData.subjects.length > 0));
+  const showRecentSearches =
+    !hasSearchSuggestions &&
+    query.trim().length === 0 &&
+    recentSearches.length > 0;
+
+  const highlightTerms = useMemo(
+    () => extractHighlightTerms(routeQuery),
+    [routeQuery],
+  );
+  const activeOperators = useMemo(
+    () => parseSearchOperators(routeQuery),
+    [routeQuery],
+  );
 
   const loadMoreRef = useIntersectionObserver<HTMLDivElement>({
     root: null,
-    rootMargin: "200px 0px",
+    rootMargin: "1200px 0px",
     threshold: 0.01,
     onChange: (isIntersecting) => {
       if (
@@ -147,6 +177,7 @@ export default function InboxSearchPage() {
   function commitQuery(nextQuery: string) {
     updateQuery.cancel();
     setSearchQuery(nextQuery);
+    setRecentSearches(pushRecentSearch(nextQuery));
     navigate({
       search: (prev) => ({
         ...prev,
@@ -156,18 +187,61 @@ export default function InboxSearchPage() {
     });
   }
 
-  const canToggleJunk = true;
+  function openResultAt(index: number) {
+    const email = results[index];
+    if (!email) return;
+    setRecentSearches(pushRecentSearch(routeQuery));
+    openEmail(email);
+  }
+
+  function moveFocus(delta: 1 | -1) {
+    if (results.length === 0) {
+      setFocusedIndex(-1);
+      return;
+    }
+    setFocusedIndex((current) => {
+      if (current < 0) return delta > 0 ? 0 : results.length - 1;
+      const next = current + delta;
+      if (next < 0) return 0;
+      if (next >= results.length) return results.length - 1;
+      return next;
+    });
+  }
+
+  function removeOperatorFromQuery(raw: string) {
+    const next = removeOperator(routeQuery, raw);
+    commitQuery(next);
+  }
+
+  useHotkeys({
+    j: { onKeyDown: () => moveFocus(1), allowInEditable: true },
+    ArrowDown: { onKeyDown: () => moveFocus(1), allowInEditable: true },
+    k: { onKeyDown: () => moveFocus(-1), allowInEditable: true },
+    ArrowUp: { onKeyDown: () => moveFocus(-1), allowInEditable: true },
+  });
+
+  const showSearchingIndicator =
+    resultsQuery.isFetching && normalizeQuery(scope.q).length >= 2;
+
   const headerActions = (
     <>
       <div className="min-w-0 flex-1 sm:max-w-80">
         <Input
-          className="h-8 text-sm"
+          className="h-7 text-xs"
           value={query}
           autoFocus
           onChange={(event) => handleQueryChange(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();
+              if (focusedIndex >= 0 && results[focusedIndex]) {
+                openResultAt(focusedIndex);
+                return;
+              }
+              if (results.length > 0) {
+                openResultAt(0);
+                return;
+              }
               commitQuery(query);
             }
           }}
@@ -175,37 +249,56 @@ export default function InboxSearchPage() {
           spellCheck={false}
         />
       </div>
-      {canToggleJunk && (
-        <Button
-          type="button"
-          variant={search.includeJunk ? "secondary" : "ghost"}
-          size="sm"
-          onClick={() =>
-            navigate({
-              search: (prev) => ({
-                ...prev,
-                includeJunk: prev.includeJunk ? undefined : true,
-              }),
-              replace: true,
-            })
-          }
-        >
-          {search.includeJunk ? "Hide junk" : "Show junk"}
-        </Button>
+      {showSearchingIndicator && (
+        <span className="text-xs text-muted-foreground" aria-live="polite">
+          Searching…
+        </span>
       )}
+      <Button
+        type="button"
+        variant={"secondary"}
+        onClick={() =>
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              includeJunk: prev.includeJunk ? undefined : true,
+            }),
+            replace: true,
+          })
+        }
+        aria-pressed={search.includeJunk ?? false}
+      >
+        Junk {search.includeJunk ? "on" : "off"}
+      </Button>
     </>
   );
 
   return (
-    <MailboxPage>
-      <MailboxPageHeader
-        title="Search"
-        actions={headerActions}
-      />
+    <MailboxPage className="max-w-none">
+      <MailboxPageHeader title="Search" actions={headerActions} />
 
       <MailboxPageBody className="overflow-y-auto">
+        {activeOperators.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 md:px-4">
+            {activeOperators.map((operator) => (
+              <button
+                key={operator.raw}
+                type="button"
+                onClick={() => removeOperatorFromQuery(operator.raw)}
+                className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <span className="font-medium text-foreground/80">
+                  {operator.key}:
+                </span>
+                <span className="truncate max-w-40">{operator.value}</span>
+                <XIcon className="size-2.5" />
+              </button>
+            ))}
+          </div>
+        )}
+
         {hasSearchSuggestions && (
-          <div className="px-3 py-3 md:px-6">
+          <div className="px-3 py-3 md:px-4">
             <SearchSuggestionsList
               query={query.trim()}
               suggestions={suggestionData}
@@ -213,6 +306,25 @@ export default function InboxSearchPage() {
                 commitQuery(nextQuery);
               }}
             />
+          </div>
+        )}
+
+        {showRecentSearches && (
+          <div className="space-y-2 px-3 py-3 md:px-4">
+            <p className="text-xs text-muted-foreground">Recent</p>
+            <div className="flex flex-wrap gap-2">
+              {recentSearches.map((entry) => (
+                <Button
+                  key={entry}
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => commitQuery(entry)}
+                >
+                  <span className="max-w-56 truncate">{entry}</span>
+                </Button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -226,6 +338,8 @@ export default function InboxSearchPage() {
           loadMoreRef={loadMoreRef}
           onOpenEmail={openEmail}
           onAction={executeEmailAction}
+          focusedIndex={focusedIndex}
+          highlightTerms={highlightTerms}
         />
       </MailboxPageBody>
     </MailboxPage>

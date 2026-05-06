@@ -3,10 +3,11 @@ import type { MailAction } from "@/features/email/mail/hooks/use-mail-actions";
 import type { ThreadIdentifier } from "@/features/email/mail/mutations";
 import { fetchEmailDetail } from "@/features/email/mail/queries";
 import { useQueryClient } from "@tanstack/react-query";
-import { type KeyboardEvent, useRef } from "react";
+import { type KeyboardEvent, type ReactNode, useRef } from "react";
 import type { EmailListItem } from "../types";
 import { formatEmailSnippet } from "../utils/formatters";
 import type { ThreadGroup } from "../utils/group-emails-by-thread";
+import { HighlightedText } from "../search/highlighted-text";
 
 export type EmailRowProps = {
   group: ThreadGroup;
@@ -19,12 +20,14 @@ export type EmailRowProps = {
   ) => void;
   isFocused?: boolean;
   isSelected?: boolean;
+  highlightTerms?: string[];
 };
 
 export function useEmailRowModel({
   group,
   view,
   onOpen,
+  highlightTerms,
 }: EmailRowProps) {
   const queryClient = useQueryClient();
   const prefetchedRef = useRef(false);
@@ -41,8 +44,22 @@ export function useEmailRowModel({
         : "To: (unknown recipient)"
       : email.fromName || email.fromAddr;
 
-  const subject = email.subject?.trim() || "(no subject)";
-  const snippet = formatEmailSnippet(email.snippet);
+  const subjectText = email.subject?.trim() || "(no subject)";
+  const snippetText = formatEmailSnippet(email.snippet);
+
+  const hasHighlights = (highlightTerms?.length ?? 0) > 0;
+  const subject: ReactNode =
+    hasHighlights && subjectText ? (
+      <HighlightedText text={subjectText} terms={highlightTerms!} />
+    ) : (
+      subjectText
+    );
+  const snippet: ReactNode =
+    hasHighlights && snippetText ? (
+      <HighlightedText text={snippetText} terms={highlightTerms!} />
+    ) : (
+      snippetText
+    );
 
   const handleMouseEnter = () => {
     if (prefetchedRef.current) return;

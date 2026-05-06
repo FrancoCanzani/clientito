@@ -62,7 +62,7 @@ export const TaskEmailRow = memo(function TaskEmailRow({
         </div>
         <div className="mt-0.5 truncate text-xs text-muted-foreground">
           {participantLabel}
-          {snippet ? ` · ${snippet}` : null}
+          {snippet && ` · ${snippet}`}
         </div>
       </div>
       {hasMetaIcons && (

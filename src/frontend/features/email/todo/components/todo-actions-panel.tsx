@@ -11,6 +11,7 @@ import type {
 } from "@/features/email/mail/types";
 import { buildForwardedEmailHtml } from "@/features/email/mail/utils/build-forwarded-html";
 import { formatQuotedDate } from "@/features/email/mail/utils/formatters";
+import { cn } from "@/lib/utils";
 
 export function TodoActionsPanel({
   selectedEmail,
@@ -18,12 +19,14 @@ export function TodoActionsPanel({
   mailboxId,
   view,
   hasThreadError,
+  className,
 }: {
   selectedEmail: EmailListItem;
   detail: EmailDetailItem | null;
   mailboxId: number;
   view: string;
   hasThreadError: boolean;
+  className?: string;
 }) {
   const { openCompose } = useMailCompose();
   const { executeEmailAction, snooze, todo } = useMailActions({
@@ -95,30 +98,27 @@ export function TodoActionsPanel({
   const busy = todo.isPending;
 
   return (
-    <aside className="min-h-0 md:w-40 md:shrink-0">
-      <div className="flex flex-col gap-1 md:sticky md:top-2">
+    <aside
+      className={cn(
+        "shrink-0 border-t border-border/40 pt-2 md:w-44 md:border-0 md:pt-0",
+        className,
+      )}
+    >
+      <div className="flex flex-row flex-wrap justify-center gap-1.5 md:flex-col md:items-start md:justify-start md:sticky md:top-2">
         <MailActionButton
           label="Reply"
           shortcut="R"
           onClick={handleReply}
           disabled={busy}
-          className="w-full justify-between"
         />
         <MailActionButton
           label="Forward"
           shortcut="F"
           onClick={handleForward}
           disabled={busy}
-          className="w-full justify-between"
         />
         <SnoozePicker onSnooze={handleSnooze}>
-          <Button
-            variant="secondary"
-            size="sm"
-            type="button"
-            disabled={busy}
-            className="w-full justify-between"
-          >
+          <Button variant="secondary" size="sm" type="button" disabled={busy}>
             <span>Snooze</span>
             <Kbd>S</Kbd>
           </Button>
@@ -128,21 +128,18 @@ export function TodoActionsPanel({
           shortcut="E"
           onClick={handleRemove}
           disabled={busy}
-          className="w-full justify-between"
         />
         <MailActionButton
           label="Archive"
           shortcut="A"
           onClick={() => void handleArchive()}
           disabled={busy}
-          className="w-full justify-between"
         />
         <MailActionButton
           label="Remove"
           shortcut="Del"
           onClick={handleRemove}
           disabled={busy}
-          className="w-full justify-between"
         />
         {hasThreadError && (
           <p className="pt-2 text-[11px] text-muted-foreground">

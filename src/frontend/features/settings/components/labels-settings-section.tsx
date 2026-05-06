@@ -101,23 +101,8 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
   }
 
   return (
-    <section
-      id="labels"
-      className="scroll-mt-20 space-y-3"
-    >
-      <div className="space-y-1">
-        <p className="text-[10px] font-medium text-muted-foreground">
-          Mail
-        </p>
-        <h2 className="text-xs font-medium text-foreground">
-          Labels
-        </h2>
-        <p className="max-w-lg text-xs text-muted-foreground">
-          Manage your email labels.
-        </p>
-      </div>
-
-      <div className="mt-4 border-t border-border/60">
+    <div className="min-w-0">
+      <div>
         {labels.length === 0 && !creating && (
           <p className="py-3 text-xs text-muted-foreground">
             No labels yet.
@@ -277,7 +262,7 @@ export function LabelsSettingsSection({ mailboxId }: LabelsSettingsSectionProps)
           </div>
         )}
       </div>
-    </section>
+    </div>
   );
 }
 

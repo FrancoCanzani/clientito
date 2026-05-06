@@ -5,8 +5,14 @@ import { fetchLocalViewPage } from "@/features/email/mail/queries";
 import { parseEmailFolderParam } from "@/features/email/mail/views";
 import { enqueueMailboxRouteViewSync } from "@/features/email/shell/route-sync";
 import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+
+const folderPageSearchSchema = z.object({
+  emailId: z.string().min(1).optional(),
+});
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/$folder/")({
+  validateSearch: folderPageSearchSchema,
   params: {
     parse: (raw) => ({ folder: parseEmailFolderParam(raw.folder) }),
   },

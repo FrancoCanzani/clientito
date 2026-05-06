@@ -12,7 +12,7 @@ import { fetchLabels } from "@/features/email/labels/queries";
 import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { beginGmailConnection } from "@/features/onboarding/mutations";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
-import { ListIcon } from "@phosphor-icons/react";
+import { CheckIcon, ListIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Link,
@@ -133,7 +133,7 @@ export function MailboxMenu() {
               transition={{ duration: 0.12, ease: "easeOut" }}
               className="p-1"
             >
-              <DropdownMenuLabel className="text-[11px]">
+              <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 Accounts
               </DropdownMenuLabel>
               {accounts.map((account) => {
@@ -154,13 +154,9 @@ export function MailboxMenu() {
                     }}
                     className="justify-between"
                   >
-                    <span className="min-w-0 flex-1 truncate text-sm">
-                      {email}
-                    </span>
+                    <span className="min-w-0 flex-1 truncate">{email}</span>
                     {isActive && (
-                      <span className="text-[10px] text-muted-foreground">
-                        Current
-                      </span>
+                      <CheckIcon className="size-3 text-muted-foreground" />
                     )}
                   </DropdownMenuItem>
                 );
@@ -174,7 +170,7 @@ export function MailboxMenu() {
               </DropdownMenuItem>
 
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-[11px]">
+              <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 Mail
               </DropdownMenuLabel>
               <DropdownMenuItem asChild>
@@ -243,7 +239,7 @@ export function MailboxMenu() {
               {labels.length > 0 && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-[11px]">
+                  <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                     Labels
                   </DropdownMenuLabel>
                   <div className="max-h-52 overflow-y-auto">
@@ -269,7 +265,7 @@ export function MailboxMenu() {
               )}
 
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-[11px]">
+              <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 Settings
               </DropdownMenuLabel>
               <DropdownMenuItem asChild>

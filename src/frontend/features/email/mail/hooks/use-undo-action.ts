@@ -13,7 +13,8 @@ type TriggerOptions = {
 
 /**
  * Returns a stable `trigger(opts)` that starts a 4-second undo countdown.
- * The actual action runs after the delay unless the user presses ↩.
+ * `onAction` runs immediately for optimistic UI, while `action` runs after
+ * the delay unless the user presses ↩.
  */
 export function useUndoAction() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,12 +43,13 @@ export function useUndoAction() {
       },
     });
 
+    opts.onAction?.();
+
     timerRef.current = setTimeout(async () => {
       timerRef.current = null;
       if (cancelledRef.current) return;
       try {
         await opts.action();
-        opts.onAction?.();
       } catch {
         toast.error("Action failed");
       }

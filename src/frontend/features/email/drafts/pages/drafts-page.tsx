@@ -49,7 +49,7 @@ export default function DraftsPage() {
   };
 
   return (
-    <MailboxPage>
+    <MailboxPage className="max-w-none">
       <MailboxPageHeader title="Drafts" />
 
       <MailboxPageBody className="overflow-y-auto">
@@ -63,7 +63,7 @@ export default function DraftsPage() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <div className="space-y-1 px-3 py-1.5 md:px-6">
+          <div className="space-y-1 px-3 py-1.5 md:px-4">
             {drafts.map((draft) => (
               <button
                 key={draft.id}

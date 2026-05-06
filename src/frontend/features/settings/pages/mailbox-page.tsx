@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
-import { SettingsSectionHeader } from "@/features/settings/components/settings-shell";
 import { useSettingsMutations } from "@/features/settings/hooks/use-settings-mutations";
 import {
   getMailboxDisplayEmail,
@@ -10,7 +9,7 @@ import {
 } from "@/hooks/use-mailboxes";
 import { ArrowClockwiseIcon, SpinnerGapIcon } from "@phosphor-icons/react";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 export default function MailboxPage() {
@@ -19,14 +18,12 @@ export default function MailboxPage() {
   const handledConnectedImportRef = useRef(false);
   const accountsQuery = useMailboxes();
   const account =
-    accountsQuery.data?.accounts.find((entry) => entry.mailboxId === mailboxId) ??
-    null;
+    accountsQuery.data?.accounts.find(
+      (entry) => entry.mailboxId === mailboxId,
+    ) ?? null;
 
-  const {
-    fullReimportMutation,
-    pendingMailboxActionIds,
-    addAccountMutation,
-  } = useSettingsMutations({ navigate });
+  const { fullReimportMutation, pendingMailboxActionIds, addAccountMutation } =
+    useSettingsMutations({ navigate });
 
   useEffect(() => {
     if (handledConnectedImportRef.current || typeof window === "undefined") {
@@ -46,40 +43,27 @@ export default function MailboxPage() {
     );
   }, []);
 
-  return (
-    <section className="space-y-3">
-      <SettingsSectionHeader
-        group="Mail"
-        title="Mailbox"
-        description="Status and local cache controls for the current account."
-      />
-      <div className="border-t border-border/60">
-        {accountsQuery.isPending ? (
-          <div className="flex min-h-40 items-center justify-center">
-            <SpinnerGapIcon className="size-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : account ? (
-          <MailboxDetails
-            account={account}
-            isBusy={
-              account.mailboxId != null &&
-              pendingMailboxActionIds.includes(account.mailboxId)
-            }
-            isConnecting={addAccountMutation.isPending}
-            onReconnect={() => addAccountMutation.mutate()}
-            onReimport={async (targetMailboxId) => {
-              const drafts = await countLocalDrafts();
-              if (!confirmReimport(drafts)) return;
-              fullReimportMutation.mutate(targetMailboxId);
-            }}
-          />
-        ) : (
-          <p className="py-3 text-xs text-muted-foreground">
-            Mailbox not found.
-          </p>
-        )}
-      </div>
-    </section>
+  return accountsQuery.isPending ? (
+    <div className="flex min-h-40 items-center justify-center">
+      <SpinnerGapIcon className="size-5 animate-spin text-muted-foreground" />
+    </div>
+  ) : account ? (
+    <MailboxDetails
+      account={account}
+      isBusy={
+        account.mailboxId != null &&
+        pendingMailboxActionIds.includes(account.mailboxId)
+      }
+      isConnecting={addAccountMutation.isPending}
+      onReconnect={() => addAccountMutation.mutate()}
+      onReimport={async (targetMailboxId) => {
+        const drafts = await countLocalDrafts();
+        if (!confirmReimport(drafts)) return;
+        fullReimportMutation.mutate(targetMailboxId);
+      }}
+    />
+  ) : (
+    <p className="py-3 text-xs text-muted-foreground">Mailbox not found.</p>
   );
 }
 
@@ -112,7 +96,8 @@ function MailboxDetails({
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span
               className={`inline-block size-1.5 rounded-full ${
-                account.syncState === "needs_reconnect" || account.syncState === "error"
+                account.syncState === "needs_reconnect" ||
+                account.syncState === "error"
                   ? "bg-amber-500"
                   : account.hasSynced
                     ? "bg-green-500"
@@ -175,8 +160,149 @@ function MailboxDetails({
           </Button>
         </div>
       </div>
+      {account.mailboxId != null && (
+        <MailboxDiagnostics mailboxId={account.mailboxId} />
+      )}
     </div>
   );
+}
+
+type MailboxDiagnosticsState = {
+  localEmailCount: number | null;
+  storageUsage: number | null;
+  storageQuota: number | null;
+  storagePersisted: boolean | null;
+  jsHeapUsed: number | null;
+  jsHeapLimit: number | null;
+};
+
+function MailboxDiagnostics({ mailboxId }: { mailboxId: number }) {
+  const [state, setState] = useState<MailboxDiagnosticsState>({
+    localEmailCount: null,
+    storageUsage: null,
+    storageQuota: null,
+    storagePersisted: null,
+    jsHeapUsed: null,
+    jsHeapLimit: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      const userId = await getCurrentUserId();
+      let localEmailCount: number | null = null;
+      if (userId) {
+        try {
+          await localDb.ensureReady();
+          localEmailCount = await localDb.emailCount(userId, mailboxId);
+        } catch {
+          localEmailCount = null;
+        }
+      }
+
+      const estimate = await navigator.storage?.estimate?.().catch(() => null);
+      const storagePersisted =
+        (await navigator.storage?.persisted?.().catch(() => null)) ?? null;
+      const memory = Reflect.get(performance, "memory") as
+        | {
+            usedJSHeapSize?: number;
+            jsHeapSizeLimit?: number;
+          }
+        | undefined;
+
+      if (cancelled) return;
+      setState({
+        localEmailCount,
+        storageUsage:
+          typeof estimate?.usage === "number" ? estimate.usage : null,
+        storageQuota:
+          typeof estimate?.quota === "number" ? estimate.quota : null,
+        storagePersisted,
+        jsHeapUsed:
+          typeof memory?.usedJSHeapSize === "number"
+            ? memory.usedJSHeapSize
+            : null,
+        jsHeapLimit:
+          typeof memory?.jsHeapSizeLimit === "number"
+            ? memory.jsHeapSizeLimit
+            : null,
+      });
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [mailboxId]);
+
+  return (
+    <div className="border-t border-border/60 py-3">
+      <div className="mb-2 space-y-0.5">
+        <p className="text-xs font-medium">Diagnostics</p>
+        <p className="text-xs text-muted-foreground">
+          Local cache and browser storage for this mailbox.
+        </p>
+      </div>
+      <dl className="grid gap-2 text-xs sm:grid-cols-2">
+        <DiagnosticItem
+          label="Local emails"
+          value={
+            state.localEmailCount == null
+              ? "Unavailable"
+              : state.localEmailCount.toLocaleString()
+          }
+        />
+        <DiagnosticItem
+          label="Storage"
+          value={formatStoragePair(state.storageUsage, state.storageQuota)}
+        />
+        <DiagnosticItem
+          label="Persistent storage"
+          value={
+            state.storagePersisted == null
+              ? "Unavailable"
+              : state.storagePersisted
+                ? "Enabled"
+                : "Not granted"
+          }
+        />
+        <DiagnosticItem
+          label="JS memory"
+          value={formatStoragePair(state.jsHeapUsed, state.jsHeapLimit)}
+        />
+      </dl>
+    </div>
+  );
+}
+
+function DiagnosticItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-2.5 py-2">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="font-mono text-[11px] text-foreground">{value}</dd>
+    </div>
+  );
+}
+
+function formatBytes(bytes: number | null): string | null {
+  if (bytes == null || !Number.isFinite(bytes)) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unit = units[0]!;
+  for (let i = 1; i < units.length && value >= 1024; i++) {
+    value /= 1024;
+    unit = units[i]!;
+  }
+  return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${unit}`;
+}
+
+function formatStoragePair(used: number | null, limit: number | null): string {
+  const usedText = formatBytes(used);
+  const limitText = formatBytes(limit);
+  if (usedText && limitText) return `${usedText} / ${limitText}`;
+  return usedText ?? "Unavailable";
 }
 
 async function countLocalDrafts(): Promise<number> {

@@ -4,10 +4,12 @@ Use this page to work faster in daily focus sessions.
 
 ## Inbox model
 
-Petit splits mail into focused views:
+Duomo splits mail into focused views:
 
+- Focus: active unread inbox work, processed one message at a time.
+- To do: messages you intentionally marked for action.
+- Screener: new first-contact senders waiting for approval.
 - Inbox: active incoming work.
-- Important: priority label view.
 - Done: processed mail.
 - Sent: outbound messages.
 - Drafts: unsent work.
@@ -15,10 +17,10 @@ Petit splits mail into focused views:
 
 ## Focus routine
 
-1. Start in Inbox.
-2. Open thread and act: reply, archive, or move.
-3. Use Done for completed items.
-4. Use Important for priority follow-up.
+1. Start in Focus.
+2. Act on each thread: reply, archive, snooze, or mark to-do.
+3. Use To do for intentional follow-up.
+4. Use Inbox and Search when you need the full mailbox surface.
 
 ## Search tips
 
@@ -44,8 +46,8 @@ Press `Cmd/Ctrl + K`:
 
 - `> inbox` jump views
 - `> search emails` open search
-- `> filters` open filter manager
-- `> subscriptions` open subscriptions manager
+- `> screener` review new senders
+- `> to do` open the action queue
 
 ## Related pages
 

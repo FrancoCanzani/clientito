@@ -30,6 +30,37 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
       const unsubscribeUrl = normalizeUnsubscribeUrl(rawUnsubscribeUrl);
       const unsubscribeEmail = normalizeUnsubscribeEmail(rawUnsubscribeEmail);
 
+      const resolveMailbox = async () => {
+        const userMailboxes = await db
+          .select()
+          .from(mailboxes)
+          .where(eq(mailboxes.userId, user.id));
+        let mailbox = userMailboxes[0];
+        if (!mailbox) {
+          const googleAccount = await db.query.account.findFirst({
+            where: and(eq(account.userId, user.id), eq(account.providerId, "google")),
+          });
+          mailbox = (await ensureMailbox(db, user.id, googleAccount?.id ?? null))!;
+        }
+        return mailbox ?? null;
+      };
+
+      const archiveExisting = async (): Promise<number> => {
+        try {
+          const mailbox = await resolveMailbox();
+          if (!mailbox) return 0;
+          const provider = new GmailDriver(db, c.env, mailbox.id);
+          const { archivedCount } = await provider.archiveSender(fromAddr);
+          return archivedCount;
+        } catch (error) {
+          console.warn("Archiving sender after unsubscribe failed", {
+            fromAddr,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return 0;
+        }
+      };
+
       if (unsubscribeUrl) {
         try {
           const res = await fetch(unsubscribeUrl, {
@@ -39,7 +70,11 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
           });
 
           if (res.ok || res.status === 204 || res.status === 302) {
-            return c.json({ method: "one-click", fromAddr, success: true }, 200);
+            const archivedCount = await archiveExisting();
+            return c.json(
+              { method: "one-click", fromAddr, success: true, archivedCount },
+              200,
+            );
           }
         } catch (error) {
           console.warn("One-click unsubscribe failed, falling back", {
@@ -57,17 +92,7 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
 
       if (unsubscribeEmail) {
         try {
-          const userMailboxes = await db
-            .select()
-            .from(mailboxes)
-            .where(eq(mailboxes.userId, user.id));
-          let mailbox = userMailboxes[0];
-          if (!mailbox) {
-            const googleAccount = await db.query.account.findFirst({
-              where: and(eq(account.userId, user.id), eq(account.providerId, "google")),
-            });
-            mailbox = (await ensureMailbox(db, user.id, googleAccount?.id ?? null))!;
-          }
+          const mailbox = await resolveMailbox();
           if (!mailbox) {
             return c.json({ error: "No mailbox configured" }, 400);
           }
@@ -79,7 +104,11 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
             body: "Unsubscribe",
           });
 
-          return c.json({ method: "mailto", fromAddr, success: true }, 200);
+          const archivedCount = await archiveExisting();
+          return c.json(
+            { method: "mailto", fromAddr, success: true, archivedCount },
+            200,
+          );
         } catch (error) {
           return c.json(
             {

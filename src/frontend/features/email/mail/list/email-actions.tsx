@@ -48,6 +48,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import type { useMailActions } from "../hooks/use-mail-actions";
 import { useUndoAction } from "../hooks/use-undo-action";
 import { unsubscribe } from "@/features/email/subscriptions/queries";
 import { blockSender, patchEmail, patchThread } from "../mutations";
@@ -63,6 +64,7 @@ type EmailActionsProps = {
   onForward?: (initial: ComposeInitial) => void;
   onReply?: () => void;
   onDraftReply?: () => void;
+  onAction?: ReturnType<typeof useMailActions>["executeEmailAction"];
 };
 
 type EmailPatchPayload = Parameters<typeof patchEmail>[1];
@@ -79,6 +81,7 @@ export function EmailActions({
   onForward,
   onReply,
   onDraftReply,
+  onAction,
 }: EmailActionsProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -205,7 +208,14 @@ export function EmailActions({
         toast.info("Opened unsubscribe page in a new tab");
         return;
       }
-      toast.success("Unsubscribed successfully");
+      const archived = result.archivedCount ?? 0;
+      toast.success(
+        archived > 0
+          ? `Unsubscribed — ${archived} ${archived === 1 ? "email" : "emails"} archived`
+          : "Unsubscribed",
+      );
+      invalidateEmails();
+      onClose?.();
     },
     onError: (error) => toast.error(error.message),
   });
@@ -287,7 +297,28 @@ export function EmailActions({
     unsubscribeMutation.isPending ||
     blockSenderMutation.isPending;
 
+  const runCentralAction = (
+    action: Parameters<NonNullable<typeof onAction>>[0],
+    opts: { closeAfter?: boolean; thread?: boolean } = {},
+  ) => {
+    if (!onAction) return false;
+    void onAction(
+      action,
+      [email.id],
+      opts.thread ? (threadIdentifier ?? undefined) : undefined,
+      {
+        identifiers: [emailIdentifier],
+        onVisible: opts.closeAfter ? () => onClose?.() : undefined,
+      },
+    );
+    return true;
+  };
+
   const handleDone = () =>
+    runCentralAction(isInInbox ? "archive" : "move-to-inbox", {
+      closeAfter: true,
+      thread: true,
+    }) ||
     undoAction({
       action: () => patchThreadOrEmail({ archived: isInInbox }),
       onAction: () => onClose?.(),
@@ -295,6 +326,7 @@ export function EmailActions({
     });
 
   const handleTrash = () =>
+    runCentralAction("trash", { closeAfter: true, thread: true }) ||
     undoAction({
       action: () => patchThreadOrEmail({ trashed: true }),
       onAction: () => onClose?.(),
@@ -315,18 +347,24 @@ export function EmailActions({
       iconWeight: isStarred ? "fill" : "regular",
       label: isStarred ? "Unstar" : "Star",
       shortcut: "S",
-      action: () => runEmailPatch({ starred: !isStarred }),
+      action: () =>
+        runCentralAction(isStarred ? "unstar" : "star") ||
+        runEmailPatch({ starred: !isStarred }),
     },
     {
       icon: email.isRead ? EnvelopeSimpleIcon : EnvelopeSimpleOpenIcon,
       label: email.isRead ? "Mark as unread" : "Mark as read",
       shortcut: "U",
-      action: () => runThreadPatch({ isRead: !email.isRead }),
+      action: () =>
+        runCentralAction(email.isRead ? "mark-unread" : "mark-read", {
+          thread: true,
+        }) || runThreadPatch({ isRead: !email.isRead }),
     },
     {
       icon: WarningIcon,
       label: "Move to spam",
       action: () =>
+        runCentralAction("spam", { closeAfter: true, thread: true }) ||
         undoAction({
           action: () => patchThreadOrEmail({ spam: true }),
           onAction: () => onClose?.(),
@@ -341,6 +379,7 @@ export function EmailActions({
         label={isInInbox ? "Done" : "Move to inbox"}
         shortcut="E"
         variant="ghost"
+        size="icon-sm"
         disabled={actionsPending}
         onClick={handleDone}
       >
@@ -350,6 +389,7 @@ export function EmailActions({
         label="Delete"
         shortcut="#"
         variant="ghost"
+        size="icon-sm"
         disabled={actionsPending}
         onClick={handleTrash}
       >
@@ -363,7 +403,12 @@ export function EmailActions({
           appliedLabelIds={email.labelIds}
           onDone={invalidateEmails}
           trigger={
-            <IconButton label="Label" shortcut="L" variant="ghost">
+            <IconButton
+              label="Label"
+              shortcut="L"
+              variant="ghost"
+              size="icon-sm"
+            >
               <TagIcon className="size-3.5" />
             </IconButton>
           }
@@ -383,6 +428,7 @@ export function EmailActions({
           label="Reply"
           shortcut="R"
           variant="ghost"
+          size="icon-sm"
           onClick={() => onReply?.()}
         >
           <ArrowBendUpLeftIcon className="size-3.5" />
@@ -391,6 +437,7 @@ export function EmailActions({
           <IconButton
             label="Draft reply"
             variant="ghost"
+            size="icon-sm"
             onClick={() => onDraftReply?.()}
           >
             <SparkleIcon className="size-3.5" />
@@ -400,6 +447,7 @@ export function EmailActions({
           <IconButton
             label="Reply all"
             variant="ghost"
+            size="icon-sm"
             onClick={handleReplyAll}
           >
             <ArrowBendDoubleUpLeftIcon className="size-3.5" />
@@ -409,6 +457,7 @@ export function EmailActions({
           label="Forward"
           shortcut="F"
           variant="ghost"
+          size="icon-sm"
           onClick={handleForward}
         >
           <ArrowBendUpRightIcon className="size-3.5" />
@@ -420,7 +469,7 @@ export function EmailActions({
           <Button
             type="button"
             variant="ghost"
-            size="icon"
+            size="icon-sm"
             disabled={actionsPending}
             aria-label="More actions"
           >
@@ -524,12 +573,14 @@ export function EmailActions({
           <AlertDialogHeader>
             <AlertDialogTitle>Unsubscribe from {email.fromAddr}?</AlertDialogTitle>
             <AlertDialogDescription>
-              You will be removed from this mailing list. This cannot be undone.
+              You'll be removed from this mailing list. Existing emails from{" "}
+              {email.fromAddr} will also be moved to Archive.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
               onClick={() => {
                 setUnsubscribeConfirmOpen(false);
                 unsubscribeMutation.mutate();

@@ -4,6 +4,7 @@ export type UnsubscribeResult = {
   success: boolean;
   url?: string;
   error?: string;
+  archivedCount?: number;
 };
 
 export async function unsubscribe(input: {

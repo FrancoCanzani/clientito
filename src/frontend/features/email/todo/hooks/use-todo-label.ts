@@ -2,7 +2,7 @@ import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import type { EmailListItem } from "@/features/email/mail/types";
 import { TODO_LABEL_NAME } from "@/features/email/labels/internal-labels";
 import { applyLabel, createLabel, removeLabel } from "@/features/email/labels/mutations";
-import { fetchLabels } from "@/features/email/labels/queries";
+import { fetchLabels, syncLabelsFromServer } from "@/features/email/labels/queries";
 import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import type { Label } from "@/features/email/labels/types";
 import { queryClient } from "@/lib/query-client";
@@ -14,7 +14,7 @@ type TodoEmail = Pick<EmailListItem, "providerMessageId" | "labelIds">;
 export const todoLabelQueryKey = (mailboxId: number) =>
   ["labels", mailboxId, "todo"] as const;
 
-function findTodoLabel(labels: Label[]): Label | null {
+export function findTodoLabel(labels: Label[]): Label | null {
   const normalizedName = TODO_LABEL_NAME.toLowerCase();
   return labels.find((label) => label.name.toLowerCase() === normalizedName) ?? null;
 }
@@ -23,17 +23,43 @@ async function fetchTodoLabel(mailboxId: number): Promise<Label | null> {
   return findTodoLabel(await fetchLabels(mailboxId));
 }
 
+async function syncTodoLabel(mailboxId: number): Promise<Label | null> {
+  return findTodoLabel(await syncLabelsFromServer(mailboxId));
+}
+
+function isDuplicateLabelError(error: unknown): boolean {
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    message.includes("409") ||
+    message.includes("already exists") ||
+    message.includes("duplicate") ||
+    message.includes("conflict")
+  );
+}
+
 export async function ensureTodoLabel(mailboxId: number): Promise<Label> {
   const existing = await fetchTodoLabel(mailboxId);
   if (existing) return existing;
 
-  const created = await createLabel(mailboxId, {
-    name: TODO_LABEL_NAME,
-    textColor: "#000000",
-    backgroundColor: "#fef1d1",
-  });
-  queryClient.setQueryData(todoLabelQueryKey(mailboxId), created);
-  return created;
+  const synced = await syncTodoLabel(mailboxId);
+  if (synced) return synced;
+
+  try {
+    const created = await createLabel(mailboxId, {
+      name: TODO_LABEL_NAME,
+      textColor: "#000000",
+      backgroundColor: "#fef1d1",
+    });
+    queryClient.setQueryData(todoLabelQueryKey(mailboxId), created);
+    return created;
+  } catch (error) {
+    if (isDuplicateLabelError(error)) {
+      const recovered = await syncTodoLabel(mailboxId);
+      if (recovered) return recovered;
+    }
+    throw error;
+  }
 }
 
 function asArray(target: TodoEmail | TodoEmail[]): TodoEmail[] {

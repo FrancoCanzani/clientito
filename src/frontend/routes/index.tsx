@@ -15,7 +15,7 @@ export const Route = createFileRoute("/")({
     if (!preferredMailboxId) return;
 
     throw redirect({
-      to: "/$mailboxId/focus",
+      to: "/$mailboxId/inbox",
       params: { mailboxId: preferredMailboxId },
     });
   },

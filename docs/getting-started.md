@@ -1,6 +1,6 @@
 # Getting Started
 
-Use this page to get Petit running in minutes.
+Use this page to get Duomo running in minutes.
 
 ## Who this is for
 
@@ -8,7 +8,7 @@ New users connecting first mailbox and learning daily flow.
 
 ## 1. Sign in
 
-1. Open Petit.
+1. Open Duomo.
 2. Sign in with your account.
 3. If asked, finish verification.
 
@@ -23,8 +23,10 @@ If sync takes long, open [Sync Troubleshooting](/docs/sync-troubleshooting).
 
 ## 3. Learn core views
 
-- Inbox: new work now.
-- Important: high-priority messages.
+- Focus: process unread inbox work one message at a time.
+- To do: emails you intentionally turned into tasks.
+- Inbox: active incoming work.
+- Screener: first-contact senders waiting for approval.
 - Done: processed and archived work.
 - Search: find by sender, subject, or content.
 - Drafts: unsent messages.

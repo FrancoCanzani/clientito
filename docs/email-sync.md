@@ -1,6 +1,6 @@
 # Email Sync Architecture
 
-This document explains how email sync currently works in Petit, with a focus on the Google/Gmail implementation that is live today.
+This document explains how email sync currently works in Duomo, with a focus on the Google/Gmail implementation that is live today.
 
 It is written for a new backend developer who needs to:
 
@@ -745,7 +745,7 @@ That sequence gives you:
 
 ## Short Summary
 
-Petit sync is currently:
+Duomo sync is currently:
 
 - provider-routed through `lib/gmail`
 - implemented for Gmail under `lib/gmail`

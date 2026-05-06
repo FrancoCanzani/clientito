@@ -6,14 +6,19 @@ import {
 } from "@/db/pending-lock";
 import { getCurrentUserId } from "@/db/user";
 import { queryClient } from "@/lib/query-client";
+import {
+  applyMailPatchToCaches,
+  applyPatchToLabelIds,
+  type EmailPatchPayload,
+} from "./utils/optimistic-mail-state";
 import { isEmailListInfiniteData } from "./utils/email-list-cache";
 import type {
   CalendarInviteResponseStatus,
-  EmailDetailItem,
   EmailListItem,
   EmailListPage,
   EmailThreadItem,
   InboxUnreadCount,
+  ViewUnreadCounts,
 } from "./types";
 import type { InfiniteData } from "@tanstack/react-query";
 
@@ -36,15 +41,6 @@ async function responseError(
   (err as Error & { status?: number }).status = response.status;
   return err;
 }
-
-type EmailPatchPayload = {
-  isRead?: boolean;
-  archived?: boolean;
-  trashed?: boolean;
-  spam?: boolean;
-  starred?: boolean;
-  snoozedUntil?: number | null;
-};
 
 export type EmailIdentifier = {
   id: string;
@@ -74,67 +70,6 @@ function toNumericIds(ids: string[]): number[] {
   return ids
     .map((id) => Number(id))
     .filter((value) => Number.isFinite(value));
-}
-
-function applyPatchToItem<
-  T extends Pick<EmailListItem, "isRead" | "labelIds" | "snoozedUntil">,
->(item: T, patch: EmailPatchPayload): T {
-  const labels = new Set(item.labelIds);
-
-  if (patch.isRead !== undefined) {
-    if (patch.isRead) labels.delete(LABEL_UNREAD);
-    else labels.add(LABEL_UNREAD);
-  }
-
-  if (patch.archived !== undefined) {
-    if (patch.archived) labels.delete(LABEL_INBOX);
-    else if (!labels.has(LABEL_TRASH) && !labels.has(LABEL_SPAM)) labels.add(LABEL_INBOX);
-  }
-
-  if (patch.trashed !== undefined) {
-    if (patch.trashed) {
-      labels.add(LABEL_TRASH);
-      labels.delete(LABEL_INBOX);
-      labels.delete(LABEL_SPAM);
-    } else {
-      labels.delete(LABEL_TRASH);
-      if (!labels.has(LABEL_SPAM)) labels.add(LABEL_INBOX);
-    }
-  }
-
-  if (patch.spam !== undefined) {
-    if (patch.spam) {
-      labels.add(LABEL_SPAM);
-      labels.delete(LABEL_INBOX);
-      labels.delete(LABEL_TRASH);
-    } else {
-      labels.delete(LABEL_SPAM);
-      if (!labels.has(LABEL_TRASH)) labels.add(LABEL_INBOX);
-    }
-  }
-
-  if (patch.starred !== undefined) {
-    if (patch.starred) labels.add(LABEL_STARRED);
-    else labels.delete(LABEL_STARRED);
-  }
-
-  return {
-    ...item,
-    isRead: patch.isRead ?? !labels.has(LABEL_UNREAD),
-    labelIds: Array.from(labels),
-    snoozedUntil:
-      patch.snoozedUntil !== undefined ? patch.snoozedUntil : item.snoozedUntil,
-  };
-}
-
-function applyPatchToLabelIds(
-  labelIds: string[],
-  patch: EmailPatchPayload,
-): string[] {
-  return applyPatchToItem(
-    { isRead: !labelIds.includes(LABEL_UNREAD), labelIds, snoozedUntil: null },
-    patch,
-  ).labelIds;
 }
 
 function isUnreadInboxLabelSet(labelIds: string[]): boolean {
@@ -214,6 +149,26 @@ function applyInboxUnreadDelta(
       };
     },
   );
+  queryClient.setQueryData<ViewUnreadCounts | undefined>(
+    emailQueryKeys.viewCounts(mailboxId),
+    (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        inbox: {
+          ...current.inbox,
+          messagesUnread: Math.max(
+            0,
+            current.inbox.messagesUnread + delta.messagesUnread,
+          ),
+          threadsUnread: Math.max(
+            0,
+            current.inbox.threadsUnread + delta.threadsUnread,
+          ),
+        },
+      };
+    },
+  );
 }
 
 function restoreInboxUnreadCount(
@@ -228,81 +183,9 @@ function invalidateInboxUnreadCount(mailboxId: number) {
   void queryClient.invalidateQueries({
     queryKey: emailQueryKeys.inboxUnreadCount(mailboxId),
   });
-}
-
-function applyOptimisticCachePatch(
-  emailIds: Set<string>,
-  patch: EmailPatchPayload,
-) {
-  queryClient.setQueriesData(
-    { queryKey: emailQueryKeys.all() },
-    (current) => {
-      if (!isEmailListInfiniteData(current)) return current;
-      let changed = false;
-      const pages = current.pages.map((page) => {
-        let pageChanged = false;
-        const emails = page.emails.map((entry) => {
-          if (!emailIds.has(entry.id)) return entry;
-          const next = applyPatchToItem(entry, patch);
-          pageChanged = true;
-          changed = true;
-          return next;
-        });
-        return pageChanged ? { ...page, emails } : page;
-      });
-      const next: InfiniteData<EmailListPage> = { ...current, pages };
-      return changed ? next : current;
-    },
-  );
-
-  for (const emailId of emailIds) {
-    queryClient.setQueryData<EmailDetailItem | undefined>(
-      emailQueryKeys.detail(emailId),
-      (current) => {
-        if (!current) return current;
-        return applyPatchToItem(current, patch);
-      },
-    );
-  }
-}
-
-function applyOptimisticThreadPatch(
-  threadId: string,
-  patch: EmailPatchPayload,
-) {
-  queryClient.setQueriesData(
-    { queryKey: emailQueryKeys.all() },
-    (current) => {
-      if (!isEmailListInfiniteData(current)) return current;
-      let changed = false;
-      const pages = current.pages.map((page) => {
-        let pageChanged = false;
-        const emails = page.emails.map((entry) => {
-          if (entry.threadId !== threadId) return entry;
-          const next = applyPatchToItem(entry, patch);
-          pageChanged = true;
-          changed = true;
-          return next;
-        });
-        return pageChanged ? { ...page, emails } : page;
-      });
-      const next: InfiniteData<EmailListPage> = { ...current, pages };
-      return changed ? next : current;
-    },
-  );
-
-  queryClient.setQueryData<EmailThreadItem[] | undefined>(
-    emailQueryKeys.thread(threadId),
-    (current) => current?.map((entry) => applyPatchToItem(entry, patch)),
-  );
-
-  const detailSnapshots = queryClient.getQueriesData<EmailDetailItem>({
-    queryKey: ["email-detail"],
+  void queryClient.invalidateQueries({
+    queryKey: emailQueryKeys.viewCounts(mailboxId),
   });
-  for (const [queryKey, detail] of detailSnapshots) {
-    if (detail?.threadId !== threadId) continue;
-    queryClient.setQueryData(queryKey, applyPatchToItem(detail, patch));
-  }
 }
 
 async function applyLocalPatch(
@@ -345,6 +228,32 @@ async function rollbackLocalPatch(
   }
 }
 
+function getCachedThreadEmails(threadId: string): EmailListItem[] {
+  const byProviderId = new Map<string, EmailListItem>();
+  const add = (email: EmailListItem) => {
+    byProviderId.set(email.providerMessageId, email);
+  };
+
+  const threadSnapshot = queryClient.getQueryData<EmailThreadItem[]>(
+    emailQueryKeys.thread(threadId),
+  );
+  for (const email of threadSnapshot ?? []) add(email);
+
+  const listSnapshots = queryClient.getQueriesData<InfiniteData<EmailListPage>>({
+    queryKey: emailQueryKeys.all(),
+  });
+  for (const [, data] of listSnapshots) {
+    if (!isEmailListInfiniteData(data)) continue;
+    for (const page of data.pages) {
+      for (const email of page.emails) {
+        if (email.threadId === threadId) add(email);
+      }
+    }
+  }
+
+  return Array.from(byProviderId.values());
+}
+
 async function patchEmails(
   emails: EmailIdentifier[],
   data: EmailPatchPayload,
@@ -356,43 +265,38 @@ async function patchEmails(
   const mailboxId = emails[0]!.mailboxId;
   const providerIds = emails.map((e) => e.providerMessageId);
   const emailIds = emails.map((e) => e.id);
-  const emailIdSet = new Set(emailIds);
-  const beforeLocal = await localDb.getEmailsByProviderMessageIds(userId, providerIds);
-  const beforeLocalByProviderId = new Map(
-    beforeLocal.map((email) => [email.providerMessageId, email]),
-  );
+  markPending(providerIds);
   const unreadCountSnapshot = queryClient.getQueryData<InboxUnreadCount>(
     emailQueryKeys.inboxUnreadCount(mailboxId),
   );
   const unreadDelta = computeUnreadDeltaForEmails(
-    emails.map(
-      (email) =>
-        beforeLocalByProviderId.get(email.providerMessageId) ?? {
-          labelIds: email.labelIds ?? [],
-        },
-    ),
+    emails.map((email) => ({ labelIds: email.labelIds ?? [] })),
     data,
   );
-  await queryClient.cancelQueries({ queryKey: emailQueryKeys.all() });
-  await queryClient.cancelQueries({
+  applyMailPatchToCaches(
+    queryClient,
+    { ids: emailIds, providerMessageIds: providerIds },
+    data,
+  );
+  applyInboxUnreadDelta(mailboxId, unreadDelta);
+  void queryClient.cancelQueries({ queryKey: emailQueryKeys.all() });
+  void queryClient.cancelQueries({
     queryKey: emailQueryKeys.inboxUnreadCount(mailboxId),
   });
-  await Promise.all(
-    emailIds.map((id) =>
-      queryClient.cancelQueries({ queryKey: emailQueryKeys.detail(id) }),
-    ),
+  void Promise.all(
+    emailIds.map((id) => queryClient.cancelQueries({ queryKey: emailQueryKeys.detail(id) })),
   );
-  applyOptimisticCachePatch(emailIdSet, data);
-  applyInboxUnreadDelta(mailboxId, unreadDelta);
-  const localPatchTask = applyLocalPatch(
-    userId,
-    toNumericIds(emailIds),
-    data,
-  );
-  markPending(providerIds);
+  let beforeLocal: EmailListItem[] = [];
+  let localPatchTask: Promise<void> = Promise.resolve();
   let requestSucceeded = false;
 
   try {
+    beforeLocal = await localDb.getEmailsByProviderMessageIds(userId, providerIds);
+    localPatchTask = applyLocalPatch(
+      userId,
+      toNumericIds(emailIds),
+      data,
+    );
     if (emails.length === 1) {
       const email = emails[0]!;
       const response = await fetch(`/api/inbox/emails/${email.id}`, {
@@ -439,6 +343,10 @@ async function patchEmails(
     if (!requestSucceeded) {
       await rollbackLocalPatch(userId, beforeLocal);
       restoreInboxUnreadCount(mailboxId, unreadCountSnapshot);
+      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      for (const id of emailIds) {
+        void queryClient.invalidateQueries({ queryKey: emailQueryKeys.detail(id) });
+      }
     } else {
       invalidateInboxUnreadCount(mailboxId);
       if (data.snoozedUntil !== undefined) {
@@ -458,28 +366,38 @@ export async function patchThread(
   const userId = await getCurrentUserId();
   if (!userId) throw new Error("Not authenticated");
 
-  const beforeLocal = await localDb.getEmailThread(userId, thread.threadId);
   const unreadCountSnapshot = queryClient.getQueryData<InboxUnreadCount>(
     emailQueryKeys.inboxUnreadCount(thread.mailboxId),
   );
+  const cachedThreadEmails = getCachedThreadEmails(thread.threadId);
+  let providerIds = cachedThreadEmails.map((email) => email.providerMessageId);
+  markPending(providerIds);
   const unreadDelta = computeUnreadDeltaForThread(
-    beforeLocal,
+    cachedThreadEmails,
     thread.labelIds,
     data,
   );
-  await queryClient.cancelQueries({ queryKey: emailQueryKeys.all() });
-  await queryClient.cancelQueries({
+  applyMailPatchToCaches(queryClient, { threadId: thread.threadId }, data);
+  applyInboxUnreadDelta(thread.mailboxId, unreadDelta);
+  void queryClient.cancelQueries({ queryKey: emailQueryKeys.all() });
+  void queryClient.cancelQueries({
     queryKey: emailQueryKeys.thread(thread.threadId),
   });
-  await queryClient.cancelQueries({
+  void queryClient.cancelQueries({
     queryKey: emailQueryKeys.inboxUnreadCount(thread.mailboxId),
   });
-  applyOptimisticThreadPatch(thread.threadId, data);
-  applyInboxUnreadDelta(thread.mailboxId, unreadDelta);
-  const localPatchTask = localDb.updateThread(userId, thread.threadId, data);
-
+  let beforeLocal: EmailListItem[] = [];
+  let localPatchTask: Promise<void> = Promise.resolve();
   let requestSucceeded = false;
   try {
+    beforeLocal = await localDb.getEmailThread(userId, thread.threadId);
+    const alreadyLocked = new Set(providerIds);
+    const additionalProviderIds = beforeLocal
+      .map((email) => email.providerMessageId)
+      .filter((id) => !alreadyLocked.has(id));
+    markPending(additionalProviderIds);
+    providerIds = [...providerIds, ...additionalProviderIds];
+    localPatchTask = localDb.updateThread(userId, thread.threadId, data);
     const response = await fetch(
       `/api/inbox/emails/threads/${encodeURIComponent(thread.threadId)}`,
       {
@@ -512,6 +430,7 @@ export async function patchThread(
         });
       }
     }
+    clearPending(providerIds);
   }
 }
 

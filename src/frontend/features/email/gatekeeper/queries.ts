@@ -2,9 +2,11 @@ import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { gatekeeperQueryKeys } from "@/features/email/gatekeeper/query-keys";
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
-import type { EmailListItem } from "@/features/email/mail/types";
+import type { EmailListItem, EmailListPage } from "@/features/email/mail/types";
+import { isEmailListInfiniteData } from "@/features/email/mail/utils/email-list-cache";
 import { queryClient } from "@/lib/query-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import type { InfiniteData, QueryKey } from "@tanstack/react-query";
 
 type GatekeeperPendingState = {
   pendingCount: number;
@@ -25,6 +27,10 @@ type GatekeeperDecisionResult = {
 
 function gatekeeperActivatedAtKey(mailboxId: number): string {
   return `gatekeeperActivatedAt:${mailboxId}`;
+}
+
+function normalizeSenderAddress(value: string | null | undefined): string {
+  return value?.trim().toLowerCase() ?? "";
 }
 
 async function resolveGatekeeperActivatedAt(mailboxId: number): Promise<number> {
@@ -121,7 +127,18 @@ export function useGatekeeperPending(mailboxId: number, enabled = true) {
 }
 
 export function useGatekeeperDecision(mailboxId: number) {
-  return useMutation({
+  return useMutation<
+    GatekeeperDecisionResult,
+    Error,
+    {
+      fromAddr: string;
+      decision: GatekeeperDecision;
+    },
+    {
+      pendingSnapshot: GatekeeperPendingState | undefined;
+      emailSnapshots: Array<[QueryKey, InfiniteData<EmailListPage> | undefined]>;
+    }
+  >({
     mutationFn: async (input: {
       fromAddr: string;
       decision: GatekeeperDecision;
@@ -143,6 +160,72 @@ export function useGatekeeperDecision(mailboxId: number) {
       });
 
       return result;
+    },
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({
+        queryKey: gatekeeperQueryKeys.pending(mailboxId),
+      });
+      const pendingSnapshot = queryClient.getQueryData<GatekeeperPendingState>(
+        gatekeeperQueryKeys.pending(mailboxId),
+      );
+      const emailSnapshots = queryClient.getQueriesData<InfiniteData<EmailListPage>>({
+        queryKey: emailQueryKeys.all(),
+      });
+      const sender = normalizeSenderAddress(input.fromAddr);
+
+      queryClient.setQueryData<GatekeeperPendingState | undefined>(
+        gatekeeperQueryKeys.pending(mailboxId),
+        (current) => {
+          if (!current) return current;
+          const beforeSenders = new Set(
+            current.items.map((item) => normalizeSenderAddress(item.fromAddr)),
+          );
+          const items = current.items.filter(
+            (item) => normalizeSenderAddress(item.fromAddr) !== sender,
+          );
+          const removedSender = beforeSenders.has(sender);
+          return {
+            ...current,
+            items,
+            pendingCount: removedSender
+              ? Math.max(0, current.pendingCount - 1)
+              : current.pendingCount,
+          };
+        },
+      );
+
+      for (const [queryKey, data] of emailSnapshots) {
+        if (!isEmailListInfiniteData(data)) continue;
+        queryClient.setQueryData(queryKey, {
+          ...data,
+          pages: data.pages.map((page) => ({
+            ...page,
+            emails:
+              input.decision === "reject"
+                ? page.emails.filter(
+                    (item) => normalizeSenderAddress(item.fromAddr) !== sender,
+                  )
+                : page.emails.map((item) =>
+                    normalizeSenderAddress(item.fromAddr) === sender
+                      ? { ...item, isGatekept: false }
+                      : item,
+                  ),
+          })),
+        });
+      }
+
+      return { pendingSnapshot, emailSnapshots };
+    },
+    onError: (_error, _input, context) => {
+      if (context?.pendingSnapshot) {
+        queryClient.setQueryData(
+          gatekeeperQueryKeys.pending(mailboxId),
+          context.pendingSnapshot,
+        );
+      }
+      for (const [queryKey, data] of context?.emailSnapshots ?? []) {
+        queryClient.setQueryData(queryKey, data);
+      }
     },
     onSuccess: async () => {
       await Promise.all([

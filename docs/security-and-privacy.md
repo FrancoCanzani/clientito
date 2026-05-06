@@ -1,6 +1,6 @@
 # Security and Privacy
 
-This page explains core security and privacy expectations in Petit.
+This page explains core security and privacy expectations in Duomo.
 
 ## Account and auth
 
@@ -10,9 +10,10 @@ This page explains core security and privacy expectations in Petit.
 
 ## Data handling
 
-- Petit reads mailbox data needed for inbox features.
-- Message metadata and content may be stored for app functionality.
-- Attachments and sync state may be processed as part of mailbox sync.
+- Duomo reads mailbox data needed for inbox features.
+- Message metadata and content are cached in the browser-local database.
+- Duomo does not keep a server-side inbox corpus.
+- Drafts, scheduled sends, attachments, settings, trust decisions, and sync state may be stored server-side for product functionality.
 
 ## AI features
 

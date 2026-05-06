@@ -1,18 +1,35 @@
 import { cn } from "@/lib/utils";
 import { formatInboxRowDate } from "@/features/email/mail/utils/formatters";
 import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
+import { useEffect, useRef } from "react";
 
 export function TodoQueuePanel({
   groups,
   selectedId,
   onSelect,
+  className,
 }: {
   groups: ThreadGroup[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  className?: string;
 }) {
+  const rowRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  useEffect(() => {
+    if (!selectedId) return;
+    rowRefs.current.get(selectedId)?.scrollIntoView({
+      block: "nearest",
+    });
+  }, [selectedId]);
+
   return (
-    <section className="flex min-h-0 flex-col overflow-hidden rounded border border-border/40 md:w-80 md:shrink-0">
+    <section
+      className={cn(
+        "flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-border/40 md:flex-initial md:w-80 md:shrink-0",
+        className,
+      )}
+    >
       <div className="flex items-center justify-between px-3 py-2 text-xs">
         <h1>To do</h1>
         <span className="text-[10px] tabular-nums">{groups.length}</span>
@@ -26,6 +43,10 @@ export function TodoQueuePanel({
           return (
             <button
               key={email.id}
+              ref={(node) => {
+                if (node) rowRefs.current.set(email.id, node);
+                else rowRefs.current.delete(email.id);
+              }}
               type="button"
               onClick={() => onSelect(email.id)}
               className={cn(

@@ -97,16 +97,7 @@ export function useUndoSend({
         onSuccess?.();
         if (viewRequestedRef.current && onView) {
           await onView(result);
-          return;
         }
-        toast.success("Email sent", {
-          action: onView
-            ? {
-                label: "View email",
-                onClick: () => void onView(result),
-              }
-            : undefined,
-        });
       } catch (error) {
         pendingRef.current = false;
         const err = error instanceof Error ? error : new Error("Failed to send email");

@@ -1,6 +1,6 @@
-import { DetoxRenderer } from "./detox-renderer";
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 import type { EmailBodySource } from "../types";
+import { DetoxRenderer } from "./detox-renderer";
 
 type PlainTextSections = {
   visibleText: string;
@@ -79,7 +79,7 @@ function PlainTextEmailRenderer({ text }: { text: string }) {
   );
 }
 
-export function MessageBody({
+export const MessageBody = memo(function MessageBody({
   detail,
 }: {
   detail?: EmailBodySource | null;
@@ -87,17 +87,25 @@ export function MessageBody({
   const bodyHtml = detail?.resolvedBodyHtml ?? detail?.bodyHtml;
   const bodyText = detail?.resolvedBodyText ?? detail?.bodyText;
 
-  const inlineContext =
-    detail?.providerMessageId &&
-    detail?.mailboxId != null &&
-    detail?.inlineAttachments &&
-    detail.inlineAttachments.length > 0
-      ? {
-          providerMessageId: detail.providerMessageId,
-          mailboxId: detail.mailboxId,
-          attachments: detail.inlineAttachments,
-        }
-      : null;
+  const providerMessageId = detail?.providerMessageId ?? null;
+  const mailboxId = detail?.mailboxId ?? null;
+  const inlineAttachments = detail?.inlineAttachments;
+
+  const inlineContext = useMemo(() => {
+    if (
+      !providerMessageId ||
+      mailboxId == null ||
+      !inlineAttachments ||
+      inlineAttachments.length === 0
+    ) {
+      return null;
+    }
+    return {
+      providerMessageId,
+      mailboxId,
+      attachments: inlineAttachments,
+    };
+  }, [providerMessageId, mailboxId, inlineAttachments]);
 
   if (bodyHtml) {
     return (
@@ -115,4 +123,4 @@ export function MessageBody({
   }
 
   return <PlainTextEmailRenderer text={bodyText} />;
-}
+});

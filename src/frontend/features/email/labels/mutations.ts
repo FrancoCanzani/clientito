@@ -1,6 +1,7 @@
 import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { localDb } from "@/db/client";
 import { invalidateInboxQueries } from "@/features/email/mail/queries";
+import { applyLabelToCaches } from "@/features/email/mail/utils/optimistic-mail-state";
 import { queryClient } from "@/lib/query-client";
 import { syncLabelsFromServer } from "./queries";
 import type { CreateLabelInput, Label, UpdateLabelInput } from "./types";
@@ -55,8 +56,8 @@ export async function deleteLabel(labelId: string, mailboxId: number): Promise<v
 }
 
 export async function applyLabel(providerMessageIds: string[], labelId: string, mailboxId: number): Promise<void> {
+  applyLabelToCaches(queryClient, providerMessageIds, labelId, true);
   await localDb.addLabelToEmails(providerMessageIds, labelId);
-  invalidateInboxQueries();
 
   const response = await fetch("/api/inbox/labels/apply", {
     method: "POST",
@@ -69,15 +70,17 @@ export async function applyLabel(providerMessageIds: string[], labelId: string, 
   });
   if (!response.ok) {
     // Rollback local change
+    applyLabelToCaches(queryClient, providerMessageIds, labelId, false);
     await localDb.removeLabelFromEmails(providerMessageIds, labelId);
     invalidateInboxQueries();
     await throwOnError(response, "Failed to apply label");
   }
+  invalidateInboxQueries();
 }
 
 export async function removeLabel(providerMessageIds: string[], labelId: string, mailboxId: number): Promise<void> {
+  applyLabelToCaches(queryClient, providerMessageIds, labelId, false);
   await localDb.removeLabelFromEmails(providerMessageIds, labelId);
-  invalidateInboxQueries();
 
   const response = await fetch("/api/inbox/labels/remove", {
     method: "POST",
@@ -90,8 +93,10 @@ export async function removeLabel(providerMessageIds: string[], labelId: string,
   });
   if (!response.ok) {
     // Rollback local change
+    applyLabelToCaches(queryClient, providerMessageIds, labelId, true);
     await localDb.addLabelToEmails(providerMessageIds, labelId);
     invalidateInboxQueries();
     await throwOnError(response, "Failed to remove label");
   }
+  invalidateInboxQueries();
 }

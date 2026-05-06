@@ -8,11 +8,17 @@ import {
 } from "@/features/email/mail/mutations";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import type {
+  EmailDetailItem,
   EmailListItem,
   EmailListPage,
+  EmailThreadItem,
 } from "@/features/email/mail/types";
 import { openEmail as openInboxEmail } from "@/features/email/mail/utils/open-email";
 import { unsubscribe } from "@/features/email/subscriptions/queries";
+import {
+  applyMailPatchToCaches,
+  removeIdsFromInfiniteData,
+} from "@/features/email/mail/utils/optimistic-mail-state";
 import { useTodoLabel } from "@/features/email/todo/hooks/use-todo-label";
 import {
   useMutation,
@@ -99,22 +105,10 @@ type InboxMutationVars = {
   thread?: ThreadIdentifier;
 };
 
-function removeIdsFromInfiniteData(
-  current: InfiniteData<EmailListPage> | undefined,
-  idSet: Set<string>,
-): InfiniteData<EmailListPage> | undefined {
-  if (!current) return current;
-  let changed = false;
-  const pages = current.pages.map((page) => {
-    const emails = page.emails.filter((entry) => !idSet.has(entry.id));
-    if (emails.length !== page.emails.length) {
-      changed = true;
-      return { ...page, emails };
-    }
-    return page;
-  });
-  return changed ? { ...current, pages } : current;
-}
+export type ExecuteMailActionOptions = {
+  identifiers?: EmailIdentifier[];
+  onVisible?: () => void;
+};
 
 export function useMailActions({
   view,
@@ -179,6 +173,7 @@ export function useMailActions({
       action: MailAction,
       explicitIds?: string[],
       threadContext?: ThreadIdentifier,
+      options: ExecuteMailActionOptions = {},
     ) => {
       const ids = explicitIds && explicitIds.length > 0 ? explicitIds : [];
       if (ids.length === 0) return;
@@ -186,6 +181,12 @@ export function useMailActions({
       const idSet = new Set(ids);
       const snapshots = queryClient.getQueriesData<EmailsCache>({
         queryKey: emailQueryKeys.all(),
+      });
+      const detailSnapshots = queryClient.getQueriesData<EmailDetailItem>({
+        queryKey: ["email-detail"],
+      });
+      const threadSnapshots = queryClient.getQueriesData<EmailThreadItem[]>({
+        queryKey: ["email-thread"],
       });
       const itemById = new Map<string, EmailListItem>();
       for (const [, cache] of snapshots) {
@@ -199,6 +200,8 @@ export function useMailActions({
       const identifiers = ids
         .map((id): EmailIdentifier | null => {
           const item = itemById.get(id);
+          const fallback = options.identifiers?.find((entry) => entry.id === id);
+          if (!item && fallback) return fallback;
           if (!item || !item.mailboxId) return null;
           return {
             id: item.id,
@@ -213,29 +216,62 @@ export function useMailActions({
         threadContext && THREAD_LEVEL_ACTIONS.has(action)
           ? threadContext
           : undefined;
+      const data = actionPayloads[action];
 
       if (identifiers.length === 0 && !thread) return;
 
-      const doAction = async () => {
+      const applyVisibleChange = () => {
+        if (data) {
+          applyMailPatchToCaches(
+            queryClient,
+            {
+              ids,
+              providerMessageIds: identifiers.map((entry) => entry.providerMessageId),
+              threadId: thread?.threadId,
+            },
+            data,
+          );
+        }
         if (LIST_CHANGING_ACTIONS.has(action)) {
           queryClient.setQueriesData<InfiniteData<EmailListPage> | undefined>(
             { queryKey: emailQueryKeys.list(view, mailboxId) },
             (current) => removeIdsFromInfiniteData(current, idSet),
           );
         }
+        options.onVisible?.();
+      };
+
+      const restoreSnapshots = () => {
+        for (const [queryKey, data] of snapshots) {
+          queryClient.setQueryData(queryKey, data);
+        }
+        for (const [queryKey, data] of detailSnapshots) {
+          queryClient.setQueryData(queryKey, data);
+        }
+        for (const [queryKey, data] of threadSnapshots) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      };
+
+      const doAction = async () => {
         try {
           await mutation.mutateAsync({ action, ids, identifiers, thread });
-        } catch (error) {
-          console.warn("Inbox action failed", error);
+        } catch {
+          // Errors are surfaced via the mutation onError toast + cache rollback.
         }
       };
 
       if (UNDO_ACTIONS.has(action)) {
         undoAction({
           action: doAction,
+          onAction: applyVisibleChange,
+          onUndo: () => {
+            restoreSnapshots();
+          },
           message: actionMessages[action] ?? "Done",
         });
       } else {
+        applyVisibleChange();
         await doAction();
       }
     },
@@ -279,7 +315,13 @@ export function useMailActions({
         toast.info("Opened unsubscribe page");
         return;
       }
-      toast.success("Unsubscribed");
+      const archived = result.archivedCount ?? 0;
+      toast.success(
+        archived > 0
+          ? `Unsubscribed — ${archived} ${archived === 1 ? "email" : "emails"} archived`
+          : "Unsubscribed",
+      );
+      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
     },
     onError: (error: Error) => toast.error(error.message),
   });

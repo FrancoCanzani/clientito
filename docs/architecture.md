@@ -1,10 +1,12 @@
 # Architecture
 
-This document is the technical reference for how Petit works end to end. It covers the runtime model, data flow, storage layers, sync pipeline, AI classification, and frontend patterns. Written for anyone who needs to understand the system before changing it.
+> Internal note: this document is being reconciled for the Duomo beta. Some sections still describe an older server-side mail-corpus design and should not be used as launch-facing product documentation.
+
+This document is the technical reference for how Duomo works end to end. It covers the runtime model, data flow, storage layers, sync pipeline, AI classification, and frontend patterns. Written for anyone who needs to understand the system before changing it.
 
 ## Runtime Model
 
-Petit is a single Cloudflare Worker that serves both the API and the frontend SPA. One deployment artifact, one URL.
+Duomo is a single Cloudflare Worker that serves both the API and the frontend SPA. One deployment artifact, one URL.
 
 ```
 Browser (React SPA)
@@ -89,7 +91,7 @@ src/
 
 ## Authentication
 
-Petit uses [better-auth](https://www.better-auth.com/) with session cookies.
+Duomo uses [better-auth](https://www.better-auth.com/) with session cookies.
 
 - **Providers**: Google OAuth (email/password also available)
 - **OAuth scopes**: Gmail read/modify/send, Calendar events (future), profile

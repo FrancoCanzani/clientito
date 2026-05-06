@@ -1,14 +1,46 @@
 import { Button } from "@/components/ui/button";
-import { ArrowsOutSimpleIcon, XIcon } from "@phosphor-icons/react";
-import { getRouteApi, useNavigate } from "@tanstack/react-router";
+import { XIcon } from "@phosphor-icons/react";
+import { formatDistanceToNowStrict } from "date-fns";
 import { AnimatePresence, motion } from "motion/react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ComposeInitial } from "../types";
+import type { DraftStatus } from "../hooks/use-draft";
 import { ComposeEmailFields } from "./compose-email-fields";
 import { getComposePanelKey, useComposeEmail } from "./compose-email-state";
 
-const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
+function DraftStatusIndicator({
+  status,
+  lastSavedAt,
+}: {
+  status: DraftStatus;
+  lastSavedAt: number | null;
+}) {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (status !== "saved" || lastSavedAt == null) return;
+    const interval = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(interval);
+  }, [status, lastSavedAt]);
+
+  if (status === "saving") {
+    return (
+      <span className="text-[10px] text-muted-foreground">Saving…</span>
+    );
+  }
+
+  if (status === "saved" && lastSavedAt != null) {
+    const elapsed = Date.now() - lastSavedAt;
+    const label =
+      elapsed < 5_000
+        ? "Saved"
+        : `Saved ${formatDistanceToNowStrict(lastSavedAt, { addSuffix: true })}`;
+    return <span className="text-[10px] text-muted-foreground">{label}</span>;
+  }
+
+  return null;
+}
 
 export function ComposePanel({
   open,
@@ -46,9 +78,8 @@ function ComposePanelBody({
   onOpenChange: (open: boolean) => void;
   initial?: ComposeInitial;
 }) {
-  const navigate = useNavigate();
-  const { mailboxId } = mailboxRoute.useParams();
   const compose = useComposeEmail(initial, {
+    onQueued: () => onOpenChange(false),
     onSent: () => onOpenChange(false),
   });
   const hasInitialRecipient = (initial?.to?.trim().length ?? 0) > 0;
@@ -71,21 +102,6 @@ function ComposePanelBody({
     return initial?.subject?.startsWith("Fwd:") ? "Forward" : "New message";
   }, [compose.subject, initial?.subject]);
 
-  const handleOpenFullComposer = async () => {
-    const handoffComposeKey = `compose_${Date.now().toString(36)}_${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
-    const composeKey = await compose.saveDraftNow(handoffComposeKey);
-
-    await compose.clearDraft();
-    onOpenChange(false);
-    navigate({
-      to: "/$mailboxId/inbox/new",
-      params: { mailboxId },
-      search: { composeKey },
-    });
-  };
-
   return (
     <>
       <motion.div
@@ -107,32 +123,24 @@ function ComposePanelBody({
       >
         <div className="flex max-h-[min(85vh,720px)] min-h-0 flex-col overflow-hidden rounded-xl border border-border/50 bg-background shadow-2xl sm:max-h-[70vh]">
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/40 px-3 py-2">
-            <h3 className="text-xs font-medium">{title}</h3>
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  void handleOpenFullComposer();
-                }}
-                aria-label="Open full composer"
-                title="Open full composer"
-              >
-                <ArrowsOutSimpleIcon className="size-3" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  handleClose();
-                }}
-                aria-label="Close compose"
-              >
-                <XIcon className="size-3" />
-              </Button>
+            <div className="flex min-w-0 items-baseline gap-2">
+              <h3 className="truncate text-xs font-medium">{title}</h3>
+              <DraftStatusIndicator
+                status={compose.draftStatus}
+                lastSavedAt={compose.draftLastSavedAt}
+              />
             </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                handleClose();
+              }}
+              aria-label="Close compose"
+            >
+              <XIcon className="size-3" />
+            </Button>
           </div>
           <div className="flex min-h-0 flex-1">
             <ComposeEmailFields

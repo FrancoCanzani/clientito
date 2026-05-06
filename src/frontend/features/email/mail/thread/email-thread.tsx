@@ -145,6 +145,17 @@ export function EmailThread({
   );
   const hasAttachments = visibleAttachments.length > 0;
 
+  const referencedCidsByMessageId = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const message of orderedThreadMessages) {
+      map.set(
+        message.id,
+        collectReferencedCids(message.resolvedBodyHtml ?? message.bodyHtml),
+      );
+    }
+    return map;
+  }, [orderedThreadMessages]);
+
   const defaultExpandedIds = useMemo(() => {
     const next = new Set<string>();
     const latest = orderedThreadMessages[orderedThreadMessages.length - 1];
@@ -159,7 +170,7 @@ export function EmailThread({
   useEffect(() => {
     requestAnimationFrame(() => {
       latestMessageRef.current?.scrollIntoView({
-        block: "center",
+        block: "start",
         behavior: "auto",
       });
     });
@@ -215,12 +226,12 @@ export function EmailThread({
         <div className="space-y-3">
           {orderedThreadMessages.map((threadEmail) => {
             const isSelected = threadEmail.id === email.id;
-            const threadReferencedCids = collectReferencedCids(
-              threadEmail.resolvedBodyHtml ?? threadEmail.bodyHtml,
-            );
+            const threadReferencedCids =
+              referencedCidsByMessageId.get(threadEmail.id) ?? new Set<string>();
             return (
               <div
                 key={threadEmail.id}
+                className="scroll-mt-16"
                 ref={
                   threadEmail.id ===
                   orderedThreadMessages[orderedThreadMessages.length - 1]?.id

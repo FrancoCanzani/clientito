@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useAttachmentUpload } from "../hooks/use-attachment-upload";
-import { loadDraft, persistDraftNow, useDraft } from "../hooks/use-draft";
+import { loadDraft, useDraft } from "../hooks/use-draft";
 import { useUndoSend } from "../hooks/use-undo-send";
 import { sendEmail } from "../mutations";
 import { fetchViewPage, invalidateInboxQueries } from "../queries";
@@ -26,6 +26,7 @@ import {
 } from "./template-interpolation";
 
 type UseComposeEmailOptions = {
+  onQueued?: () => void;
   onSent?: () => void;
 };
 
@@ -289,6 +290,8 @@ export function useComposeEmail(
   const mailboxesQuery = useMailboxes();
   const { user } = useAuth();
   const composeKey = getComposePanelKey(initial);
+  // composeKey is a stable fingerprint of every `initial` field these memos
+  // read — re-deriving on its change is sufficient.
   const initialDraft = useMemo(() => createComposeDraft(initial), [composeKey]);
   const [draft, setDraft] = useState(() => initialDraft);
   const [loadingDraft, setLoadingDraft] = useState(true);
@@ -542,18 +545,6 @@ export function useComposeEmail(
     setDraft(initialDraft);
   }, [attachments, initialDraft, serverDraft]);
 
-  const saveDraftNow = useCallback(async (targetComposeKey?: string) => {
-    const key = targetComposeKey ?? composeKey;
-    await persistDraftNow(key, {
-      ...draftRef.current,
-      body: bodyRef.current,
-    });
-    queryClient.invalidateQueries({
-      queryKey: draftQueryKeys.list(draftRef.current.mailboxId),
-    });
-    return key;
-  }, [composeKey, queryClient]);
-
   // Snapshot draft state at trigger time so the undo-send closure captures
   // the values that were current when the user pressed Send.
   const draftSnapshotRef = useRef(draft);
@@ -617,7 +608,7 @@ export function useComposeEmail(
         ? attachments.files.map((file) => ({ ...file }))
         : undefined;
     setSendPending(true);
-    options?.onSent?.();
+    options?.onQueued?.();
     undoSend.trigger();
   }, [draft, attachments, undoSend, options]);
 
@@ -686,8 +677,9 @@ export function useComposeEmail(
     templates,
     applyTemplateById,
     clearDraft,
-    saveDraftNow,
     composeKey,
     loadingDraft,
+    draftStatus: serverDraft.status,
+    draftLastSavedAt: serverDraft.lastSavedAt,
   };
 }

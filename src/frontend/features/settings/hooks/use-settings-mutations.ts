@@ -1,5 +1,6 @@
 import { accountQueryKeys } from "@/features/settings/query-keys";
 import { clearLocalData } from "@/db/client";
+import { resetCurrentUserCache } from "@/db/user";
 import { beginGmailConnection } from "@/features/onboarding/mutations";
 import {
   deleteAccount,
@@ -119,7 +120,10 @@ export function useSettingsMutations({
 
   const deleteMutation = useMutation({
     mutationFn: deleteAccount,
-    onSuccess: () => {
+    onSuccess: async () => {
+      resetCurrentUserCache();
+      await clearLocalData();
+      queryClient.clear();
       toast.success("Account deleted");
       navigate({ to: "/login" });
     },

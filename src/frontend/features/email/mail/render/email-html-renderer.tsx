@@ -7,10 +7,12 @@ export function EmailHtmlRenderer({ html }: { html: string }) {
   const shadowRootRef = useRef<ShadowRoot | null>(null);
 
   useEffect(() => {
-    if (!hostRef.current || shadowRootRef.current) {
+    const host = hostRef.current;
+    if (!host || shadowRootRef.current) {
       return;
     }
-    shadowRootRef.current = hostRef.current.attachShadow({ mode: "open" });
+    shadowRootRef.current =
+      host.shadowRoot ?? host.attachShadow({ mode: "open" });
   }, []);
 
   useEffect(() => {
@@ -57,7 +59,19 @@ export function EmailHtmlRenderer({ html }: { html: string }) {
     };
 
     shadowRoot.addEventListener("click", handleClick);
-    return () => shadowRoot.removeEventListener("click", handleClick);
+    const handleImageError = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLImageElement)) return;
+      target.setAttribute("data-image-error", "true");
+      target.removeAttribute("src");
+      target.setAttribute("alt", target.alt || "Preview unavailable");
+    };
+
+    shadowRoot.addEventListener("error", handleImageError, true);
+    return () => {
+      shadowRoot.removeEventListener("click", handleClick);
+      shadowRoot.removeEventListener("error", handleImageError, true);
+    };
   }, []);
 
   return <div ref={hostRef} className="w-full min-w-0 max-w-full" />;

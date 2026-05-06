@@ -4,6 +4,7 @@ import type {
   EmailDetailItem,
   EmailThreadItem,
 } from "@/features/email/mail/types";
+import { cn } from "@/lib/utils";
 
 export function TodoReaderPanel({
   currentEmail,
@@ -11,16 +12,23 @@ export function TodoReaderPanel({
   hasDetailError,
   onRetry,
   hasThreadError,
+  className,
 }: {
   currentEmail: EmailDetailItem | null;
   threadMessages: EmailThreadItem[];
   hasDetailError: boolean;
   hasThreadError: boolean;
   onRetry: () => void;
+  className?: string;
 }) {
+  const sectionClassName = cn(
+    "min-h-0 flex-1 overflow-hidden rounded border border-border/40 bg-background",
+    className,
+  );
+
   if (hasDetailError) {
     return (
-      <section className="min-h-0 flex-1 overflow-hidden rounded border border-border/40 bg-background">
+      <section className={sectionClassName}>
         <div className="flex h-full items-center justify-center px-6 text-center">
           <div className="space-y-3">
             <p className="text-sm font-medium">Unable to open email</p>
@@ -35,14 +43,14 @@ export function TodoReaderPanel({
 
   if (!currentEmail) {
     return (
-      <section className="min-h-0 flex-1 overflow-hidden rounded border border-border/40 bg-background">
+      <section className={sectionClassName}>
         <div className="h-full" />
       </section>
     );
   }
 
   return (
-    <section className="min-h-0 flex-1 overflow-hidden rounded border border-border/40 bg-background">
+    <section className={sectionClassName}>
       <div className="h-full min-h-0 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-5 py-8 md:px-8">
           <EmailThread

@@ -1,4 +1,5 @@
 import { IconButton } from "@/components/ui/icon-button";
+import type { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import type { EmailDetailItem } from "@/features/email/mail/types";
 import { cn } from "@/lib/utils";
 import {
@@ -18,6 +19,7 @@ export function EmailDetailHeader({
   hasPrev = false,
   hasNext = false,
   onForward,
+  onAction,
   onReply,
   onDraftReply,
   isScrolled = false,
@@ -30,6 +32,7 @@ export function EmailDetailHeader({
   hasPrev?: boolean;
   hasNext?: boolean;
   onForward: (initial: ComposeInitial) => void;
+  onAction?: ReturnType<typeof useMailActions>["executeEmailAction"];
   onReply: () => void;
   onDraftReply?: () => void;
   isScrolled?: boolean;
@@ -37,7 +40,7 @@ export function EmailDetailHeader({
   return (
     <div
       className={cn(
-        "sticky top-0 z-20 flex min-h-14 shrink-0 items-center justify-between gap-3 border-b bg-background px-3 md:px-6",
+        "sticky top-0 z-20 flex min-h-10 shrink-0 items-center justify-between gap-3 border-b bg-background px-3 py-1.5 md:px-4",
         isScrolled ? "border-border/40" : "border-transparent",
       )}
     >
@@ -47,6 +50,7 @@ export function EmailDetailHeader({
             label="Back"
             shortcut="Esc"
             variant="ghost"
+            size="icon-sm"
             onClick={() => onBack?.()}
           >
             <ArrowLeftIcon className="size-3.5" />
@@ -54,6 +58,8 @@ export function EmailDetailHeader({
           <IconButton
             label="Previous"
             shortcut="K"
+            variant="ghost"
+            size="icon-sm"
             onClick={() => onPrev?.()}
             disabled={!hasPrev}
           >
@@ -62,6 +68,8 @@ export function EmailDetailHeader({
           <IconButton
             label="Next"
             shortcut="J"
+            variant="ghost"
+            size="icon-sm"
             onClick={() => onNext?.()}
             disabled={!hasNext}
           >
@@ -73,6 +81,7 @@ export function EmailDetailHeader({
           email={email}
           onClose={onClose}
           onForward={onForward}
+          onAction={onAction}
           onReply={onReply}
           onDraftReply={onDraftReply}
         />

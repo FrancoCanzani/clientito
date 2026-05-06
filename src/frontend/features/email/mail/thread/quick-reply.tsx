@@ -10,59 +10,20 @@ import {
   useState,
 } from "react";
 import type {
-  ComposeInitial,
   EmailDetailItem,
   EmailListItem,
-  EmailThreadItem,
 } from "../types";
-import { formatQuotedDate } from "../utils/formatters";
+import type { EmailThreadItem } from "../types";
 import { ComposeEmailFields } from "../compose/compose-email-fields";
 import { useComposeEmail } from "../compose/compose-email-state";
+import {
+  buildReplyInitial,
+  pickReplySource,
+} from "../utils/reply-compose";
 
 export type QuickReplyHandle = {
   scrollIntoViewAndFocus: (draft?: string) => void;
 };
-
-function buildReplyInitial(
-  email: EmailListItem,
-  detail?: EmailDetailItem | null,
-): ComposeInitial {
-  const subject = email.subject
-    ? `Re: ${email.subject.replace(/^Re:\s*/i, "")}`
-    : "Re:";
-
-  const originalFrom = email.fromName
-    ? `${email.fromName} &lt;${email.fromAddr}&gt;`
-    : email.fromAddr;
-  const originalDate = formatQuotedDate(email.date);
-  const originalBody =
-    detail?.resolvedBodyHtml ?? detail?.resolvedBodyText ?? email.snippet ?? "";
-  const quotedHtml = `<div data-forwarded-message="true"><div data-forwarded-header>On ${originalDate}, ${originalFrom} wrote:</div><div data-forwarded-original-body>${originalBody}</div></div>`;
-
-  return {
-    mailboxId: email.mailboxId,
-    to: email.fromAddr,
-    subject,
-    bodyHtml: quotedHtml,
-    threadId: email.threadId ?? undefined,
-  };
-}
-
-function pickReplySource(
-  fallback: EmailListItem,
-  threadMessages: EmailThreadItem[],
-  selfEmails: Set<string>,
-): EmailListItem {
-  const sorted = [...threadMessages].sort((left, right) => {
-    if (right.date !== left.date) return right.date - left.date;
-    return right.createdAt - left.createdAt;
-  });
-  return (
-    sorted.find((message) => !selfEmails.has(message.fromAddr.toLowerCase())) ??
-    sorted[0] ??
-    fallback
-  );
-}
 
 export const QuickReply = forwardRef<
   QuickReplyHandle,
@@ -162,7 +123,7 @@ function QuickReplyComposer({
     [replySource, detail],
   );
   const compose = useComposeEmail(initial, {
-    onSent: onClose,
+    onQueued: onClose,
   });
   const appliedDraftIdRef = useRef<number | null>(null);
 

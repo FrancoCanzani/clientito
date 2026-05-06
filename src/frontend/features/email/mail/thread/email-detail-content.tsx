@@ -1,4 +1,5 @@
 import type { EmailDetailItem, EmailThreadItem } from "@/features/email/mail/types";
+import type { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import { useIsScrolled } from "@/hooks/use-is-scrolled";
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import type { ComposeInitial } from "../types";
@@ -23,6 +24,7 @@ export const EmailDetailContent = forwardRef<
     hasPrev?: boolean;
     hasNext?: boolean;
     onForward: (initial: ComposeInitial) => void;
+    onAction?: ReturnType<typeof useMailActions>["executeEmailAction"];
   }
 >(function EmailDetailContent(
   {
@@ -36,6 +38,7 @@ export const EmailDetailContent = forwardRef<
     hasPrev = false,
     hasNext = false,
     onForward,
+    onAction,
   },
   ref,
 ) {
@@ -63,6 +66,7 @@ export const EmailDetailContent = forwardRef<
           hasPrev={hasPrev}
           hasNext={hasNext}
           onForward={onForward}
+          onAction={onAction}
           onReply={() => quickReplyRef.current?.scrollIntoViewAndFocus()}
           onDraftReply={() => {
             const draft = email.aiDraftReply?.trim();

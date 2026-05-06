@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RichTextField } from "@/features/settings/components/rich-text-field";
-import { SettingsSectionHeader } from "@/features/settings/components/settings-shell";
 import { useSettingsMutations } from "@/features/settings/hooks/use-settings-mutations";
 import {
   useMailboxes,
@@ -83,43 +82,36 @@ export default function SignaturesPage() {
   }
 
   return (
-    <section className="min-w-0 space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <SettingsSectionHeader
-          group="Mail"
-          title="Signatures"
-          description="Create rich email signatures and choose the default for this account."
-        />
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-nowrap">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={addSignature}
-            className="flex-1 sm:flex-none"
-          >
-            <PlusIcon className="mr-1.5 size-3.5" />
-            Add
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            className="flex-1 sm:flex-none"
-            disabled={!isDirty || account?.mailboxId == null || signatureMutation.isPending}
-            onClick={() => {
-              if (account?.mailboxId == null) return;
-              signatureMutation.mutate({
-                mailboxId: account.mailboxId,
-                signature: serializeState(state),
-              });
-            }}
-          >
-            {signatureMutation.isPending ? "Saving..." : "Save"}
-          </Button>
-        </div>
+    <div className="min-w-0 space-y-4">
+      <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-nowrap sm:justify-end">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={addSignature}
+          className="flex-1 sm:flex-none"
+        >
+          <PlusIcon className="mr-1.5 size-3.5" />
+          Add
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          className="flex-1 sm:flex-none"
+          disabled={!isDirty || account?.mailboxId == null || signatureMutation.isPending}
+          onClick={() => {
+            if (account?.mailboxId == null) return;
+            signatureMutation.mutate({
+              mailboxId: account.mailboxId,
+              signature: serializeState(state),
+            });
+          }}
+        >
+          {signatureMutation.isPending ? "Saving..." : "Save"}
+        </Button>
       </div>
 
-      <div className="min-w-0 space-y-4 border-t border-border/60 pt-4">
+      <div className="min-w-0 space-y-4">
         <div className="min-w-0 space-y-2">
           {state.items.length === 0 ? (
             <p className="py-3 text-xs text-muted-foreground">
@@ -203,7 +195,7 @@ export default function SignaturesPage() {
           </div>
         )}
       </div>
-    </section>
+    </div>
   );
 }
 

@@ -3,18 +3,13 @@ import { getCurrentUserId } from "@/db/user";
 import { fetchAllLocalViewEmails } from "@/features/email/mail/queries";
 import type { EmailListPage } from "@/features/email/mail/types";
 import { groupEmailsByThread } from "@/features/email/mail/utils/group-emails-by-thread";
-import { TODO_LABEL_NAME } from "@/features/email/labels/internal-labels";
+import { ensureTodoLabel, findTodoLabel } from "@/features/email/todo/hooks/use-todo-label";
 import type { Label } from "@/features/email/labels/types";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 export const todoDataQueryKey = (mailboxId: number) =>
   ["emails", "todo", mailboxId] as const;
-
-function findTodoLabel(labels: Label[]): Label | null {
-  const normalizedName = TODO_LABEL_NAME.toLowerCase();
-  return labels.find((label) => label.name.toLowerCase() === normalizedName) ?? null;
-}
 
 export async function fetchTodoLabelLocal(mailboxId: number): Promise<Label | null> {
   const userId = await getCurrentUserId();
@@ -35,6 +30,19 @@ export async function fetchTodoPageLocal(
   return { ...page, label };
 }
 
+export async function fetchTodoPage(
+  mailboxId: number,
+): Promise<EmailListPage & { label: Label | null }> {
+  let label = await fetchTodoLabelLocal(mailboxId);
+  label ??= await ensureTodoLabel(mailboxId);
+
+  const page = await fetchAllLocalViewEmails({
+    mailboxId,
+    view: label.gmailId,
+  });
+  return { ...page, label };
+}
+
 export function useTodoData({
   mailboxId,
 }: {
@@ -42,7 +50,7 @@ export function useTodoData({
 }) {
   const emailsQuery = useInfiniteQuery({
     queryKey: todoDataQueryKey(mailboxId),
-    queryFn: () => fetchTodoPageLocal(mailboxId),
+    queryFn: () => fetchTodoPage(mailboxId),
     initialPageParam: "" as string,
     getNextPageParam: () => undefined,
     staleTime: 5_000,

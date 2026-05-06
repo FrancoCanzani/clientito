@@ -138,6 +138,26 @@ export class GmailDriver {
     return { trashedCount: ids.length };
   }
 
+  async archiveSender(fromEmail: string): Promise<{ archivedCount: number }> {
+    const ids = await listMessageIdsFromSender(
+      this.db,
+      this.mailboxId,
+      this.env,
+      fromEmail,
+    );
+    if (ids.length > 0) {
+      await batchModifyGmailMessages(
+        this.db,
+        this.mailboxId,
+        this.env,
+        ids,
+        [],
+        ["INBOX", "UNREAD"],
+      );
+    }
+    return { archivedCount: ids.length };
+  }
+
   isReconnectError(error: unknown): boolean {
     return isGmailReconnectRequiredError(error);
   }

@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
-import { SettingsSectionHeader } from "@/features/settings/components/settings-shell";
 import {
   updateMailboxAiClassificationEnabled,
   updateMailboxAiEnabled,
@@ -50,22 +49,14 @@ export default function AiPage() {
   const aiEnabled = account?.aiEnabled ?? true;
   const aiClassificationEnabled = account?.aiClassificationEnabled ?? false;
 
-  return (
-    <section className="space-y-3">
-      <SettingsSectionHeader
-        group="Mail"
-        title="AI"
-        description="Control AI-powered features for this mailbox."
-      />
-      <div className="border-t border-border/60">
-        {accountsQuery.isPending ? (
-          <div className="flex min-h-40 items-center justify-center">
-            <SpinnerGapIcon className="size-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : !account || account.mailboxId == null ? (
-          <p className="py-3 text-xs text-muted-foreground">Mailbox not found.</p>
-        ) : (
-          <div className="flex flex-col gap-5 py-3">
+  return accountsQuery.isPending ? (
+    <div className="flex min-h-40 items-center justify-center">
+      <SpinnerGapIcon className="size-5 animate-spin text-muted-foreground" />
+    </div>
+  ) : !account || account.mailboxId == null ? (
+    <p className="py-3 text-xs text-muted-foreground">Mailbox not found.</p>
+  ) : (
+    <div className="flex flex-col gap-5 py-3">
             <div className="space-y-0.5">
               <p className="text-xs font-medium">Composer AI</p>
               <p className="max-w-md text-xs text-muted-foreground">
@@ -144,9 +135,6 @@ export default function AiPage() {
                 Off
               </Button>
             </ButtonGroup>
-          </div>
-        )}
-      </div>
-    </section>
+    </div>
   );
 }

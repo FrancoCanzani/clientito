@@ -2,7 +2,7 @@ import { openCompose } from "@/features/email/mail/compose/compose-events";
 import { cn } from "@/lib/utils";
 import Defuddle from "defuddle";
 import DOMPurify from "dompurify";
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import TurndownService from "turndown";
@@ -16,6 +16,7 @@ import { prepareEmailHtml } from "../utils/prepare-email-html";
 import { EmailHtmlRenderer } from "./email-html-renderer";
 
 const MIN_READABLE_CHARS = 40;
+const DEFUDDLE_MIN_HTML_LENGTH = 5_000;
 
 const PROSE_SIZE_CLASS: Record<string, string> = {
   sm: "prose-sm",
@@ -39,6 +40,33 @@ type ExtractionStats = {
   imageCount: number;
   tableCount: number;
 };
+
+function MarkdownImage({
+  src,
+  alt,
+}: {
+  src?: string;
+  alt?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <span className="inline-flex min-h-8 items-center rounded-md border border-border/70 bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+        Preview unavailable
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt ?? ""}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 const FORBID_TAGS = [
   "form",
@@ -231,7 +259,12 @@ function detox(
 
   const hasQuoted = markQuotedBlocks(doc);
 
-  const contentHtml = extractReaderContent(doc) ?? doc.body.innerHTML;
+  // Defuddle clones the entire DOM and is the dominant cost of detox. For
+  // short HTML the extraction rarely improves the result, so skip it.
+  const shouldExtract = rawHtml.length >= DEFUDDLE_MIN_HTML_LENGTH;
+  const contentHtml = shouldExtract
+    ? extractReaderContent(doc) ?? doc.body.innerHTML
+    : doc.body.innerHTML;
 
   const contentDoc = new DOMParser().parseFromString(
     `<html><body>${contentHtml}</body></html>`,
@@ -269,15 +302,17 @@ export function DetoxRenderer({
   const [showImages, setShowImages] = useState(defaultShowImages);
   const [forceOriginal, setForceOriginal] = useState(false);
 
+  // Defer the heavy detox work so the route can paint before parsing runs.
+  const deferredHtml = useDeferredValue(html);
   const result = useMemo(
-    () => detox(html, showImages, true, inlineContext),
-    [html, showImages, inlineContext],
+    () => detox(deferredHtml, showImages, true, inlineContext),
+    [deferredHtml, showImages, inlineContext],
   );
   const isEmpty = result.textLength < MIN_READABLE_CHARS;
   const showOriginal = forceOriginal || isEmpty;
   const preparedOriginal = useMemo(
-    () => (showOriginal ? prepareEmailHtml(html, inlineContext) : ""),
-    [showOriginal, html, inlineContext],
+    () => (showOriginal ? prepareEmailHtml(deferredHtml, inlineContext) : ""),
+    [showOriginal, deferredHtml, inlineContext],
   );
 
   if (showOriginal) {
@@ -300,7 +335,7 @@ export function DetoxRenderer({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 max-w-full space-y-3">
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         {result.hasImages && !showImages && (
           <button
@@ -322,11 +357,13 @@ export function DetoxRenderer({
       <article
         style={{ fontFamily: "var(--reading-font)" }}
         className={cn(
-          "prose prose-neutral dark:prose-invert max-w-none",
+          "prose prose-neutral dark:prose-invert max-w-none min-w-0 break-words",
           PROSE_SIZE_CLASS[fontSize],
           "prose-headings:font-semibold prose-a:text-foreground prose-a:underline-offset-2",
           "prose-img:rounded-md prose-img:max-w-full prose-img:h-auto",
-          "prose-pre:overflow-x-auto",
+          "prose-pre:overflow-x-auto prose-pre:max-w-full",
+          "[&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto",
+          "[&_a]:break-all",
         )}
       >
         <ReactMarkdown
@@ -351,6 +388,7 @@ export function DetoxRenderer({
                 </a>
               );
             },
+            img: ({ src, alt }) => <MarkdownImage src={src} alt={alt} />,
           }}
         >
           {result.markdown}

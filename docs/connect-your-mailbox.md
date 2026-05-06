@@ -14,7 +14,7 @@ This guide covers mailbox connection, required permissions, and quick checks aft
 2. Choose connect mailbox.
 3. Select Google account.
 4. Approve requested permissions.
-5. Return to Petit and wait for sync status to show ready.
+5. Return to Duomo and wait for the mailbox to load.
 
 ## What to check after connect
 

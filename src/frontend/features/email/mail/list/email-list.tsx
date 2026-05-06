@@ -5,9 +5,9 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { useMailCompose } from "@/features/email/mail/compose/compose-context";
-import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
 import type { MailAction } from "@/features/email/mail/hooks/use-mail-actions";
 import { useMailHotkeys } from "@/features/email/mail/hooks/use-mail-hotkeys";
+import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
 import type { ThreadIdentifier } from "@/features/email/mail/mutations";
 import type { EmailListItem } from "@/features/email/mail/types";
 import { useMailboxPageScrollState } from "@/features/email/shell/mailbox-scroll-state";
@@ -111,7 +111,9 @@ export function EmailList({
 
   useEffect(() => {
     virtualizer.measure();
-  }, [rowHeight, virtualizer]);
+    // virtualizer is intentionally omitted: its identity changes every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowHeight]);
 
   useEffect(() => {
     if (focusedIndex < 0) return;
@@ -126,6 +128,7 @@ export function EmailList({
   const loadMoreLabel = isFetchingNextPage
     ? "Loading more..."
     : "Scroll for more";
+
   const RowComponent = getRowComponent({
     listVariant,
     isMobile,

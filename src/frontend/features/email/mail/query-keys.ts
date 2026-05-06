@@ -3,8 +3,12 @@ export const emailQueryKeys = {
   list: (view: string, mailboxId: number) => ["emails", view, mailboxId] as const,
   viewSyncState: (view: string, mailboxId: number) =>
     ["emails", "view-sync-state", view, mailboxId] as const,
+  viewSyncMeta: (view: string, mailboxId: number) =>
+    ["emails", "view-sync-meta", view, mailboxId] as const,
   inboxUnreadCount: (mailboxId: number) =>
     ["emails", "inbox-unread-count", mailboxId] as const,
+  viewCounts: (mailboxId: number) =>
+    ["emails", "view-counts", mailboxId] as const,
   detail: (emailId: string) => ["email-detail", emailId] as const,
   thread: (threadId: string) => ["email-thread", threadId] as const,
   calendarInvitePreview: (mailboxId: number, providerMessageId: string) =>

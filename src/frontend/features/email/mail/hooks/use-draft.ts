@@ -1,11 +1,25 @@
 import { draftQueryKeys } from "@/features/email/mail/query-keys";
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DraftState } from "../types";
 
 const SAVE_DELAY_MS = 2000;
+
+export type DraftStatus = "idle" | "saving" | "saved";
+
+function draftsEqual(a: DraftState, b: DraftState) {
+  return (
+    a.to === b.to &&
+    a.cc === b.cc &&
+    a.bcc === b.bcc &&
+    a.subject === b.subject &&
+    a.body === b.body &&
+    (a.forwardedContent ?? "") === (b.forwardedContent ?? "") &&
+    a.mailboxId === b.mailboxId
+  );
+}
 
 type PersistedDraft = {
   id: number;
@@ -91,30 +105,42 @@ export async function loadDraft(composeKey: string): Promise<DraftState | null> 
   }
 }
 
-export async function persistDraftNow(
-  composeKey: string,
-  draft: DraftState,
-): Promise<void> {
-  if (isDraftEmpty(draft)) {
-    await deleteDraftByKey(composeKey);
-    return;
-  }
-
-  await saveDraft(composeKey, draft);
-}
-
 export function useDraft(composeKey: string, draft: DraftState) {
   const queryClient = useQueryClient();
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  const lastSavedSnapshot = useRef<DraftState | null>(null);
+  const [status, setStatus] = useState<DraftStatus>("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
+    const isEmpty = isDraftEmpty(draft);
+    const matchesSaved =
+      lastSavedSnapshot.current != null &&
+      draftsEqual(draft, lastSavedSnapshot.current);
+
+    if (matchesSaved) return;
+
+    if (isEmpty && lastSavedSnapshot.current == null) {
+      return;
+    }
+
+    setStatus("saving");
+
     const timer = setTimeout(() => {
       const currentDraft = draftRef.current;
       if (isDraftEmpty(currentDraft)) {
-        void deleteDraftByKey(composeKey);
+        void deleteDraftByKey(composeKey).then(() => {
+          lastSavedSnapshot.current = null;
+          setLastSavedAt(null);
+          setStatus("idle");
+        });
       } else {
-        void saveDraft(composeKey, currentDraft);
+        void saveDraft(composeKey, currentDraft).then(() => {
+          lastSavedSnapshot.current = currentDraft;
+          setLastSavedAt(Date.now());
+          setStatus("saved");
+        });
       }
     }, SAVE_DELAY_MS);
 
@@ -122,8 +148,13 @@ export function useDraft(composeKey: string, draft: DraftState) {
   }, [draft, composeKey]);
 
   return {
+    status,
+    lastSavedAt,
     clearDraft: async () => {
       await deleteDraftByKey(composeKey);
+      lastSavedSnapshot.current = null;
+      setLastSavedAt(null);
+      setStatus("idle");
       queryClient.invalidateQueries({
         queryKey: draftQueryKeys.list(draftRef.current.mailboxId),
       });

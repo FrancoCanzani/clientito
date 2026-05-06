@@ -5,10 +5,16 @@ import { fetchLocalViewPage } from "@/features/email/mail/queries";
 import { parseInboxLabelParam } from "@/features/email/mail/views";
 import { enqueueMailboxRouteViewSync } from "@/features/email/shell/route-sync";
 import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+
+const labelPageSearchSchema = z.object({
+  emailId: z.string().min(1).optional(),
+});
 
 export const Route = createFileRoute(
   "/_dashboard/$mailboxId/inbox/labels/$label/",
 )({
+  validateSearch: labelPageSearchSchema,
   params: {
     parse: (raw) => ({ label: parseInboxLabelParam(raw.label) }),
   },

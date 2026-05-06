@@ -64,6 +64,11 @@ export type InboxUnreadCount = {
   syncedAt: number;
 };
 
+export type ViewUnreadCounts = {
+  inbox: InboxUnreadCount;
+  todo: InboxUnreadCount;
+};
+
 export type EmailListItem = {
   id: string;
   mailboxId: number | null;

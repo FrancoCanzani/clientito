@@ -166,6 +166,7 @@ export function AttachmentItem({
   const [isDownloading, setIsDownloading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState<"image" | "pdf" | null>(null);
+  const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -189,7 +190,7 @@ export function AttachmentItem({
     ? (attachment.inlineUrl ?? inlinePreviewUrl)
     : null;
   const pdfPreviewUrl = isPdfAttachment(attachment) ? inlinePreviewUrl : null;
-  const previewType = imagePreviewUrl
+  const previewType = imagePreviewUrl && !imagePreviewFailed
     ? "image"
     : pdfPreviewUrl
       ? "pdf"
@@ -207,12 +208,13 @@ export function AttachmentItem({
           className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/60 text-muted-foreground disabled:cursor-default"
           aria-label={previewType ? "Preview attachment" : undefined}
         >
-          {imagePreviewUrl ? (
+          {imagePreviewUrl && !imagePreviewFailed ? (
             <img
               src={imagePreviewUrl}
               alt={attachment.filename || "Image attachment"}
               className="size-full object-cover"
               loading="lazy"
+              onError={() => setImagePreviewFailed(true)}
             />
           ) : pdfPreviewUrl ? (
             <FilePdfIcon className="size-4" />
@@ -277,7 +279,14 @@ export function AttachmentItem({
         </div>
       )}
 
-      {previewOpen === "image" && imagePreviewUrl && (
+      {imagePreviewFailed && (
+        <div className="mb-2 flex items-center gap-2 border-l border-border/70 pl-3 text-xs text-muted-foreground">
+          <ImageIcon className="size-4 shrink-0" />
+          <p className="truncate">Preview unavailable</p>
+        </div>
+      )}
+
+      {previewOpen === "image" && imagePreviewUrl && !imagePreviewFailed && (
         <ImageLightbox
           src={imagePreviewUrl}
           alt={attachment.filename || "Image attachment"}

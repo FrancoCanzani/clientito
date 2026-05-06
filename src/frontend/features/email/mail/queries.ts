@@ -18,6 +18,7 @@ import type {
   EmailThreadItem,
   InboxSearchScope,
   InboxSearchSuggestionsResponse,
+  ViewUnreadCounts,
 } from "./types";
 
 const VIEW_PAGE_SIZE = 25;
@@ -717,6 +718,20 @@ type RemoteCursor = {
 };
 type DecodedCursor = LocalCursor | LegacyLocalCursor | RemoteCursor;
 
+export type ViewSyncMeta = {
+  lastFetchedAt: number | null;
+  lastError: string | null;
+  lastErrorAt: number | null;
+  lastCursorType: "local" | "remote" | "complete" | null;
+};
+
+const EMPTY_VIEW_SYNC_META: ViewSyncMeta = {
+  lastFetchedAt: null,
+  lastError: null,
+  lastErrorAt: null,
+  lastCursorType: null,
+};
+
 function encodeViewCursor(cursor: DecodedCursor): string {
   return btoa(JSON.stringify(cursor));
 }
@@ -746,6 +761,44 @@ function refreshKey(mailboxId: number, view: string): string {
 
 function viewSyncedKey(mailboxId: number, view: string): string {
   return `viewSynced:${mailboxId}:${view}`;
+}
+
+function viewSyncMetaKey(mailboxId: number, view: string): string {
+  return `viewSyncMeta:${mailboxId}:${view}`;
+}
+
+function parseViewSyncMeta(raw: string | null): ViewSyncMeta {
+  if (!raw) return EMPTY_VIEW_SYNC_META;
+  try {
+    const parsed = JSON.parse(raw) as Partial<ViewSyncMeta>;
+    return {
+      lastFetchedAt:
+        typeof parsed.lastFetchedAt === "number" ? parsed.lastFetchedAt : null,
+      lastError:
+        typeof parsed.lastError === "string" ? parsed.lastError : null,
+      lastErrorAt:
+        typeof parsed.lastErrorAt === "number" ? parsed.lastErrorAt : null,
+      lastCursorType:
+        parsed.lastCursorType === "local" ||
+        parsed.lastCursorType === "remote" ||
+        parsed.lastCursorType === "complete"
+          ? parsed.lastCursorType
+          : null,
+    };
+  } catch {
+    return EMPTY_VIEW_SYNC_META;
+  }
+}
+
+async function setViewSyncMeta(
+  mailboxId: number,
+  view: string,
+  meta: ViewSyncMeta,
+): Promise<void> {
+  await localDb.setMeta(viewSyncMetaKey(mailboxId, view), JSON.stringify(meta));
+  void queryClient.invalidateQueries({
+    queryKey: emailQueryKeys.viewSyncMeta(view, mailboxId),
+  });
 }
 
 function searchRefreshKey(params: InboxSearchScope): string {
@@ -798,6 +851,19 @@ export async function fetchViewSyncState(params: {
   await alignActiveUser(userId);
   return (
     (await localDb.getMeta(viewSyncedKey(params.mailboxId, params.view))) === "1"
+  );
+}
+
+export async function fetchViewSyncMeta(params: {
+  mailboxId: number;
+  view: string;
+}): Promise<ViewSyncMeta> {
+  const userId = await getCurrentUserId();
+  if (!userId) return EMPTY_VIEW_SYNC_META;
+
+  await alignActiveUser(userId);
+  return parseViewSyncMeta(
+    await localDb.getMeta(viewSyncMetaKey(params.mailboxId, params.view)),
   );
 }
 
@@ -870,12 +936,41 @@ async function fetchServerPage(
     }),
   });
   if (!res.ok) {
+    const errorBody = (await res
+      .clone()
+      .json()
+      .catch(() => null)) as { error?: string } | null;
     const retryAfter = res.headers.get("retry-after");
     const retryAfterSeconds = retryAfter ? Number(retryAfter) : NaN;
     const retryAfterMs =
       Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
         ? Math.floor(retryAfterSeconds * 1000)
         : null;
+    const reconnectRequired =
+      res.status === 401 && errorBody?.error === "google_reconnect_required";
+    const lastError =
+      reconnectRequired
+        ? "reconnect_required"
+        : res.status === 429
+          ? "gmail_rate_limited"
+          : `fetch_failed_${res.status}`;
+    const previousMeta = parseViewSyncMeta(
+      await localDb.getMeta(viewSyncMetaKey(mailboxId, view)),
+    );
+    await setViewSyncMeta(mailboxId, view, {
+      lastFetchedAt: previousMeta.lastFetchedAt,
+      lastError,
+      lastErrorAt: Date.now(),
+      lastCursorType: cursor.token ? "remote" : null,
+    });
+    void queryClient.invalidateQueries({
+      queryKey: emailQueryKeys.viewSyncMeta(view, mailboxId),
+    });
+    if (reconnectRequired) {
+      void queryClient.invalidateQueries({
+        queryKey: accountsQueryOptions.queryKey,
+      });
+    }
     throw new GmailViewFetchError(
       `View fetch failed: ${res.status}`,
       res.status,
@@ -889,6 +984,12 @@ async function fetchServerPage(
   };
   const emails = await persistEmails(body.emails, userId, mailboxId);
   void markViewSynced(mailboxId, view);
+  await setViewSyncMeta(mailboxId, view, {
+    lastFetchedAt: Date.now(),
+    lastError: null,
+    lastErrorAt: null,
+    lastCursorType: body.cursor ? "remote" : "complete",
+  });
   const nextCursor = body.cursor
     ? encodeViewCursor({
         type: "remote",
@@ -1558,6 +1659,22 @@ export async function fetchInboxUnreadCount(
 
   if (!response.ok || !result?.data) {
     throw new Error(result?.error ?? "Failed to fetch inbox unread count");
+  }
+
+  return result.data;
+}
+
+export async function fetchViewUnreadCounts(
+  mailboxId: number,
+): Promise<ViewUnreadCounts> {
+  const params = new URLSearchParams({ mailboxId: String(mailboxId) });
+  const response = await fetch(`/api/inbox/view-counts?${params.toString()}`);
+  const result = (await response.json().catch(() => null)) as
+    | { data?: ViewUnreadCounts; error?: string }
+    | null;
+
+  if (!response.ok || !result?.data) {
+    throw new Error(result?.error ?? "Failed to fetch view unread counts");
   }
 
   return result.data;

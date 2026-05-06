@@ -5,7 +5,7 @@ import {
   EmailDetailContent,
   type EmailDetailContentHandle,
 } from "@/features/email/mail/thread/email-detail-content";
-import { patchEmail, patchThread } from "@/features/email/mail/mutations";
+import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import {
   fetchEmailDetail,
   fetchEmailThread,
@@ -22,14 +22,12 @@ import { MailboxPage } from "@/features/email/shell/mailbox-page";
 import { clearFocusedEmail, setFocusedEmail } from "@/hooks/use-focused-email";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import {
-  useMutation,
   useQuery,
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useUndoAction } from "@/features/email/mail/hooks/use-undo-action";
 
 export function EmailDetailView({
   mailboxId,
@@ -118,6 +116,11 @@ function EmailDetailPane({
   const router = useRouter();
   const queryClient = useQueryClient();
   const { openCompose } = useMailCompose();
+  const { executeEmailAction } = useMailActions({
+    view,
+    mailboxId,
+    presentation: embedded ? "panel" : "route",
+  });
   const contentRef = useRef<EmailDetailContentHandle>(null);
   const currentEmail = email;
 
@@ -141,22 +144,12 @@ function EmailDetailPane({
   ]);
 
   const orderedEmails = useMemo(() => {
-    const snapshots = queryClient.getQueriesData<InfiniteData<EmailListPage>>({
-      queryKey: emailQueryKeys.list(view, mailboxId),
-    });
-    const candidateLists = snapshots
-      .map(([, data]) => data)
-      .filter((data): data is InfiniteData<EmailListPage> =>
-        isEmailListInfiniteData(data),
-      )
-      .map((data) => data.pages.flatMap((page) => page.emails))
-      .filter((emails) => emails.length > 0);
-
-    const containingCurrent = candidateLists.find((emails) =>
-      emails.some((item) => item.id === emailId),
+    const data = queryClient.getQueryData<InfiniteData<EmailListPage>>(
+      emailQueryKeys.list(view, mailboxId),
     );
-    return containingCurrent ?? candidateLists[0] ?? [];
-  }, [queryClient, mailboxId, view, emailId]);
+    if (!isEmailListInfiniteData(data)) return [];
+    return data.pages.flatMap((page) => page.emails);
+  }, [queryClient, mailboxId, view]);
 
   const orderedIds = useMemo(
     () => orderedEmails.map((item) => item.id),
@@ -257,22 +250,6 @@ function EmailDetailPane({
         labelIds: currentEmail.labelIds,
       }
     : null;
-  const patchThreadOrEmail = (payload: Parameters<typeof patchEmail>[1]) =>
-    threadIdentifier
-      ? patchThread(threadIdentifier, payload)
-      : patchEmail(emailIdentifier, payload);
-
-  const emailPatchMutation = useMutation({
-    mutationFn: (payload: Parameters<typeof patchEmail>[1]) =>
-      patchEmail(emailIdentifier, payload),
-  });
-  const threadPatchMutation = useMutation({
-    mutationFn: (payload: Parameters<typeof patchEmail>[1]) =>
-      patchThreadOrEmail(payload),
-  });
-
-  const undoAction = useUndoAction();
-
   const isInInbox = currentEmail.labelIds.includes("INBOX");
   const isStarred = currentEmail.labelIds.includes("STARRED");
 
@@ -319,24 +296,31 @@ function EmailDetailPane({
     c: () => openCompose(),
     f: () => handleForward(),
     e: () => {
-      undoAction({
-        action: () => patchThreadOrEmail({ archived: isInInbox }),
-        onAction: goBack,
-        message: isInInbox ? "Marked as done" : "Moved to inbox",
-      });
+      void executeEmailAction(
+        isInInbox ? "archive" : "move-to-inbox",
+        [currentEmail.id],
+        threadIdentifier ?? undefined,
+        { identifiers: [emailIdentifier], onVisible: goBack },
+      );
     },
     "#": () => {
-      undoAction({
-        action: () => patchThreadOrEmail({ trashed: true }),
-        onAction: goBack,
-        message: "Moved to trash",
+      void executeEmailAction("trash", [currentEmail.id], threadIdentifier ?? undefined, {
+        identifiers: [emailIdentifier],
+        onVisible: goBack,
       });
     },
     s: () => {
-      emailPatchMutation.mutate({ starred: !isStarred });
+      void executeEmailAction(isStarred ? "unstar" : "star", [currentEmail.id], undefined, {
+        identifiers: [emailIdentifier],
+      });
     },
     u: () => {
-      threadPatchMutation.mutate({ isRead: !currentEmail.isRead });
+      void executeEmailAction(
+        currentEmail.isRead ? "mark-unread" : "mark-read",
+        [currentEmail.id],
+        threadIdentifier ?? undefined,
+        { identifiers: [emailIdentifier] },
+      );
     },
     Escape: () => goBack(),
   });
@@ -355,6 +339,7 @@ function EmailDetailPane({
         hasPrev={hasPrev}
         hasNext={hasNext}
         onForward={handleForward}
+        onAction={executeEmailAction}
       />
     </div>
   );

@@ -25,8 +25,20 @@ type NavigateToEmail = (
         replace?: boolean;
       }
     | {
+        to: "/$mailboxId/$folder";
+        params: { mailboxId: number; folder: EmailFolderView };
+        search: { emailId?: string };
+        replace?: boolean;
+      }
+    | {
         to: "/$mailboxId/$folder/email/$emailId";
         params: { mailboxId: number; folder: EmailFolderView; emailId: string };
+        replace?: boolean;
+      }
+    | {
+        to: "/$mailboxId/inbox/labels/$label";
+        params: { mailboxId: number; label: InboxLabelView };
+        search: { emailId?: string };
         replace?: boolean;
       }
     | {
@@ -116,25 +128,49 @@ export function openEmail(
       replace: options?.replace,
     });
   } else if (isInboxLabelView(context)) {
-    navigate({
-      to: "/$mailboxId/inbox/labels/$label/email/$emailId",
-      params: {
-        mailboxId: routeMailboxId,
-        label: context as InboxLabelView,
-        emailId: emailState.id,
-      },
-      replace: options?.replace,
-    });
+    if (options?.presentation === "panel") {
+      navigate({
+        to: "/$mailboxId/inbox/labels/$label",
+        params: {
+          mailboxId: routeMailboxId,
+          label: context as InboxLabelView,
+        },
+        search: { emailId: emailState.id },
+        replace: options?.replace,
+      });
+    } else {
+      navigate({
+        to: "/$mailboxId/inbox/labels/$label/email/$emailId",
+        params: {
+          mailboxId: routeMailboxId,
+          label: context as InboxLabelView,
+          emailId: emailState.id,
+        },
+        replace: options?.replace,
+      });
+    }
   } else if (context !== "inbox") {
-    navigate({
-      to: "/$mailboxId/$folder/email/$emailId",
-      params: {
-        mailboxId: routeMailboxId,
-        folder: context as EmailFolderView,
-        emailId: emailState.id,
-      },
-      replace: options?.replace,
-    });
+    if (options?.presentation === "panel") {
+      navigate({
+        to: "/$mailboxId/$folder",
+        params: {
+          mailboxId: routeMailboxId,
+          folder: context as EmailFolderView,
+        },
+        search: { emailId: emailState.id },
+        replace: options?.replace,
+      });
+    } else {
+      navigate({
+        to: "/$mailboxId/$folder/email/$emailId",
+        params: {
+          mailboxId: routeMailboxId,
+          folder: context as EmailFolderView,
+          emailId: emailState.id,
+        },
+        replace: options?.replace,
+      });
+    }
   } else {
     navigate({
       to: "/$mailboxId/inbox/email/$emailId",

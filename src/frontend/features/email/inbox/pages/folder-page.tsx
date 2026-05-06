@@ -1,16 +1,18 @@
-import { Button } from "@/components/ui/button";
-import { EmailList } from "@/features/email/mail/list/email-list";
-import { MailFilterBar } from "@/features/email/mail/list/mail-filter-bar";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import {
+  MailListPane,
+  MailReaderPane,
+} from "@/features/email/inbox/pages/mail-pane";
 import { useArchivedData } from "@/features/email/inbox/hooks/use-archived-data";
 import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
-import { VIEW_LABELS } from "@/features/email/mail/views";
-import {
-  MailboxPage,
-  MailboxPageHeader,
-} from "@/features/email/shell/mailbox-page";
-import { cn } from "@/lib/utils";
-import { FunnelSimpleIcon } from "@phosphor-icons/react";
+import { VIEW_LABELS, type EmailFolderView } from "@/features/email/mail/views";
+import { MailboxPage } from "@/features/email/shell/mailbox-page";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
 
@@ -36,7 +38,7 @@ function GenericFolderPage({
   folder,
 }: {
   mailboxId: number;
-  folder: string;
+  folder: EmailFolderView;
 }) {
   const emailData = useMailViewData({ view: folder, mailboxId });
   return <FolderView mailboxId={mailboxId} folder={folder} emailData={emailData} />;
@@ -48,64 +50,82 @@ function FolderView({
   emailData,
 }: {
   mailboxId: number;
-  folder: string;
+  folder: EmailFolderView;
   emailData: ReturnType<typeof useMailViewData>;
 }) {
+  const search = route.useSearch();
+  const navigate = route.useNavigate();
+  const isMobile = useIsMobile();
   const [showFilters, setShowFilters] = useState(false);
   const { openEmail, executeEmailAction } = useMailActions({
     view: folder,
     mailboxId,
+    presentation: isMobile ? "route" : "panel",
   });
 
   const title = (VIEW_LABELS as Record<string, string>)[folder] ?? folder;
-  const showFilterControls = emailData.hasEmails || emailData.hasActiveFilters;
-  const filterBarVisible = showFilters || emailData.hasActiveFilters;
+  const selectedEmailId = isMobile ? null : (search.emailId ?? null);
+
+  const clearSelectedEmail = () =>
+    navigate({
+      to: "/$mailboxId/$folder",
+      params: { mailboxId, folder },
+      search: {},
+      replace: true,
+    });
+
+  const navigateSelectedEmail = (nextEmailId: string) =>
+    navigate({
+      to: "/$mailboxId/$folder",
+      params: { mailboxId, folder },
+      search: { emailId: nextEmailId },
+      replace: true,
+    });
+
+  const listPane = (
+    <MailListPane
+      title={title}
+      emailData={emailData}
+      showFilters={showFilters}
+      onShowFiltersChange={setShowFilters}
+      onOpen={openEmail}
+      onAction={executeEmailAction}
+      selectedEmailId={selectedEmailId}
+      enableKeyboardNavigation={!selectedEmailId}
+      compact={!isMobile}
+    />
+  );
+
+  if (isMobile) {
+    return <MailboxPage className="max-w-none">{listPane}</MailboxPage>;
+  }
 
   return (
-    <MailboxPage>
-      <MailboxPageHeader
-        title={title}
-        actions={
-          showFilterControls && (
-            <>
-              {filterBarVisible && (
-                <MailFilterBar
-                  filters={emailData.filters}
-                  onChange={emailData.setFilters}
-                  view={emailData.view}
-                  className="hidden md:flex"
-                />
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowFilters((visible) => !visible)}
-                aria-pressed={filterBarVisible}
-                className={cn("gap-1.5", filterBarVisible && "bg-muted")}
-              >
-                <FunnelSimpleIcon className="size-3.5" />
-                <span>Filter</span>
-              </Button>
-            </>
-          )
-        }
-      />
-      {showFilterControls && filterBarVisible && (
-        <MailFilterBar
-          filters={emailData.filters}
-          onChange={emailData.setFilters}
-          view={emailData.view}
-          className="flex px-3 pb-1.5 md:hidden"
-        />
-      )}
-      <EmailList
-        emailData={emailData}
-        onOpen={openEmail}
-        onAction={executeEmailAction}
-        filterBarOpen={showFilters}
-        onFilterBarOpenChange={setShowFilters}
-        hideFilterControls
-      />
+    <MailboxPage className="max-w-none">
+      <ResizablePanelGroup
+        orientation="horizontal"
+        className="min-h-0 flex-1 overflow-hidden"
+      >
+        <ResizablePanel
+          defaultSize="50%"
+          minSize="320px"
+          maxSize="65%"
+          className="min-w-0"
+        >
+          {listPane}
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel minSize="360px" defaultSize="50%" className="min-w-0">
+          <MailReaderPane
+            mailboxId={mailboxId}
+            view={folder}
+            emailId={selectedEmailId}
+            emptyDescription={`Open a message from ${title.toLowerCase()} to read it here.`}
+            onClose={clearSelectedEmail}
+            onNavigateToEmail={navigateSelectedEmail}
+          />
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </MailboxPage>
   );
 }
