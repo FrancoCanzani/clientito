@@ -1,8 +1,9 @@
+import { PageSpinner } from "@/components/page-spinner";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
+ Empty,
+ EmptyDescription,
+ EmptyHeader,
+ EmptyTitle,
 } from "@/components/ui/empty";
 import { useMailCompose } from "@/features/email/mail/compose/compose-context";
 import type { MailAction } from "@/features/email/mail/hooks/use-mail-actions";
@@ -23,214 +24,217 @@ import { TaskEmailRow } from "./task-email-row";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
-const MOBILE_ROW_HEIGHT = 64;
+const MOBILE_ROW_HEIGHT = 88;
 const DESKTOP_ROW_HEIGHT = 84;
 const TASK_ROW_HEIGHT = 56;
 
 export function EmailList({
-  emailData,
-  onOpen,
-  onAction,
-  emptyTitle,
-  emptyDescription,
-  filterBarOpen,
-  onFilterBarOpenChange,
-  hideFilterControls = false,
-  enableKeyboardNavigation = true,
-  listVariant = "mail",
-  selectedEmailId,
+ emailData,
+ onOpen,
+ onAction,
+ emptyTitle,
+ emptyDescription,
+ filterBarOpen,
+ onFilterBarOpenChange,
+ hideFilterControls = false,
+ enableKeyboardNavigation = true,
+ listVariant = "mail",
+ selectedEmailId,
 }: {
-  emailData: ReturnType<typeof useMailViewData>;
-  onOpen: (email: EmailListItem) => void;
-  onAction: (
-    action: MailAction,
-    ids?: string[],
-    thread?: ThreadIdentifier,
-  ) => void;
-  emptyTitle?: string;
-  emptyDescription?: string;
-  filterBarOpen?: boolean;
-  onFilterBarOpenChange?: (open: boolean) => void;
-  hideFilterControls?: boolean;
-  enableKeyboardNavigation?: boolean;
-  listVariant?: "mail" | "task";
-  selectedEmailId?: string | null;
+ emailData: ReturnType<typeof useMailViewData>;
+ onOpen: (email: EmailListItem) => void;
+ onAction: (
+ action: MailAction,
+ ids?: string[],
+ thread?: ThreadIdentifier,
+ ) => void;
+ emptyTitle?: string;
+ emptyDescription?: string;
+ filterBarOpen?: boolean;
+ onFilterBarOpenChange?: (open: boolean) => void;
+ hideFilterControls?: boolean;
+ enableKeyboardNavigation?: boolean;
+ listVariant?: "mail" | "task";
+ selectedEmailId?: string | null;
 }) {
-  const {
-    view,
-    hasEmails,
-    threadGroups,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-    loadMoreRef,
-    filters,
-    setFilters,
-    hasActiveFilters,
-  } = emailData;
-  const [showFilters, setShowFilters] = useState(false);
-  const filterToggleOpen = filterBarOpen ?? showFilters;
-  const setFilterToggleOpen = onFilterBarOpenChange ?? setShowFilters;
-  const filterBarVisible = filterToggleOpen || hasActiveFilters;
-  const { openCompose } = useMailCompose();
-  const isMobile = useIsMobile();
-  const { mailboxId: routeMailboxId } = mailboxRoute.useParams();
-  const navigate = useNavigate();
-  const rowHeight =
-    listVariant === "task"
-      ? TASK_ROW_HEIGHT
-      : isMobile
-        ? MOBILE_ROW_HEIGHT
-        : DESKTOP_ROW_HEIGHT;
+ const {
+ view,
+ hasEmails,
+ threadGroups,
+ hasNextPage,
+ isFetchingNextPage,
+ isLoading,
+ loadMoreRef,
+ filters,
+ setFilters,
+ hasActiveFilters,
+ } = emailData;
+ const [showFilters, setShowFilters] = useState(false);
+ const filterToggleOpen = filterBarOpen ?? showFilters;
+ const setFilterToggleOpen = onFilterBarOpenChange ?? setShowFilters;
+ const filterBarVisible = filterToggleOpen || hasActiveFilters;
+ const { openCompose } = useMailCompose();
+ const isMobile = useIsMobile();
+ const { mailboxId: routeMailboxId } = mailboxRoute.useParams();
+ const navigate = useNavigate();
+ const rowHeight =
+ listVariant === "task"
+ ? TASK_ROW_HEIGHT
+ : isMobile
+ ? MOBILE_ROW_HEIGHT
+ : DESKTOP_ROW_HEIGHT;
 
-  const goToSearch = () =>
-    navigate({
-      to: "/$mailboxId/inbox/search",
-      params: { mailboxId: routeMailboxId },
-    });
+ const goToSearch = () =>
+ navigate({
+ to: "/$mailboxId/inbox/search",
+ params: { mailboxId: routeMailboxId },
+ });
 
-  const { focusedIndex } = useMailHotkeys({
-    groups: threadGroups,
-    view,
-    onOpen,
-    onAction,
-    onCompose: openCompose,
-    onSearch: goToSearch,
-    enabled: enableKeyboardNavigation,
-  });
+ const { focusedIndex } = useMailHotkeys({
+ groups: threadGroups,
+ view,
+ onOpen,
+ onAction,
+ onCompose: openCompose,
+ onSearch: goToSearch,
+ enabled: enableKeyboardNavigation,
+ });
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  useMailboxPageScrollState(scrollRef);
+ const scrollRef = useRef<HTMLDivElement>(null);
+ useMailboxPageScrollState(scrollRef);
 
-  const virtualizer = useVirtualizer({
-    count: threadGroups.length,
-    estimateSize: () => rowHeight,
-    overscan: 10,
-    getScrollElement: () => scrollRef.current,
-  });
+ const virtualizer = useVirtualizer({
+ count: threadGroups.length,
+ estimateSize: () => rowHeight,
+ overscan: 10,
+ getScrollElement: () => scrollRef.current,
+ });
 
-  useEffect(() => {
-    virtualizer.measure();
-    // virtualizer is intentionally omitted: its identity changes every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rowHeight]);
+ useEffect(() => {
+ virtualizer.measure();
+ // virtualizer is intentionally omitted: its identity changes every render.
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [rowHeight]);
 
-  useEffect(() => {
-    if (focusedIndex < 0) return;
-    if (focusedIndex < threadGroups.length) {
-      virtualizer.scrollToIndex(focusedIndex, { align: "auto" });
-    }
-  }, [focusedIndex, threadGroups.length, virtualizer]);
+ useEffect(() => {
+ if (focusedIndex < 0) return;
+ if (focusedIndex < threadGroups.length) {
+ virtualizer.scrollToIndex(focusedIndex, { align: "auto" });
+ }
+ }, [focusedIndex, threadGroups.length, virtualizer]);
 
-  const virtualItems = virtualizer.getVirtualItems();
+ useEffect(() => {
+ if (!selectedEmailId) return;
+ const idx = threadGroups.findIndex((g) =>
+ g.emails.some((email) => email.id === selectedEmailId),
+ );
+ if (idx >= 0) {
+ virtualizer.scrollToIndex(idx, { align: "auto" });
+ }
+ }, [selectedEmailId, threadGroups, virtualizer]);
 
-  const showLoadMoreSentinel = hasNextPage || isFetchingNextPage;
-  const loadMoreLabel = isFetchingNextPage
-    ? "Loading more..."
-    : "Scroll for more";
+ const virtualItems = virtualizer.getVirtualItems();
 
-  const RowComponent = getRowComponent({
-    listVariant,
-    isMobile,
-  });
+ const showLoadMoreSentinel = hasNextPage || isFetchingNextPage;
+ const loadMoreLabel = isFetchingNextPage
+ ? "Loading more..."
+ : "Scroll for more";
 
-  const showFilterControls = hasEmails || hasActiveFilters;
+ const RowComponent = getRowComponent({
+ listVariant,
+ isMobile,
+ });
 
-  return (
-    <div className="flex w-full min-h-0 min-w-0 flex-1 flex-col">
-      {showFilterControls && !hideFilterControls && (
-        <div className="flex justify-end px-3 pt-1.5 md:px-6">
-          <button
-            type="button"
-            onClick={() => setFilterToggleOpen(!filterToggleOpen)}
-            className={cn(
-              "rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground",
-              filterBarVisible && "text-foreground",
-            )}
-          >
-            Filter
-          </button>
-        </div>
-      )}
+ const showFilterControls = hasEmails || hasActiveFilters;
 
-      {showFilterControls && !hideFilterControls && filterBarVisible && (
-        <MailFilterBar filters={filters} onChange={setFilters} view={view} />
-      )}
+ return (
+ <div className="flex w-full min-h-0 min-w-0 flex-1 flex-col">
+ {showFilterControls && !hideFilterControls && (
+ <div className="flex justify-end px-3 pt-1.5 md:px-6">
+ <button
+ type="button"
+ onClick={() => setFilterToggleOpen(!filterToggleOpen)}
+ className={cn(
+ " px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground",
+ filterBarVisible && "text-foreground",
+ )}
+ >
+ Filter
+ </button>
+ </div>
+ )}
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        {hasEmails ? (
-          <div
-            className="relative w-full"
-            style={{ height: virtualizer.getTotalSize() }}
-          >
-            {virtualItems.map((virtualItem) => {
-              const group = threadGroups[virtualItem.index]!;
+ {showFilterControls && !hideFilterControls && filterBarVisible && (
+ <MailFilterBar filters={filters} onChange={setFilters} view={view} />
+ )}
 
-              return (
-                <div
-                  key={group.representative.id}
-                  className="absolute left-0 w-full"
-                  style={{
-                    height: virtualItem.size,
-                    transform: `translateY(${virtualItem.start}px)`,
-                  }}
-                >
-                  <RowComponent
-                    group={group}
-                    view={view}
-                    onOpen={onOpen}
-                    onAction={onAction}
-                    isFocused={virtualItem.index === focusedIndex}
-                    isSelected={group.emails.some(
-                      (email) => email.id === selectedEmailId,
-                    )}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        ) : isLoading ? (
-          <Empty className="min-h-56 justify-center">
-            <EmptyHeader>
-              <EmptyTitle>Setting up your inbox…</EmptyTitle>
-              <EmptyDescription>
-                Fetching your messages. This only takes a moment.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          <Empty className="min-h-56 justify-center">
-            <EmptyHeader>
-              <EmptyTitle>{emptyTitle ?? "No emails"}</EmptyTitle>
-              <EmptyDescription>
-                {emptyDescription ??
-                  "Messages that belong to this view will show up here."}
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        )}
+ <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+ {hasEmails ? (
+ <div
+ className="relative w-full"
+ style={{ height: virtualizer.getTotalSize() }}
+ >
+ {virtualItems.map((virtualItem) => {
+ const group = threadGroups[virtualItem.index]!;
 
-        {showLoadMoreSentinel && (
-          <div
-            ref={loadMoreRef}
-            className="p-6 text-center text-xs text-muted-foreground"
-          >
-            {loadMoreLabel}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+ return (
+ <div
+ key={group.representative.id}
+ className="absolute left-0 w-full"
+ style={{
+ height: virtualItem.size,
+ transform: `translateY(${virtualItem.start}px)`,
+ }}
+ >
+ <RowComponent
+ group={group}
+ view={view}
+ onOpen={onOpen}
+ onAction={onAction}
+ isFocused={virtualItem.index === focusedIndex}
+ isSelected={group.emails.some(
+ (email) => email.id === selectedEmailId,
+ )}
+ />
+ </div>
+ );
+ })}
+ </div>
+ ) : isLoading ? (
+ <PageSpinner />
+ ) : (
+ <Empty className="min-h-56 justify-center">
+ <EmptyHeader>
+ <EmptyTitle>{emptyTitle ?? "No emails"}</EmptyTitle>
+ <EmptyDescription>
+ {emptyDescription ??
+ "Messages that belong to this view will show up here."}
+ </EmptyDescription>
+ </EmptyHeader>
+ </Empty>
+ )}
+
+ {showLoadMoreSentinel && (
+ <div
+ ref={loadMoreRef}
+ className="p-6 text-center text-xs text-muted-foreground"
+ >
+ {loadMoreLabel}
+ </div>
+ )}
+ </div>
+ </div>
+ );
 }
 
 function getRowComponent({
-  listVariant,
-  isMobile,
+ listVariant,
+ isMobile,
 }: {
-  listVariant: "mail" | "task";
-  isMobile: boolean;
+ listVariant: "mail" | "task";
+ isMobile: boolean;
 }) {
-  if (listVariant === "task") return TaskEmailRow;
-  if (isMobile) return MobileEmailRow;
-  return SplitEmailRow;
+ if (listVariant === "task") return TaskEmailRow;
+ if (isMobile) return MobileEmailRow;
+ return SplitEmailRow;
 }

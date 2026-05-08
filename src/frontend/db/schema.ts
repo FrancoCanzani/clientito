@@ -1,51 +1,51 @@
 export type EmailDirection = "sent" | "received";
 export type EmailAICategory =
-  | "action_required"
-  | "invoice"
-  | "notification"
-  | "newsletter"
-  | "fyi"
-  | "unknown";
+ | "action_required"
+ | "invoice"
+ | "notification"
+ | "newsletter"
+ | "fyi"
+ | "unknown";
 
 export type EmailRow = {
-  id: number;
-  userId: string;
-  mailboxId: number | null;
-  providerMessageId: string;
-  threadId: string | null;
-  fromAddr: string;
-  fromName: string | null;
-  toAddr: string | null;
-  ccAddr: string | null;
-  subject: string | null;
-  snippet: string | null;
-  bodyText: string | null;
-  bodyHtml: string | null;
-  date: number;
-  direction: EmailDirection | null;
-  isRead: boolean;
-  labelIds: string | null;
-  hasInbox: boolean;
-  hasSent: boolean;
-  hasTrash: boolean;
-  hasSpam: boolean;
-  hasStarred: boolean;
-  unsubscribeUrl: string | null;
-  unsubscribeEmail: string | null;
-  snoozedUntil: number | null;
-  inlineAttachments: string | null;
-  attachments: string | null;
-  hasCalendar: boolean;
-  isGatekept: boolean;
-  aiCategory: EmailAICategory | null;
-  aiConfidence: number | null;
-  aiReason: string | null;
-  aiSummary: string | null;
-  aiDraftReply: string | null;
-  aiClassifiedAt: number | null;
-  aiClassificationKey: string | null;
-  aiSplitIds: string | null;
-  createdAt: number;
+ id: number;
+ userId: string;
+ mailboxId: number | null;
+ providerMessageId: string;
+ threadId: string | null;
+ fromAddr: string;
+ fromName: string | null;
+ toAddr: string | null;
+ ccAddr: string | null;
+ subject: string | null;
+ snippet: string | null;
+ bodyText: string | null;
+ bodyHtml: string | null;
+ date: number;
+ direction: EmailDirection | null;
+ isRead: boolean;
+ labelIds: string | null;
+ hasInbox: boolean;
+ hasSent: boolean;
+ hasTrash: boolean;
+ hasSpam: boolean;
+ hasStarred: boolean;
+ unsubscribeUrl: string | null;
+ unsubscribeEmail: string | null;
+ snoozedUntil: number | null;
+ inlineAttachments: string | null;
+ attachments: string | null;
+ hasCalendar: boolean;
+ isGatekept: boolean;
+ aiCategory: EmailAICategory | null;
+ aiConfidence: number | null;
+ aiReason: string | null;
+ aiSummary: string | null;
+ aiDraftReply: string | null;
+ aiClassifiedAt: number | null;
+ aiClassificationKey: string | null;
+ aiSplitIds: string | null;
+ createdAt: number;
 };
 
 export type EmailInsert = Omit<EmailRow, "id"> & { id?: number };
@@ -53,68 +53,68 @@ export type EmailInsert = Omit<EmailRow, "id"> & { id?: number };
 export type LabelType = "system" | "user";
 
 export type LabelRow = {
-  gmailId: string;
-  userId: string;
-  mailboxId: number;
-  name: string;
-  type: LabelType;
-  textColor: string | null;
-  backgroundColor: string | null;
-  messagesTotal: number;
-  messagesUnread: number;
-  syncedAt: number;
+ gmailId: string;
+ userId: string;
+ mailboxId: number;
+ name: string;
+ type: LabelType;
+ textColor: string | null;
+ backgroundColor: string | null;
+ messagesTotal: number;
+ messagesUnread: number;
+ syncedAt: number;
 };
 
 export type LabelInsert = LabelRow;
 
 export type SplitRule = {
-  domains?: string[];
-  senders?: string[];
-  recipients?: string[];
-  subjectContains?: string[];
-  hasAttachment?: boolean | null;
-  fromMailingList?: boolean | null;
-  gmailLabels?: string[];
+ domains?: string[];
+ senders?: string[];
+ recipients?: string[];
+ subjectContains?: string[];
+ hasAttachment?: boolean | null;
+ fromMailingList?: boolean | null;
+ gmailLabels?: string[];
 };
 
 export type SplitViewRow = {
-  id: string;
-  userId: string;
-  name: string;
-  description: string;
-  icon: string | null;
-  color: string | null;
-  position: number;
-  visible: boolean;
-  pinned: boolean;
-  isSystem: boolean;
-  systemKey: string | null;
-  rules: SplitRule | null;
-  matchMode: "rules";
-  showInOther: boolean;
-  createdAt: number;
-  updatedAt: number;
+ id: string;
+ userId: string;
+ name: string;
+ description: string;
+ icon: string | null;
+ color: string | null;
+ position: number;
+ visible: boolean;
+ pinned: boolean;
+ isSystem: boolean;
+ systemKey: string | null;
+ rules: SplitRule | null;
+ matchMode: "rules";
+ showInOther: boolean;
+ createdAt: number;
+ updatedAt: number;
 };
 
 export type DraftAttachmentKey = {
-  key: string;
-  filename: string;
-  mimeType: string;
+ key: string;
+ filename: string;
+ mimeType: string;
 };
 
 export type DraftRow = {
-  id: number;
-  userId: string;
-  composeKey: string;
-  mailboxId: number | null;
-  toAddr: string;
-  ccAddr: string;
-  bccAddr: string;
-  subject: string;
-  body: string;
-  forwardedContent: string;
-  threadId: string | null;
-  attachmentKeys: string | null;
-  updatedAt: number;
-  createdAt: number;
+ id: number;
+ userId: string;
+ composeKey: string;
+ mailboxId: number | null;
+ toAddr: string;
+ ccAddr: string;
+ bccAddr: string;
+ subject: string;
+ body: string;
+ forwardedContent: string;
+ threadId: string | null;
+ attachmentKeys: string | null;
+ updatedAt: number;
+ createdAt: number;
 };

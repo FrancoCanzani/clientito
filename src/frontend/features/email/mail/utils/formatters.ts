@@ -10,103 +10,103 @@ const FORMAT_CONTROL_CHARS_RE = /[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
 const LEADING_NON_ALNUM_RE = /^[^\p{L}\p{N}]+/u;
 
 export function formatInboxRowDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  if (isToday(date)) {
-    return format(date, "p");
-  }
+ const date = new Date(timestamp);
+ if (isToday(date)) {
+ return format(date, "p");
+ }
 
-  return isThisYear(date) ? format(date, "MMM d") : format(date, "MMM d, yyyy");
+ return isThisYear(date) ? format(date, "MMM d") : format(date, "MMM d, yyyy");
 }
 
 export function formatEmailDetailDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleString([], {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+ return new Date(timestamp).toLocaleString([], {
+ dateStyle: "medium",
+ timeStyle: "short",
+ });
 }
 
 export function formatEmailThreadDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+ return new Date(timestamp).toLocaleString([], {
+ month: "short",
+ day: "numeric",
+ hour: "numeric",
+ minute: "2-digit",
+ });
 }
 
 export function formatQuotedDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleString([], {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+ return new Date(timestamp).toLocaleString([], {
+ dateStyle: "medium",
+ timeStyle: "short",
+ });
 }
 
 function trimTrailingEllipsis(value: string): string {
-  return value.replace(/(?:\s*(?:\.\.\.|…))+$/g, "").trim();
+ return value.replace(/(?:\s*(?:\.\.\.|…))+$/g, "").trim();
 }
 
 function truncateAtWordBoundary(value: string, maxChars: number): string {
-  if (value.length <= maxChars) return value;
+ if (value.length <= maxChars) return value;
 
-  const chunk = value.slice(0, maxChars + 1);
-  const lastWhitespace = chunk.lastIndexOf(" ");
-  const cutoff =
-    lastWhitespace >= MIN_WORD_BREAK_INDEX ? lastWhitespace : maxChars;
+ const chunk = value.slice(0, maxChars + 1);
+ const lastWhitespace = chunk.lastIndexOf(" ");
+ const cutoff =
+ lastWhitespace >= MIN_WORD_BREAK_INDEX ? lastWhitespace : maxChars;
 
-  return `${chunk.slice(0, cutoff).trimEnd()}…`;
+ return `${chunk.slice(0, cutoff).trimEnd()}…`;
 }
 
 function extractTextFromSanitizedHtml(value: string): string {
-  if (!value || typeof DOMParser === "undefined") return value;
-  const doc = new DOMParser().parseFromString(value, "text/html");
-  return doc.body?.textContent ?? value;
+ if (!value || typeof DOMParser === "undefined") return value;
+ const doc = new DOMParser().parseFromString(value, "text/html");
+ return doc.body?.textContent ?? value;
 }
 
 function normalizeSnippetText(value: string): string {
-  return value
-    .replace(DEFAULT_IGNORABLE_RE, "")
-    .replace(ZERO_WIDTH_CHARS_RE, "")
-    .replace(FORMAT_CONTROL_CHARS_RE, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(LEADING_NON_ALNUM_RE, "")
-    .trimStart();
+ return value
+ .replace(DEFAULT_IGNORABLE_RE, "")
+ .replace(ZERO_WIDTH_CHARS_RE, "")
+ .replace(FORMAT_CONTROL_CHARS_RE, "")
+ .replace(/\s+/g, " ")
+ .trim()
+ .replace(LEADING_NON_ALNUM_RE, "")
+ .trimStart();
 }
 
 export function formatEmailSnippet(
-  raw: string | null | undefined,
+ raw: string | null | undefined,
 ): string {
-  if (!raw) return "";
+ if (!raw) return "";
 
-  const decoded = decode(raw, { strict: false });
-  const sanitizedHtml = DOMPurify.sanitize(decoded, {
-    USE_PROFILES: { html: true },
-    ALLOWED_ATTR: [],
-  });
-  const extractedText = extractTextFromSanitizedHtml(sanitizedHtml);
-  const cleaned = normalizeSnippetText(extractedText);
+ const decoded = decode(raw, { strict: false });
+ const sanitizedHtml = DOMPurify.sanitize(decoded, {
+ USE_PROFILES: { html: true },
+ ALLOWED_ATTR: [],
+ });
+ const extractedText = extractTextFromSanitizedHtml(sanitizedHtml);
+ const cleaned = normalizeSnippetText(extractedText);
 
-  if (!cleaned) return "";
+ if (!cleaned) return "";
 
-  return truncateAtWordBoundary(
-    trimTrailingEllipsis(cleaned),
-    MAX_SNIPPET_PREVIEW_CHARS,
-  );
+ return truncateAtWordBoundary(
+ trimTrailingEllipsis(cleaned),
+ MAX_SNIPPET_PREVIEW_CHARS,
+ );
 }
 
 export function formatBytes(size: number | null): string {
-  if (!size || size <= 0) {
-    return "Unknown size";
-  }
+ if (!size || size <= 0) {
+ return "Unknown size";
+ }
 
-  const units = ["B", "KB", "MB", "GB"];
-  let value = size;
-  let index = 0;
-  while (value >= 1024 && index < units.length - 1) {
-    value /= 1024;
-    index += 1;
-  }
+ const units = ["B", "KB", "MB", "GB"];
+ let value = size;
+ let index = 0;
+ while (value >= 1024 && index < units.length - 1) {
+ value /= 1024;
+ index += 1;
+ }
 
-  const decimals = value >= 10 || index === 0 ? 0 : 1;
-  return `${value.toFixed(decimals)} ${units[index]}`;
+ const decimals = value >= 10 || index === 0 ? 0 : 1;
+ return `${value.toFixed(decimals)} ${units[index]}`;
 }

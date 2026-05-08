@@ -2,48 +2,48 @@ import { useCallback, useState } from "react";
 import { uploadAttachments } from "../mutations";
 
 export type AttachmentFile = {
-  key: string;
-  filename: string;
-  mimeType: string;
-  size: number;
+ key: string;
+ filename: string;
+ mimeType: string;
+ size: number;
 };
 
 export function useAttachmentUpload(initialFiles: AttachmentFile[] = []) {
-  const [files, setFiles] = useState<AttachmentFile[]>(initialFiles);
-  const [uploading, setUploading] = useState(false);
+ const [files, setFiles] = useState<AttachmentFile[]>(initialFiles);
+ const [uploading, setUploading] = useState(false);
 
-  const addFiles = useCallback(async (inputFiles: FileList | File[]) => {
-    setUploading(true);
-    try {
-      const result = await uploadAttachments(Array.from(inputFiles));
-      setFiles((prev) => [...prev, ...result]);
-    } finally {
-      setUploading(false);
-    }
-  }, []);
+ const addFiles = useCallback(async (inputFiles: FileList | File[]) => {
+ setUploading(true);
+ try {
+ const result = await uploadAttachments(Array.from(inputFiles));
+ setFiles((prev) => [...prev, ...result]);
+ } finally {
+ setUploading(false);
+ }
+ }, []);
 
-  const removeFile = useCallback((key: string) => {
-    setFiles((prev) => prev.filter((f) => f.key !== key));
-  }, []);
+ const removeFile = useCallback((key: string) => {
+ setFiles((prev) => prev.filter((f) => f.key !== key));
+ }, []);
 
-  const clear = useCallback(() => {
-    setFiles([]);
-  }, []);
+ const clear = useCallback(() => {
+ setFiles([]);
+ }, []);
 
-  const getAttachmentKeys = useCallback(() => {
-    return files.map((f) => ({
-      key: f.key,
-      filename: f.filename,
-      mimeType: f.mimeType,
-    }));
-  }, [files]);
+ const getAttachmentKeys = useCallback(() => {
+ return files.map((f) => ({
+ key: f.key,
+ filename: f.filename,
+ mimeType: f.mimeType,
+ }));
+ }, [files]);
 
-  return {
-    files,
-    uploading,
-    addFiles,
-    removeFile,
-    clear,
-    getAttachmentKeys,
-  };
+ return {
+ files,
+ uploading,
+ addFiles,
+ removeFile,
+ clear,
+ getAttachmentKeys,
+ };
 }

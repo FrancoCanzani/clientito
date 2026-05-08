@@ -1,36 +1,21 @@
-import { clearLocalData } from "@/db/client";
-import { resetCurrentUserCache } from "@/db/user";
-import { signOut, useSession } from "@/lib/auth-client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { forceSignOut } from "@/lib/app-version";
+import { useSession } from "@/lib/auth-client";
+import { useMutation } from "@tanstack/react-query";
 
 export function useAuth() {
-  const session = useSession();
-  const isAuthenticated = Boolean(session.data?.user);
+ const session = useSession();
+ const isAuthenticated = Boolean(session.data?.user);
 
-  return {
-    user: session.data?.user ?? null,
-    isLoading: session.isPending,
-    isAuthenticated,
-    error: session.error,
-  };
+ return {
+ user: session.data?.user ?? null,
+ isLoading: session.isPending,
+ isAuthenticated,
+ error: session.error,
+ };
 }
 
 export function useLogout() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      const result = await signOut();
-      if (result.error) {
-        throw new Error(result.error.message || "Failed to log out");
-      }
-      return result;
-    },
-    onSuccess: () => {
-      resetCurrentUserCache();
-      void clearLocalData();
-      queryClient.clear();
-      window.location.href = "/login";
-    },
-  });
+ return useMutation({
+ mutationFn: () => forceSignOut("user_logout"),
+ });
 }

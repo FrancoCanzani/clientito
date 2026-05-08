@@ -1,114 +1,114 @@
 export type SyncPreference = {
-  mailboxId: number | null;
-  months: 3 | 6 | 12 | null;
-  cutoffAt: number | null;
+ mailboxId: number | null;
+ months: 3 | 6 | 12 | null;
+ cutoffAt: number | null;
 };
 
 export type UpdateSyncPreferenceResult = SyncPreference;
 
 export type UpdateSyncPreferenceInput = {
-  mailboxId: number;
-  months: 3 | 6 | 12 | null;
+ mailboxId: number;
+ months: 3 | 6 | 12 | null;
 };
 
 function getErrorMessage(payload: unknown): string | null {
-  if (typeof payload !== "object" || payload === null) return null;
-  const error = Reflect.get(payload, "error");
-  return typeof error === "string" ? error : null;
+ if (typeof payload !== "object" || payload === null) return null;
+ const error = Reflect.get(payload, "error");
+ return typeof error === "string" ? error : null;
 }
 
 export async function updateSyncPreference(
-  input: UpdateSyncPreferenceInput,
+ input: UpdateSyncPreferenceInput,
 ): Promise<UpdateSyncPreferenceResult> {
-  const response = await fetch("/api/settings/sync", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
+ const response = await fetch("/api/settings/sync", {
+ method: "PUT",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify(input),
+ });
 
-  if (!response.ok) {
-    const json = await response.json().catch(() => ({}));
-    throw new Error(getErrorMessage(json) ?? "Failed to update import history");
-  }
+ if (!response.ok) {
+ const json = await response.json().catch(() => ({}));
+ throw new Error(getErrorMessage(json) ?? "Failed to update import history");
+ }
 
-  const json = await response.json();
-  return json.data;
+ const json = await response.json();
+ return json.data;
 }
 
 export async function updateMailboxSignature(
-  mailboxId: number,
-  signature: string,
+ mailboxId: number,
+ signature: string,
 ): Promise<void> {
-  const response = await fetch(`/api/settings/mailboxes/${mailboxId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ signature }),
-  });
+ const response = await fetch(`/api/settings/mailboxes/${mailboxId}`, {
+ method: "PATCH",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ signature }),
+ });
 
-  if (!response.ok) {
-    const json = await response.json().catch(() => ({}));
-    throw new Error(getErrorMessage(json) ?? "Failed to update signatures");
-  }
+ if (!response.ok) {
+ const json = await response.json().catch(() => ({}));
+ throw new Error(getErrorMessage(json) ?? "Failed to update signatures");
+ }
 }
 
 export async function updateMailboxTemplates(
-  mailboxId: number,
-  templates: string,
+ mailboxId: number,
+ templates: string,
 ): Promise<void> {
-  const response = await fetch(`/api/settings/mailboxes/${mailboxId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ templates }),
-  });
+ const response = await fetch(`/api/settings/mailboxes/${mailboxId}`, {
+ method: "PATCH",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ templates }),
+ });
 
-  if (!response.ok) {
-    const json = await response.json().catch(() => ({}));
-    throw new Error(getErrorMessage(json) ?? "Failed to update templates");
-  }
+ if (!response.ok) {
+ const json = await response.json().catch(() => ({}));
+ throw new Error(getErrorMessage(json) ?? "Failed to update templates");
+ }
 }
 
 export async function updateMailboxAiEnabled(
-  mailboxId: number,
-  aiEnabled: boolean,
+ mailboxId: number,
+ aiEnabled: boolean,
 ): Promise<void> {
-  const response = await fetch(`/api/settings/mailboxes/${mailboxId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ aiEnabled }),
-  });
+ const response = await fetch(`/api/settings/mailboxes/${mailboxId}`, {
+ method: "PATCH",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ aiEnabled }),
+ });
 
-  if (!response.ok) {
-    const json = await response.json().catch(() => ({}));
-    throw new Error(getErrorMessage(json) ?? "Failed to update AI setting");
-  }
+ if (!response.ok) {
+ const json = await response.json().catch(() => ({}));
+ throw new Error(getErrorMessage(json) ?? "Failed to update AI setting");
+ }
 }
 
 export async function updateMailboxAiClassificationEnabled(
-  mailboxId: number,
-  aiClassificationEnabled: boolean,
+ mailboxId: number,
+ aiClassificationEnabled: boolean,
 ): Promise<void> {
-  const response = await fetch(`/api/settings/mailboxes/${mailboxId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ aiClassificationEnabled }),
-  });
+ const response = await fetch(`/api/settings/mailboxes/${mailboxId}`, {
+ method: "PATCH",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ aiClassificationEnabled }),
+ });
 
-  if (!response.ok) {
-    const json = await response.json().catch(() => ({}));
-    throw new Error(
-      getErrorMessage(json) ??
-        "Failed to update AI classification setting",
-    );
-  }
+ if (!response.ok) {
+ const json = await response.json().catch(() => ({}));
+ throw new Error(
+ getErrorMessage(json) ??
+ "Failed to update AI classification setting",
+ );
+ }
 }
 
 export async function deleteAccount(): Promise<void> {
-  const response = await fetch("/api/settings/account", {
-    method: "DELETE",
-  });
+ const response = await fetch("/api/settings/account", {
+ method: "DELETE",
+ });
 
-  if (!response.ok) {
-    const json = await response.json().catch(() => ({}));
-    throw new Error(getErrorMessage(json) ?? "Failed to delete account");
-  }
+ if (!response.ok) {
+ const json = await response.json().catch(() => ({}));
+ throw new Error(getErrorMessage(json) ?? "Failed to delete account");
+ }
 }

@@ -24,6 +24,7 @@ import {
 } from "@/features/email/shell/mailbox-page";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
+import { cn } from "@/lib/utils";
 import { XIcon } from "@phosphor-icons/react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
@@ -214,9 +215,9 @@ export default function InboxSearchPage() {
   }
 
   useHotkeys({
-    j: { onKeyDown: () => moveFocus(1), allowInEditable: true },
+    j: () => moveFocus(1),
     ArrowDown: { onKeyDown: () => moveFocus(1), allowInEditable: true },
-    k: { onKeyDown: () => moveFocus(-1), allowInEditable: true },
+    k: () => moveFocus(-1),
     ArrowUp: { onKeyDown: () => moveFocus(-1), allowInEditable: true },
   });
 
@@ -225,7 +226,33 @@ export default function InboxSearchPage() {
 
   const headerActions = (
     <>
-      <div className="min-w-0 flex-1 sm:max-w-80">
+      <span
+        className={cn(
+          "text-xs text-muted-foreground",
+          showSearchingIndicator ? "visible" : "invisible",
+        )}
+        aria-live="polite"
+        aria-hidden={!showSearchingIndicator}
+      >
+        Searching…
+      </span>
+      <Button
+        type="button"
+        variant={"secondary"}
+        onClick={() =>
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              includeJunk: prev.includeJunk ? undefined : true,
+            }),
+            replace: true,
+          })
+        }
+        aria-pressed={search.includeJunk ?? false}
+      >
+        Junk {search.includeJunk ? "on" : "off"}
+      </Button>
+      <div className="min-w-40 flex-1 max-w-80">
         <Input
           className="h-7 text-xs"
           value={query}
@@ -249,27 +276,6 @@ export default function InboxSearchPage() {
           spellCheck={false}
         />
       </div>
-      {showSearchingIndicator && (
-        <span className="text-xs text-muted-foreground" aria-live="polite">
-          Searching…
-        </span>
-      )}
-      <Button
-        type="button"
-        variant={"secondary"}
-        onClick={() =>
-          navigate({
-            search: (prev) => ({
-              ...prev,
-              includeJunk: prev.includeJunk ? undefined : true,
-            }),
-            replace: true,
-          })
-        }
-        aria-pressed={search.includeJunk ?? false}
-      >
-        Junk {search.includeJunk ? "on" : "off"}
-      </Button>
     </>
   );
 
@@ -285,7 +291,7 @@ export default function InboxSearchPage() {
                 key={operator.raw}
                 type="button"
                 onClick={() => removeOperatorFromQuery(operator.raw)}
-                className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="inline-flex items-center gap-1 border border-border/60 bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <span className="font-medium text-foreground/80">
                   {operator.key}:

@@ -18,7 +18,10 @@ export function viewToGmailFilter(view: string): GmailViewFilter | null {
     case "important":
       return { labelIds: ["IMPORTANT"] };
     case "archived":
-      return { query: "-in:inbox -in:trash -in:spam -in:drafts" };
+      // Keep this predicate in lockstep with the local "archived"/Done view.
+      // If Gmail returns sent mail here, sync can spend the first page on rows
+      // that SQLite correctly hides from Done, leaving the screen looking stale.
+      return { query: "-in:inbox -in:sent -in:trash -in:spam -in:drafts" };
     default:
       if (view.startsWith("Label_") || /^[A-Z_]+$/.test(view)) {
         return { labelIds: [view] };

@@ -26,19 +26,28 @@ const viewPageRequestSchema = z.object({
   cursor: z.string().optional(),
   limit: z.number().int().positive().max(VIEW_PAGE_MAX_THREADS).optional(),
   beforeMs: z.number().int().positive().optional(),
+  filters: z
+    .object({
+      unread: z.boolean().optional(),
+      starred: z.boolean().optional(),
+      hasAttachment: z.boolean().optional(),
+    })
+    .optional(),
 });
 
-function appendBeforeClause(query: string | undefined, beforeMs: number): string {
-  const seconds = Math.floor(beforeMs / 1000);
-  const clause = `before:${seconds}`;
-  return query && query.length > 0 ? `${query} ${clause}` : clause;
+function appendQueryClauses(
+  query: string | undefined,
+  clauses: string[],
+): string {
+  const parts = [query, ...clauses].filter((p): p is string => Boolean(p && p.length > 0));
+  return parts.join(" ");
 }
 
 const viewRoutes = (api: Hono<AppRouteEnv>) => {
   api.post("/page", zValidator("json", viewPageRequestSchema), async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
-    const { mailboxId, view, cursor, limit, beforeMs } = c.req.valid("json");
+    const { mailboxId, view, cursor, limit, beforeMs, filters } = c.req.valid("json");
 
     const filter = viewToGmailFilter(view);
     if (!filter) {
@@ -48,8 +57,12 @@ const viewRoutes = (api: Hono<AppRouteEnv>) => {
     const mailbox = await resolveMailbox(db, user.id, mailboxId);
     if (!mailbox) return c.json({ error: "No mailbox found" }, 400);
 
-    const effectiveQuery =
-      beforeMs != null ? appendBeforeClause(filter.query, beforeMs) : filter.query;
+    const extraClauses: string[] = [];
+    if (beforeMs != null) extraClauses.push(`before:${Math.floor(beforeMs / 1000)}`);
+    if (filters?.unread) extraClauses.push("is:unread");
+    if (filters?.starred) extraClauses.push("is:starred");
+    if (filters?.hasAttachment) extraClauses.push("has:attachment");
+    const effectiveQuery = appendQueryClauses(filter.query, extraClauses);
 
     try {
       const accessToken = await getGmailTokenForMailbox(db, mailbox.id, {

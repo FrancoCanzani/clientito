@@ -227,16 +227,95 @@ export async function listThreadsPage(
   });
 }
 
+export type GmailProfile = {
+  emailAddress?: string;
+  messagesTotal?: number;
+  threadsTotal?: number;
+  historyId?: string;
+};
+
+export async function getGmailProfile(accessToken: string): Promise<GmailProfile> {
+  return gmailRequest<GmailProfile>(accessToken, "/profile");
+}
+
+type GmailHistoryMessageRef = {
+  id: string;
+  threadId?: string;
+};
+
+type GmailHistoryEntry = {
+  messagesAdded?: Array<{ message: GmailHistoryMessageRef }>;
+  messagesDeleted?: Array<{ message: GmailHistoryMessageRef }>;
+  labelsAdded?: Array<{
+    message: GmailHistoryMessageRef;
+    labelIds?: string[];
+  }>;
+  labelsRemoved?: Array<{
+    message: GmailHistoryMessageRef;
+    labelIds?: string[];
+  }>;
+};
+
+export type GmailHistoryListResponse = {
+  history?: GmailHistoryEntry[];
+  nextPageToken?: string;
+  historyId?: string;
+};
+
+export type GmailHistoryType =
+  | "messageAdded"
+  | "messageDeleted"
+  | "labelAdded"
+  | "labelRemoved";
+
+export class GmailHistoryStaleError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GmailHistoryStaleError";
+  }
+}
+
+export async function listGmailHistory(
+  accessToken: string,
+  options: {
+    startHistoryId: string;
+    pageToken?: string;
+    historyTypes?: GmailHistoryType[];
+    maxResults?: number;
+  },
+): Promise<GmailHistoryListResponse> {
+  try {
+    return await gmailRequest<GmailHistoryListResponse>(accessToken, "/history", {
+      startHistoryId: options.startHistoryId,
+      pageToken: options.pageToken,
+      maxResults: String(options.maxResults ?? 500),
+      historyTypes: options.historyTypes,
+    });
+  } catch (error) {
+    if (error instanceof Error && /\(404\)/.test(error.message)) {
+      throw new GmailHistoryStaleError(
+        "Gmail historyId is too old; full re-sync required.",
+      );
+    }
+    throw error;
+  }
+}
+
 async function fetchThread(
   accessToken: string,
   threadId: string,
   format: GmailMessageFormat = "full",
+  metadataHeaders?: string[],
 ): Promise<GmailThreadResponse> {
+  const messagesFields =
+    format === "metadata"
+      ? "id,threadId,historyId,internalDate,snippet,labelIds,payload(mimeType,headers)"
+      : "id,threadId,historyId,internalDate,snippet,labelIds,payload";
   return gmailRequest<GmailThreadResponse>(accessToken, `/threads/${threadId}`, {
     format,
-    // Use the whole payload tree so attachment metadata (filename, size,
-    // body.attachmentId) is always present for parsing.
-    fields: "id,historyId,messages(id,threadId,historyId,internalDate,snippet,labelIds,payload)",
+    fields: `id,historyId,messages(${messagesFields})`,
+    metadataHeaders:
+      format === "metadata" && metadataHeaders?.length ? metadataHeaders : undefined,
   });
 }
 
@@ -249,6 +328,7 @@ export async function fetchThreadsBatch(
   threadIds: string[],
   format: GmailMessageFormat = "full",
   concurrency = 5,
+  metadataHeaders?: string[],
 ): Promise<Map<string, GmailThreadResponse | null>> {
   const results = new Map<string, GmailThreadResponse | null>();
   if (threadIds.length === 0) return results;
@@ -260,7 +340,10 @@ export async function fetchThreadsBatch(
     while (index < threadIds.length && !firstError) {
       const id = threadIds[index++];
       try {
-        results.set(id, await fetchThread(accessToken, id, format));
+        results.set(
+          id,
+          await fetchThread(accessToken, id, format, metadataHeaders),
+        );
       } catch (error) {
         if (isGmailNotFoundError(error)) {
           // Thread was deleted between list and fetch — skip.

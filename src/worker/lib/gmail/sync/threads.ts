@@ -1,20 +1,27 @@
 import { fetchThreadsBatch } from "../client";
+import type { GmailMessageFormat } from "../types";
 import { parseGmailMessage, type ParsedEmail } from "./parse";
 
-const THREAD_FETCH_CONCURRENCY = 3;
+// 10 × threads.get (10 units each) = 100 units, well under Gmail's 250/sec/user.
+const THREAD_FETCH_CONCURRENCY = 10;
 
 export async function fetchThreadsAndParse(
   accessToken: string,
   threadIds: string[],
   cutoffAt: number | null,
+  options?: {
+    format?: GmailMessageFormat;
+    metadataHeaders?: string[];
+  },
 ): Promise<ParsedEmail[]> {
   if (threadIds.length === 0) return [];
 
   const threads = await fetchThreadsBatch(
     accessToken,
     threadIds,
-    "full",
+    options?.format ?? "full",
     THREAD_FETCH_CONCURRENCY,
+    options?.metadataHeaders,
   );
   const parsed: ParsedEmail[] = [];
 

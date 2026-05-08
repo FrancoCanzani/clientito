@@ -6,6 +6,9 @@ import path from "path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.APP_VERSION ?? "dev"),
+  },
   server: {
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin",

@@ -5,13 +5,13 @@ import { fetchDrafts } from "@/features/email/mail/queries";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/drafts")({
-  loader: async ({ context, params }) => {
-    const drafts = await context.queryClient.ensureQueryData({
-      queryKey: draftQueryKeys.list(params.mailboxId),
-      queryFn: () => fetchDrafts(params.mailboxId),
-    });
-    return { drafts };
-  },
-  errorComponent: RouteError,
-  component: DraftsPage,
+ loader: async ({ context, params }) => {
+ const drafts = await context.queryClient.ensureQueryData({
+ queryKey: draftQueryKeys.list(params.mailboxId),
+ queryFn: () => fetchDrafts(params.mailboxId),
+ });
+ return { drafts };
+ },
+ errorComponent: RouteError,
+ component: DraftsPage,
 });

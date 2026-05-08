@@ -1,3 +1,3 @@
 export const splitViewQueryKeys = {
-  all: () => ["split-views"] as const,
+ all: () => ["split-views"] as const,
 } as const;

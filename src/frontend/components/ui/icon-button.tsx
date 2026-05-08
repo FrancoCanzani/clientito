@@ -1,57 +1,57 @@
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
+ Tooltip,
+ TooltipContent,
+ TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { VariantProps } from "class-variance-authority";
 import * as React from "react";
 
 type IconButtonProps = React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean;
-    label: string;
-    shortcut?: string;
-    tooltipSide?: React.ComponentProps<typeof TooltipContent>["side"];
-  };
+ VariantProps<typeof buttonVariants> & {
+ asChild?: boolean;
+ label: string;
+ shortcut?: string;
+ tooltipSide?: React.ComponentProps<typeof TooltipContent>["side"];
+ };
 
 const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
-  function IconButton(
-    {
-      label,
-      shortcut,
-      tooltipSide = "top",
-      variant = "ghost",
-      size,
-      children,
-      ...props
-    },
-    ref,
-  ) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            ref={ref}
-            variant={variant}
-            size={size}
-            aria-label={label}
-            {...props}
-          >
-            {children}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent
-          side={tooltipSide}
-          className="flex items-center gap-2 text-xs"
-        >
-          {label}
-          {shortcut && <Kbd>{shortcut}</Kbd>}
-        </TooltipContent>
-      </Tooltip>
-    );
-  },
+ function IconButton(
+ {
+ label,
+ shortcut,
+ tooltipSide = "top",
+ variant = "ghost",
+ size,
+ children,
+ ...props
+ },
+ ref,
+ ) {
+ return (
+ <Tooltip>
+ <TooltipTrigger asChild>
+ <Button
+ ref={ref}
+ variant={variant}
+ size={size}
+ aria-label={label}
+ {...props}
+ >
+ {children}
+ </Button>
+ </TooltipTrigger>
+ <TooltipContent
+ side={tooltipSide}
+ className="flex items-center gap-2 text-xs"
+ >
+ {label}
+ {shortcut && <Kbd>{shortcut}</Kbd>}
+ </TooltipContent>
+ </Tooltip>
+ );
+ },
 );
 IconButton.displayName = "IconButton";
 

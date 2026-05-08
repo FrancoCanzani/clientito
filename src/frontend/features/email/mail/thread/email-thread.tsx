@@ -11,12 +11,12 @@ import {
   PaperclipIcon,
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AttachmentItem } from "../compose/attachment-item";
+import { MessageBody } from "../render/message-body";
 import {
   formatEmailDetailDate,
   formatEmailThreadDate,
 } from "../utils/formatters";
-import { AttachmentItem } from "../compose/attachment-item";
-import { MessageBody } from "../render/message-body";
 import { CalendarInviteCard } from "./calendar-invite-card";
 
 function normalizeCid(value: string): string {
@@ -29,9 +29,9 @@ function collectReferencedCids(
   const referenced = new Set<string>();
   if (!bodyHtml) return referenced;
 
-  const cidRegex = /\bcid:([^"'>\s]+)/gi;
+  const cidAttrRegex = /data-cid="([^"]+)"/gi;
   let match: RegExpExecArray | null;
-  while ((match = cidRegex.exec(bodyHtml)) !== null) {
+  while ((match = cidAttrRegex.exec(bodyHtml)) !== null) {
     const cid = match[1];
     if (!cid) continue;
     referenced.add(normalizeCid(cid));
@@ -130,7 +130,9 @@ export function EmailThread({
   const formattedDate = formatEmailDetailDate(email.date);
   const subject = email.subject ?? "(no subject)";
   const recipientRows = buildRecipientRows(email);
-  const showThread = Boolean(email.threadId && orderedThreadMessages.length > 1);
+  const showThread = Boolean(
+    email.threadId && orderedThreadMessages.length > 1,
+  );
   const selectedReferencedCids = useMemo(
     () => collectReferencedCids(email.resolvedBodyHtml ?? email.bodyHtml),
     [email.resolvedBodyHtml, email.bodyHtml],
@@ -217,7 +219,7 @@ export function EmailThread({
       <CalendarInviteCard email={email} />
 
       {threadError && showThread && (
-        <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p className="border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           Could not load the full thread.
         </p>
       )}
@@ -227,7 +229,8 @@ export function EmailThread({
           {orderedThreadMessages.map((threadEmail) => {
             const isSelected = threadEmail.id === email.id;
             const threadReferencedCids =
-              referencedCidsByMessageId.get(threadEmail.id) ?? new Set<string>();
+              referencedCidsByMessageId.get(threadEmail.id) ??
+              new Set<string>();
             return (
               <div
                 key={threadEmail.id}
@@ -261,7 +264,7 @@ export function EmailThread({
           })}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-md border border-white/30 bg-background/75 shadow-xs backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-background/60">
+        <div className="overflow-x-auto border border-white/30 bg-background/75 shadow-xs backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-background/60">
           <div className="p-5">
             <MessageBody detail={email} />
           </div>
@@ -294,7 +297,7 @@ function ThreadMessage({
   const hasAttachments = attachments.length > 0;
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-white/30 bg-background/75 shadow-sm backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-background/60">
+    <div className="overflow-x-auto border border-border/40">
       <button
         type="button"
         onClick={onToggle}

@@ -143,7 +143,11 @@ export function parseGmailMessage(
   const bodyHtml = extractMessageBodyHtml(message);
   const attachments = extractMessageAttachments(message);
   const labelIds = [...(message.labelIds ?? [])];
-  const hasAttachments = attachments.length > 0;
+  // metadata-format responses have no parts, so fall back to the top-level
+  // mimeType to keep the attachment badge roughly correct on list rows.
+  const topMimeType = message.payload?.mimeType?.toLowerCase() ?? null;
+  const hasAttachments =
+    attachments.length > 0 || topMimeType === "multipart/mixed";
   if (hasAttachments && !labelIds.includes(HAS_ATTACHMENT_LABEL)) {
     labelIds.push(HAS_ATTACHMENT_LABEL);
   }

@@ -44,6 +44,8 @@ app.onError((err, c) => {
   return c.json({ error: "Internal server error" }, 500);
 });
 
+app.get("/api/version", (c) => c.json({ version: c.env.APP_VERSION }));
+
 app.use("*", authMiddleware);
 
 app.all("/api/auth/*", async (c) => {

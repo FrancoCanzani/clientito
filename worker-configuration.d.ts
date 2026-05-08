@@ -15,6 +15,7 @@ declare namespace Cloudflare {
 		BETTER_AUTH_SECRET: string;
 		BETTER_AUTH_URL: string;
 		OPENAI_API_KEY: string;
+		APP_VERSION: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

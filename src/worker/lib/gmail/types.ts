@@ -102,7 +102,7 @@ export type GmailMessage = {
   payload?: GmailMessagePart;
 };
 
-export type GmailMessageFormat = "full" | "minimal";
+export type GmailMessageFormat = "full" | "minimal" | "metadata";
 
 export type GmailAttachmentResponse = {
   data?: string;
