@@ -46,9 +46,9 @@ import { useComposeEmail } from "./compose-email-state";
 import { GrammarDiffView } from "./grammar-diff-view";
 import { RecipientInput } from "./recipient-input";
 import {
-  formatReminderLabel,
   ReplyReminderPicker,
 } from "./reply-reminder-picker";
+import { formatReminderLabel } from "./reply-reminder-options";
 import { ScheduleSendPicker } from "./schedule-send-picker";
 
 type ComposeEmailFieldsProps = {

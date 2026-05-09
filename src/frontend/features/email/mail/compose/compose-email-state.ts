@@ -292,7 +292,10 @@ export function useComposeEmail(
  const composeKey = getComposePanelKey(initial);
  // composeKey is a stable fingerprint of every `initial` field these memos
  // read — re-deriving on its change is sufficient.
- const initialDraft = useMemo(() => createComposeDraft(initial), [composeKey]);
+ const initialDraft = useMemo(
+ () => createComposeDraft(initial),
+ [initial],
+ );
  const [draft, setDraft] = useState(() => initialDraft);
  const [loadingDraft, setLoadingDraft] = useState(true);
  const initialAttachments = useMemo(
@@ -303,7 +306,7 @@ export function useComposeEmail(
  mimeType: file.mimeType,
  size: file.size ?? 0,
  })),
- [composeKey],
+ [initial?.attachmentKeys],
  );
  const attachments = useAttachmentUpload(initialAttachments);
  const bodyRef = useRef(draft.body);
@@ -403,9 +406,15 @@ export function useComposeEmail(
  () => availableMailboxes.find((entry) => entry.mailboxId === mailboxId),
  [availableMailboxes, mailboxId],
  );
- const signatures = activeMailbox?.signatures.items ?? [];
+ const signatures = useMemo(
+ () => activeMailbox?.signatures.items ?? [],
+ [activeMailbox?.signatures.items],
+ );
  const defaultSignatureId = activeMailbox?.signatures.defaultId ?? null;
- const templates = activeMailbox?.templates.items ?? [];
+ const templates = useMemo(
+ () => activeMailbox?.templates.items ?? [],
+ [activeMailbox?.templates.items],
+ );
 
  useEffect(() => {
  if (draft.mailboxId != null || availableMailboxes.length !== 1) {
@@ -672,7 +681,7 @@ export function useComposeEmail(
  );
  }
  },
- [draft, attachments, clearDraft, queryClient, options],
+ [draft, attachments, clearDraft, queryClient, options, threadId],
  );
 
  const canSend = useMemo(() => {

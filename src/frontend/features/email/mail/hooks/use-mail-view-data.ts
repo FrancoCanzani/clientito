@@ -18,6 +18,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { useEffect, useMemo, useState } from "react";
 
 const LOAD_MORE_ROOT_MARGIN = "1200px 0px";
+const EMPTY_PAGES: EmailListPage[] = [];
 
 export type MailListFilters = {
  unread?: boolean;
@@ -93,7 +94,10 @@ export function useMailViewData({
 
  const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } =
  emailsQuery;
- const loadedPages = emailsQuery.data?.pages ?? [];
+ const loadedPages = useMemo(
+ () => emailsQuery.data?.pages ?? EMPTY_PAGES,
+ [emailsQuery.data?.pages],
+ );
 
  const allEmails = useMemo(
  () => loadedPages.flatMap((page) => page.emails),
@@ -162,7 +166,7 @@ export function useMailViewData({
  },
  });
 
- return {
+  return {
  view,
  mailboxId,
  hasEmails,
@@ -178,10 +182,11 @@ export function useMailViewData({
  loadMoreRef,
  filters,
  setFilters,
- hasActiveFilters,
- refreshView: refreshMutation.mutate,
- isRefreshingView: refreshMutation.isPending,
- focusWindowActive: focusWindow.active,
- hiddenByFocusCount,
- };
+    hasActiveFilters,
+    refreshView: refreshMutation.mutate,
+    refreshViewAsync: refreshMutation.mutateAsync,
+    isRefreshingView: refreshMutation.isPending,
+    focusWindowActive: focusWindow.active,
+    hiddenByFocusCount,
+  };
 }

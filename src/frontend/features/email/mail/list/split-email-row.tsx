@@ -32,12 +32,13 @@ export const SplitEmailRow = memo(function SplitEmailRow({
       onClick={handleOpen}
       onKeyDown={handleKeyDown}
     >
-      <div
-        className={cn(
-          "flex h-full min-w-0 flex-col justify-center gap-0.5 overflow-hidden border-b border-border/40 px-4 py-1.5 transition-colors hover:bg-muted",
-          (isFocused || isSelected) && "bg-muted",
-        )}
-      >
+ <div
+ className={cn(
+ "flex h-full min-w-0 flex-col justify-center gap-0.5 overflow-hidden border-b border-border/40 px-4 py-1.5 transition-colors hover:bg-muted",
+ isFocused && "bg-muted",
+ isSelected && "bg-card",
+ )}
+ >
         <div className="flex min-w-0 items-center gap-1.5">
           {!email.isRead && <span className="sr-only">Unread.</span>}
           <span

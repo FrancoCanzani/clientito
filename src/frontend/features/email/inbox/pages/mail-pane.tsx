@@ -16,7 +16,9 @@ import { MailFilterBar } from "@/features/email/mail/list/mail-filter-bar";
 import { ViewSyncStatusControl } from "@/features/email/mail/list/view-sync-status";
 import type { ThreadIdentifier } from "@/features/email/mail/mutations";
 import type { EmailListItem } from "@/features/email/mail/types";
+import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
 import { MailboxPageHeader } from "@/features/email/shell/mailbox-page";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { FunnelSimpleIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
@@ -34,6 +36,7 @@ export function MailListPane({
  enableKeyboardNavigation = true,
  compact = false,
  headerExtraActions,
+ onSnooze,
 }: {
  title: string;
  emailData: MailViewData;
@@ -45,11 +48,13 @@ export function MailListPane({
  ids?: string[],
  thread?: ThreadIdentifier,
  ) => void;
+ onSnooze?: (group: ThreadGroup, timestamp: number | null) => void;
  selectedEmailId?: string | null;
  enableKeyboardNavigation?: boolean;
  compact?: boolean;
  headerExtraActions?: ReactNode;
 }) {
+ const isMobile = useIsMobile();
  const showFilterControls = emailData.hasEmails || emailData.hasActiveFilters;
  const filterBarVisible = showFilters || emailData.hasActiveFilters;
 
@@ -67,6 +72,7 @@ export function MailListPane({
  className="hidden md:flex"
  />
  )}
+ {!isMobile && (
  <ViewSyncStatusControl
  isBusy={emailData.isLoading || emailData.isRefreshing}
  needsReconnect={emailData.needsReconnect}
@@ -74,6 +80,7 @@ export function MailListPane({
  onRefresh={() => emailData.refreshView()}
  disabled={emailData.isRefreshingView}
  />
+ )}
  {headerExtraActions}
  {showFilterControls && (
  <Button
@@ -105,6 +112,7 @@ export function MailListPane({
  emailData={emailData}
  onOpen={onOpen}
  onAction={onAction}
+ onSnooze={onSnooze}
  filterBarOpen={showFilters}
  onFilterBarOpenChange={onShowFiltersChange}
  enableKeyboardNavigation={enableKeyboardNavigation}

@@ -75,5 +75,5 @@ export function useHotkeys(
  );
 
  return tinykeys(target, keyBindingMap);
- }, [enabled, keySignature, target]);
+ }, [enabled, keySignature, target, bindings]);
 }

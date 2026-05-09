@@ -11,7 +11,7 @@ import { paletteIcon } from "../registry/palette-icon";
 import type { Command, CommandContext } from "../registry/types";
 
 export function useAccountCommands(ctx: CommandContext): Command[] {
- const accounts = useMailboxes().data?.accounts ?? [];
+ const accounts = useMailboxes().data?.accounts;
  const router = useRouter();
 
  const matches = router.state.matches;
@@ -47,8 +47,9 @@ export function useAccountCommands(ctx: CommandContext): Command[] {
 
  return useMemo(() => {
  if (ctx.activeMailboxId == null) return [];
+ const mailboxAccounts = accounts ?? [];
 
- return accounts
+ return mailboxAccounts
  .filter(
  (
  account,

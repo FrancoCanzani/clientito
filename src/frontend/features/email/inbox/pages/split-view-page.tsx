@@ -22,6 +22,7 @@ import {
  MailboxPageBody,
  MailboxPageHeader,
 } from "@/features/email/shell/mailbox-page";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { FunnelSimpleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
@@ -91,9 +92,10 @@ function SplitViewContent({
  view: string;
  splitRule: SplitRule | null;
 }) {
+ const isMobile = useIsMobile();
  const [showFilters, setShowFilters] = useState(false);
  const emailData = useMailViewData({ view, mailboxId, splitRule });
- const { openEmail, executeEmailAction } = useMailActions({
+ const { openEmail, executeEmailAction, snooze } = useMailActions({
  view,
  mailboxId,
  });
@@ -106,6 +108,7 @@ function SplitViewContent({
  title={title}
  actions={
  <>
+ {!isMobile && (
  <ViewSyncStatusControl
  isBusy={emailData.isLoading || emailData.isRefreshing}
  needsReconnect={emailData.needsReconnect}
@@ -113,6 +116,7 @@ function SplitViewContent({
  onRefresh={() => emailData.refreshView()}
  disabled={emailData.isRefreshingView}
  />
+ )}
  {showFilterControls && (
  <>
  {filterBarVisible && (
@@ -148,6 +152,32 @@ function SplitViewContent({
  emailData={emailData}
  onOpen={openEmail}
  onAction={executeEmailAction}
+ onSnooze={(group, timestamp) =>
+ group.threadId && group.representative.mailboxId
+ ? void snooze(
+ {
+ kind: "thread",
+ thread: {
+ threadId: group.threadId,
+ mailboxId: group.representative.mailboxId,
+ labelIds: group.representative.labelIds,
+ },
+ },
+ timestamp,
+ )
+ : void snooze(
+ {
+ kind: "email",
+ identifier: {
+ id: group.representative.id,
+ providerMessageId: group.representative.providerMessageId,
+ mailboxId: group.representative.mailboxId ?? mailboxId,
+ labelIds: group.representative.labelIds,
+ },
+ },
+ timestamp,
+ )
+ }
  filterBarOpen={showFilters}
  onFilterBarOpenChange={setShowFilters}
  hideFilterControls

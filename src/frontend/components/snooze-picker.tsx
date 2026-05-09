@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
  Popover,
  PopoverContent,
@@ -17,6 +17,8 @@ import {
 type SnoozePickerProps = {
  onSnooze: (timestamp: number) => void;
  children: React.ReactNode;
+ open?: boolean;
+ onOpenChange?: (open: boolean) => void;
 };
 
 function getLaterToday(): number {
@@ -39,11 +41,52 @@ function getNextMondayMorning(): number {
  return d.getTime();
 }
 
-export function SnoozePicker({ onSnooze, children }: SnoozePickerProps) {
- const [open, setOpen] = useState(false);
+function formatSnoozeReference(timestamp: number): string {
+ return new Intl.DateTimeFormat(undefined, {
+ weekday: "short",
+ hour: "numeric",
+ minute: "2-digit",
+ }).format(new Date(timestamp));
+}
+
+export function SnoozePicker({
+ onSnooze,
+ children,
+ open: controlledOpen,
+ onOpenChange,
+}: SnoozePickerProps) {
+ const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
  const [showCustom, setShowCustom] = useState(false);
  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
  const [time, setTime] = useState("09:00");
+ const open = controlledOpen ?? uncontrolledOpen;
+ const presets = useMemo(
+ () => [
+ {
+ label: "Later today",
+ timestamp: getLaterToday(),
+ icon: ClockIcon,
+ },
+ {
+ label: "Tomorrow morning",
+ timestamp: getTomorrowMorning(),
+ icon: SunIcon,
+ },
+ {
+ label: "Next week",
+ timestamp: getNextMondayMorning(),
+ icon: CalendarIcon,
+ },
+ ],
+ [],
+ );
+
+ const setOpen = (next: boolean) => {
+ onOpenChange?.(next);
+ if (controlledOpen === undefined) {
+ setUncontrolledOpen(next);
+ }
+ };
 
  const handlePreset = (timestamp: number) => {
  onSnooze(timestamp);
@@ -73,38 +116,31 @@ export function SnoozePicker({ onSnooze, children }: SnoozePickerProps) {
  <PopoverTrigger asChild>{children}</PopoverTrigger>
  <PopoverContent align="end" className="w-auto p-0">
  {!showCustom ? (
- <div className="flex flex-col gap-0.5 p-1">
+ <div className="flex min-w-48 flex-col gap-0.5 p-1">
+ {presets.map((preset) => {
+ const Icon = preset.icon;
+ return (
  <button
+ key={preset.label}
  type="button"
- className="flex min-h-7 w-full items-center gap-2 px-2 py-1 text-left text-xs/relaxed text-foreground outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground"
- onClick={() => handlePreset(getLaterToday())}
+ className="flex min-h-8 w-full items-center gap-2 px-2 py-1 text-left text-xs/relaxed text-foreground outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground"
+ onClick={() => handlePreset(preset.timestamp)}
  >
- <ClockIcon className="size-3.5 text-muted-foreground" />
- Later today
+ <Icon className="size-3.5 text-muted-foreground" />
+ <span className="flex-1">{preset.label}</span>
+ <span className="text-[11px] text-muted-foreground">
+ {formatSnoozeReference(preset.timestamp)}
+ </span>
  </button>
+ );
+ })}
  <button
  type="button"
- className="flex min-h-7 w-full items-center gap-2 px-2 py-1 text-left text-xs/relaxed text-foreground outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground"
- onClick={() => handlePreset(getTomorrowMorning())}
- >
- <SunIcon className="size-3.5 text-muted-foreground" />
- Tomorrow morning
- </button>
- <button
- type="button"
- className="flex min-h-7 w-full items-center gap-2 px-2 py-1 text-left text-xs/relaxed text-foreground outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground"
- onClick={() => handlePreset(getNextMondayMorning())}
- >
- <CalendarIcon className="size-3.5 text-muted-foreground" />
- Next week
- </button>
- <button
- type="button"
- className="flex min-h-7 w-full items-center gap-2 px-2 py-1 text-left text-xs/relaxed text-foreground outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground"
+ className="flex min-h-8 w-full items-center gap-2 px-2 py-1 text-left text-xs/relaxed text-foreground outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground"
  onClick={() => setShowCustom(true)}
  >
  <CalendarDotsIcon className="size-3.5 text-muted-foreground" />
- Pick date & time
+ <span className="flex-1">Pick date & time</span>
  </button>
  </div>
  ) : (

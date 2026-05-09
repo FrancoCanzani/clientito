@@ -18,6 +18,7 @@ export type EmailRowProps = {
     ids?: string[],
     thread?: ThreadIdentifier,
   ) => void;
+  onSnooze?: (group: ThreadGroup, timestamp: number | null) => void;
   isFocused?: boolean;
   isSelected?: boolean;
   highlightTerms?: string[];

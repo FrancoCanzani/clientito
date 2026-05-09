@@ -61,13 +61,15 @@ export const QuickReply = forwardRef<
  if (!open) {
  return (
  <div ref={containerRef} className="mt-6">
+ <div className="overflow-hidden border border-border/40 bg-card shadow-xs">
  <button
  type="button"
  onClick={() => setOpen(true)}
- className="flex w-full items-center justify-center gap-2 border border-border/40 bg-card p-3 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+ className="flex w-full items-center justify-center gap-2 px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
  >
  Click here to reply
  </button>
+ </div>
  </div>
  );
  }
@@ -142,8 +144,8 @@ function QuickReplyComposer({
  };
 
  return (
- <div className="flex max-h-[60vh] flex-col overflow-hidden border border-border/40 bg-card">
- <div className="flex items-center gap-2 border-b border-border/50 px-4 py-2">
+ <div className="flex max-h-[60vh] flex-col overflow-hidden border border-border/40 bg-card shadow-xs">
+ <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2">
  <ArrowBendUpLeftIcon className="size-3.5 text-muted-foreground" />
  <span className="flex-1 text-xs text-muted-foreground">Reply</span>
  <button

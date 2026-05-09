@@ -12,8 +12,8 @@ import {
  HeadingSelect,
  LinkEditor,
  ToolbarButton,
- normalizeLink,
 } from "./compose-toolbar-shared";
+import { normalizeLink } from "./compose-toolbar-utils";
 
 export function ComposeDockedToolbar({
  editor,

@@ -57,7 +57,7 @@ function FolderView({
  const navigate = route.useNavigate();
  const isMobile = useIsMobile();
  const [showFilters, setShowFilters] = useState(false);
- const { openEmail, executeEmailAction } = useMailActions({
+ const { openEmail, executeEmailAction, snooze } = useMailActions({
  view: folder,
  mailboxId,
  presentation: isMobile ? "route" : "panel",
@@ -90,6 +90,32 @@ function FolderView({
  onShowFiltersChange={setShowFilters}
  onOpen={openEmail}
  onAction={executeEmailAction}
+ onSnooze={(group, timestamp) =>
+ group.threadId && group.representative.mailboxId
+ ? void snooze(
+ {
+ kind: "thread",
+ thread: {
+ threadId: group.threadId,
+ mailboxId: group.representative.mailboxId,
+ labelIds: group.representative.labelIds,
+ },
+ },
+ timestamp,
+ )
+ : void snooze(
+ {
+ kind: "email",
+ identifier: {
+ id: group.representative.id,
+ providerMessageId: group.representative.providerMessageId,
+ mailboxId: group.representative.mailboxId ?? mailboxId,
+ labelIds: group.representative.labelIds,
+ },
+ },
+ timestamp,
+ )
+ }
  selectedEmailId={selectedEmailId}
  enableKeyboardNavigation={!selectedEmailId}
  compact={!isMobile}

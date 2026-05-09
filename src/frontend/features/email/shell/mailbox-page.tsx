@@ -42,7 +42,7 @@ export function MailboxPageHeader({
  return (
  <header
  className={cn(
- "flex min-h-10 shrink-0 items-center justify-between gap-3 border-b bg-background px-3 py-1.5 transition-colors duration-200 md:px-4",
+ "flex min-h-10 shrink-0 items-center justify-between gap-3 border-b bg-background px-3 py-1.5 md:px-4",
  isScrolled ? "border-border/40" : "border-transparent",
  className,
  )}

@@ -36,7 +36,7 @@ export default function LabelPage() {
  labelsQuery.data
  ?.filter((label) => !isInternalLabelName(label.name))
  .find((l) => l.gmailId === label)?.name ?? label;
- const { openEmail, executeEmailAction } = useMailActions({
+ const { openEmail, executeEmailAction, snooze } = useMailActions({
  view: label,
  mailboxId,
  presentation: isMobile ? "route" : "panel",
@@ -67,6 +67,32 @@ export default function LabelPage() {
  onShowFiltersChange={setShowFilters}
  onOpen={openEmail}
  onAction={executeEmailAction}
+ onSnooze={(group, timestamp) =>
+ group.threadId && group.representative.mailboxId
+ ? void snooze(
+ {
+ kind: "thread",
+ thread: {
+ threadId: group.threadId,
+ mailboxId: group.representative.mailboxId,
+ labelIds: group.representative.labelIds,
+ },
+ },
+ timestamp,
+ )
+ : void snooze(
+ {
+ kind: "email",
+ identifier: {
+ id: group.representative.id,
+ providerMessageId: group.representative.providerMessageId,
+ mailboxId: group.representative.mailboxId ?? mailboxId,
+ labelIds: group.representative.labelIds,
+ },
+ },
+ timestamp,
+ )
+ }
  selectedEmailId={selectedEmailId}
  enableKeyboardNavigation={!selectedEmailId}
  compact={!isMobile}

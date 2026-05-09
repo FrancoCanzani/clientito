@@ -34,6 +34,8 @@ const TABS = [
   { id: "inbox", label: "Inbox", to: "/$mailboxId/inbox" as const },
 ];
 
+const BASE_DOCUMENT_TITLE = "Duomo";
+
 type TabId = (typeof TABS)[number]["id"];
 type CreateViewPayload = { name: string; rules: SplitRule | null };
 type ViewRuleForm = {
@@ -185,6 +187,18 @@ export function MailboxTopbar() {
     viewCounts?.inbox.messagesUnread,
     viewCounts?.todo.messagesUnread,
   ]);
+
+  useEffect(() => {
+    const unread = viewCounts?.inbox.messagesUnread ?? 0;
+    document.title =
+      unread > 0
+        ? `(${formatUnreadCount(unread)}) ${BASE_DOCUMENT_TITLE}`
+        : BASE_DOCUMENT_TITLE;
+
+    return () => {
+      document.title = BASE_DOCUMENT_TITLE;
+    };
+  }, [viewCounts?.inbox.messagesUnread]);
 
   return (
     <header className="flex shrink-0 items-center gap-1 border-b border-border/40 bg-background p-2">

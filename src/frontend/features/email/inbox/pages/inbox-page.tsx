@@ -25,7 +25,7 @@ export default function InboxPage() {
  const isMobile = useIsMobile();
  const [showFilters, setShowFilters] = useState(false);
  const emailData = useInboxData({ mailboxId });
- const { openEmail, executeEmailAction } = useMailActions({
+ const { openEmail, executeEmailAction, snooze } = useMailActions({
  view: "inbox",
  mailboxId,
  presentation: isMobile ? "route" : "panel",
@@ -76,6 +76,32 @@ export default function InboxPage() {
  onShowFiltersChange={setShowFilters}
  onOpen={openEmail}
  onAction={executeEmailAction}
+ onSnooze={(group, timestamp) =>
+ group.threadId && group.representative.mailboxId
+ ? void snooze(
+ {
+ kind: "thread",
+ thread: {
+ threadId: group.threadId,
+ mailboxId: group.representative.mailboxId,
+ labelIds: group.representative.labelIds,
+ },
+ },
+ timestamp,
+ )
+ : void snooze(
+ {
+ kind: "email",
+ identifier: {
+ id: group.representative.id,
+ providerMessageId: group.representative.providerMessageId,
+ mailboxId: group.representative.mailboxId ?? mailboxId,
+ labelIds: group.representative.labelIds,
+ },
+ },
+ timestamp,
+ )
+ }
  selectedEmailId={selectedEmailId}
  enableKeyboardNavigation={!selectedEmailId}
  compact={!isMobile}

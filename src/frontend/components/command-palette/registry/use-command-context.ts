@@ -14,7 +14,8 @@ export function useCommandContext(): CommandContext {
  const router = useRouter();
  const isMobile = useIsMobile();
  const focused = useFocusedEmail();
- const accounts = useMailboxes().data?.accounts ?? [];
+ const mailboxAccounts = useMailboxes().data?.accounts;
+ const accounts = useMemo(() => mailboxAccounts ?? [], [mailboxAccounts]);
 
  const matches = router.state.matches;
  const currentRouteId = matches[matches.length - 1]?.routeId ?? "";
@@ -45,7 +46,9 @@ export function useCommandContext(): CommandContext {
  labelView ?? folderView ?? (isInboxRootRoute ? "inbox" : undefined);
 
  const selectedEmailId = focused?.id ?? null;
- const selectedEmail = focused
+ const selectedEmail = useMemo(
+ () =>
+ focused
  ? {
  fromAddr: focused.fromAddr,
  fromName: focused.fromName,
@@ -53,7 +56,9 @@ export function useCommandContext(): CommandContext {
  threadId: focused.threadId,
  mailboxId: focused.mailboxId,
  }
- : null;
+ : null,
+ [focused],
+ );
 
  return useMemo(
  () => ({
