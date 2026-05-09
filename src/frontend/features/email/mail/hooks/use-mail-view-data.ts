@@ -107,13 +107,22 @@ export function useMailViewData({
  const threadGroups = useMemo(
  () =>
  focusWindow.active
- ? allThreadGroups.filter(isImportantThread)
+ ? allThreadGroups.filter((group) => {
+ if (isImportantThread(group)) return true;
+ if (!focusWindow.startedAt) return true;
+ return group.representative.date < focusWindow.startedAt;
+ })
  : allThreadGroups,
- [focusWindow.active, allThreadGroups],
+ [allThreadGroups, focusWindow.active, focusWindow.startedAt],
  );
- const hiddenByFocusCount = focusWindow.active
- ? allThreadGroups.length - threadGroups.length
- : 0;
+ const hiddenByFocusCount = useMemo(() => {
+ if (!focusWindow.active || !focusWindow.startedAt) return 0;
+ const startedAt = focusWindow.startedAt;
+ return allThreadGroups.filter((group) => {
+ if (isImportantThread(group)) return false;
+ return group.representative.date >= startedAt;
+ }).length;
+ }, [allThreadGroups, focusWindow.active, focusWindow.startedAt]);
  const heldDuringFocusCount = useMemo(() => {
  if (!focusWindow.active || !focusWindow.startedAt) return 0;
  return allThreadGroups.filter((group) => {

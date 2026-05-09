@@ -116,7 +116,9 @@ export function CalendarInviteCard({ email }: { email: EmailDetailItem }) {
  <p className="truncate text-sm font-medium">
  {invite.title?.trim() || "Calendar invite"}
  </p>
- <p className="text-xs text-muted-foreground">{formatInviteDate(invite)}</p>
+ <p className="font-mono text-[10px] tracking-tighter tabular-nums text-muted-foreground">
+ {formatInviteDate(invite)}
+ </p>
  {invite.location && (
  <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
  <MapPinIcon className="size-3" />

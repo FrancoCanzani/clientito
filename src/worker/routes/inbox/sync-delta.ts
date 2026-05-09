@@ -14,6 +14,7 @@ import {
 } from "../../lib/gmail/errors";
 import { resolveMailbox } from "../../lib/gmail/mailboxes";
 import { pullDeltaSync } from "../../lib/gmail/sync/history";
+import { markRepliedReminders } from "../../lib/reminders/detect-replies";
 import type { AppRouteEnv } from "../types";
 
 const deltaSyncSchema = z.object({
@@ -92,6 +93,25 @@ export function registerInboxSyncDelta(api: Hono<AppRouteEnv>) {
         }
 
         await advanceCursor(result.newHistoryId, true);
+
+        if (result.added.length > 0) {
+          await markRepliedReminders(
+            db,
+            c.env,
+            user.id,
+            mailbox.id,
+            result.added.map((message) => ({
+              threadId: message.threadId,
+              labelIds: message.labelIds,
+            })),
+          ).catch((error) => {
+            console.warn("Reply-reminder detection failed", {
+              mailboxId: mailbox.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
+        }
+
         return c.json({
           status: "ok" as const,
           added: result.added,

@@ -15,7 +15,7 @@ function isComposerAiAvailable(ctx: CommandContext): boolean {
  if (mailboxId == null) return false;
  const cached = queryClient.getQueryData(accountsQueryOptions.queryKey);
  const account = cached?.accounts.find((a) => a.mailboxId === mailboxId);
- return account?.aiEnabled ?? true;
+ return account?.aiEnabled ?? false;
 }
 
 const composerCommands: Command[] = COMPOSER_AI_ACTIONS.map((action) => ({

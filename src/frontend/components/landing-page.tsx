@@ -594,7 +594,7 @@ export default function LandingPage() {
 
  <section className="pb-24">
  <div className="overflow-hidden border border-border/80 bg-sidebar shadow-[0_1px_0_0_rgba(0,0,0,0.02)]">
- <div className="flex items-center gap-1.5 border-b border-border/60 px-3 py-2">
+ <div className="flex items-center gap-1.5 border-b border-border/40 px-3 py-2">
  <span className="size-2.5 bg-border" />
  <span className="size-2.5 bg-border" />
  <span className="size-2.5 bg-border" />
@@ -838,7 +838,7 @@ export default function LandingPage() {
  </Accordion>
  </section>
 
- <section className="border-t border-border/60 py-16">
+ <section className="border-t border-border/40 py-16">
  <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
  <div>
  <h2 className="font-serif text-2xl tracking-tight">
@@ -858,7 +858,7 @@ export default function LandingPage() {
  </section>
  </main>
 
- <footer className="border-t border-border/60">
+ <footer className="border-t border-border/40">
  <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-5 py-8 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
  <div className="flex items-center gap-2">
  <span className="font-serif text-base italic text-foreground">

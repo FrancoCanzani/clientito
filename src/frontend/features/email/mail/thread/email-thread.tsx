@@ -61,7 +61,7 @@ function AttachmentsSection({
   if (attachments.length === 0) return null;
 
   return (
-    <section className="space-y-2.5 border-t border-border/60 px-5 py-3.5">
+    <section className="space-y-2.5 border-t border-border/40 px-5 py-3.5">
       <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
         <PaperclipIcon className="size-3" />
         <span>{formatAttachmentLabel(attachments.length)}</span>
@@ -191,31 +191,6 @@ export function EmailThread({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="min-w-0 font-medium text-foreground">{subject}</h1>
-
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="min-w-0 space-y-1">
-              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                {recipientRows.map((row) => (
-                  <p key={row.label} className="min-w-0">
-                    <span className="mr-1 font-medium text-foreground/70">
-                      {row.label}
-                    </span>
-                    <span>{row.value}</span>
-                  </p>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-            {formattedDate}
-          </span>
-        </div>
-      </div>
-
       <CalendarInviteCard email={email} />
 
       {threadError && showThread && (
@@ -225,54 +200,97 @@ export function EmailThread({
       )}
 
       {showThread ? (
-        <div className="space-y-3">
-          {orderedThreadMessages.map((threadEmail) => {
-            const isSelected = threadEmail.id === email.id;
-            const threadReferencedCids =
-              referencedCidsByMessageId.get(threadEmail.id) ??
-              new Set<string>();
-            return (
-              <div
-                key={threadEmail.id}
-                className="scroll-mt-16"
-                ref={
-                  threadEmail.id ===
-                  orderedThreadMessages[orderedThreadMessages.length - 1]?.id
-                    ? latestMessageRef
-                    : undefined
-                }
-              >
-                <ThreadMessage
-                  email={threadEmail}
-                  body={isSelected ? email : threadEmail}
-                  expanded={isExpanded(threadEmail.id)}
-                  onToggle={() => toggleMessage(threadEmail.id)}
-                  attachments={
-                    isSelected
-                      ? visibleAttachments
-                      : (threadEmail.attachments ?? []).filter(
-                          (attachment) =>
-                            !shouldHideInlineImageAttachment(
-                              attachment,
-                              threadReferencedCids,
-                            ),
-                        )
-                  }
-                />
+        <>
+          <div className="space-y-2">
+            <h1 className="min-w-0 text-xs font-medium text-foreground">
+              {subject}
+            </h1>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                {recipientRows.map((row) => (
+                  <p key={row.label} className="min-w-0">
+                    <span className="mr-1 font-medium text-foreground/70">
+                      {row.label}
+                    </span>
+                    <span>{row.value}</span>
+                  </p>
+                ))}
               </div>
-            );
-          })}
-        </div>
+              <span className="shrink-0 font-mono text-[10px] tracking-tighter tabular-nums text-muted-foreground">
+                {formattedDate}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {orderedThreadMessages.map((threadEmail) => {
+              const isSelected = threadEmail.id === email.id;
+              const threadReferencedCids =
+                referencedCidsByMessageId.get(threadEmail.id) ??
+                new Set<string>();
+              return (
+                <div
+                  key={threadEmail.id}
+                  className="scroll-mt-16"
+                  ref={
+                    threadEmail.id ===
+                    orderedThreadMessages[orderedThreadMessages.length - 1]?.id
+                      ? latestMessageRef
+                      : undefined
+                  }
+                >
+                  <ThreadMessage
+                    email={threadEmail}
+                    body={isSelected ? email : threadEmail}
+                    expanded={isExpanded(threadEmail.id)}
+                    onToggle={() => toggleMessage(threadEmail.id)}
+                    attachments={
+                      isSelected
+                        ? visibleAttachments
+                        : (threadEmail.attachments ?? []).filter(
+                            (attachment) =>
+                              !shouldHideInlineImageAttachment(
+                                attachment,
+                                threadReferencedCids,
+                              ),
+                          )
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </>
       ) : (
-        <div className="overflow-x-auto border border-white/30 bg-background/75 shadow-xs backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-background/60">
-          <div className="p-5">
+        <article className="overflow-x-auto border border-border/40 bg-card shadow-xs">
+          <header className="space-y-2 px-5 pt-5 pb-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <h1 className="min-w-0 truncate text-xs font-medium text-foreground">
+                {subject}
+              </h1>
+              <span className="shrink-0 font-mono text-[10px] tracking-tighter tabular-nums text-muted-foreground">
+                {formattedDate}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              {recipientRows.map((row) => (
+                <p key={row.label} className="min-w-0">
+                  <span className="mr-1 font-medium text-foreground/70">
+                    {row.label}
+                  </span>
+                  <span>{row.value}</span>
+                </p>
+              ))}
+            </div>
+          </header>
+          <div className="border-t border-border/40 p-5">
             <MessageBody detail={email} />
           </div>
 
           {hasAttachments && (
             <AttachmentsSection attachments={visibleAttachments} />
           )}
-        </div>
+        </article>
       )}
     </div>
   );
@@ -297,7 +315,7 @@ function ThreadMessage({
   const hasAttachments = attachments.length > 0;
 
   return (
-    <div className="overflow-x-auto border border-border/40">
+    <div className="overflow-x-auto border border-border/40 bg-card shadow-xs">
       <button
         type="button"
         onClick={onToggle}
@@ -314,7 +332,7 @@ function ThreadMessage({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-          <span className="tabular-nums">{formattedDate}</span>
+          <span className="font-mono text-[10px] tracking-tighter tabular-nums">{formattedDate}</span>
           {expanded ? (
             <CaretDownIcon className="size-3" />
           ) : (
@@ -325,7 +343,7 @@ function ThreadMessage({
 
       {expanded && (
         <>
-          <div className="border-t border-border/60 px-5 pb-5 pt-4">
+          <div className="border-t border-border/40 px-5 pb-5 pt-4">
             <MessageBody detail={body ?? email} />
           </div>
 

@@ -5,6 +5,7 @@ import calendarRoutes from "./calendar/router";
 import emailsRoutes from "./emails/router";
 import gatekeeperRoutes from "./gatekeeper/router";
 import labelsRoutes from "./labels/router";
+import remindersRoutes from "./reminders/router";
 import { registerInboxSearch } from "./search";
 import { registerInboxSyncDelta } from "./sync-delta";
 import { registerInboxUnreadCount } from "./unread-count";
@@ -20,6 +21,7 @@ inboxRoutes.route("/labels", labelsRoutes);
 inboxRoutes.route("/subscriptions", subscriptionsRoutes);
 inboxRoutes.route("/calendar", calendarRoutes);
 inboxRoutes.route("/gatekeeper", gatekeeperRoutes);
+inboxRoutes.route("/reminders", remindersRoutes);
 
 const viewSubRoutes = new Hono<AppRouteEnv>();
 viewRoutes(viewSubRoutes);

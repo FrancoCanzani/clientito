@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 
 export const FOCUS_WINDOW_ENDED_EVENT = "petit:focus-window-ended";
+const FOCUS_WINDOW_STORAGE_KEY = "petit:focus-window-state:v1";
 
 export type FocusWindowState = {
  active: boolean;
@@ -21,7 +22,57 @@ const INACTIVE: FocusWindowState = {
 };
 
 let state: FocusWindowState = INACTIVE;
+let hydratedFromStorage = false;
 const listeners = new Set<() => void>();
+
+function clampHeldCount(value: unknown): number {
+ if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+ return Math.max(0, Math.floor(value));
+}
+
+function readStoredState(): FocusWindowState {
+ if (typeof window === "undefined") return INACTIVE;
+ try {
+ const raw = window.localStorage.getItem(FOCUS_WINDOW_STORAGE_KEY);
+ if (!raw) return INACTIVE;
+ const parsed = JSON.parse(raw) as Partial<FocusWindowState> | null;
+ if (!parsed || typeof parsed !== "object") return INACTIVE;
+ if (parsed.active !== true) return INACTIVE;
+
+ const startedAt =
+ typeof parsed.startedAt === "number" && Number.isFinite(parsed.startedAt)
+ ? parsed.startedAt
+ : null;
+ const endsAt =
+ typeof parsed.endsAt === "number" && Number.isFinite(parsed.endsAt)
+ ? parsed.endsAt
+ : null;
+
+ if (endsAt != null && endsAt <= Date.now()) return INACTIVE;
+
+ return {
+ active: true,
+ startedAt,
+ endsAt,
+ heldCount: clampHeldCount(parsed.heldCount),
+ };
+ } catch {
+ return INACTIVE;
+ }
+}
+
+function persistState(next: FocusWindowState): void {
+ if (typeof window === "undefined") return;
+ try {
+ if (!next.active) {
+ window.localStorage.removeItem(FOCUS_WINDOW_STORAGE_KEY);
+ return;
+ }
+ window.localStorage.setItem(FOCUS_WINDOW_STORAGE_KEY, JSON.stringify(next));
+ } catch {
+ // Ignore storage failures (privacy mode, full quota, etc).
+ }
+}
 
 function emitChange(): void {
  for (const listener of listeners) listener();
@@ -29,6 +80,7 @@ function emitChange(): void {
 
 function setState(next: FocusWindowState): void {
  state = next;
+ persistState(next);
  emitChange();
 }
 
@@ -66,6 +118,14 @@ export function recordFocusWindowHeldCount(count: number): void {
 
 export function useFocusWindow() {
  const snapshot = useSyncExternalStore(subscribe, getSnapshot, () => INACTIVE);
+
+ useEffect(() => {
+ if (hydratedFromStorage) return;
+ hydratedFromStorage = true;
+ // Do not overwrite a session that started before hydration runs.
+ if (state.active) return;
+ setState(readStoredState());
+ }, []);
 
  useEffect(() => {
  if (!snapshot.active || !snapshot.endsAt) return;

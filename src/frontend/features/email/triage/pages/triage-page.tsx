@@ -2,43 +2,43 @@ import { PageContainer } from "@/components/page-container";
 import { PageSpinner } from "@/components/page-spinner";
 import { SnoozePicker } from "@/components/snooze-picker";
 import {
- AlertDialog,
- AlertDialogAction,
- AlertDialogCancel,
- AlertDialogContent,
- AlertDialogDescription,
- AlertDialogFooter,
- AlertDialogHeader,
- AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
- Empty,
- EmptyDescription,
- EmptyHeader,
- EmptyTitle,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
 } from "@/components/ui/empty";
 import { Kbd } from "@/components/ui/kbd";
 import { AttachmentBar } from "@/features/email/mail/compose/attachment-bar";
+import { useMailCompose } from "@/features/email/mail/compose/compose-context";
 import { ComposeEditor } from "@/features/email/mail/compose/compose-editor";
 import { getComposerEditor } from "@/features/email/mail/compose/compose-editor-ref";
 import { useComposeEmail } from "@/features/email/mail/compose/compose-email-state";
 import { RecipientInput } from "@/features/email/mail/compose/recipient-input";
-import { MailActionButton } from "@/features/email/mail/mail-action-button";
-import { MessageBody } from "@/features/email/mail/render/message-body";
-import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
+import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
 import { fetchEmailDetail } from "@/features/email/mail/queries";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { MessageBody } from "@/features/email/mail/render/message-body";
 import type {
- EmailDetailItem,
- EmailListItem,
+  EmailDetailItem,
+  EmailListItem,
 } from "@/features/email/mail/types";
 import { formatEmailDetailDate } from "@/features/email/mail/utils/formatters";
 import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
 import {
- buildReplyInitial,
- pickReplySource,
+  buildReplyInitial,
+  pickReplySource,
 } from "@/features/email/mail/utils/reply-compose";
 import { useAuth } from "@/hooks/use-auth";
 import { useHotkeys } from "@/hooks/use-hotkeys";
@@ -47,640 +47,784 @@ import { cn } from "@/lib/utils";
 import { PaperclipIcon, XIcon } from "@phosphor-icons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
+import { AnimatePresence, motion } from "motion/react";
 import {
- useCallback,
- useEffect,
- useMemo,
- useRef,
- useState,
- type ReactNode,
- type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
 } from "react";
 import { toast } from "sonner";
 
 const route = getRouteApi("/_dashboard/$mailboxId/triage");
 
 function getThreadContext(group: ThreadGroup) {
- const email = group.representative;
- if (!group.threadId || email.mailboxId == null) return undefined;
- return {
- threadId: group.threadId,
- mailboxId: email.mailboxId,
- labelIds: email.labelIds,
- };
+  const email = group.representative;
+  if (!group.threadId || email.mailboxId == null) return undefined;
+  return {
+    threadId: group.threadId,
+    mailboxId: email.mailboxId,
+    labelIds: email.labelIds,
+  };
 }
 
 export default function TriagePage() {
- const { mailboxId } = route.useParams();
- const navigate = route.useNavigate();
- const queryClient = useQueryClient();
- const snoozeButtonRef = useRef<HTMLButtonElement>(null);
- const { threadGroups, isLoading } = useMailViewData({
- view: "inbox",
- mailboxId,
- });
+  const { mailboxId } = route.useParams();
+  const navigate = route.useNavigate();
+  const queryClient = useQueryClient();
+  const snoozeButtonRef = useRef<HTMLButtonElement>(null);
+  const { threadGroups, isLoading } = useMailViewData({
+    view: "inbox",
+    mailboxId,
+  });
 
- const hasSeededRef = useRef(false);
- const [triageIds, setTriageIds] = useState<Set<string>>(new Set());
+  const hasSeededRef = useRef(false);
+  const [triageIds, setTriageIds] = useState<Set<string>>(new Set());
 
- useEffect(() => {
- if (hasSeededRef.current) return;
- if (isLoading) return;
- const next = new Set<string>();
- for (const group of threadGroups) {
- if (group.emails.some((email) => !email.isRead)) {
- next.add(group.representative.id);
- }
- }
- setTriageIds(next);
- hasSeededRef.current = true;
- }, [isLoading, threadGroups]);
+  useEffect(() => {
+    if (hasSeededRef.current) return;
+    if (isLoading) return;
+    const next = new Set<string>();
+    for (const group of threadGroups) {
+      if (group.emails.some((email) => !email.isRead)) {
+        next.add(group.representative.id);
+      }
+    }
+    setTriageIds(next);
+    hasSeededRef.current = true;
+  }, [isLoading, threadGroups]);
 
- const queue = useMemo(
- () => threadGroups.filter((group) => triageIds.has(group.representative.id)),
- [threadGroups, triageIds],
- );
+  const queue = useMemo(
+    () =>
+      threadGroups.filter((group) => triageIds.has(group.representative.id)),
+    [threadGroups, triageIds],
+  );
 
- const [cursorIndex, setCursorIndex] = useState(0);
- const [replyOpen, setReplyOpen] = useState(false);
- const [unsubscribeConfirmOpen, setUnsubscribeConfirmOpen] = useState(false);
+  const [cursorIndex, setCursorIndex] = useState(0);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [unsubscribeConfirmOpen, setUnsubscribeConfirmOpen] = useState(false);
 
- const currentGroup = queue[cursorIndex] ?? null;
- const current = currentGroup?.representative ?? null;
- const currentDetailQuery = useQuery({
- queryKey: current
- ? emailQueryKeys.detail(current.id)
- : ["email", "triage", "detail", "none"],
- queryFn: () =>
- fetchEmailDetail(current!.id, {
- mailboxId: current!.mailboxId ?? undefined,
- view: "inbox",
- }),
- enabled: Boolean(current),
- staleTime: 30_000,
- });
- const currentDetail = currentDetailQuery.data ?? null;
+  const currentGroup = queue[cursorIndex] ?? null;
+  const current = currentGroup?.representative ?? null;
 
- useEffect(() => {
- const next = queue[cursorIndex + 1]?.representative;
- if (!next) return;
- void queryClient.prefetchQuery({
- queryKey: emailQueryKeys.detail(next.id),
- queryFn: () =>
- fetchEmailDetail(next.id, {
- mailboxId: next.mailboxId ?? undefined,
- view: "inbox",
- }),
- });
- }, [cursorIndex, mailboxId, queue, queryClient]);
+  const currentDetailQuery = useQuery({
+    queryKey: current
+      ? emailQueryKeys.detail(current.id)
+      : ["email", "triage", "detail", "none"],
+    queryFn: () =>
+      fetchEmailDetail(current!.id, {
+        mailboxId: current!.mailboxId ?? undefined,
+        view: "inbox",
+      }),
+    enabled: Boolean(current),
+    staleTime: 30_000,
+  });
+  const currentDetail = currentDetailQuery.data ?? null;
 
- const advance = useCallback(() => setCursorIndex((i) => i + 1), []);
- const goPrev = useCallback(
- () => setCursorIndex((i) => Math.max(0, i - 1)),
- [],
- );
+  useEffect(() => {
+    const next = queue[cursorIndex + 1]?.representative;
+    if (!next) return;
+    void queryClient.prefetchQuery({
+      queryKey: emailQueryKeys.detail(next.id),
+      queryFn: () =>
+        fetchEmailDetail(next.id, {
+          mailboxId: next.mailboxId ?? undefined,
+          view: "inbox",
+        }),
+    });
+  }, [cursorIndex, mailboxId, queue, queryClient]);
 
- const {
- executeEmailAction,
- snooze,
- todo,
- unsubscribe: unsubscribeMutation,
- } = useMailActions({
- view: "inbox",
- mailboxId,
- });
+  const advance = useCallback(() => setCursorIndex((i) => i + 1), []);
+  const goPrev = useCallback(
+    () => setCursorIndex((i) => Math.max(0, i - 1)),
+    [],
+  );
 
- const archiveCurrent = useCallback(() => {
- if (!current || !currentGroup) return;
- void executeEmailAction(
- "archive",
- currentGroup.emails.map((email) => email.id),
- getThreadContext(currentGroup),
- );
- }, [current, currentGroup, executeEmailAction]);
+  const {
+    executeEmailAction,
+    snooze,
+    todo,
+    unsubscribe: unsubscribeMutation,
+  } = useMailActions({
+    view: "inbox",
+    mailboxId,
+  });
 
- const handleDone = useCallback(() => {
- archiveCurrent();
- advance();
- }, [advance, archiveCurrent]);
+  const { openCompose } = useMailCompose();
 
- const handleReplyQueued = useCallback(() => {
- setReplyOpen(false);
- advance();
- }, [advance]);
+  const archiveCurrent = useCallback(() => {
+    if (!current || !currentGroup) return;
+    void executeEmailAction(
+      "archive",
+      currentGroup.emails.map((email) => email.id),
+      getThreadContext(currentGroup),
+    );
+  }, [current, currentGroup, executeEmailAction]);
 
- const handleTodo = useCallback(() => {
- if (!currentGroup) return;
- void todo
- .add(currentGroup.emails)
- .catch((error: Error) =>
- toast.error(error.message || "Failed to mark to-do"),
- );
- advance();
- }, [advance, currentGroup, todo]);
+  const trashCurrent = useCallback(() => {
+    if (!current || !currentGroup) return;
+    void executeEmailAction(
+      "trash",
+      currentGroup.emails.map((email) => email.id),
+      getThreadContext(currentGroup),
+    );
+  }, [current, currentGroup, executeEmailAction]);
 
- const handleSnooze = useCallback(
- (timestamp: number) => {
- if (!current || current.mailboxId == null) return;
- void snooze(
- current.threadId != null
- ? {
- kind: "thread",
- thread: {
- threadId: current.threadId,
- mailboxId: current.mailboxId,
- labelIds: current.labelIds,
- },
- }
- : {
- kind: "email",
- identifier: {
- id: current.id,
- providerMessageId: current.providerMessageId,
- mailboxId: current.mailboxId,
- labelIds: current.labelIds,
- },
- },
- timestamp,
- );
- advance();
- },
- [advance, current, snooze],
- );
+  const handleDone = useCallback(() => {
+    archiveCurrent();
+    advance();
+  }, [advance, archiveCurrent]);
 
- const exitToInbox = useCallback(() => {
- void navigate({
- to: "/$mailboxId/inbox",
- params: { mailboxId },
- });
- }, [mailboxId, navigate]);
+  const handleDelete = useCallback(() => {
+    trashCurrent();
+    advance();
+  }, [advance, trashCurrent]);
 
- useEffect(() => {
- if (!current || current.isRead) return;
- void executeEmailAction("mark-read", [current.id]);
- }, [current, executeEmailAction]);
+  const handleReplyQueued = useCallback(() => {
+    setReplyOpen(false);
+    advance();
+  }, [advance]);
 
- const focusComposerEditor = useCallback(() => {
- if (!current) return;
- const isMobile =
- typeof window !== "undefined" &&
- !window.matchMedia("(min-width: 1024px)").matches;
- if (isMobile) setReplyOpen(true);
- requestAnimationFrame(() => {
- getComposerEditor()?.commands.focus();
- });
- }, [current]);
+  const handleTodo = useCallback(() => {
+    if (!currentGroup) return;
+    void todo
+      .add(currentGroup.emails)
+      .catch((error: Error) =>
+        toast.error(error.message || "Failed to mark to-do"),
+      );
+    advance();
+  }, [advance, currentGroup, todo]);
 
- useHotkeys(
- {
- e: () => handleDone(),
- r: () => focusComposerEditor(),
- s: () => {
- snoozeButtonRef.current?.click();
- },
- t: () => handleTodo(),
- j: () => advance(),
- ArrowDown: () => advance(),
- ArrowRight: () => advance(),
- k: () => goPrev(),
- ArrowUp: () => goPrev(),
- ArrowLeft: () => goPrev(),
- Escape: () => {
- if (replyOpen) {
- setReplyOpen(false);
- return;
- }
- exitToInbox();
- },
- },
- { enabled: Boolean(current) },
- );
+  const handleSnooze = useCallback(
+    (timestamp: number) => {
+      if (!current || current.mailboxId == null) return;
+      void snooze(
+        current.threadId != null
+          ? {
+              kind: "thread",
+              thread: {
+                threadId: current.threadId,
+                mailboxId: current.mailboxId,
+                labelIds: current.labelIds,
+              },
+            }
+          : {
+              kind: "email",
+              identifier: {
+                id: current.id,
+                providerMessageId: current.providerMessageId,
+                mailboxId: current.mailboxId,
+                labelIds: current.labelIds,
+              },
+            },
+        timestamp,
+      );
+      advance();
+    },
+    [advance, current, snooze],
+  );
 
- if (isLoading) {
- return <TriageShell body={<PageSpinner />} footer={null} />;
- }
+  const exitToInbox = useCallback(() => {
+    void navigate({
+      to: "/$mailboxId/inbox",
+      params: { mailboxId },
+    });
+  }, [mailboxId, navigate]);
 
- if (!current) {
- return (
- <TriageShell
- body={<TriageDone processed={triageIds.size} onExit={exitToInbox} />}
- footer={null}
- />
- );
- }
+  useEffect(() => {
+    if (!current || current.isRead) return;
+    void executeEmailAction("mark-read", [current.id]);
+  }, [current, executeEmailAction]);
 
- return (
- <>
- <TriageShell
- body={
- <TriageEmail
- key={current.id}
- email={current}
- detail={currentDetail}
- />
- }
- side={
- <TriageReplyComposer
- key={current.id}
- email={current}
- detail={currentDetail}
- group={currentGroup}
- mobileOpen={replyOpen}
- onClose={() => setReplyOpen(false)}
- onQueued={handleReplyQueued}
- />
- }
- sideOpen={replyOpen}
- footer={
- <TriageActionBar
- onDone={handleDone}
- onSnooze={handleSnooze}
- snoozeButtonRef={snoozeButtonRef}
- onKeep={advance}
- onReply={focusComposerEditor}
- onTodo={handleTodo}
- isTodo={todo.isTodo(current)}
- onUnsubscribe={() => setUnsubscribeConfirmOpen(true)}
- canUnsubscribe={Boolean(
- current.unsubscribeUrl || current.unsubscribeEmail,
- )}
- actionsPending={todo.isPending || unsubscribeMutation.isPending}
- />
- }
- />
- <AlertDialog
- open={unsubscribeConfirmOpen}
- onOpenChange={setUnsubscribeConfirmOpen}
- >
- <AlertDialogContent>
- <AlertDialogHeader>
- <AlertDialogTitle>
- Unsubscribe from {current.fromAddr}?
- </AlertDialogTitle>
- <AlertDialogDescription>
- You'll be removed from this mailing list. Existing emails from{" "}
- {current.fromAddr} will also be moved to Archive.
- </AlertDialogDescription>
- </AlertDialogHeader>
- <AlertDialogFooter>
- <AlertDialogCancel>Cancel</AlertDialogCancel>
- <AlertDialogAction
- variant="destructive"
- onClick={() => {
- setUnsubscribeConfirmOpen(false);
- unsubscribeMutation.mutate(current, {
- onSuccess: (result) => {
- if (result.method !== "manual") handleDone();
- },
- });
- }}
- >
- Unsubscribe
- </AlertDialogAction>
- </AlertDialogFooter>
- </AlertDialogContent>
- </AlertDialog>
- </>
- );
+  const focusComposerEditor = useCallback(() => {
+    if (!current) return;
+    const isMobile =
+      typeof window !== "undefined" &&
+      !window.matchMedia("(min-width: 1024px)").matches;
+    if (isMobile) setReplyOpen(true);
+    requestAnimationFrame(() => {
+      getComposerEditor()?.commands.focus();
+    });
+  }, [current]);
+
+  useHotkeys(
+    {
+      e: () => handleDone(),
+      r: () => focusComposerEditor(),
+      c: () => openCompose(),
+      s: () => {
+        snoozeButtonRef.current?.click();
+      },
+      t: () => handleTodo(),
+      "#": () => handleDelete(),
+      j: () => advance(),
+      ArrowDown: () => advance(),
+      ArrowRight: () => advance(),
+      k: () => goPrev(),
+      ArrowUp: () => goPrev(),
+      ArrowLeft: () => goPrev(),
+      Escape: () => {
+        if (replyOpen) {
+          setReplyOpen(false);
+          return;
+        }
+        exitToInbox();
+      },
+    },
+    { enabled: Boolean(current) },
+  );
+
+  if (isLoading) {
+    return <TriageShell body={<PageSpinner />} footer={null} />;
+  }
+
+  if (!current) {
+    return (
+      <TriageShell
+        body={<TriageDone processed={triageIds.size} onExit={exitToInbox} />}
+        footer={null}
+      />
+    );
+  }
+
+  return (
+    <>
+      <TriageShell
+        header={
+          <TriageProgressStrip
+            position={cursorIndex + 1}
+            total={queue.length}
+          />
+        }
+        body={
+          <TriageEmail
+            email={current}
+            detail={currentDetail}
+            remaining={queue.length - cursorIndex}
+          />
+        }
+        side={
+          <TriageReplyComposer
+            key={current.id}
+            email={current}
+            detail={currentDetail}
+            group={currentGroup}
+            mobileOpen={replyOpen}
+            onClose={() => setReplyOpen(false)}
+            onQueued={handleReplyQueued}
+          />
+        }
+        sideOpen={replyOpen}
+        footer={
+          <TriageActionBar
+            onDone={handleDone}
+            onDelete={handleDelete}
+            onSnooze={handleSnooze}
+            snoozeButtonRef={snoozeButtonRef}
+            onKeep={advance}
+            onReply={focusComposerEditor}
+            onTodo={handleTodo}
+            isTodo={todo.isTodo(current)}
+            onUnsubscribe={() => setUnsubscribeConfirmOpen(true)}
+            canUnsubscribe={Boolean(
+              current.unsubscribeUrl || current.unsubscribeEmail,
+            )}
+            actionsPending={todo.isPending || unsubscribeMutation.isPending}
+          />
+        }
+      />
+      <AlertDialog
+        open={unsubscribeConfirmOpen}
+        onOpenChange={setUnsubscribeConfirmOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Unsubscribe from {current.fromAddr}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You'll be removed from this mailing list. Existing emails from{" "}
+              {current.fromAddr} will also be moved to Archive.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setUnsubscribeConfirmOpen(false);
+                unsubscribeMutation.mutate(current, {
+                  onSuccess: (result) => {
+                    if (result.method !== "manual") handleDone();
+                  },
+                });
+              }}
+            >
+              Unsubscribe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 }
 
 function TriageShell({
- body,
- side,
- sideOpen = false,
- footer,
+  header,
+  body,
+  side,
+  sideOpen = false,
+  footer,
 }: {
- body: ReactNode;
- side?: ReactNode;
- sideOpen?: boolean;
- footer: ReactNode;
+  header?: ReactNode;
+  body: ReactNode;
+  side?: ReactNode;
+  sideOpen?: boolean;
+  footer: ReactNode;
 }) {
- return (
- <PageContainer className="max-w-none">
- <div className="flex min-h-0 w-full flex-1 flex-col bg-background lg:flex-row">
- <div className="flex min-h-0 min-w-0 flex-1 flex-col">
- <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
- {footer}
- </div>
- {side && (
- <aside
- className={cn(
- "min-h-0",
- sideOpen
- ? "fixed inset-2 z-40 flex flex-col border border-border/40 bg-background"
- : "hidden",
- "lg:static lg:inset-auto lg:flex lg:w-2/5 lg:shrink-0 lg:flex-col lg:border-0 lg:border-l lg:border-border/40 lg:bg-background",
- )}
- >
- {side}
- </aside>
- )}
- </div>
- </PageContainer>
- );
+  return (
+    <PageContainer className="max-w-none">
+      <div className="flex min-h-0 w-full flex-1 flex-col bg-background lg:flex-row">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {header}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {body}
+          </div>
+          {footer}
+        </div>
+        {side && (
+          <aside
+            className={cn(
+              "min-h-0",
+              sideOpen
+                ? "fixed inset-2 z-40 flex flex-col border border-border/40 bg-card"
+                : "hidden",
+              "lg:static lg:inset-auto lg:flex lg:w-2/5 lg:shrink-0 lg:flex-col lg:border-0 lg:border-l lg:border-border/40 lg:bg-card",
+            )}
+          >
+            {side}
+          </aside>
+        )}
+      </div>
+    </PageContainer>
+  );
+}
+
+function TriageProgressStrip({
+  position,
+  total,
+}: {
+  position: number;
+  total: number;
+}) {
+  const safeTotal = Math.max(total, 1);
+  const clampedPos = Math.min(Math.max(position, 1), safeTotal);
+  const pct = (clampedPos / safeTotal) * 100;
+  return (
+    <div className="flex h-10 shrink-0 items-center gap-3 border-b border-border/40 bg-background px-3 md:px-6">
+      <span className="shrink-0 text-xs">Triage</span>
+      <div className="relative h-px flex-1 bg-border/60">
+        <div
+          className="absolute inset-y-0 left-0 bg-foreground/70 transition-[width] duration-200 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+        {clampedPos} / {safeTotal}
+      </span>
+    </div>
+  );
 }
 
 function TriageEmail({
- email,
- detail,
+  email,
+  detail,
+  remaining,
 }: {
- email: EmailListItem;
- detail: EmailDetailItem | null;
+  email: EmailListItem;
+  detail: EmailDetailItem | null;
+  remaining: number;
 }) {
- const sender = email.fromName?.trim() || email.fromAddr;
- const senderEmail = email.fromName ? email.fromAddr : null;
+  const senderLine = email.fromName?.trim()
+    ? `${email.fromName.trim()} <${email.fromAddr}>`
+    : email.fromAddr;
+  const subject = email.subject?.trim() || "(no subject)";
+  const formattedDate = formatEmailDetailDate(email.date);
+  const recipient = detail?.toAddr ?? "me";
+  const showCc = Boolean(detail?.ccAddr);
 
- return (
- <article className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 pt-12 pb-16 sm:px-10">
- <header className="space-y-3">
- <div className="flex items-baseline justify-between gap-4 text-xs text-muted-foreground">
- <div className="flex min-w-0 items-baseline gap-2">
- <span className="truncate font-medium text-foreground/85">
- {sender}
- </span>
- {senderEmail && (
- <span className="truncate text-foreground/35">{senderEmail}</span>
- )}
- </div>
- <time className="shrink-0 tabular-nums">
- {formatEmailDetailDate(email.date)}
- </time>
- </div>
- <h1
- className="truncate text-sm font-medium text-foreground"
- style={{ fontFamily: "var(--reading-font)" }}
- >
- {email.subject?.trim() || "(no subject)"}
- </h1>
- </header>
+  return (
+    <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-3">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {remaining > 1 && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-3 -bottom-1 top-2 border border-border/50 bg-background/70 shadow-xs"
+          />
+        )}
+        {remaining > 2 && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-6 -bottom-2 top-4 border border-border/40 bg-background/50"
+          />
+        )}
 
- <div className="border-t border-border/40 pt-7">
- <div
- className="text-[0.95rem] leading-relaxed text-foreground/85"
- style={{ fontFamily: "var(--reading-font)" }}
- >
- <MessageBody detail={detail ?? null} />
- </div>
- </div>
- </article>
- );
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.article
+            key={email.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.16, ease: [0.32, 0.72, 0, 1] }}
+            className="relative flex min-h-0 flex-1 flex-col overflow-y-auto border border-border/40 bg-card shadow-xs dark:border-white/10"
+          >
+            <header className="space-y-2 px-5 pt-5 pb-4">
+              <div className="flex items-center justify-between">
+                <h1 className="min-w-0 text-sm font-medium text-foreground">
+                  {subject}
+                </h1>
+                <span className="shrink-0 font-mono text-[10px] tracking-tighter tabular-nums text-muted-foreground">
+                  {formattedDate}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <p className="min-w-0">
+                    <span className="mr-1 font-medium text-foreground/70">
+                      From
+                    </span>
+                    <span>{senderLine}</span>
+                  </p>
+                  <p className="min-w-0">
+                    <span className="mr-1 font-medium text-foreground/70">
+                      To
+                    </span>
+                    <span>{recipient}</span>
+                  </p>
+                  {showCc && (
+                    <p className="min-w-0">
+                      <span className="mr-1 font-medium text-foreground/70">
+                        Cc
+                      </span>
+                      <span>{detail?.ccAddr}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </header>
+            <div className="border-t border-border/40 p-5">
+              {detail ? (
+                <MessageBody detail={detail} />
+              ) : email.snippet ? (
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {email.snippet}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground/60">Loading…</p>
+              )}
+            </div>
+          </motion.article>
+        </AnimatePresence>
+      </div>
+    </div>
+  );
 }
 
 function TriageActionBar({
- onDone,
- onSnooze,
- snoozeButtonRef,
- onKeep,
- onReply,
- onTodo,
- isTodo,
- onUnsubscribe,
- canUnsubscribe,
- actionsPending,
+  onDone,
+  onDelete,
+  onSnooze,
+  snoozeButtonRef,
+  onKeep,
+  onReply,
+  onTodo,
+  isTodo,
+  onUnsubscribe,
+  canUnsubscribe,
+  actionsPending,
 }: {
- onDone: () => void;
- onSnooze: (timestamp: number) => void;
- snoozeButtonRef: RefObject<HTMLButtonElement | null>;
- onKeep: () => void;
- onReply: () => void;
- onTodo: () => void;
- isTodo: boolean;
- onUnsubscribe: () => void;
- canUnsubscribe: boolean;
- actionsPending: boolean;
+  onDone: () => void;
+  onDelete: () => void;
+  onSnooze: (timestamp: number) => void;
+  snoozeButtonRef: RefObject<HTMLButtonElement | null>;
+  onKeep: () => void;
+  onReply: () => void;
+  onTodo: () => void;
+  isTodo: boolean;
+  onUnsubscribe: () => void;
+  canUnsubscribe: boolean;
+  actionsPending: boolean;
 }) {
- return (
- <div className="flex h-12 shrink-0 items-center border-t border-border/40">
- <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-1.5 px-6 sm:px-10">
- <MailActionButton label="Done" shortcut="E" onClick={onDone} />
- <SnoozePicker onSnooze={onSnooze}>
- <Button
- ref={snoozeButtonRef}
- variant="secondary"
- size="sm"
- type="button"
- >
- <span>Snooze</span>
- <Kbd>S</Kbd>
- </Button>
- </SnoozePicker>
- <MailActionButton
- shortcut="T"
- label={isTodo ? "To-do*" : "To-do"}
- onClick={onTodo}
- disabled={actionsPending}
- />
- {canUnsubscribe && (
- <MailActionButton
- shortcut="U"
- label="Unsubscribe"
- onClick={onUnsubscribe}
- disabled={actionsPending}
- />
- )}
- <MailActionButton shortcut="J" label="Keep" onClick={onKeep} />
- <MailActionButton
- label="Reply"
- shortcut="R"
- onClick={onReply}
- className="lg:hidden"
- />
- </div>
- </div>
- );
+  return (
+    <div className="flex h-14 shrink-0 items-center border-t border-border/40">
+      <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2 px-6 sm:px-10">
+        <Button
+          type="button"
+          variant="default"
+          size="sm"
+          onClick={onDone}
+          className="px-3"
+        >
+          <span>Done</span>
+          <Kbd>E</Kbd>
+        </Button>
+
+        <SnoozePicker onSnooze={onSnooze}>
+          <Button ref={snoozeButtonRef} variant="ghost" size="sm" type="button">
+            <span>Snooze</span>
+            <Kbd>S</Kbd>
+          </Button>
+        </SnoozePicker>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onTodo}
+          disabled={actionsPending}
+        >
+          <span>{isTodo ? "To-do*" : "To-do"}</span>
+          <Kbd>T</Kbd>
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onKeep}>
+          <span>Keep</span>
+          <Kbd>J</Kbd>
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onDelete}
+          className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        >
+          <span>Delete</span>
+          <Kbd>#</Kbd>
+        </Button>
+
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={onReply}
+          className="lg:hidden"
+        >
+          <span>Reply</span>
+          <Kbd>R</Kbd>
+        </Button>
+
+        {canUnsubscribe && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onUnsubscribe}
+            disabled={actionsPending}
+            className="ml-auto text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          >
+            <span>Unsubscribe</span>
+            <Kbd>U</Kbd>
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function TriageReplyComposer({
- email,
- detail,
- group,
- mobileOpen,
- onClose,
- onQueued,
+  email,
+  detail,
+  group,
+  mobileOpen,
+  onClose,
+  onQueued,
 }: {
- email: EmailListItem;
- detail: EmailDetailItem | null;
- group: ThreadGroup | null;
- mobileOpen: boolean;
- onClose: () => void;
- onQueued: () => void;
+  email: EmailListItem;
+  detail: EmailDetailItem | null;
+  group: ThreadGroup | null;
+  mobileOpen: boolean;
+  onClose: () => void;
+  onQueued: () => void;
 }) {
- const { user } = useAuth();
- const mailboxesQuery = useMailboxes();
- const selfEmails = useMemo(() => {
- const emails = new Set<string>();
- if (user?.email) emails.add(user.email.toLowerCase());
- for (const account of mailboxesQuery.data?.accounts ?? []) {
- const displayEmail = getMailboxDisplayEmail(account);
- if (displayEmail) emails.add(displayEmail.toLowerCase());
- if (account.email) emails.add(account.email.toLowerCase());
- if (account.gmailEmail) emails.add(account.gmailEmail.toLowerCase());
- }
- return emails;
- }, [mailboxesQuery.data?.accounts, user?.email]);
- const replySource = useMemo(
- () => pickReplySource(email, group?.emails ?? [email], selfEmails),
- [email, group?.emails, selfEmails],
- );
- const initial = useMemo(
- () =>
- buildReplyInitial(
- replySource,
- replySource.id === detail?.id ? detail : null,
- ),
- [detail, replySource],
- );
- const compose = useComposeEmail(initial, {
- onQueued,
- });
- const fileInputRef = useRef<HTMLInputElement>(null);
- const fromLabel = useMemo(() => {
- const activeMailbox = compose.availableMailboxes.find(
- (account) => account.mailboxId === compose.mailboxId,
- );
- return activeMailbox ? getMailboxDisplayEmail(activeMailbox) : null;
- }, [compose.availableMailboxes, compose.mailboxId]);
+  const { user } = useAuth();
+  const mailboxesQuery = useMailboxes();
+  const selfEmails = useMemo(() => {
+    const emails = new Set<string>();
+    if (user?.email) emails.add(user.email.toLowerCase());
+    for (const account of mailboxesQuery.data?.accounts ?? []) {
+      const displayEmail = getMailboxDisplayEmail(account);
+      if (displayEmail) emails.add(displayEmail.toLowerCase());
+      if (account.email) emails.add(account.email.toLowerCase());
+      if (account.gmailEmail) emails.add(account.gmailEmail.toLowerCase());
+    }
+    return emails;
+  }, [mailboxesQuery.data?.accounts, user?.email]);
+  const replySource = useMemo(
+    () => pickReplySource(email, group?.emails ?? [email], selfEmails),
+    [email, group?.emails, selfEmails],
+  );
+  const initial = useMemo(
+    () =>
+      buildReplyInitial(
+        replySource,
+        replySource.id === detail?.id ? detail : null,
+      ),
+    [detail, replySource],
+  );
+  const compose = useComposeEmail(initial, {
+    onQueued,
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fromLabel = useMemo(() => {
+    const activeMailbox = compose.availableMailboxes.find(
+      (account) => account.mailboxId === compose.mailboxId,
+    );
+    return activeMailbox ? getMailboxDisplayEmail(activeMailbox) : null;
+  }, [compose.availableMailboxes, compose.mailboxId]);
 
- const showFromRow = compose.availableMailboxes.length > 1;
+  const showFromRow = compose.availableMailboxes.length > 1;
 
- return (
- <section className="flex h-full min-h-0 w-full flex-col bg-background">
- <div className="flex shrink-0 items-center justify-between border-b border-border/40 px-4 py-2 lg:hidden">
- <span className="text-xs text-muted-foreground">Reply</span>
- <Button
- type="button"
- variant="ghost"
- size="icon"
- onClick={onClose}
- aria-label="Close reply composer"
- >
- <XIcon className="size-3.5" />
- </Button>
- </div>
- <div className="shrink-0 space-y-0.5 px-5 pt-6 pb-3 lg:pt-9">
- <div className="flex items-start gap-3 px-1 py-1.5">
- <span className="shrink-0 pt-1 text-xs text-muted-foreground/70">
- To
- </span>
- <div className="min-w-0 flex-1">
- <RecipientInput value={compose.to} onChange={compose.setTo} />
- </div>
- </div>
- {showFromRow && (
- <TriageComposerRow label="From">
- <span className="block min-w-0 truncate text-sm text-foreground/80">
- {fromLabel ?? "Current mailbox"}
- </span>
- </TriageComposerRow>
- )}
- <TriageComposerRow label="Subject">
- <input
- value={compose.subject}
- onChange={(event) => compose.setSubject(event.target.value)}
- aria-label="Subject"
- className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
- />
- </TriageComposerRow>
- </div>
- <div className="min-h-0 flex-1 overflow-y-auto border-t border-border/40 px-5 py-4">
- <ComposeEditor
- initialContent={compose.body}
- onChange={compose.setBody}
- onSend={() => {
- if (compose.canSend) compose.send();
- }}
- className="min-h-80 text-sm leading-relaxed"
- autoFocus={mobileOpen}
- />
- </div>
- {(compose.attachments.files.length > 0 ||
- compose.attachments.uploading) && (
- <div className="shrink-0 border-t border-border/40 px-5 pt-2">
- <AttachmentBar
- files={compose.attachments.files}
- uploading={compose.attachments.uploading}
- onAddFiles={(files) => compose.attachments.addFiles(files)}
- onRemoveFile={compose.attachments.removeFile}
- />
- </div>
- )}
- <input
- ref={fileInputRef}
- type="file"
- multiple
- className="hidden"
- onChange={(event) => {
- if (event.target.files && event.target.files.length > 0) {
- compose.attachments.addFiles(event.target.files);
- event.target.value = "";
- }
- }}
- />
- <div className="flex h-12 shrink-0 items-center justify-between border-t border-border/40 px-3">
- <Button
- type="button"
- variant="ghost"
- size="icon"
- onClick={() => fileInputRef.current?.click()}
- disabled={compose.attachments.uploading}
- aria-label="Attach files"
- title="Attach files"
- >
- <PaperclipIcon className="size-3.5" />
- </Button>
- <Button
- type="button"
- variant="secondary"
- size="sm"
- onClick={() => compose.send()}
- disabled={!compose.canSend || compose.isPending}
- >
- {compose.isPending ? "Sending..." : "Send"}
- </Button>
- </div>
- </section>
- );
+  return (
+    <section className="flex h-full min-h-0 w-full flex-col bg-card">
+      <div className="flex shrink-0 items-center justify-between border-b border-border/40 px-4 py-2 lg:hidden">
+        <span className="text-xs text-muted-foreground">Reply</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          aria-label="Close reply composer"
+        >
+          <XIcon className="size-3.5" />
+        </Button>
+      </div>
+      <div className="shrink-0 space-y-0.5 px-5 pt-6 pb-3 lg:pt-9">
+        <div className="flex items-start gap-3 px-1 py-1.5">
+          <span className="w-14 shrink-0 pt-1 text-xs text-muted-foreground/70">
+            To
+          </span>
+          <div className="min-w-0 flex-1">
+            <RecipientInput value={compose.to} onChange={compose.setTo} />
+          </div>
+        </div>
+        {showFromRow && (
+          <TriageComposerRow label="From">
+            <span className="block min-w-0 truncate text-sm text-foreground/80">
+              {fromLabel ?? "Current mailbox"}
+            </span>
+          </TriageComposerRow>
+        )}
+        <TriageComposerRow label="Subject">
+          <input
+            value={compose.subject}
+            onChange={(event) => compose.setSubject(event.target.value)}
+            aria-label="Subject"
+            className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+          />
+        </TriageComposerRow>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto border-t border-border/40 px-5 py-4">
+        <ComposeEditor
+          initialContent={compose.body}
+          onChange={compose.setBody}
+          onSend={() => {
+            if (compose.canSend) compose.send();
+          }}
+          className="min-h-80 text-sm leading-relaxed"
+          autoFocus={mobileOpen}
+        />
+      </div>
+      {(compose.attachments.files.length > 0 ||
+        compose.attachments.uploading) && (
+        <div className="shrink-0 border-t border-border/40 px-5 pt-2">
+          <AttachmentBar
+            files={compose.attachments.files}
+            uploading={compose.attachments.uploading}
+            onAddFiles={(files) => compose.attachments.addFiles(files)}
+            onRemoveFile={compose.attachments.removeFile}
+          />
+        </div>
+      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          if (event.target.files && event.target.files.length > 0) {
+            compose.attachments.addFiles(event.target.files);
+            event.target.value = "";
+          }
+        }}
+      />
+      <div className="flex h-12 shrink-0 items-center justify-between border-t border-border/40 px-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={compose.attachments.uploading}
+          aria-label="Attach files"
+          title="Attach files"
+        >
+          <PaperclipIcon className="size-3" />
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => compose.send()}
+          disabled={!compose.canSend || compose.isPending}
+        >
+          {compose.isPending ? "Sending..." : "Send"}
+        </Button>
+      </div>
+    </section>
+  );
 }
 
 function TriageComposerRow({
- label,
- children,
+  label,
+  children,
 }: {
- label: string;
- children: ReactNode;
+  label: string;
+  children: ReactNode;
 }) {
- return (
- <div className="flex items-baseline gap-3 px-1 py-1.5">
- <span className="shrink-0 text-xs text-muted-foreground/70">{label}</span>
- <div className="min-w-0 flex-1">{children}</div>
- </div>
- );
+  return (
+    <div className="flex items-baseline gap-3 px-1 py-1.5">
+      <span className="w-14 shrink-0 text-xs text-muted-foreground/70">
+        {label}
+      </span>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
 }
 
 function TriageDone({
- processed,
- onExit,
+  processed,
+  onExit,
 }: {
- processed: number;
- onExit: () => void;
+  processed: number;
+  onExit: () => void;
 }) {
- return (
- <Empty className="pb-20">
- <EmptyHeader>
- <EmptyTitle>No emails</EmptyTitle>
- <EmptyDescription>
- {processed === 0
- ? "No unread mail. All caught up."
- : `You triaged ${processed} ${processed === 1 ? "email" : "emails"}.`}
- </EmptyDescription>
- </EmptyHeader>
- <button
- type="button"
- onClick={onExit}
- className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
- >
- Back to inbox
- </button>
- </Empty>
- );
+  return (
+    <Empty className="pb-20">
+      <EmptyHeader>
+        <EmptyTitle>No emails</EmptyTitle>
+        <EmptyDescription>
+          {processed === 0
+            ? "No unread mail. All caught up."
+            : `You triaged ${processed} ${processed === 1 ? "email" : "emails"}.`}
+        </EmptyDescription>
+      </EmptyHeader>
+      <button
+        type="button"
+        onClick={onExit}
+        className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+      >
+        Back to inbox
+      </button>
+    </Empty>
+  );
 }

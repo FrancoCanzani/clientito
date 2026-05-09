@@ -530,6 +530,41 @@ export async function blockSender(params: {
  return json.data;
 }
 
+export type CreateReplyReminderInput = {
+ mailboxId: number;
+ threadId: string;
+ sentMessageId: string;
+ sentAt: number;
+ durationMs: number;
+};
+
+export type CreateReplyReminderResult = {
+ id: number;
+ threadId: string;
+ remindAt: number;
+ status: "pending" | "replied" | "dismissed" | "surfaced";
+};
+
+export async function createReplyReminder(
+ input: CreateReplyReminderInput,
+): Promise<CreateReplyReminderResult> {
+ const response = await fetch("/api/inbox/reminders", {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify(input),
+ });
+
+ const json = (await response.json().catch(() => null)) as
+ | { data?: CreateReplyReminderResult; error?: string }
+ | null;
+
+ if (!response.ok || !json?.data) {
+ throw new Error(json?.error ?? "Failed to create reply reminder");
+ }
+
+ return json.data;
+}
+
 type SendEmailInput = {
  mailboxId?: number;
  to: string;

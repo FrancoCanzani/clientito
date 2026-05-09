@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAttachmentUpload } from "../hooks/use-attachment-upload";
 import { loadDraft, useDraft } from "../hooks/use-draft";
 import { useUndoSend } from "../hooks/use-undo-send";
-import { sendEmail } from "../mutations";
+import { createReplyReminder, sendEmail } from "../mutations";
 import { fetchViewPage, invalidateInboxQueries } from "../queries";
 import type { ComposeInitial, DraftState } from "../types";
 import { buildPlainForwardedHtml } from "../utils/build-forwarded-html";
@@ -552,10 +552,13 @@ export function useComposeEmail(
  const attachmentSnapshotRef = useRef<
  AttachmentKey[] | undefined
  >(undefined);
+ const [replyReminderMs, setReplyReminderMs] = useState<number | null>(null);
+ const replyReminderSnapshotRef = useRef<number | null>(null);
 
  const undoSend = useUndoSend({
- onSend: () => {
- return sendEmail(
+ onSend: async () => {
+ const sentAt = Date.now();
+ const result = await sendEmail(
  buildEmailPayload(
  draftSnapshotRef.current,
  bodySnapshotRef.current,
@@ -563,6 +566,30 @@ export function useComposeEmail(
  attachmentSnapshotRef.current,
  ),
  );
+
+ const reminderMs = replyReminderSnapshotRef.current;
+ const mailboxIdSnapshot = draftSnapshotRef.current.mailboxId;
+ if (
+ reminderMs &&
+ result.threadId &&
+ result.providerMessageId &&
+ mailboxIdSnapshot != null
+ ) {
+ try {
+ await createReplyReminder({
+ mailboxId: mailboxIdSnapshot,
+ threadId: result.threadId,
+ sentMessageId: result.providerMessageId,
+ sentAt,
+ durationMs: reminderMs,
+ });
+ } catch (error) {
+ console.warn("Failed to register reply reminder", error);
+ toast.error("Email sent, but reply reminder could not be set");
+ }
+ }
+
+ return result;
  },
  onUndo: () => {
  const snapshot = draftSnapshotRef.current;
@@ -607,10 +634,11 @@ export function useComposeEmail(
  attachments.files.length > 0
  ? attachments.files.map((file) => ({ ...file }))
  : undefined;
+ replyReminderSnapshotRef.current = replyReminderMs;
  setSendPending(true);
  options?.onQueued?.();
  undoSend.trigger();
- }, [draft, attachments, undoSend, options]);
+ }, [draft, attachments, undoSend, options, replyReminderMs]);
 
  const scheduleSend = useCallback(
  async (scheduledFor: number) => {
@@ -669,6 +697,8 @@ export function useComposeEmail(
  canSend,
  send,
  scheduleSend,
+ replyReminderMs,
+ setReplyReminderMs,
  isPending: sendPending,
  attachments,
  signatures,

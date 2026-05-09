@@ -230,6 +230,12 @@ function EmailDetailPane({
  }
  : null;
  const isInInbox = currentEmail.labelIds.includes("INBOX");
+ const isSpam = currentEmail.labelIds.includes("SPAM");
+ const primaryAction = isInInbox
+ ? "archive"
+ : isSpam
+ ? "not-spam"
+ : "move-to-inbox";
  const isStarred = currentEmail.labelIds.includes("STARRED");
 
  const threadMessages = useMemo(() => {
@@ -276,7 +282,7 @@ function EmailDetailPane({
  f: () => handleForward(),
  e: () => {
  void executeEmailAction(
- isInInbox ? "archive" : "move-to-inbox",
+ primaryAction,
  [currentEmail.id],
  threadIdentifier ?? undefined,
  { identifiers: [emailIdentifier], onVisible: goBack },

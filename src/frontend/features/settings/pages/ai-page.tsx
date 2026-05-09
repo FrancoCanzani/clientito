@@ -23,11 +23,8 @@ export default function AiPage() {
  const composerMutation = useMutation({
  mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
  updateMailboxAiEnabled(id, enabled),
- onSuccess: async (_, variables) => {
+ onSuccess: async () => {
  await queryClient.invalidateQueries({ queryKey: accountQueryKeys.all() });
- toast.success(
- variables.enabled ? "Composer AI enabled" : "Composer AI disabled",
- );
  },
  onError: (error) => toast.error(error.message),
  });
@@ -46,7 +43,7 @@ export default function AiPage() {
  onError: (error) => toast.error(error.message),
  });
 
- const aiEnabled = account?.aiEnabled ?? true;
+ const aiEnabled = account?.aiEnabled ?? false;
  const aiClassificationEnabled = account?.aiClassificationEnabled ?? false;
 
  return accountsQuery.isPending ? (

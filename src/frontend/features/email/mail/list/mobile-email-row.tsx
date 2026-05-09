@@ -48,7 +48,7 @@ export const MobileEmailRow = memo(function MobileEmailRow({
  </span>
  {!email.isRead && (
  <span
- className="size-1.5 shrink-0 bg-blue-500"
+ className="size-1.5 shrink-0 bg-primary"
  aria-hidden
  />
  )}
@@ -74,7 +74,7 @@ export const MobileEmailRow = memo(function MobileEmailRow({
  {threadCount > 1 && (
  <span className="text-[11px] tabular-nums">[{threadCount}]</span>
  )}
- <span className="whitespace-nowrap tabular-nums">
+ <span className="whitespace-nowrap font-mono text-[10px] tracking-tighter tabular-nums">
  {formatInboxRowDate(email.date)}
  </span>
  </div>

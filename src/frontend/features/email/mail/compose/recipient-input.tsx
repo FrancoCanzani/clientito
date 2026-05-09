@@ -68,6 +68,12 @@ function joinRecipients(emails: string[]): string {
  return emails.join(", ");
 }
 
+function formatRecipientLabel(email: string, name?: string | null): string {
+ const trimmedName = name?.trim();
+ if (!trimmedName) return email;
+ return `${trimmedName} <${email}>`;
+}
+
 function estimateChipWidth(label: string): number {
  return Math.min(label.length, 48) * 7 + 26;
 }
@@ -148,7 +154,10 @@ export function RecipientInput({
  inputValue.trim().length >= 1;
 
  const chipLabels = useMemo(
- () => chips.map((email) => nameMap.get(email) ?? email),
+ () =>
+ chips.map((email) =>
+ formatRecipientLabel(email, nameMap.get(email)),
+ ),
  [chips, nameMap],
  );
  const collapsedPreview = useMemo(
@@ -357,6 +366,14 @@ export function RecipientInput({
  }, [isFocused, onFocusField]);
 
  useEffect(() => {
+ if (!showDropdown) return;
+ const selector = `[data-suggestion-index="${activeIndex}"]`;
+ const target = containerRef.current?.querySelector(selector);
+ if (!(target instanceof HTMLElement)) return;
+ target.scrollIntoView({ block: "nearest" });
+ }, [activeIndex, showDropdown]);
+
+ useEffect(() => {
  if (editingIndex === null) return;
  requestAnimationFrame(() => editingInputRef.current?.focus());
  }, [editingIndex]);
@@ -389,12 +406,13 @@ export function RecipientInput({
  ) : (
  chips.map((email, i) => {
  const displayName = nameMap.get(email);
+ const displayLabel = formatRecipientLabel(email, displayName);
  const isEditing = editingIndex === i;
 
  return (
  <span
  key={email}
- className="flex max-w-48 items-center gap-1 bg-muted px-1.5 py-0.5 text-xs"
+ className="group/chip inline-flex h-5 max-w-72 items-center gap-1 bg-primary/10 py-0 pr-0.5 pl-1.5 text-[11px] text-foreground/90 ring-1 ring-primary/15 transition-colors hover:bg-primary/15"
  title={email}
  >
  {isEditing ? (
@@ -420,7 +438,7 @@ export function RecipientInput({
  ) : (
  <button
  type="button"
- className="max-w-36 truncate text-left"
+ className="max-w-64 truncate text-left"
  onMouseDown={(event) => event.preventDefault()}
  onClick={(event) => {
  event.stopPropagation();
@@ -429,13 +447,13 @@ export function RecipientInput({
  setOpen(false);
  }}
  >
- {displayName ?? email}
+ {displayLabel}
  </button>
  )}
  <button
  type="button"
- aria-label={`Remove ${displayName ?? email}`}
- className="shrink-0 text-muted-foreground/60 hover:text-foreground"
+ aria-label={`Remove ${displayLabel}`}
+ className="ml-0.5 flex size-4 shrink-0 items-center justify-center text-muted-foreground/70 transition-colors hover:bg-primary/20 hover:text-foreground"
  onMouseDown={(event) => event.preventDefault()}
  onClick={(event) => {
  event.stopPropagation();
@@ -443,7 +461,7 @@ export function RecipientInput({
  }}
  tabIndex={-1}
  >
- <XIcon className="size-2.5" />
+ <XIcon className="size-2" />
  </button>
  </span>
  );
@@ -466,16 +484,17 @@ export function RecipientInput({
  onKeyDown={handleKeyDown}
  onPaste={handleInputPaste}
  autoFocus={autoFocus}
- className={`min-w-20 flex-1 bg-transparent py-1 text-xs outline-none placeholder:text-muted-foreground/50 ${showCollapsedPreview ? "sr-only" : ""} ${inputClassName ?? ""}`}
+ className={`min-w-20 flex-1 bg-transparent py-1 text-[11px] outline-none placeholder:text-muted-foreground/50 ${showCollapsedPreview ? "sr-only" : ""} ${inputClassName ?? ""}`}
  />
  </div>
 
  {showDropdown && (
- <div className="absolute top-full left-0 z-50 mt-1 w-full overflow-hidden border border-border bg-popover shadow-lg">
+ <div className="absolute top-full left-0 z-50 mt-1 w-full max-h-44 overflow-y-auto border border-border bg-popover shadow-sm">
  {suggestions.map((suggestion, i) => (
  <button
  key={suggestion.email}
  type="button"
+ data-suggestion-index={i}
  className={`flex w-full items-center gap-2 px-2 py-1 text-left text-xs transition-colors ${
  i === activeIndex ? "bg-muted" : "hover:bg-muted/50"
  }`}
@@ -486,14 +505,9 @@ export function RecipientInput({
  onMouseEnter={() => setSelectedIndex(i)}
  >
  <div className="min-w-0 flex-1">
- <div className="truncate text-sm">
- {suggestion.name ?? suggestion.email}
+ <div className="truncate text-[11px]">
+ {formatRecipientLabel(suggestion.email, suggestion.name)}
  </div>
- {suggestion.name && (
- <div className="truncate text-xs text-muted-foreground">
- {suggestion.email}
- </div>
- )}
  </div>
  </button>
  ))}

@@ -8,9 +8,9 @@ export default function AccountPage() {
  return (
  <div>
  <Row label="Name" value={user?.name ?? "—"} />
- <div className="border-t border-border/60" />
+ <div className="border-t border-border/40" />
  <Row label="Email" value={user?.email ?? "—"} truncate />
- <div className="border-t border-border/60" />
+ <div className="border-t border-border/40" />
  <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
  <p className="text-xs font-medium">Session</p>
  <Button

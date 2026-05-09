@@ -8,6 +8,8 @@ import sqlite3InitModule, {
 
 const DB_FILENAME = "/petit.db";
 const SAH_POOL_DIRECTORY = ".petit-sahpool";
+const SQLITE_OPTIONAL_OPFS_WARNING =
+ "Ignoring inability to install OPFS sqlite3_vfs:";
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS emails (
@@ -168,6 +170,39 @@ let db: OpfsSAHPoolDatabase | null = null;
 let initPromise: Promise<void> | null = null;
 const stmtCache = new Map<string, PreparedStatement>();
 
+type SqliteGlobal = typeof globalThis & {
+ sqlite3ApiConfig?: {
+ warn?: (...args: unknown[]) => void;
+ [key: string]: unknown;
+ };
+};
+
+function shouldHideOptionalOpfsWarning(args: unknown[]): boolean {
+ const message = args.map((arg) => String(arg)).join(" ");
+ return (
+ message.includes(SQLITE_OPTIONAL_OPFS_WARNING) &&
+ message.includes("Missing SharedArrayBuffer")
+ );
+}
+
+async function initSqlite3Module() {
+ const sqliteGlobal = globalThis as SqliteGlobal;
+ const existingConfig = sqliteGlobal.sqlite3ApiConfig;
+ const existingWarn = existingConfig?.warn;
+ sqliteGlobal.sqlite3ApiConfig = {
+ ...existingConfig,
+ warn: (...args: unknown[]) => {
+ if (shouldHideOptionalOpfsWarning(args)) return;
+ if (existingWarn) {
+ existingWarn(...args);
+ } else {
+ console.warn(...args);
+ }
+ },
+ };
+ return sqlite3InitModule();
+}
+
 async function purgeLegacyOpfsDb(): Promise<void> {
  try {
  const root = await navigator.storage.getDirectory();
@@ -184,21 +219,27 @@ async function purgeLegacyOpfsDb(): Promise<void> {
  }
 }
 
-async function initDb(): Promise<void> {
- if (db) return;
- if (initPromise) return initPromise;
-
- initPromise = (async () => {
- const sqlite3 = await sqlite3InitModule();
+async function ensurePool(): Promise<SAHPoolUtil> {
+ if (pool) return pool;
+ const sqlite3 = await initSqlite3Module();
  if (typeof sqlite3.installOpfsSAHPoolVfs !== "function") {
  throw new Error("sqlite-wasm SAH-Pool VFS unavailable in this browser");
  }
  await purgeLegacyOpfsDb();
  pool = await sqlite3.installOpfsSAHPoolVfs({
  directory: SAH_POOL_DIRECTORY,
- initialCapacity: 8,
+ initialCapacity: 32,
  });
- db = new pool.OpfsSAHPoolDb(DB_FILENAME);
+ return pool;
+}
+
+async function initDb(): Promise<void> {
+ if (db) return;
+ if (initPromise) return initPromise;
+
+ initPromise = (async () => {
+ const activePool = await ensurePool();
+ db = new activePool.OpfsSAHPoolDb(DB_FILENAME);
  db.exec(PRAGMAS);
  db.exec(SCHEMA_SQL);
  })();
@@ -207,6 +248,7 @@ async function initDb(): Promise<void> {
  await initPromise;
  } catch (error) {
  initPromise = null;
+ db = null;
  throw error;
  }
 }
@@ -277,10 +319,14 @@ async function deleteDb(): Promise<void> {
  }
  db = null;
  }
- if (pool) {
- await pool.wipeFiles();
- }
  initPromise = null;
+ if (pool) {
+ try {
+ await pool.wipeFiles();
+ } catch {
+ /* ignore */
+ }
+ }
 }
 
 async function handle(req: RpcRequest): Promise<unknown> {

@@ -291,7 +291,7 @@ export default function InboxSearchPage() {
                 key={operator.raw}
                 type="button"
                 onClick={() => removeOperatorFromQuery(operator.raw)}
-                className="inline-flex items-center gap-1 border border-border/60 bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="inline-flex items-center gap-1 border border-border/40 bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <span className="font-medium text-foreground/80">
                   {operator.key}:

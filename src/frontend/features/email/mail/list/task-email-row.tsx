@@ -39,7 +39,7 @@ export const TaskEmailRow = memo(function TaskEmailRow({
  <span
  className={cn(
  "size-2 shrink-0 bg-muted-foreground/30",
- !email.isRead && "bg-blue-500",
+ !email.isRead && "bg-primary",
  )}
  aria-hidden
  />
@@ -76,7 +76,7 @@ export const TaskEmailRow = memo(function TaskEmailRow({
  )}
  </div>
  )}
- <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+ <span className="shrink-0 whitespace-nowrap font-mono text-[10px] tracking-tighter tabular-nums text-muted-foreground">
  {formatInboxRowDate(email.date)}
  </span>
  </div>

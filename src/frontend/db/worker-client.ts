@@ -115,3 +115,9 @@ class DbWorkerClient {
 }
 
 export const dbClient = new DbWorkerClient();
+
+if (import.meta.hot) {
+ import.meta.hot.dispose(() => {
+ dbClient.dispose();
+ });
+}

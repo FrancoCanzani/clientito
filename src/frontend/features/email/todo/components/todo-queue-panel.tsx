@@ -55,10 +55,10 @@ export function TodoQueuePanel({
  )}
  >
  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
- <span className="min-w-0 truncate text-blue-900 dark:text-blue-50">
+ <span className="min-w-0 truncate text-primary">
  {sender}
  </span>
- <span className="shrink-0 text-xs tabular-nums">
+ <span className="shrink-0 font-mono text-[10px] tracking-tighter tabular-nums">
  {formatInboxRowDate(email.date)}
  </span>
  </div>

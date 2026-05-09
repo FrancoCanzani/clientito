@@ -80,6 +80,9 @@ export function ScheduleSendPicker({
  <PopoverContent align="end" className="w-auto p-0">
  {!showCustom ? (
  <div className="flex flex-col gap-0.5 p-1">
+ <div className="px-2 pt-1 pb-0.5 text-[11px] text-muted-foreground">
+ Schedule send
+ </div>
  <button
  type="button"
  className="flex min-h-7 w-full items-center gap-2 px-2 py-1 text-left text-xs/relaxed text-foreground outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground"

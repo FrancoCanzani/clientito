@@ -97,7 +97,7 @@ export function CommandListPanel({
  className="flex cursor-pointer items-center px-2 py-1.5 text-xs transition-colors data-[selected=true]:bg-muted"
  >
  <span>
- <span className="font-medium text-blue-900 dark:text-blue-50">
+ <span className="font-medium text-primary">
  {group}:
  </span>{" "}
  {label}

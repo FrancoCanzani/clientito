@@ -152,5 +152,22 @@ export function useMailHotkeys({
  if (!enabled || groups.length === 0) setFocusedId(null);
  }, [enabled, groups.length]);
 
+ useEffect(() => {
+ if (!enabled || groups.length === 0) return;
+ const newestReceivedId =
+ groups.find((group) => group.representative.direction === "received")
+ ?.representative.id ?? null;
+ const defaultId = newestReceivedId ?? groups[0]?.representative.id ?? null;
+ if (!defaultId) return;
+ setFocusedId((current) => {
+ const exists = current
+ ? groups.some((group) => group.representative.id === current)
+ : false;
+ const next = exists ? current : defaultId;
+ if (next !== current) onFocusChange?.(next);
+ return next;
+ });
+ }, [enabled, groups, onFocusChange, view]);
+
  return { focusedIndex: enabled ? focusedIndex : -1, setFocusedId };
 }

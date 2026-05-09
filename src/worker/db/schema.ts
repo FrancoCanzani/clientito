@@ -156,6 +156,44 @@ export const splitViews = sqliteTable(
   ],
 );
 
+export type ReplyReminderStatus =
+  | "pending"
+  | "replied"
+  | "dismissed"
+  | "surfaced";
+
+export const replyReminders = sqliteTable(
+  "reply_reminders",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mailboxId: integer("mailbox_id")
+      .notNull()
+      .references(() => mailboxes.id, { onDelete: "cascade" }),
+    threadId: text("thread_id").notNull(),
+    sentMessageId: text("sent_message_id").notNull(),
+    sentAt: integer("sent_at").notNull(),
+    remindAt: integer("remind_at").notNull(),
+    status: text("status")
+      .$type<ReplyReminderStatus>()
+      .notNull()
+      .default("pending"),
+    surfacedAt: integer("surfaced_at"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("reply_reminders_thread_idx").on(
+      table.userId,
+      table.mailboxId,
+      table.threadId,
+    ),
+    index("reply_reminders_due_idx").on(table.status, table.remindAt),
+    index("reply_reminders_user_status_idx").on(table.userId, table.status),
+  ],
+);
+
 export const drafts = sqliteTable(
   "drafts",
   {
