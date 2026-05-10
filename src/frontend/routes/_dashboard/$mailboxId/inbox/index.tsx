@@ -1,7 +1,5 @@
 import { Error as RouteError } from "@/components/error";
 import InboxPage from "@/features/email/inbox/pages/inbox-page";
-import { fetchLocalViewPage } from "@/features/email/mail/queries";
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
@@ -30,24 +28,6 @@ const inboxPageSearchSchema = z.object({
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/inbox/")({
   validateSearch: inboxPageSearchSchema,
-  loaderDeps: ({ search }) => ({
-    mode: search.mode ?? "important",
-  }),
-  loader: async ({ context, params, deps }) => {
-    const view = deps.mode === "all" ? "inbox" : "important";
-    await context.queryClient.ensureInfiniteQueryData({
-      queryKey: emailQueryKeys.list(view, params.mailboxId),
-      queryFn: ({ pageParam }) =>
-        fetchLocalViewPage({
-          view,
-          mailboxId: params.mailboxId,
-          cursor: pageParam || undefined,
-        }),
-      initialPageParam: "",
-      pages: 1,
-      getNextPageParam: (lastPage) => lastPage?.cursor ?? undefined,
-    });
-  },
   errorComponent: RouteError,
   component: InboxPage,
 });

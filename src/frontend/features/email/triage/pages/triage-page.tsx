@@ -27,7 +27,7 @@ import { useComposeEmail } from "@/features/email/mail/compose/compose-email-sta
 import { RecipientInput } from "@/features/email/mail/compose/recipient-input";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
-import { fetchEmailDetail } from "@/features/email/mail/queries";
+import { fetchEmailDetail } from "@/features/email/mail/data/thread-detail";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { MessageBody } from "@/features/email/mail/render/message-body";
 import type {

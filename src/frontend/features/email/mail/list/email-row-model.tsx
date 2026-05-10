@@ -1,6 +1,6 @@
 import type { MailAction } from "@/features/email/mail/hooks/use-mail-actions";
 import type { ThreadIdentifier } from "@/features/email/mail/mutations";
-import { fetchEmailDetail } from "@/features/email/mail/queries";
+import { fetchEmailDetail } from "@/features/email/mail/data/thread-detail";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import { type KeyboardEvent, type ReactNode, useRef } from "react";

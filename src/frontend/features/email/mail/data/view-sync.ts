@@ -1,0 +1,399 @@
+import { localDb } from "@/db/client";
+import { getCurrentUserId } from "@/db/user";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { accountQueryKeys } from "@/features/settings/query-keys";
+import { accountsQueryOptions } from "@/hooks/use-mailboxes";
+import { queryClient } from "@/lib/query-client";
+import { AsyncQueuer } from "@tanstack/pacer/async-queuer";
+import { VIEW_PAGE_SIZE } from "./constants";
+import { alignActiveUser, persistEmails } from "./local-cache";
+import { dedup } from "./request-dedup";
+import type {
+  DeltaSyncResponse,
+  MailListFilters,
+  PulledEmail,
+  RemoteCursor,
+  ViewPage,
+} from "./types";
+import { encodeViewCursor } from "./view-cursor";
+import {
+  parseViewSyncStatus,
+  setViewSyncStatus,
+  viewSyncMetaKey,
+} from "./view-sync-status";
+
+const GMAIL_SYNC_WAIT_MS = 0;
+const GMAIL_SYNC_MAX_SIZE = 100;
+const GMAIL_SYNC_DEFAULT_COOLDOWN_MS = 60_000;
+
+function refreshKey(mailboxId: number, view: string): string {
+  return `view-refresh:${mailboxId}:${view}`;
+}
+
+const refreshInFlight = new Map<string, Promise<void>>();
+const refreshLastRunAt = new Map<string, number>();
+const VIEW_BACKGROUND_REFRESH_COOLDOWN_MS = 10_000;
+
+async function refreshViewFromServer(
+  userId: string,
+  mailboxId: number,
+  view: string,
+  reason: GmailSyncReason = "background",
+): Promise<void> {
+  const key = refreshKey(mailboxId, view);
+  const existing = refreshInFlight.get(key);
+  if (existing && reason !== "active-view") return existing;
+
+  const lastRunAt = refreshLastRunAt.get(key) ?? 0;
+  // A successful background refresh invalidates this same list query. Without a
+  // short per-view cooldown, that invalidation immediately schedules another
+  // background refresh from the first-page fetch and loops forever.
+  if (
+    reason !== "active-view" &&
+    Date.now() - lastRunAt < VIEW_BACKGROUND_REFRESH_COOLDOWN_MS
+  ) {
+    return;
+  }
+
+  const task = (async () => {
+    try {
+      await enqueueViewSyncPage({
+        userId,
+        mailboxId,
+        view,
+        cursor: { type: "remote" },
+        reason,
+        invalidateOnSuccess: true,
+      });
+    } catch {
+      /* background refresh failure is non-fatal */
+    }
+  })().finally(() => {
+    refreshLastRunAt.set(key, Date.now());
+    if (refreshInFlight.get(key) === task) refreshInFlight.delete(key);
+  });
+
+  refreshInFlight.set(key, task);
+  return task;
+}
+
+class GmailViewFetchError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly retryAfterMs: number | null,
+  ) {
+    super(message);
+    this.name = "GmailViewFetchError";
+  }
+}
+
+async function fetchServerPage(
+  userId: string,
+  mailboxId: number,
+  view: string,
+  cursor: RemoteCursor,
+  filters?: MailListFilters,
+): Promise<ViewPage> {
+  const res = await fetch("/api/inbox/view/page", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mailboxId,
+      view,
+      cursor: cursor.token || undefined,
+      beforeMs: cursor.beforeMs,
+      limit: VIEW_PAGE_SIZE,
+      filters,
+    }),
+  });
+  if (!res.ok) {
+    const errorBody = (await res
+      .clone()
+      .json()
+      .catch(() => null)) as { error?: string } | null;
+    const retryAfter = res.headers.get("retry-after");
+    const retryAfterSeconds = retryAfter ? Number(retryAfter) : NaN;
+    const retryAfterMs =
+      Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
+        ? Math.floor(retryAfterSeconds * 1000)
+        : null;
+    const reconnectRequired =
+      res.status === 401 && errorBody?.error === "google_reconnect_required";
+    const lastError = reconnectRequired
+      ? "reconnect_required"
+      : res.status === 429
+        ? "gmail_rate_limited"
+        : `fetch_failed_${res.status}`;
+    const previousMeta = parseViewSyncStatus(
+      await localDb.getMeta(viewSyncMetaKey(mailboxId, view)),
+    );
+    await setViewSyncStatus(mailboxId, view, {
+      lastFetchedAt: previousMeta.lastFetchedAt,
+      lastError,
+    });
+    if (reconnectRequired) {
+      void queryClient.invalidateQueries({
+        queryKey: accountsQueryOptions.queryKey,
+      });
+    }
+    throw new GmailViewFetchError(
+      `View fetch failed: ${res.status}`,
+      res.status,
+      retryAfterMs,
+    );
+  }
+
+  const body = (await res.json()) as {
+    emails: PulledEmail[];
+    cursor: string | null;
+  };
+  const emails = await persistEmails(body.emails, userId, mailboxId);
+  await setViewSyncStatus(mailboxId, view, {
+    lastFetchedAt: Date.now(),
+    lastError: null,
+  });
+  const nextCursor = body.cursor
+    ? encodeViewCursor({
+        type: "remote",
+        token: body.cursor,
+        beforeMs: cursor.beforeMs,
+      })
+    : null;
+  return { emails, cursor: nextCursor };
+}
+
+type GmailSyncReason = "active-view" | "active-page" | "background" | "preload";
+
+type GmailViewSyncTask = {
+  key: string;
+  userId: string;
+  mailboxId: number;
+  view: string;
+  cursor: RemoteCursor;
+  reason: GmailSyncReason;
+  priority: number;
+  invalidateOnSuccess: boolean;
+  filters?: MailListFilters;
+  resolve: (page: ViewPage) => void;
+  reject: (error: unknown) => void;
+};
+
+const gmailViewSyncInFlight = new Map<string, Promise<ViewPage>>();
+
+function getGmailViewSyncPriority(
+  view: string,
+  reason: GmailSyncReason,
+): number {
+  if (reason === "active-page") return 1_100;
+  if (reason === "active-view") return 1_000;
+  if (view === "inbox") return 700;
+  if (view === "sent" || view === "starred" || view === "important") return 400;
+  if (view === "archived") return 250;
+  if (view === "spam" || view === "trash") return 100;
+  return reason === "preload" ? 10 : 200;
+}
+
+function getGmailViewSyncKey(params: {
+  userId: string;
+  mailboxId: number;
+  view: string;
+  cursor: RemoteCursor;
+  filters?: MailListFilters;
+}): string {
+  return [
+    params.userId,
+    params.mailboxId,
+    params.view,
+    params.cursor.token ?? "first",
+    params.cursor.beforeMs ?? "none",
+    params.filters?.unread ? "u" : "",
+    params.filters?.starred ? "s" : "",
+    params.filters?.hasAttachment ? "a" : "",
+  ].join(":");
+}
+
+function getGmailCooldownMs(error: unknown): number | null {
+  if (!(error instanceof GmailViewFetchError)) return null;
+  if (error.status !== 429 && error.status !== 503) return null;
+  return error.retryAfterMs ?? GMAIL_SYNC_DEFAULT_COOLDOWN_MS;
+}
+
+const gmailViewSyncQueue = new AsyncQueuer<GmailViewSyncTask>(
+  async (task) => {
+    try {
+      const page = await fetchServerPage(
+        task.userId,
+        task.mailboxId,
+        task.view,
+        task.cursor,
+        task.filters,
+      );
+      task.resolve(page);
+      if (task.invalidateOnSuccess) {
+        void queryClient.invalidateQueries({
+          queryKey: emailQueryKeys.list(task.view, task.mailboxId),
+        });
+      }
+    } catch (error) {
+      task.reject(error);
+      throw error;
+    } finally {
+      gmailViewSyncInFlight.delete(task.key);
+    }
+  },
+  {
+    key: "gmail-view-sync",
+    concurrency: 1,
+    wait: GMAIL_SYNC_WAIT_MS,
+    maxSize: GMAIL_SYNC_MAX_SIZE,
+    getPriority: (task) => task.priority,
+    throwOnError: false,
+    onError: (error, _task, queuer) => {
+      const cooldownMs = getGmailCooldownMs(error);
+      if (cooldownMs == null) return;
+      queuer.stop();
+      globalThis.setTimeout(() => queuer.start(), cooldownMs);
+    },
+  },
+);
+
+export function enqueueViewSyncPage(params: {
+  userId: string;
+  mailboxId: number;
+  view: string;
+  cursor: RemoteCursor;
+  reason: GmailSyncReason;
+  invalidateOnSuccess?: boolean;
+  filters?: MailListFilters;
+}): Promise<ViewPage> {
+  const key = getGmailViewSyncKey(params);
+  const existing = gmailViewSyncInFlight.get(key);
+  if (existing) return existing;
+
+  const promise = new Promise<ViewPage>((resolve, reject) => {
+    const queued = gmailViewSyncQueue.addItem({
+      ...params,
+      key,
+      priority: getGmailViewSyncPriority(params.view, params.reason),
+      invalidateOnSuccess: params.invalidateOnSuccess ?? false,
+      resolve,
+      reject,
+    });
+    if (!queued) reject(new Error("Gmail sync queue is full."));
+  });
+  gmailViewSyncInFlight.set(key, promise);
+  return promise;
+}
+
+export async function enqueueActiveViewSync(params: {
+  mailboxId: number;
+  view: string;
+}): Promise<void> {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return;
+    await alignActiveUser(userId);
+    await refreshViewFromServer(
+      userId,
+      params.mailboxId,
+      params.view,
+      "active-view",
+    );
+  } catch {
+    /* Active sync is best-effort; the list can render cached local data. */
+  }
+}
+
+const HARDCODED_PRELOAD_VIEWS: ReadonlyArray<string> = [
+  "sent",
+  "archived",
+  "starred",
+  "important",
+];
+
+export function preloadInactiveViews(
+  mailboxId: number,
+  extraViews: ReadonlyArray<string> = [],
+): void {
+  if (!mailboxId) return;
+
+  void (async () => {
+    const userId = await getCurrentUserId();
+    if (!userId) return;
+    await alignActiveUser(userId);
+
+    const seen = new Set<string>();
+    for (const view of [...HARDCODED_PRELOAD_VIEWS, ...extraViews]) {
+      if (!view || seen.has(view)) continue;
+      seen.add(view);
+      void enqueueViewSyncPage({
+        userId,
+        mailboxId,
+        view,
+        cursor: { type: "remote" },
+        reason: "preload",
+      }).catch(() => {});
+    }
+  })();
+}
+
+export async function runDeltaSync(
+  mailboxId: number,
+): Promise<DeltaSyncResponse | null> {
+  if (!mailboxId) return null;
+
+  return dedup(`delta-sync:${mailboxId}`, async () => {
+    const userId = await getCurrentUserId();
+    if (!userId) return null;
+    await alignActiveUser(userId);
+
+    const res = await fetch("/api/inbox/sync/delta", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mailboxId }),
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        await queryClient.invalidateQueries({
+          queryKey: accountQueryKeys.all(),
+        });
+      }
+      return null;
+    }
+    const body = (await res.json()) as DeltaSyncResponse;
+
+    let appliedAnything = false;
+
+    if (body.added?.length) {
+      await persistEmails(body.added, userId, mailboxId);
+      appliedAnything = true;
+    }
+
+    if (body.deleted?.length) {
+      await localDb.deleteEmailsByProviderMessageId(body.deleted);
+      appliedAnything = true;
+    }
+
+    if (body.labelChanges?.length) {
+      for (const change of body.labelChanges) {
+        for (const labelId of change.removedLabels) {
+          await localDb.removeLabelFromEmails(
+            [change.providerMessageId],
+            labelId,
+          );
+        }
+        for (const labelId of change.addedLabels) {
+          await localDb.addLabelToEmails([change.providerMessageId], labelId);
+        }
+      }
+      appliedAnything = true;
+    }
+
+    if (appliedAnything) {
+      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+    }
+
+    return body;
+  });
+}

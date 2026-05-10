@@ -1,18 +1,14 @@
 import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
-import {
+  MailListReaderPage,
   MailListPane,
   MailReaderPane,
+  useThreadGroupSnooze,
 } from "@/features/email/inbox/pages/mail-pane";
 import { isInternalLabelName } from "@/features/email/labels/internal-labels";
 import { fetchLabels } from "@/features/email/labels/queries";
 import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
-import { MailboxPage } from "@/features/email/shell/mailbox-page";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
@@ -42,6 +38,7 @@ export default function LabelPage() {
     presentation: isMobile ? "route" : "panel",
   });
   const selectedEmailId = isMobile ? null : (search.emailId ?? null);
+  const handleSnooze = useThreadGroupSnooze(mailboxId, snooze);
 
   const clearSelectedEmail = () =>
     navigate({
@@ -67,72 +64,31 @@ export default function LabelPage() {
       onShowFiltersChange={setShowFilters}
       onOpen={openEmail}
       onAction={executeEmailAction}
-      onSnooze={(group, timestamp) =>
-        group.threadId && group.representative.mailboxId
-          ? void snooze(
-              {
-                kind: "thread",
-                thread: {
-                  threadId: group.threadId,
-                  mailboxId: group.representative.mailboxId,
-                  labelIds: group.representative.labelIds,
-                },
-              },
-              timestamp,
-            )
-          : void snooze(
-              {
-                kind: "email",
-                identifier: {
-                  id: group.representative.id,
-                  providerMessageId: group.representative.providerMessageId,
-                  mailboxId: group.representative.mailboxId ?? mailboxId,
-                  labelIds: group.representative.labelIds,
-                },
-              },
-              timestamp,
-            )
-      }
+      onSnooze={handleSnooze}
       selectedEmailId={selectedEmailId}
       enableKeyboardNavigation={!selectedEmailId}
       compact={!isMobile}
     />
   );
 
-  if (isMobile || !emailData.hasEmails) {
-    return <MailboxPage className="max-w-none">{listPane}</MailboxPage>;
-  }
-
   return (
-    <MailboxPage className="max-w-none">
-      <ResizablePanelGroup
-        orientation="horizontal"
-        className="min-h-0 flex-1 overflow-hidden"
-      >
-        <ResizablePanel
-          defaultSize="50%"
-          minSize="320px"
-          maxSize="65%"
-          className="min-w-0"
-        >
-          {listPane}
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel minSize="360px" defaultSize="50%" className="min-w-0">
-          <MailReaderPane
-            mailboxId={mailboxId}
-            view={label}
-            emailId={selectedEmailId}
-            emptyDescription={`Open a message from ${labelName.toLowerCase()} to read it here.`}
-            onClose={clearSelectedEmail}
-            onNavigateToEmail={navigateSelectedEmail}
-            listGroups={emailData.threadGroups}
-            hasNextPage={emailData.hasNextPage}
-            isFetchingNextPage={emailData.isFetchingNextPage}
-            fetchNextPage={emailData.fetchNextPage}
-          />
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    </MailboxPage>
+    <MailListReaderPage
+      showReader={!isMobile && emailData.hasEmails}
+      listPane={listPane}
+      readerPane={
+        <MailReaderPane
+          mailboxId={mailboxId}
+          view={label}
+          emailId={selectedEmailId}
+          emptyDescription={`Open a message from ${labelName.toLowerCase()} to read it here.`}
+          onClose={clearSelectedEmail}
+          onNavigateToEmail={navigateSelectedEmail}
+          listGroups={emailData.threadGroups}
+          hasNextPage={emailData.hasNextPage}
+          isFetchingNextPage={emailData.isFetchingNextPage}
+          fetchNextPage={emailData.fetchNextPage}
+        />
+      }
+    />
   );
 }

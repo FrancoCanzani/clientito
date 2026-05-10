@@ -1,6 +1,6 @@
 import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { localDb } from "@/db/client";
-import { invalidateInboxQueries } from "@/features/email/mail/queries";
+import { invalidateInboxQueries } from "@/features/email/mail/data/invalidation";
 import { applyLabelToCaches } from "@/features/email/mail/utils/optimistic-mail-state";
 import { queryClient } from "@/lib/query-client";
 import { syncLabelsFromServer } from "./queries";

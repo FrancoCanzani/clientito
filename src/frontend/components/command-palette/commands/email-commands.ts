@@ -1,5 +1,5 @@
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
-import { invalidateInboxQueries } from "@/features/email/mail/queries";
+import { invalidateInboxQueries } from "@/features/email/mail/data/invalidation";
 import { patchEmail, type EmailIdentifier } from "@/features/email/mail/mutations";
 import type { EmailListItem, EmailListPage } from "@/features/email/mail/types";
 import { isEmailListInfiniteData } from "@/features/email/mail/utils/email-list-cache";

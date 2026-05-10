@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import type { SplitRule } from "@/db/schema";
 import { FocusWindowToggle } from "@/features/email/focus-window/focus-window-toggle";
 import { useMailCompose } from "@/features/email/mail/compose/compose-context";
-import { fetchViewUnreadCounts } from "@/features/email/mail/queries";
+import { fetchViewUnreadCounts } from "@/features/email/mail/data/unread-counts";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import {
   createMailboxSplitView,
@@ -118,8 +118,9 @@ export function MailboxTopbar() {
       const match = state.matches.find((m) =>
         m.routeId.startsWith("/_dashboard/$mailboxId/views"),
       );
-      const params = match?.params as { viewId?: unknown } | undefined;
-      return typeof params?.viewId === "string" ? params.viewId : null;
+      const params = match?.params;
+      const viewId = params && "viewId" in params ? params.viewId : null;
+      return typeof viewId === "string" ? viewId : null;
     },
   });
   const { openCompose } = useMailCompose();

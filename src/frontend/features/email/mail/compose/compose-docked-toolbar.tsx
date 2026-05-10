@@ -89,10 +89,8 @@ export function ComposeDockedToolbar({
     setLinkOpen(false);
   }, [editor]);
 
-  const currentLink =
-    editor && typeof editor.getAttributes("link").href === "string"
-      ? (editor.getAttributes("link").href as string)
-      : "";
+  const linkHref = editor?.getAttributes("link").href;
+  const currentLink = typeof linkHref === "string" ? linkHref : "";
 
   if (!editor) return null;
 

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
  fetchEmailDetail,
  fetchEmailThread,
-} from "@/features/email/mail/queries";
+} from "@/features/email/mail/data/thread-detail";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import type {
  EmailDetailItem,

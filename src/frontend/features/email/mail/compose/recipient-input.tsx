@@ -1,4 +1,4 @@
-import { fetchContactSuggestions } from "@/features/email/mail/queries";
+import { fetchContactSuggestions } from "@/features/email/mail/data/contacts";
 import { XIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";

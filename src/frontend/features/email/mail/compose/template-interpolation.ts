@@ -50,7 +50,7 @@ function lookup(ctx: TemplateContext, path: string): string | null {
   let cursor: unknown = ctx;
   for (const segment of segments) {
     if (cursor && typeof cursor === "object" && segment in cursor) {
-      cursor = (cursor as Record<string, unknown>)[segment];
+      cursor = Reflect.get(cursor, segment);
     } else {
       return null;
     }

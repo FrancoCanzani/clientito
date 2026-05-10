@@ -10,7 +10,7 @@ import { TrashIcon } from "@phosphor-icons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
-import { deleteDraft, fetchDrafts } from "@/features/email/mail/queries";
+import { deleteDraft, fetchDrafts } from "@/features/email/mail/data/drafts";
 import { draftQueryKeys } from "@/features/email/mail/query-keys";
 import type { ComposeInitial, DraftItem } from "@/features/email/mail/types";
 import { htmlToPlainText } from "@/features/email/mail/utils/html-to-plain-text";

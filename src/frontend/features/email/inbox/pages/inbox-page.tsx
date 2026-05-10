@@ -1,24 +1,28 @@
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import { useGatekeeperPending } from "@/features/email/gatekeeper/queries";
 import { useInboxData } from "@/features/email/inbox/hooks/use-inbox-data";
 import {
+  MailListReaderPage,
   MailListPane,
   MailReaderPane,
+  useThreadGroupSnooze,
 } from "@/features/email/inbox/pages/mail-pane";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
-import { MailboxPage } from "@/features/email/shell/mailbox-page";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link, getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
 
 const route = getRouteApi("/_dashboard/$mailboxId/inbox/");
 type InboxMode = "important" | "all";
+type InboxSearch = { emailId?: string; mode?: InboxMode };
+
+function inboxSearch(mode: InboxMode, emailId?: string): InboxSearch {
+  return {
+    ...(emailId ? { emailId } : {}),
+    ...(mode === "all" ? { mode } : {}),
+  };
+}
 
 export default function InboxPage() {
   const { mailboxId } = route.useParams();
@@ -40,12 +44,13 @@ export default function InboxPage() {
   const gatekeeperPendingQuery = useGatekeeperPending(mailboxId, true);
   const pendingSendersCount = gatekeeperPendingQuery.data?.pendingCount ?? 0;
   const selectedEmailId = isMobile ? null : (search.emailId ?? null);
+  const handleSnooze = useThreadGroupSnooze(mailboxId, snooze);
 
   const clearSelectedEmail = () =>
     navigate({
       to: "/$mailboxId/inbox",
       params: { mailboxId },
-      search: inboxMode === "all" ? { mode: "all" } : {},
+      search: inboxSearch(inboxMode),
       replace: true,
     });
 
@@ -53,10 +58,7 @@ export default function InboxPage() {
     navigate({
       to: "/$mailboxId/inbox",
       params: { mailboxId },
-      search: {
-        emailId: nextEmailId,
-        ...(inboxMode === "all" ? { mode: "all" as const } : {}),
-      },
+      search: inboxSearch(inboxMode, nextEmailId),
       replace: true,
     });
 
@@ -65,7 +67,7 @@ export default function InboxPage() {
     navigate({
       to: "/$mailboxId/inbox",
       params: { mailboxId },
-      search: nextMode === "all" ? { mode: "all" } : {},
+      search: inboxSearch(nextMode),
       replace: true,
     });
   };
@@ -118,32 +120,7 @@ export default function InboxPage() {
       onShowFiltersChange={setShowFilters}
       onOpen={openEmail}
       onAction={executeEmailAction}
-      onSnooze={(group, timestamp) =>
-        group.threadId && group.representative.mailboxId
-          ? void snooze(
-              {
-                kind: "thread",
-                thread: {
-                  threadId: group.threadId,
-                  mailboxId: group.representative.mailboxId,
-                  labelIds: group.representative.labelIds,
-                },
-              },
-              timestamp,
-            )
-          : void snooze(
-              {
-                kind: "email",
-                identifier: {
-                  id: group.representative.id,
-                  providerMessageId: group.representative.providerMessageId,
-                  mailboxId: group.representative.mailboxId ?? mailboxId,
-                  labelIds: group.representative.labelIds,
-                },
-              },
-              timestamp,
-            )
-      }
+      onSnooze={handleSnooze}
       selectedEmailId={selectedEmailId}
       enableKeyboardNavigation={!selectedEmailId}
       compact={!isMobile}
@@ -162,41 +139,25 @@ export default function InboxPage() {
     />
   );
 
-  if (isMobile || !emailData.hasEmails) {
-    return <MailboxPage className="max-w-none">{listPane}</MailboxPage>;
-  }
-
   return (
-    <MailboxPage className="max-w-none">
-      <ResizablePanelGroup
-        orientation="horizontal"
-        className="min-h-0 flex-1 overflow-hidden"
-      >
-        <ResizablePanel
-          defaultSize="50%"
-          minSize="320px"
-          maxSize="65%"
-          className="min-w-0"
-        >
-          {listPane}
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel minSize="360px" defaultSize="50%" className="min-w-0">
-          <MailReaderPane
-            mailboxId={mailboxId}
-            view="inbox"
-            inboxMode={inboxMode}
-            emailId={selectedEmailId}
-            emptyDescription="Open a message from the inbox to read it here."
-            onClose={clearSelectedEmail}
-            onNavigateToEmail={navigateSelectedEmail}
-            listGroups={emailData.threadGroups}
-            hasNextPage={emailData.hasNextPage}
-            isFetchingNextPage={emailData.isFetchingNextPage}
-            fetchNextPage={emailData.fetchNextPage}
-          />
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    </MailboxPage>
+    <MailListReaderPage
+      showReader={!isMobile && emailData.hasEmails}
+      listPane={listPane}
+      readerPane={
+        <MailReaderPane
+          mailboxId={mailboxId}
+          view="inbox"
+          inboxMode={inboxMode}
+          emailId={selectedEmailId}
+          emptyDescription="Open a message from the inbox to read it here."
+          onClose={clearSelectedEmail}
+          onNavigateToEmail={navigateSelectedEmail}
+          listGroups={emailData.threadGroups}
+          hasNextPage={emailData.hasNextPage}
+          isFetchingNextPage={emailData.isFetchingNextPage}
+          fetchNextPage={emailData.fetchNextPage}
+        />
+      }
+    />
   );
 }

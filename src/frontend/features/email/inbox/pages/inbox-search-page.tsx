@@ -4,7 +4,7 @@ import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import {
   fetchSearchEmails,
   fetchSearchSuggestions,
-} from "@/features/email/mail/queries";
+} from "@/features/email/mail/data/search";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { extractHighlightTerms } from "@/features/email/mail/search/highlight-terms";
 import {
@@ -88,7 +88,7 @@ export default function InboxSearchPage() {
       "inbox",
       scope.includeJunk ?? false,
     ),
-    initialPageParam: "" as string,
+    initialPageParam: "",
     enabled: normalizeQuery(scope.q).length >= 2,
     initialData: initialResults
       ? {

@@ -36,6 +36,10 @@ function normalizeState(state: SignatureState): SignatureState {
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function parseState(raw: string): SignatureState {
   const value = raw.trim();
   if (!value) {
@@ -43,26 +47,21 @@ function parseState(raw: string): SignatureState {
   }
 
   try {
-    const parsed = JSON.parse(value) as {
-      defaultId?: unknown;
-      items?: Array<{ id?: unknown; name?: unknown; body?: unknown }>;
-    };
+    const parsed = JSON.parse(value);
+    if (!isRecord(parsed)) return { defaultId: null, items: [] };
     if (Array.isArray(parsed.items)) {
       return normalizeState({
         defaultId:
           typeof parsed.defaultId === "string" ? parsed.defaultId : null,
         items: parsed.items
-          .filter(
-            (item) =>
-              typeof item?.id === "string" &&
-              typeof item?.name === "string" &&
-              typeof item?.body === "string",
-          )
-          .map((item) => ({
-            id: item.id as string,
-            name: item.name as string,
-            body: item.body as string,
-          })),
+          .filter(isRecord)
+          .flatMap((item) =>
+            typeof item.id === "string" &&
+            typeof item.name === "string" &&
+            typeof item.body === "string"
+              ? [{ id: item.id, name: item.name, body: item.body }]
+              : [],
+          ),
       });
     }
   } catch {}

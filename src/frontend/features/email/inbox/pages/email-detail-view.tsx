@@ -10,7 +10,7 @@ import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import {
  fetchEmailDetail,
  fetchEmailThread,
-} from "@/features/email/mail/queries";
+} from "@/features/email/mail/data/thread-detail";
 import type {
  ComposeInitial,
  EmailDetailItem,

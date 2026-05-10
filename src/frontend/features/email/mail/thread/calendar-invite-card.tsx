@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { respondToCalendarInvite } from "@/features/email/mail/mutations";
-import { fetchCalendarInvitePreview } from "@/features/email/mail/queries";
+import { fetchCalendarInvitePreview } from "@/features/email/mail/data/calendar";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import type {
   CalendarInvitePreview,

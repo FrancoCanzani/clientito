@@ -1,8 +1,6 @@
 import { markEmailRead } from "@/features/email/mail/mutations";
-import {
-  fetchEmailDetail,
-  invalidateInboxQueries,
-} from "@/features/email/mail/queries";
+import { invalidateInboxQueries } from "@/features/email/mail/data/invalidation";
+import { fetchEmailDetail } from "@/features/email/mail/data/thread-detail";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import type {
   EmailDetailItem,

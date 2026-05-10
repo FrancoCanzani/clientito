@@ -1,7 +1,7 @@
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
 import type { Label } from "@/features/email/labels/types";
-import { fetchAllLocalViewEmails } from "@/features/email/mail/queries";
+import { fetchAllLocalViewEmails } from "@/features/email/mail/data/view-pages";
 import type { EmailListPage } from "@/features/email/mail/types";
 import { groupEmailsByThread } from "@/features/email/mail/utils/group-emails-by-thread";
 import {
@@ -52,7 +52,7 @@ export function useTodoData({ mailboxId }: { mailboxId: number }) {
   const emailsQuery = useInfiniteQuery({
     queryKey: todoDataQueryKey(mailboxId),
     queryFn: () => fetchTodoPage(mailboxId),
-    initialPageParam: "" as string,
+    initialPageParam: "",
     getNextPageParam: () => undefined,
     staleTime: 5_000,
     gcTime: 2 * 60_000,

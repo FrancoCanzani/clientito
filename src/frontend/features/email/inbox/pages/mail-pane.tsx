@@ -5,6 +5,11 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { EmailDetailView } from "@/features/email/inbox/pages/email-detail-view";
 import {
   useMailActions,
@@ -17,13 +22,95 @@ import { ViewSyncStatusControl } from "@/features/email/mail/list/view-sync-stat
 import type { ThreadIdentifier } from "@/features/email/mail/mutations";
 import type { EmailListItem } from "@/features/email/mail/types";
 import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
-import { MailboxPageHeader } from "@/features/email/shell/mailbox-page";
+import {
+  MailboxPage,
+  MailboxPageHeader,
+} from "@/features/email/shell/mailbox-page";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { FunnelSimpleIcon } from "@phosphor-icons/react";
-import type { ReactNode } from "react";
+import { useCallback, type ReactNode } from "react";
 
-type MailViewData = ReturnType<typeof useMailViewData>;
+export type MailViewData = ReturnType<typeof useMailViewData>;
+export type MailSnoozeTarget = Parameters<
+  ReturnType<typeof useMailActions>["snooze"]
+>[0];
+
+export function MailListReaderPage({
+  showReader,
+  listPane,
+  readerPane,
+}: {
+  showReader: boolean;
+  listPane: ReactNode;
+  readerPane: ReactNode;
+}) {
+  if (!showReader) {
+    return <MailboxPage className="max-w-none">{listPane}</MailboxPage>;
+  }
+
+  return (
+    <MailboxPage className="max-w-none">
+      <ResizablePanelGroup
+        orientation="horizontal"
+        className="min-h-0 flex-1 overflow-hidden"
+      >
+        <ResizablePanel
+          defaultSize="50%"
+          minSize="320px"
+          maxSize="65%"
+          className="min-w-0"
+        >
+          {listPane}
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel minSize="360px" defaultSize="50%" className="min-w-0">
+          {readerPane}
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </MailboxPage>
+  );
+}
+
+export function getThreadGroupSnoozeTarget(
+  group: ThreadGroup,
+  fallbackMailboxId: number,
+): MailSnoozeTarget {
+  const mailboxId = group.representative.mailboxId ?? fallbackMailboxId;
+
+  if (group.threadId && group.representative.mailboxId) {
+    return {
+      kind: "thread",
+      thread: {
+        threadId: group.threadId,
+        mailboxId: group.representative.mailboxId,
+        labelIds: group.representative.labelIds,
+      },
+    };
+  }
+
+  return {
+    kind: "email",
+    identifier: {
+      id: group.representative.id,
+      providerMessageId: group.representative.providerMessageId,
+      mailboxId,
+      labelIds: group.representative.labelIds,
+    },
+  };
+}
+
+export function useThreadGroupSnooze(
+  mailboxId: number,
+  snooze: ReturnType<typeof useMailActions>["snooze"],
+) {
+  return useCallback(
+    (group: ThreadGroup, timestamp: number | null) => {
+      void snooze(getThreadGroupSnoozeTarget(group, mailboxId), timestamp);
+    },
+    [mailboxId, snooze],
+  );
+}
 
 export function MailListPane({
   title,
@@ -130,11 +217,11 @@ export function MailListPane({
 }
 
 export function MailReaderPane({
- mailboxId,
- view,
- inboxMode,
- emailId,
- emptyDescription,
+  mailboxId,
+  view,
+  inboxMode,
+  emailId,
+  emptyDescription,
   onClose,
   onNavigateToEmail,
   listGroups,
@@ -142,10 +229,10 @@ export function MailReaderPane({
   isFetchingNextPage = false,
   fetchNextPage,
 }: {
- mailboxId: number;
- view: string;
- inboxMode?: "important" | "all";
- emailId: string | null;
+  mailboxId: number;
+  view: string;
+  inboxMode?: "important" | "all";
+  emailId: string | null;
   emptyDescription: string;
   onClose: () => void;
   onNavigateToEmail: (nextEmailId: string) => void;
@@ -170,12 +257,12 @@ export function MailReaderPane({
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col bg-background">
       <EmailDetailView
- mailboxId={mailboxId}
- emailId={emailId}
- view={view}
- inboxMode={inboxMode}
- onClose={onClose}
- onNavigateToEmail={onNavigateToEmail}
+        mailboxId={mailboxId}
+        emailId={emailId}
+        view={view}
+        inboxMode={inboxMode}
+        onClose={onClose}
+        onNavigateToEmail={onNavigateToEmail}
         listGroups={listGroups}
         hasNextPage={hasNextPage}
         isFetchingNextPage={isFetchingNextPage}

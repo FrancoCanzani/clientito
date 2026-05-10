@@ -53,7 +53,7 @@ import { toast } from "sonner";
 import type { useMailActions } from "../hooks/use-mail-actions";
 import { useUndoAction } from "../hooks/use-undo-action";
 import { blockSender, patchEmail, patchThread } from "../mutations";
-import { invalidateInboxQueries } from "../queries";
+import { invalidateInboxQueries } from "../data/invalidation";
 import type { ComposeInitial, EmailDetailItem } from "../types";
 import { buildForwardedEmailHtml } from "../utils/build-forwarded-html";
 import { formatQuotedDate } from "../utils/formatters";

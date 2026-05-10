@@ -1,4 +1,4 @@
-import { fetchSearchEmails } from "@/features/email/mail/queries";
+import { fetchSearchEmails } from "@/features/email/mail/data/search";
 
 export type SearchResult = {
  id: string;
