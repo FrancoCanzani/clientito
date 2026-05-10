@@ -31,31 +31,6 @@ const GMAIL_RATE_LIMIT_REASONS = new Set([
 const TOKEN_REFRESH_BUFFER_MS = 60_000;
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 
-const RATE_LIMIT_COOLDOWN_MS = 60_000;
-const rateLimitedUntil = new Map<string, number>();
-
-function tokenFingerprint(accessToken: string): string {
-  return accessToken.slice(-16);
-}
-
-function getRateLimitWaitMs(accessToken: string): number {
-  const until = rateLimitedUntil.get(tokenFingerprint(accessToken));
-  if (!until) return 0;
-  const remaining = until - Date.now();
-  if (remaining <= 0) {
-    rateLimitedUntil.delete(tokenFingerprint(accessToken));
-    return 0;
-  }
-  return remaining;
-}
-
-function markRateLimited(accessToken: string): void {
-  rateLimitedUntil.set(
-    tokenFingerprint(accessToken),
-    Date.now() + RATE_LIMIT_COOLDOWN_MS,
-  );
-}
-
 function parseRetryAfterMs(retryAfter: string | null): number | null {
   if (!retryAfter) return null;
 
@@ -109,13 +84,6 @@ async function gmailRequestRaw(
   path: string,
   query?: Record<string, GmailQueryValue>,
 ): Promise<Response> {
-  const cooldownMs = getRateLimitWaitMs(accessToken);
-  if (cooldownMs > 0) {
-    throw createGmailRateLimitError(
-      `Gmail account in cooldown for ${Math.ceil(cooldownMs / 1000)}s after recent rate limit.`,
-    );
-  }
-
   const url = new URL(`${GMAIL_API_BASE}${path}`);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
@@ -161,7 +129,6 @@ async function gmailRequestRaw(
     }
 
     if (attempt === GMAIL_MAX_RATE_LIMIT_RETRIES) {
-      markRateLimited(accessToken);
       throw createGmailRateLimitError(
         `Gmail API rate limit reached for ${path} (status ${response.status}).`,
       );

@@ -2,16 +2,13 @@ import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { z } from "zod";
+import { getUser } from "../../middleware/auth";
 import { mailboxes } from "../../db/schema";
 import {
   getGmailTokenForMailbox,
   listThreadsPage,
 } from "../../lib/gmail/client";
-import {
-  GOOGLE_RECONNECT_REQUIRED_MESSAGE,
-  isGmailRateLimitError,
-  isGmailReconnectRequiredError,
-} from "../../lib/gmail/errors";
+import { handleGmailError } from "../../lib/gmail/errors";
 import { resolveMailbox } from "../../lib/gmail/mailboxes";
 import { fetchThreadsAndParse } from "../../lib/gmail/sync/threads";
 import { viewToGmailFilter } from "../../lib/gmail/view-filter";
@@ -46,7 +43,7 @@ function appendQueryClauses(
 const viewRoutes = (api: Hono<AppRouteEnv>) => {
   api.post("/page", zValidator("json", viewPageRequestSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const { mailboxId, view, cursor, limit, beforeMs, filters } = c.req.valid("json");
 
     const filter = viewToGmailFilter(view);
@@ -97,28 +94,8 @@ const viewRoutes = (api: Hono<AppRouteEnv>) => {
         cursor: page.nextPageToken ?? null,
       });
     } catch (error) {
-      if (isGmailReconnectRequiredError(error)) {
-        await db
-          .update(mailboxes)
-          .set({
-            authState: "reconnect_required",
-            lastErrorAt: Date.now(),
-            lastErrorMessage: GOOGLE_RECONNECT_REQUIRED_MESSAGE,
-            updatedAt: Date.now(),
-          })
-          .where(eq(mailboxes.id, mailbox.id));
-        return c.json(
-          {
-            error: "google_reconnect_required",
-            message: GOOGLE_RECONNECT_REQUIRED_MESSAGE,
-          },
-          401,
-        );
-      }
-      if (isGmailRateLimitError(error)) {
-        c.header("Retry-After", "60");
-        return c.json({ error: "gmail_rate_limited" }, 429);
-      }
+      const handled = handleGmailError(error, db, mailbox.id, c);
+      if (handled) return handled;
       throw error;
     }
   });

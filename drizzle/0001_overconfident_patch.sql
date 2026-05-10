@@ -1,1 +1,0 @@
-ALTER TABLE `mailboxes` ADD `ai_enabled` integer DEFAULT true NOT NULL;

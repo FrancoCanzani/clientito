@@ -5,12 +5,13 @@ import { MailActionButton } from "@/features/email/mail/mail-action-button";
 import { useMailCompose } from "@/features/email/mail/compose/compose-context";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import type {
- ComposeInitial,
- EmailDetailItem,
- EmailListItem,
+  ComposeInitial,
+  EmailDetailItem,
+  EmailListItem,
 } from "@/features/email/mail/types";
 import { buildForwardedEmailHtml } from "@/features/email/mail/utils/build-forwarded-html";
 import { formatQuotedDate } from "@/features/email/mail/utils/formatters";
+import { shortcutKey } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 
 export function TodoActionsPanel({
@@ -104,43 +105,43 @@ export function TodoActionsPanel({
  className,
  )}
  >
- <div className="flex flex-row flex-wrap justify-center gap-1.5 md:flex-col md:items-start md:justify-start md:sticky md:top-2">
- <MailActionButton
- label="Reply"
- shortcut="R"
- onClick={handleReply}
- disabled={busy}
- />
- <MailActionButton
- label="Forward"
- shortcut="F"
- onClick={handleForward}
- disabled={busy}
- />
- <SnoozePicker onSnooze={handleSnooze}>
- <Button variant="secondary" size="sm" type="button" disabled={busy}>
- <span>Snooze</span>
- <Kbd>S</Kbd>
- </Button>
- </SnoozePicker>
- <MailActionButton
- label="Done"
- shortcut="E"
- onClick={handleRemove}
- disabled={busy}
- />
- <MailActionButton
- label="Archive"
- shortcut="A"
- onClick={() => void handleArchive()}
- disabled={busy}
- />
- <MailActionButton
- label="Remove"
- shortcut="Del"
- onClick={handleRemove}
- disabled={busy}
- />
+<div className="flex flex-row flex-wrap justify-center gap-1.5 md:flex-col md:items-start md:justify-start md:sticky md:top-2">
+  <MailActionButton
+  label="Reply"
+  shortcutId="action:reply"
+  onClick={handleReply}
+  disabled={busy}
+  />
+  <MailActionButton
+  label="Forward"
+  shortcutId="action:forward"
+  onClick={handleForward}
+  disabled={busy}
+  />
+  <SnoozePicker onSnooze={handleSnooze}>
+  <Button variant="secondary" size="sm" type="button" disabled={busy}>
+  <span>Snooze</span>
+  {shortcutKey("action:snooze") && <Kbd>{shortcutKey("action:snooze")}</Kbd>}
+  </Button>
+  </SnoozePicker>
+  <MailActionButton
+  label="Done"
+  shortcutId="action:archive"
+  onClick={handleRemove}
+  disabled={busy}
+  />
+  <MailActionButton
+  label="Archive"
+  shortcutId="action:archive-todo"
+  onClick={() => void handleArchive()}
+  disabled={busy}
+  />
+  <MailActionButton
+  label="Remove"
+  shortcutId="action:delete"
+  onClick={handleRemove}
+  disabled={busy}
+  />
  {hasThreadError && (
  <p className="pt-2 text-[11px] text-muted-foreground">
  Thread unavailable.

@@ -1,30 +1,13 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Hono } from "hono";
 import { parseCalendarInviteFromIcs } from "../../../lib/calendar/ics";
+import { isCalendarMimeType, isCalendarFilename } from "../../../lib/gmail/calendar-detection";
 import { GmailDriver } from "../../../lib/gmail/driver";
 import { isGmailReconnectRequiredError } from "../../../lib/gmail/errors";
 import { resolveMailbox } from "../../../lib/gmail/mailboxes";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 import { previewCalendarInviteSchema } from "./schemas";
-
-const CALENDAR_MIME_PREFIXES = [
-  "text/calendar",
-  "application/ics",
-  "application/icalendar",
-  "application/x-ical",
-  "application/vnd.ms-outlook",
-] as const;
-
-function isCalendarMimeType(value: string | null | undefined): boolean {
-  if (!value) return false;
-  const normalized = value.trim().toLowerCase();
-  return CALENDAR_MIME_PREFIXES.some((prefix) => normalized.startsWith(prefix));
-}
-
-function isCalendarFilename(value: string | null | undefined): boolean {
-  if (!value) return false;
-  return value.trim().toLowerCase().endsWith(".ics");
-}
 
 function extractCalendarBlob(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -38,7 +21,7 @@ export function registerPreviewCalendarInvite(api: Hono<AppRouteEnv>) {
     zValidator("json", previewCalendarInviteSchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const { mailboxId, providerMessageId } = c.req.valid("json");
 
       const mailbox = await resolveMailbox(db, user.id, mailboxId);

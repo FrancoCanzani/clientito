@@ -1,5 +1,5 @@
 import type { EmailView } from "./views";
-import type { EmailAICategory } from "@/db/schema";
+
 
 export type DraftState = {
  mailboxId: number | null;
@@ -70,34 +70,30 @@ export type ViewUnreadCounts = {
 };
 
 export type EmailListItem = {
- id: string;
- mailboxId: number | null;
- providerMessageId: string;
- fromAddr: string;
- fromName: string | null;
- toAddr: string | null;
- ccAddr: string | null;
- subject: string | null;
- snippet: string | null;
- threadId: string | null;
- date: number;
- direction: "sent" | "received" | null;
- isRead: boolean;
- labelIds: string[];
- hasAttachment: boolean;
- hasCalendar: boolean;
- isGatekept: boolean;
- createdAt: number;
- unsubscribeUrl: string | null;
- unsubscribeEmail: string | null;
- snoozedUntil: number | null;
- aiCategory: EmailAICategory | null;
- aiConfidence: number | null;
- aiReason: string | null;
- aiSummary: string | null;
- aiDraftReply: string | null;
- aiClassifiedAt: number | null;
- threadCount?: number;
+  id: string;
+  mailboxId: number | null;
+  providerMessageId: string;
+  fromAddr: string;
+  fromName: string | null;
+  toAddr: string | null;
+  ccAddr: string | null;
+  subject: string | null;
+  snippet: string | null;
+  threadId: string | null;
+  date: number;
+  direction: "sent" | "received" | null;
+  isRead: boolean;
+  labelIds: string[];
+  hasAttachment: boolean;
+  hasCalendar: boolean;
+  isGatekept: boolean;
+  createdAt: number;
+  unsubscribeUrl: string | null;
+  unsubscribeEmail: string | null;
+  snoozedUntil: number | null;
+  aiSummary: string | null;
+  aiDraftReply: string | null;
+  threadCount?: number;
 };
 
 export type EmailInlineAttachment = {

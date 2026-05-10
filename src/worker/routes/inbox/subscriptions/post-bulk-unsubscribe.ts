@@ -11,6 +11,7 @@ import {
   normalizeUnsubscribeUrl,
 } from "../../../lib/gmail/subscriptions/service";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 
 const bulkUnsubscribeSchema = z.object({
   items: z
@@ -38,7 +39,7 @@ export function registerPostBulkUnsubscribe(api: Hono<AppRouteEnv>) {
     zValidator("json", bulkUnsubscribeSchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const { items } = c.req.valid("json");
 
       let mailbox: typeof mailboxes.$inferSelect | null = null;

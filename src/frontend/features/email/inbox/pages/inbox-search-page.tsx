@@ -22,7 +22,7 @@ import {
   MailboxPageBody,
   MailboxPageHeader,
 } from "@/features/email/shell/mailbox-page";
-import { useHotkeys } from "@/hooks/use-hotkeys";
+import { useShortcuts } from "@/hooks/use-shortcuts";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { cn } from "@/lib/utils";
 import { XIcon } from "@phosphor-icons/react";
@@ -214,11 +214,14 @@ export default function InboxSearchPage() {
     commitQuery(next);
   }
 
-  useHotkeys({
-    j: () => moveFocus(1),
-    ArrowDown: { onKeyDown: () => moveFocus(1), allowInEditable: true },
-    k: () => moveFocus(-1),
-    ArrowUp: { onKeyDown: () => moveFocus(-1), allowInEditable: true },
+  useShortcuts("search", {
+    "search:next": () => moveFocus(1),
+    "search:prev": () => moveFocus(-1),
+    "search:next-arrow": () => moveFocus(1),
+    "search:prev-arrow": () => moveFocus(-1),
+    "action:esc": () => {
+      void navigate({ to: "/$mailboxId/inbox", params: { mailboxId } });
+    },
   });
 
   const showSearchingIndicator =

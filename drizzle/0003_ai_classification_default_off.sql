@@ -1,2 +1,0 @@
-ALTER TABLE `mailboxes`
-ADD `ai_classification_enabled` integer DEFAULT false NOT NULL;

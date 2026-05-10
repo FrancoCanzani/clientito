@@ -1,23 +1,24 @@
 import { openCompose } from "@/features/email/mail/compose/compose-events";
 import { ArrowBendUpLeftIcon, PencilSimpleIcon } from "@phosphor-icons/react";
+import { shortcutKey } from "@/lib/shortcuts";
 import { paletteIcon } from "../registry/palette-icon";
 import { registerCommands } from "../registry/registry";
 import type { Command } from "../registry/types";
 
 const composeCommands: Command[] = [
- {
- id: "compose:new",
- label: "Compose new email",
- icon: paletteIcon(PencilSimpleIcon),
- group: "email",
- shortcut: "C",
- keywords: ["compose", "write", "new", "draft", "send"],
- when: (ctx) => ctx.defaultMailboxId != null && !ctx.composerOpen,
- perform: (ctx, services) => {
- openCompose({ mailboxId: ctx.defaultMailboxId ?? undefined });
- services.close();
- },
- },
+  {
+    id: "compose:new",
+    label: "Compose new email",
+    icon: paletteIcon(PencilSimpleIcon),
+    group: "email",
+    shortcut: shortcutKey("action:compose"),
+  keywords: ["compose", "write", "new", "draft", "send"],
+  when: (ctx) => ctx.defaultMailboxId != null && !ctx.composerOpen,
+  perform: (ctx, services) => {
+  openCompose({ mailboxId: ctx.defaultMailboxId ?? undefined });
+  services.close();
+  },
+  },
  {
  id: "compose:feedback",
  label: "Send feedback",

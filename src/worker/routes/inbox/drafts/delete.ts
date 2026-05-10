@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import { drafts } from "../../../db/schema";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 import { draftIdParamsSchema, deleteDraftByKeyQuerySchema } from "./schemas";
 
 export function registerDeleteDrafts(api: Hono<AppRouteEnv>) {
@@ -11,7 +12,7 @@ export function registerDeleteDrafts(api: Hono<AppRouteEnv>) {
     zValidator("query", deleteDraftByKeyQuerySchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const { composeKey } = c.req.valid("query");
 
       await db
@@ -26,7 +27,7 @@ export function registerDeleteDrafts(api: Hono<AppRouteEnv>) {
 
   api.delete("/:id", zValidator("param", draftIdParamsSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const { id } = c.req.valid("param");
 
     await db

@@ -38,7 +38,6 @@ export type MailboxAccount = {
   syncWindowMonths: 3 | 6 | 12 | null;
   syncCutoffAt: number | null;
   aiEnabled: boolean;
-  aiClassificationEnabled: boolean;
   syncState: "needs_reconnect" | "ready_to_sync" | "error" | "ready";
   error: string | null;
   createdAt: number | null;
@@ -203,8 +202,7 @@ function isRawMailboxAccount(value: unknown): value is RawMailboxAccount {
     typeof value.authState === "string" &&
     typeof value.hasSynced === "boolean" &&
     typeof value.hasValidCredentials === "boolean" &&
-    typeof value.aiEnabled === "boolean" &&
-    typeof value.aiClassificationEnabled === "boolean"
+    typeof value.aiEnabled === "boolean"
   );
 }
 

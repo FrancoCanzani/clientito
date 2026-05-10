@@ -6,6 +6,7 @@ import { appendSignature } from "../../../lib/gmail/mailbox/signature";
 import { eq } from "drizzle-orm";
 import { mailboxes, scheduledEmails } from "../../../db/schema";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 import { sendEmailBodySchema } from "./schemas";
 import {
   deleteAttachmentFile,
@@ -15,7 +16,7 @@ import {
 export function registerPostEmail(api: Hono<AppRouteEnv>) {
   api.post("/send", zValidator("json", sendEmailBodySchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const env = c.env;
 
     const input = c.req.valid("json");

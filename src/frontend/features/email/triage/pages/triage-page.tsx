@@ -41,8 +41,9 @@ import {
   pickReplySource,
 } from "@/features/email/mail/utils/reply-compose";
 import { useAuth } from "@/hooks/use-auth";
-import { useHotkeys } from "@/hooks/use-hotkeys";
+import { useShortcuts } from "@/hooks/use-shortcuts";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
+import { shortcutKey } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { PaperclipIcon, XIcon } from "@phosphor-icons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -250,23 +251,24 @@ export default function TriagePage() {
     });
   }, [current]);
 
-  useHotkeys(
+  useShortcuts(
+    "triage",
     {
-      e: () => handleDone(),
-      r: () => focusComposerEditor(),
-      c: () => openCompose(),
-      s: () => {
+      "action:archive": () => handleDone(),
+      "action:reply": () => focusComposerEditor(),
+      "action:compose": () => openCompose(),
+      "action:snooze": () => {
         snoozeButtonRef.current?.click();
       },
-      t: () => handleTodo(),
-      "#": () => handleDelete(),
-      j: () => advance(),
-      ArrowDown: () => advance(),
-      ArrowRight: () => advance(),
-      k: () => goPrev(),
-      ArrowUp: () => goPrev(),
-      ArrowLeft: () => goPrev(),
-      Escape: () => {
+      "action:todo": () => handleTodo(),
+      "action:trash": () => handleDelete(),
+      "triage:advance": () => advance(),
+      "triage:advance-arrow": () => advance(),
+      "triage:advance-arrow-right": () => advance(),
+      "triage:prev": () => goPrev(),
+      "triage:prev-arrow": () => goPrev(),
+      "triage:prev-arrow-left": () => goPrev(),
+      "action:esc": () => {
         if (replyOpen) {
           setReplyOpen(false);
           return;
@@ -569,13 +571,13 @@ function TriageActionBar({
           className="px-3"
         >
           <span>Done</span>
-          <Kbd>E</Kbd>
+          <Kbd>{shortcutKey("action:archive")}</Kbd>
         </Button>
 
         <SnoozePicker onSnooze={onSnooze}>
           <Button ref={snoozeButtonRef} variant="ghost" size="sm" type="button">
             <span>Snooze</span>
-            <Kbd>S</Kbd>
+            <Kbd>{shortcutKey("action:snooze")}</Kbd>
           </Button>
         </SnoozePicker>
         <Button
@@ -586,11 +588,11 @@ function TriageActionBar({
           disabled={actionsPending}
         >
           <span>{isTodo ? "To-do*" : "To-do"}</span>
-          <Kbd>T</Kbd>
+          <Kbd>{shortcutKey("action:todo")}</Kbd>
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onKeep}>
           <span>Keep</span>
-          <Kbd>J</Kbd>
+          <Kbd>{shortcutKey("triage:advance")}</Kbd>
         </Button>
         <Button
           type="button"
@@ -600,7 +602,7 @@ function TriageActionBar({
           className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
         >
           <span>Delete</span>
-          <Kbd>#</Kbd>
+          <Kbd>{shortcutKey("action:trash")}</Kbd>
         </Button>
 
         <Button
@@ -611,7 +613,7 @@ function TriageActionBar({
           className="lg:hidden"
         >
           <span>Reply</span>
-          <Kbd>R</Kbd>
+          <Kbd>{shortcutKey("action:reply")}</Kbd>
         </Button>
 
         {canUnsubscribe && (
@@ -624,7 +626,7 @@ function TriageActionBar({
             className="ml-auto text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           >
             <span>Unsubscribe</span>
-            <Kbd>U</Kbd>
+            <Kbd>{shortcutKey("action:toggle-read")}</Kbd>
           </Button>
         )}
       </div>

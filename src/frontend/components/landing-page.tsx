@@ -13,31 +13,6 @@ import {
 } from "./ui/accordion";
 import { Button } from "./ui/button";
 
-type Shortcut = {
- keys: string;
- label: string;
- keyIds: string[];
-};
-
-type KeyboardKey = {
- id: string;
- label: string;
- width?: number;
-};
-const KEYBOARD_UNIT_REM = 1.8;
-
-const SHORTCUTS: Shortcut[] = [
- { keys: "⌘K", label: "Open command palette", keyIds: ["CMD", "K"] },
- { keys: "⌘C", label: "Compose new message", keyIds: ["CMD", "C"] },
- { keys: "⌘1", label: "Inbox", keyIds: ["CMD", "1"] },
- { keys: "⌘2", label: "Starred", keyIds: ["CMD", "2"] },
- { keys: "⌘3", label: "Done", keyIds: ["CMD", "3"] },
- { keys: "J / K", label: "Move between threads", keyIds: ["J", "K"] },
- { keys: "E", label: "Mark as done", keyIds: ["E"] },
- { keys: "S", label: "Snooze", keyIds: ["S"] },
- { keys: "/", label: "Search", keyIds: ["SLASH"] },
- { keys: "?", label: "Show all shortcuts", keyIds: ["SHIFT", "SLASH"] },
-];
 const FAQ_ITEMS: Array<{ question: string; answer: string }> = [
  {
  question: "Do you store my emails on your servers?",
@@ -59,96 +34,6 @@ const FAQ_ITEMS: Array<{ question: string; answer: string }> = [
  answer:
  "New messages from that sender are moved out of inbox and blocked according to your mailbox rules.",
  },
-];
-
-const KEYBOARD_LAYOUT: KeyboardKey[][] = [
- [
- { id: "ESC", label: "Esc", width: 1.4 },
- { id: "F1", label: "F1" },
- { id: "F2", label: "F2" },
- { id: "F3", label: "F3" },
- { id: "F4", label: "F4" },
- { id: "F5", label: "F5" },
- { id: "F6", label: "F6" },
- { id: "F7", label: "F7" },
- { id: "F8", label: "F8" },
- { id: "F9", label: "F9" },
- { id: "F10", label: "F10" },
- { id: "F11", label: "F11" },
- { id: "F12", label: "F12" },
- { id: "LOCK", label: "🔒", width: 1.4 },
- ],
- [
- { id: "BACKTICK", label: "~\n`" },
- { id: "1", label: "!\n1" },
- { id: "2", label: "@\n2" },
- { id: "3", label: "#\n3" },
- { id: "4", label: "$\n4" },
- { id: "5", label: "%\n5" },
- { id: "6", label: "^\n6" },
- { id: "7", label: "&\n7" },
- { id: "8", label: "*\n8" },
- { id: "9", label: "(\n9" },
- { id: "0", label: ")\n0" },
- { id: "MINUS", label: "_\n-" },
- { id: "EQUAL", label: "+\n=" },
- { id: "BACKSPACE", label: "delete", width: 2.2 },
- ],
- [
- { id: "TAB", label: "Tab", width: 1.6 },
- { id: "Q", label: "Q" },
- { id: "W", label: "W" },
- { id: "E", label: "E" },
- { id: "R", label: "R" },
- { id: "T", label: "T" },
- { id: "Y", label: "Y" },
- { id: "U", label: "U" },
- { id: "I", label: "I" },
- { id: "O", label: "O" },
- { id: "P", label: "P" },
- { id: "LBRACKET", label: "[" },
- { id: "RBRACKET", label: "]" },
- { id: "BACKSLASH", label: "\\", width: 1.6 },
- ],
- [
- { id: "CAPS", label: "Caps", width: 1.9 },
- { id: "A", label: "A" },
- { id: "S", label: "S" },
- { id: "D", label: "D" },
- { id: "F", label: "F" },
- { id: "G", label: "G" },
- { id: "H", label: "H" },
- { id: "J", label: "J" },
- { id: "K", label: "K" },
- { id: "L", label: "L" },
- { id: "SEMICOLON", label: ";" },
- { id: "QUOTE", label: "'" },
- { id: "ENTER", label: "Enter", width: 2.3 },
- ],
- [
- { id: "SHIFT", label: "Shift", width: 2.4 },
- { id: "Z", label: "Z" },
- { id: "X", label: "X" },
- { id: "C", label: "C" },
- { id: "V", label: "V" },
- { id: "B", label: "B" },
- { id: "N", label: "N" },
- { id: "M", label: "M" },
- { id: "COMMA", label: "," },
- { id: "DOT", label: "." },
- { id: "SLASH", label: "/" },
- { id: "SHIFT_R", label: "Shift", width: 2.8 },
- ],
- [
- { id: "GLOBE", label: "🌐", width: 1.3 },
- { id: "CTRL", label: "Ctrl", width: 1.6 },
- { id: "ALT", label: "Alt", width: 1.4 },
- { id: "CMD", label: "⌘", width: 1.8 },
- { id: "SPACE", label: "", width: 5.8 },
- { id: "CMD_R", label: "⌘", width: 1.8 },
- { id: "ALT_R", label: "Alt", width: 1.4 },
- { id: "ARROWS", label: "", width: 3.4 },
- ],
 ];
 
 const AI_GRAMMAR_ORIGINAL =
@@ -525,16 +410,11 @@ function AiSummaryPreview() {
  );
 }
 
-export default function LandingPage() {
+export function LandingPage() {
  const { isAuthenticated } = useAuth();
  const accounts = useMailboxes().data?.accounts ?? [];
  const preferredMailboxId = getPreferredMailboxId(accounts);
- const [hoveredShortcut, setHoveredShortcut] = useState<string | null>(null);
- const highlightedKeyIds = useMemo(() => {
- if (!hoveredShortcut) return new Set<string>();
- const shortcut = SHORTCUTS.find((entry) => entry.keys === hoveredShortcut);
- return new Set(shortcut?.keyIds ?? []);
- }, [hoveredShortcut]);
+
 
  return (
  <div className="min-h-svh bg-background text-foreground antialiased">
@@ -708,114 +588,7 @@ export default function LandingPage() {
  </div>
  </section>
 
- <section className="py-20 md:py-24">
- <div className="mb-6 flex items-center gap-3 text-muted-foreground">
- <span className="h-px flex-1 bg-border" />
- <span className="text-lg">Keyboard First</span>
- </div>{" "}
- <h2 className="font-serif text-3xl leading-tight tracking-tight md:text-4xl">
- Move at your speed.
- </h2>
- <p className="mt-6 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
- Every primary action has a shortcut. The mouse is optional.
- </p>
- <div className="mt-5 overflow-hidden bg-sidebar p-1">
- <div className="bg-background p-3 md:p-4">
- <div className="space-y-3">
- <div className="border border-border/30 bg-sidebar/30 p-2">
- <div className="w-full">
- {KEYBOARD_LAYOUT.map((row, rowIndex) => (
- <div key={rowIndex} className="mb-1.5 flex gap-1 last:mb-0">
- {row.map((key) => {
- if (key.id === "ARROWS") {
- const arrowIds = ["LEFT", "DOWN", "UP", "RIGHT"];
- const hasActiveArrow = arrowIds.some((id) =>
- highlightedKeyIds.has(id),
- );
- const getArrowClass = (id: string) =>
- `flex items-center justify-center border text-[9px] font-medium transition-colors ${
- highlightedKeyIds.has(id)
- ? "border-primary/40 bg-primary/10 text-foreground"
- : "border-border/40 bg-background text-muted-foreground"
- }`;
-
- return (
- <div
- key={key.id}
- style={{
- width: `${(key.width ?? 1) * KEYBOARD_UNIT_REM}rem`,
- }}
- className={`grid h-8 grid-cols-3 grid-rows-2 gap-0.5 border p-0.5 ${
- hasActiveArrow
- ? "border-primary/30 bg-primary/5"
- : "border-border/40 bg-muted/20"
- }`}
- >
- <span />
- <span className={getArrowClass("UP")}>↑</span>
- <span />
- <span className={getArrowClass("LEFT")}>←</span>
- <span className={getArrowClass("DOWN")}>↓</span>
- <span className={getArrowClass("RIGHT")}>→</span>
- </div>
- );
- }
-
- const isActive = highlightedKeyIds.has(key.id);
- return (
- <kbd
- key={key.id}
- style={{
- width: `${(key.width ?? 1) * KEYBOARD_UNIT_REM}rem`,
- }}
- className={`inline-flex h-8 items-center justify-center border px-1.5 text-[10px] leading-tight whitespace-pre-line font-medium transition-colors ${
- isActive
- ? "border-primary/40 bg-primary/10 text-foreground"
- : "border-border/40 bg-background text-muted-foreground"
- }`}
- >
- {key.label}
- </kbd>
- );
- })}
- </div>
- ))}
- </div>
- </div>
-
- <p className="my-4 text-[11px] text-center text-muted-foreground font-medium">
- Hover a command to preview the keys.
- </p>
-
- <div className="border border-border/30 bg-sidebar/30 p-2">
- <div className="grid gap-1.5 sm:grid-cols-2">
- {SHORTCUTS.map((shortcut) => (
- <div
- key={shortcut.keys}
- className={`flex items-center justify-between gap-2 border px-2 py-1.5 text-xs ${
- hoveredShortcut === shortcut.keys
- ? "border-primary/30 bg-primary/10"
- : "border-border/30 bg-background"
- }`}
- onMouseEnter={() => setHoveredShortcut(shortcut.keys)}
- onMouseLeave={() => setHoveredShortcut(null)}
- >
- <span className="truncate text-muted-foreground">
- {shortcut.label}
- </span>
- <kbd className="border border-border/50 bg-muted px-1.5 py-0.5 text-[11px] text-foreground">
- {shortcut.keys}
- </kbd>
- </div>
- ))}
- </div>
- </div>
- </div>
- </div>
- </div>
- </section>
-
- <span className="w-full flex justify-center font-medium text-xl">
+  <span className="w-full flex justify-center font-medium text-xl">
  FAQ
  </span>
 

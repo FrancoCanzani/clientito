@@ -8,6 +8,7 @@ import {
   resolveSyncCutoffAt,
 } from "../../lib/gmail/sync/preferences";
 import type { AppRouteEnv } from "../types";
+import { getUser } from "../../middleware/auth";
 
 const syncSettingsBodySchema = z.object({
   mailboxId: z.number().int().positive().optional(),
@@ -20,7 +21,7 @@ export function registerPutSyncSettings(settingsRoutes: Hono<AppRouteEnv>) {
     zValidator("json", syncSettingsBodySchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const body = c.req.valid("json");
 
       const mailbox = await resolveMailbox(db, user.id, body.mailboxId);

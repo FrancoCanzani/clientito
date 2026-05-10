@@ -4,6 +4,7 @@ import { GmailDriver } from "../../../lib/gmail/driver";
 import { resolveMailbox } from "../../../lib/gmail/mailboxes";
 import { applyEmailPatch } from "./internal/mutation";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 import { patchThreadBodySchema } from "./schemas";
 
 export function registerPatchThread(api: Hono<AppRouteEnv>) {
@@ -12,7 +13,7 @@ export function registerPatchThread(api: Hono<AppRouteEnv>) {
     zValidator("json", patchThreadBodySchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const threadId = c.req.param("threadId")?.trim();
       const { mailboxId, labelIds: currentLabelIds, ...mutation } = c.req.valid("json");
 

@@ -83,25 +83,6 @@ export async function updateMailboxAiEnabled(
  }
 }
 
-export async function updateMailboxAiClassificationEnabled(
- mailboxId: number,
- aiClassificationEnabled: boolean,
-): Promise<void> {
- const response = await fetch(`/api/settings/mailboxes/${mailboxId}`, {
- method: "PATCH",
- headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ aiClassificationEnabled }),
- });
-
- if (!response.ok) {
- const json = await response.json().catch(() => ({}));
- throw new Error(
- getErrorMessage(json) ??
- "Failed to update AI classification setting",
- );
- }
-}
-
 export async function deleteAccount(): Promise<void> {
  const response = await fetch("/api/settings/account", {
  method: "DELETE",

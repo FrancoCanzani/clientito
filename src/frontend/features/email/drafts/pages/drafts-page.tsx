@@ -67,7 +67,7 @@ export default function DraftsPage() {
 
  <MailboxPageBody className="overflow-y-auto">
  {drafts.length === 0 ? (
- <Empty className="min-h-56 justify-center">
+ <Empty>
  <EmptyHeader>
  <EmptyTitle>No drafts</EmptyTitle>
  <EmptyDescription>

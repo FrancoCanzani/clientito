@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useHotkeys } from "@/hooks/use-hotkeys";
+import { useShortcuts } from "@/hooks/use-shortcuts";
 import { getMailboxDisplayEmail } from "@/hooks/use-mailboxes";
 import { cn } from "@/lib/utils";
 import {
@@ -233,29 +233,20 @@ export function ComposeEmailFields({
     }
   }, [focusedField]);
 
-  useHotkeys(
+  useShortcuts(
+    "compose",
     {
-      o: {
-        onKeyDown: () => setFocusedField("to"),
+      "compose:focus-to": () => setFocusedField("to"),
+      "compose:focus-cc": () => {
+        setShowCc(true);
+        setFocusedField("cc");
       },
-      c: {
-        onKeyDown: () => {
-          setShowCc(true);
-          setFocusedField("cc");
-        },
+      "compose:focus-bcc": () => {
+        setShowBcc(true);
+        setFocusedField("bcc");
       },
-      b: {
-        onKeyDown: () => {
-          setShowBcc(true);
-          setFocusedField("bcc");
-        },
-      },
-      s: {
-        onKeyDown: () => setFocusedField("subject"),
-      },
-      m: {
-        onKeyDown: () => setFocusedField("body"),
-      },
+      "compose:focus-subject": () => setFocusedField("subject"),
+      "compose:focus-body": () => setFocusedField("body"),
     },
     { target: rootRef.current },
   );

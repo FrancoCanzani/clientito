@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import {
   Sheet,
   SheetContent,
@@ -11,6 +12,7 @@ import { fetchLabels } from "@/features/email/labels/queries";
 import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { beginGmailConnection } from "@/features/onboarding/mutations";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
+import { shortcutKey } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import {
   ArchiveIcon,
@@ -39,6 +41,17 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
+const sidebarShortcutIds: Record<string, string> = {
+  Inbox: "nav:inbox",
+  Search: "nav:search",
+  Starred: "nav:starred",
+  Done: "nav:archived",
+  Sent: "nav:sent",
+  Drafts: "nav:drafts",
+  Spam: "nav:spam",
+  Trash: "nav:trash",
+};
+
 const mailSidebarItems = [
   { label: "Inbox", icon: TrayIcon, to: "/$mailboxId/inbox" },
   {
@@ -202,11 +215,13 @@ function SidebarLabel({
   label,
   count,
   expanded = false,
+  shortcutKey,
 }: {
   icon: Icon;
   label: string;
   count?: number;
   expanded?: boolean;
+  shortcutKey?: string;
 }) {
   return (
     <>
@@ -219,6 +234,16 @@ function SidebarLabel({
       >
         {label}
       </span>
+      {shortcutKey && (
+        <Kbd
+          className={cn(
+            "hidden group-hover/sidebar:inline-flex",
+            expanded && "inline-flex",
+          )}
+        >
+          {shortcutKey}
+        </Kbd>
+      )}
       {count != null && count > 0 && (
         <span
           className={cn(
@@ -369,6 +394,7 @@ function MailboxSidebarContent({
                   icon={item.icon}
                   label={item.label}
                   expanded={expanded}
+                  shortcutKey={shortcutKey(sidebarShortcutIds[item.label])}
                 />
               </Link>
             ) : (
@@ -389,6 +415,7 @@ function MailboxSidebarContent({
                   icon={item.icon}
                   label={item.label}
                   expanded={expanded}
+                  shortcutKey={shortcutKey(sidebarShortcutIds[item.label])}
                 />
               </Link>
             );
@@ -444,6 +471,7 @@ function MailboxSidebarContent({
             icon={GearSixIcon}
             label="Settings"
             expanded={expanded}
+            shortcutKey={shortcutKey("nav:settings")}
           />
         </Link>
       </div>

@@ -4,24 +4,25 @@ import { patchEmail, type EmailIdentifier } from "@/features/email/mail/mutation
 import type { EmailListItem, EmailListPage } from "@/features/email/mail/types";
 import { isEmailListInfiniteData } from "@/features/email/mail/utils/email-list-cache";
 import {
- CheckIcon,
- ClockIcon,
- EnvelopeOpenIcon,
- EnvelopeSimpleIcon,
- StarIcon,
- TrashIcon,
- TrayIcon,
- WarningIcon,
+  CheckIcon,
+  ClockIcon,
+  EnvelopeOpenIcon,
+  EnvelopeSimpleIcon,
+  StarIcon,
+  TrashIcon,
+  TrayIcon,
+  WarningIcon,
 } from "@phosphor-icons/react";
 import type { InfiniteData } from "@tanstack/react-query";
 import { addHours, nextMonday, startOfTomorrow } from "date-fns";
 import { toast } from "sonner";
+import { shortcutKey } from "@/lib/shortcuts";
 import { paletteIcon } from "../registry/palette-icon";
 import { registerCommands } from "../registry/registry";
 import type {
- Command,
- CommandContext,
- CommandServices,
+  Command,
+  CommandContext,
+  CommandServices,
 } from "../registry/types";
 
 type PatchData = Parameters<typeof patchEmail>[1];
@@ -102,137 +103,141 @@ async function performEmailAction(
 
 const hasEmail = (ctx: CommandContext) => ctx.selectedEmailId !== null;
 
+function key(id: string) {
+  return shortcutKey(id);
+}
+
 const emailCommands: Command[] = [
- {
- id: "email:done",
- label: "Mark as done",
- icon: paletteIcon(CheckIcon),
- group: "email",
- shortcut: "E",
- keywords: ["done", "archive", "remove"],
- when: hasEmail,
- perform: (ctx, services) =>
- performEmailAction(ctx, services, { archived: true }),
- },
- {
- id: "email:move-to-inbox",
- label: "Move to inbox",
- icon: paletteIcon(TrayIcon),
- group: "email",
- keywords: ["unarchive", "inbox", "move"],
- when: hasEmail,
- perform: (ctx, services) =>
- performEmailAction(ctx, services, { archived: false }),
- },
- {
- id: "email:trash",
- label: "Move to trash",
- icon: paletteIcon(TrashIcon),
- group: "email",
- shortcut: "#",
- keywords: ["trash", "delete", "remove"],
- when: hasEmail,
- perform: (ctx, services) =>
- performEmailAction(ctx, services, { trashed: true }, "Moved to trash"),
- },
- {
- id: "email:spam",
- label: "Mark as spam",
- icon: paletteIcon(WarningIcon),
- group: "email",
- keywords: ["spam", "junk"],
- when: hasEmail,
- perform: (ctx, services) =>
- performEmailAction(ctx, services, { spam: true }, "Marked as spam"),
- },
- {
- id: "email:mark-read",
- label: "Mark as read",
- icon: paletteIcon(EnvelopeOpenIcon),
- group: "email",
- shortcut: "U",
- keywords: ["read", "seen"],
- when: hasEmail,
- perform: (ctx, services) =>
- performEmailAction(ctx, services, { isRead: true }),
- },
- {
- id: "email:mark-unread",
- label: "Mark as unread",
- icon: paletteIcon(EnvelopeSimpleIcon),
- group: "email",
- shortcut: "U",
- keywords: ["unread", "unseen"],
- when: hasEmail,
- perform: (ctx, services) =>
- performEmailAction(ctx, services, { isRead: false }),
- },
- {
- id: "email:star",
- label: "Star email",
- icon: paletteIcon(StarIcon),
- group: "email",
- shortcut: "S",
- keywords: ["star", "favorite", "important"],
- when: hasEmail,
- perform: (ctx, services) =>
- performEmailAction(ctx, services, { starred: true }),
- },
- {
- id: "email:unstar",
- label: "Unstar email",
- icon: paletteIcon(StarIcon),
- group: "email",
- keywords: ["unstar", "unfavorite"],
- when: hasEmail,
- perform: (ctx, services) =>
- performEmailAction(ctx, services, { starred: false }),
- },
- {
- id: "email:snooze-1h",
- label: "Snooze for 1 hour",
- icon: paletteIcon(ClockIcon),
- group: "email",
- keywords: ["snooze", "remind", "later"],
- when: hasEmail,
- perform: (ctx, services) =>
- performEmailAction(
- ctx,
- services,
- { snoozedUntil: addHours(new Date(), 1).getTime() },
- "Snoozed for 1 hour",
- ),
- },
- {
- id: "email:snooze-tomorrow",
- label: "Snooze until tomorrow",
- icon: paletteIcon(ClockIcon),
- group: "email",
- keywords: ["snooze", "remind", "tomorrow"],
- when: hasEmail,
- perform: (ctx, services) =>
- performEmailAction(
- ctx,
- services,
- { snoozedUntil: startOfTomorrow().getTime() },
- "Snoozed until tomorrow",
- ),
- },
- {
- id: "email:snooze-next-week",
- label: "Snooze until next week",
- icon: paletteIcon(ClockIcon),
- group: "email",
- keywords: ["snooze", "remind", "next week"],
- when: hasEmail,
- perform: (ctx, services) =>
- performEmailAction(
- ctx,
- services,
- { snoozedUntil: nextMonday(new Date()).getTime() },
- "Snoozed until next week",
- ),
- },
+  {
+  id: "email:done",
+  label: "Mark as done",
+  icon: paletteIcon(CheckIcon),
+  group: "email",
+  shortcut: key("action:archive"),
+  keywords: ["done", "archive", "remove"],
+  when: hasEmail,
+  perform: (ctx, services) =>
+  performEmailAction(ctx, services, { archived: true }),
+  },
+  {
+  id: "email:move-to-inbox",
+  label: "Move to inbox",
+  icon: paletteIcon(TrayIcon),
+  group: "email",
+  keywords: ["unarchive", "inbox", "move"],
+  when: hasEmail,
+  perform: (ctx, services) =>
+  performEmailAction(ctx, services, { archived: false }),
+  },
+  {
+  id: "email:trash",
+  label: "Move to trash",
+  icon: paletteIcon(TrashIcon),
+  group: "email",
+  shortcut: key("action:trash"),
+  keywords: ["trash", "delete", "remove"],
+  when: hasEmail,
+  perform: (ctx, services) =>
+  performEmailAction(ctx, services, { trashed: true }, "Moved to trash"),
+  },
+  {
+  id: "email:spam",
+  label: "Mark as spam",
+  icon: paletteIcon(WarningIcon),
+  group: "email",
+  keywords: ["spam", "junk"],
+  when: hasEmail,
+  perform: (ctx, services) =>
+  performEmailAction(ctx, services, { spam: true }, "Marked as spam"),
+  },
+  {
+  id: "email:mark-read",
+  label: "Mark as read",
+  icon: paletteIcon(EnvelopeOpenIcon),
+  group: "email",
+  shortcut: key("action:toggle-read"),
+  keywords: ["read", "seen"],
+  when: hasEmail,
+  perform: (ctx, services) =>
+  performEmailAction(ctx, services, { isRead: true }),
+  },
+  {
+  id: "email:mark-unread",
+  label: "Mark as unread",
+  icon: paletteIcon(EnvelopeSimpleIcon),
+  group: "email",
+  shortcut: key("action:toggle-read"),
+  keywords: ["unread", "unseen"],
+  when: hasEmail,
+  perform: (ctx, services) =>
+  performEmailAction(ctx, services, { isRead: false }),
+  },
+  {
+  id: "email:star",
+  label: "Star email",
+  icon: paletteIcon(StarIcon),
+  group: "email",
+  shortcut: key("action:star"),
+  keywords: ["star", "favorite", "important"],
+  when: hasEmail,
+  perform: (ctx, services) =>
+  performEmailAction(ctx, services, { starred: true }),
+  },
+  {
+  id: "email:unstar",
+  label: "Unstar email",
+  icon: paletteIcon(StarIcon),
+  group: "email",
+  keywords: ["unstar", "unfavorite"],
+  when: hasEmail,
+  perform: (ctx, services) =>
+  performEmailAction(ctx, services, { starred: false }),
+  },
+  {
+  id: "email:snooze-1h",
+  label: "Snooze for 1 hour",
+  icon: paletteIcon(ClockIcon),
+  group: "email",
+  keywords: ["snooze", "remind", "later"],
+  when: hasEmail,
+  perform: (ctx, services) =>
+  performEmailAction(
+  ctx,
+  services,
+  { snoozedUntil: addHours(new Date(), 1).getTime() },
+  "Snoozed for 1 hour",
+  ),
+  },
+  {
+  id: "email:snooze-tomorrow",
+  label: "Snooze until tomorrow",
+  icon: paletteIcon(ClockIcon),
+  group: "email",
+  keywords: ["snooze", "remind", "tomorrow"],
+  when: hasEmail,
+  perform: (ctx, services) =>
+  performEmailAction(
+  ctx,
+  services,
+  { snoozedUntil: startOfTomorrow().getTime() },
+  "Snoozed until tomorrow",
+  ),
+  },
+  {
+  id: "email:snooze-next-week",
+  label: "Snooze until next week",
+  icon: paletteIcon(ClockIcon),
+  group: "email",
+  keywords: ["snooze", "remind", "next week"],
+  when: hasEmail,
+  perform: (ctx, services) =>
+  performEmailAction(
+  ctx,
+  services,
+  { snoozedUntil: nextMonday(new Date()).getTime() },
+  "Snoozed until next week",
+  ),
+  },
 ];
 
 registerCommands(emailCommands);

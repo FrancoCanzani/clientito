@@ -6,7 +6,16 @@ import { VIEW_PAGE_SIZE } from "./constants";
 import { alignActiveUser } from "./local-cache";
 import type { MailListFilters, ViewPage } from "./types";
 import { decodeViewCursor, encodeViewCursor } from "./view-cursor";
-import { enqueueViewSyncPage } from "./view-sync";
+import { enqueueViewSyncPage, refreshViewFromServer } from "./view-sync";
+
+function toDbCursor(
+  decoded: DecodedCursor | null,
+): { date: number; id?: number } | undefined {
+  if (!decoded || decoded.type !== "local") return undefined;
+  return { date: decoded.beforeDate, id: decoded.beforeId };
+}
+
+import type { DecodedCursor } from "./types";
 
 export async function fetchViewPage(params: {
   mailboxId: number;
@@ -21,33 +30,22 @@ export async function fetchViewPage(params: {
   await alignActiveUser(userId);
 
   const splitRule = params.splitRule ?? null;
-  const splitScoped = splitRule !== null;
   const filters = params.filters;
-  const decoded = decodeViewCursor(params.cursor);
+  const { cursor: decoded, beforeMs } = decodeViewCursor(params.cursor);
 
-  if (decoded?.type === "remote" && !splitScoped) {
+  if (decoded?.type === "remote" && splitRule === null) {
     return enqueueViewSyncPage({
       userId,
       mailboxId: params.mailboxId,
       view: params.view,
-      cursor: decoded,
+      remoteCursor: decoded,
       reason: "active-page",
       filters,
+      beforeMs,
     });
   }
 
-  const localCursor =
-    decoded?.type === "local"
-      ? "beforeDate" in decoded
-        ? {
-            date: decoded.beforeDate,
-            id: decoded.beforeId,
-          }
-        : typeof decoded.beforeMs === "number"
-          ? { date: decoded.beforeMs }
-          : undefined
-      : undefined;
-  const beforeMs = localCursor?.date;
+  const localCursor = toDbCursor(decoded);
   const local = await localDb.getEmails({
     userId,
     mailboxId: params.mailboxId,
@@ -61,46 +59,29 @@ export async function fetchViewPage(params: {
   });
 
   if (local.data.length === 0) {
-    if (splitScoped) {
-      await enqueueViewSyncPage({
-        userId,
-        mailboxId: params.mailboxId,
-        view: params.view,
-        cursor: { type: "remote", beforeMs },
-        reason: "active-page",
-        filters,
-      });
-      const seeded = await localDb.getEmails({
-        userId,
-        mailboxId: params.mailboxId,
-        view: params.view,
-        limit: VIEW_PAGE_SIZE,
-        cursor: localCursor,
-        splitRule,
-        isRead: filters?.unread ? "false" : undefined,
-        starred: filters?.starred,
-        hasAttachment: filters?.hasAttachment,
-      });
-      if (seeded.pagination.hasMore && seeded.pagination.cursor) {
-        return {
-          emails: seeded.data,
-          cursor: encodeViewCursor({
-            type: "local",
-            beforeDate: seeded.pagination.cursor.date,
-            beforeId: seeded.pagination.cursor.id,
-          }),
-        };
-      }
-      return { emails: seeded.data, cursor: null };
-    }
-    return enqueueViewSyncPage({
-      userId,
-      mailboxId: params.mailboxId,
-      view: params.view,
-      cursor: { type: "remote", beforeMs },
-      reason: "active-view",
-      filters,
-    });
+    return splitRule !== null
+      ? fetchSeededFromServer({
+          userId,
+          mailboxId: params.mailboxId,
+          view: params.view,
+          splitRule,
+          localCursor,
+          beforeMs: localCursor?.date,
+          filters,
+        })
+      : enqueueViewSyncPage({
+          userId,
+          mailboxId: params.mailboxId,
+          view: params.view,
+          remoteCursor: { type: "remote" },
+          reason: "active-view",
+          filters,
+          beforeMs: localCursor?.date,
+        });
+  }
+
+  if (!decoded) {
+    void refreshViewFromServer(userId, params.mailboxId, params.view);
   }
 
   const lastDate =
@@ -117,17 +98,56 @@ export async function fetchViewPage(params: {
     };
   }
 
-  if (splitScoped) {
+  if (splitRule !== null) {
     return { emails: local.data, cursor: null };
   }
 
   return {
     emails: local.data,
-    cursor: encodeViewCursor({
-      type: "remote",
-      beforeMs: lastDate ?? undefined,
-    }),
+    cursor: encodeViewCursor({ type: "remote" }, lastDate ?? undefined),
   };
+}
+
+async function fetchSeededFromServer(params: {
+  userId: string;
+  mailboxId: number;
+  view: string;
+  splitRule: SplitRule;
+  localCursor: { date: number; id?: number } | undefined;
+  beforeMs: number | undefined;
+  filters?: MailListFilters;
+}): Promise<ViewPage> {
+  await enqueueViewSyncPage({
+    userId: params.userId,
+    mailboxId: params.mailboxId,
+    view: params.view,
+    remoteCursor: { type: "remote" },
+    reason: "active-page",
+    filters: params.filters,
+    beforeMs: params.beforeMs,
+  });
+  const seeded = await localDb.getEmails({
+    userId: params.userId,
+    mailboxId: params.mailboxId,
+    view: params.view,
+    limit: VIEW_PAGE_SIZE,
+    cursor: params.localCursor,
+    splitRule: params.splitRule,
+    isRead: params.filters?.unread ? "false" : undefined,
+    starred: params.filters?.starred,
+    hasAttachment: params.filters?.hasAttachment,
+  });
+  if (seeded.pagination.hasMore && seeded.pagination.cursor) {
+    return {
+      emails: seeded.data,
+      cursor: encodeViewCursor({
+        type: "local",
+        beforeDate: seeded.pagination.cursor.date,
+        beforeId: seeded.pagination.cursor.id,
+      }),
+    };
+  }
+  return { emails: seeded.data, cursor: null };
 }
 
 export async function fetchLocalViewPage(params: {
@@ -142,18 +162,8 @@ export async function fetchLocalViewPage(params: {
 
   await alignActiveUser(userId);
 
-  const decoded = decodeViewCursor(params.cursor);
-  const localCursor =
-    decoded?.type === "local"
-      ? "beforeDate" in decoded
-        ? {
-            date: decoded.beforeDate,
-            id: decoded.beforeId,
-          }
-        : typeof decoded.beforeMs === "number"
-          ? { date: decoded.beforeMs }
-          : undefined
-      : undefined;
+  const { cursor: decoded } = decodeViewCursor(params.cursor);
+  const localCursor = toDbCursor(decoded);
 
   const local = await localDb.getEmails({
     userId,

@@ -3,6 +3,7 @@ import type { Hono } from "hono";
 import { GmailDriver } from "../../../lib/gmail/driver";
 import { resolveMailbox } from "../../../lib/gmail/mailboxes";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 import { deleteEmailBodySchema } from "./schemas";
 
 export function registerDeleteEmail(api: Hono<AppRouteEnv>) {
@@ -11,7 +12,7 @@ export function registerDeleteEmail(api: Hono<AppRouteEnv>) {
     zValidator("json", deleteEmailBodySchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const { providerMessageId, mailboxId } = c.req.valid("json");
 
       const mailbox = await resolveMailbox(db, user.id, mailboxId);

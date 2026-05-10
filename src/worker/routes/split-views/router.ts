@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "../../middleware/auth";
+import { getUser, requireAuth } from "../../middleware/auth";
 import { splitViews, type SplitRule } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
 
@@ -115,7 +115,7 @@ splitViewsRoutes.use("*", requireAuth);
 
 splitViewsRoutes.get("/", async (c) => {
   const db = c.get("db");
-  const user = c.get("user")!;
+  const user = getUser(c);
   await ensureSystemSplits(db, user.id);
   const rows = await db
     .select()
@@ -127,7 +127,7 @@ splitViewsRoutes.get("/", async (c) => {
 
 splitViewsRoutes.post("/", zValidator("json", createBodySchema), async (c) => {
   const db = c.get("db");
-  const user = c.get("user")!;
+  const user = getUser(c);
   const body = c.req.valid("json");
   const now = Date.now();
 
@@ -169,7 +169,7 @@ splitViewsRoutes.patch(
   zValidator("json", updateBodySchema),
   async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const id = c.req.param("id");
     const body = c.req.valid("json");
 
@@ -213,7 +213,7 @@ splitViewsRoutes.patch(
 
 splitViewsRoutes.delete("/:id", async (c) => {
   const db = c.get("db");
-  const user = c.get("user")!;
+  const user = getUser(c);
   const id = c.req.param("id");
 
   const [existing] = await db
@@ -237,7 +237,7 @@ splitViewsRoutes.post(
   zValidator("json", z.object({ visible: z.boolean() })),
   async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const key = c.req.param("key");
     const { visible } = c.req.valid("json");
 
@@ -269,7 +269,7 @@ splitViewsRoutes.put(
   zValidator("json", reorderBodySchema),
   async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const { ids } = c.req.valid("json");
     const now = Date.now();
 

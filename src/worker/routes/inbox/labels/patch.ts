@@ -6,6 +6,7 @@ import { mailboxes } from "../../../db/schema";
 import { getGmailTokenForMailbox } from "../../../lib/gmail/client";
 import { updateGmailLabel } from "../../../lib/gmail/mailbox/labels";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 
 const updateLabelParamsSchema = z.object({
   labelId: z.string().trim().min(1),
@@ -25,7 +26,7 @@ export function registerUpdateLabel(api: Hono<AppRouteEnv>) {
     zValidator("json", updateLabelBodySchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const { labelId } = c.req.valid("param");
       const { mailboxId, name, textColor, backgroundColor } = c.req.valid("json");
 

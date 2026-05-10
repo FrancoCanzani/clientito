@@ -18,7 +18,7 @@ import {
  TooltipContent,
  TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useHotkeys } from "@/hooks/use-hotkeys";
+import { useShortcuts } from "@/hooks/use-shortcuts";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { ListIcon } from "@phosphor-icons/react";
@@ -27,7 +27,6 @@ const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
-const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 type CSSVars = React.CSSProperties & Record<`--${string}`, string>;
 
 type SidebarContextProps = {
@@ -98,9 +97,9 @@ function SidebarProvider({
  return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
  }, [isMobile, setOpen, setOpenMobile]);
 
- useHotkeys({
- [`$mod+${SIDEBAR_KEYBOARD_SHORTCUT}`]: () => toggleSidebar(),
- });
+  useShortcuts("global", {
+  "global:toggle-sidebar": () => toggleSidebar(),
+  });
 
  // We add a state so that we can do data-state="expanded" or "collapsed".
  // This makes it easier to style the sidebar with Tailwind classes.

@@ -3,7 +3,7 @@ import type { ThreadIdentifier } from "@/features/email/mail/mutations";
 import type { EmailListItem } from "@/features/email/mail/types";
 import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
 import { clearFocusedEmail, setFocusedEmail } from "@/hooks/use-focused-email";
-import { useHotkeys } from "@/hooks/use-hotkeys";
+import { useShortcuts } from "@/hooks/use-shortcuts";
 import { useEffect, useRef, useState } from "react";
 
 type InboxHotkeysOptions = {
@@ -18,6 +18,7 @@ type InboxHotkeysOptions = {
   onCompose: () => void;
   onSearch: () => void;
   onFocusChange?: (emailId: string | null) => void;
+  onRefresh?: () => void;
   enabled?: boolean;
 };
 
@@ -29,6 +30,7 @@ export function useMailHotkeys({
   onCompose,
   onSearch,
   onFocusChange,
+  onRefresh,
   enabled = true,
 }: InboxHotkeysOptions) {
   const [focusedId, setFocusedId] = useState<string | null>(null);
@@ -55,27 +57,34 @@ export function useMailHotkeys({
     onFocusChange?.(target);
   };
 
-  useHotkeys({
-    j: {
-      enabled: enabled && groups.length > 0,
-      onKeyDown: () => moveFocus(focusedIndex < 0 ? 0 : focusedIndex + 1),
-    },
-    k: {
-      enabled: enabled && groups.length > 0,
-      onKeyDown: () => moveFocus(focusedIndex < 0 ? 0 : focusedIndex - 1),
-    },
-    Enter: {
-      enabled: enabled && Boolean(focusedEmail),
-      onKeyDown: () => {
-        if (focusedEmail) {
-          onOpen(focusedEmail);
-        }
+  useShortcuts(
+    "inbox-list",
+    {
+      "inbox:next": {
+        action: () => moveFocus(focusedIndex < 0 ? 0 : focusedIndex + 1),
+        enabled: enabled && groups.length > 0,
       },
-    },
-    e: {
-      enabled: enabled && Boolean(focusedEmail),
-      onKeyDown: () => {
-        if (focusedEmail) {
+      "inbox:next-arrow": {
+        action: () => moveFocus(focusedIndex < 0 ? 0 : focusedIndex + 1),
+        enabled: enabled && groups.length > 0,
+      },
+      "inbox:prev": {
+        action: () => moveFocus(focusedIndex < 0 ? 0 : focusedIndex - 1),
+        enabled: enabled && groups.length > 0,
+      },
+      "inbox:prev-arrow": {
+        action: () => moveFocus(focusedIndex < 0 ? 0 : focusedIndex - 1),
+        enabled: enabled && groups.length > 0,
+      },
+      "inbox:open": {
+        action: () => {
+          if (focusedEmail) onOpen(focusedEmail);
+        },
+        enabled: enabled && Boolean(focusedEmail),
+      },
+      "action:archive": {
+        action: () => {
+          if (!focusedEmail) return;
           onAction(
             view === "archived" || view === "trash"
               ? "move-to-inbox"
@@ -89,13 +98,12 @@ export function useMailHotkeys({
                 }
               : undefined,
           );
-        }
+        },
+        enabled: enabled && Boolean(focusedEmail),
       },
-    },
-    u: {
-      enabled: enabled && Boolean(focusedEmail),
-      onKeyDown: () => {
-        if (focusedEmail) {
+      "action:toggle-read": {
+        action: () => {
+          if (!focusedEmail) return;
           onAction(
             focusedEmail.isRead ? "mark-unread" : "mark-read",
             focusedGroup?.emails.map((email) => email.id) ?? [focusedEmail.id],
@@ -107,19 +115,59 @@ export function useMailHotkeys({
                 }
               : undefined,
           );
-        }
+        },
+        enabled: enabled && Boolean(focusedEmail),
+      },
+      "action:compose": {
+        action: () => onCompose(),
+        enabled,
+      },
+      "action:search": {
+        action: () => onSearch(),
+        enabled,
+      },
+      "action:star": {
+        action: () => {
+          if (!focusedEmail) return;
+          const isStarred = focusedEmail.labelIds.includes("STARRED");
+          onAction(
+            isStarred ? "unstar" : "star",
+            focusedGroup?.emails.map((email) => email.id) ?? [focusedEmail.id],
+            focusedGroup?.threadId && focusedEmail.mailboxId
+              ? {
+                  threadId: focusedGroup.threadId,
+                  mailboxId: focusedEmail.mailboxId,
+                  labelIds: focusedEmail.labelIds,
+                }
+              : undefined,
+          );
+        },
+        enabled: enabled && Boolean(focusedEmail),
+      },
+      "action:trash": {
+        action: () => {
+          if (!focusedEmail) return;
+          onAction(
+            "trash",
+            focusedGroup?.emails.map((email) => email.id) ?? [focusedEmail.id],
+            focusedGroup?.threadId && focusedEmail.mailboxId
+              ? {
+                  threadId: focusedGroup.threadId,
+                  mailboxId: focusedEmail.mailboxId,
+                  labelIds: focusedEmail.labelIds,
+                }
+              : undefined,
+          );
+        },
+        enabled: enabled && Boolean(focusedEmail),
+      },
+      "action:refresh": {
+        action: () => onRefresh?.(),
+        enabled: enabled && Boolean(onRefresh),
       },
     },
-    c: {
-      enabled,
-      onKeyDown: () => onCompose(),
-    },
-    "/": (e) => {
-      if (!enabled) return;
-      e.preventDefault();
-      onSearch();
-    },
-  });
+    { enabled },
+  );
 
   // Sync focused email to the global store for the command palette.
   useEffect(() => {
@@ -144,13 +192,27 @@ export function useMailHotkeys({
     return () => clearFocusedEmail();
   }, []);
 
+  useEffect(() => {
+    setFocusedId(null);
+  }, [view]);
+
   // Reset focus when the list is fully swapped out (e.g. view change → empty).
   useEffect(() => {
     if (!enabled || groups.length === 0) setFocusedId(null);
   }, [enabled, groups.length]);
 
+  const initializedRef = useRef(false);
+
   useEffect(() => {
-    if (!enabled || groups.length === 0) return;
+    initializedRef.current = false;
+  }, [view]);
+
+  useEffect(() => {
+    if (!enabled || groups.length === 0) {
+      initializedRef.current = false;
+      return;
+    }
+    if (initializedRef.current) return;
     const newestReceivedId =
       groups.find((group) => group.representative.direction === "received")
         ?.representative.id ?? null;
@@ -162,6 +224,7 @@ export function useMailHotkeys({
         : false;
       const next = exists ? current : defaultId;
       if (next !== current) onFocusChange?.(next);
+      initializedRef.current = true;
       return next;
     });
   }, [enabled, groups, onFocusChange, view]);

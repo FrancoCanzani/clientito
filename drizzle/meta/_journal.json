@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1777149099393,
-      "tag": "0000_gray_surge",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1777318005095,
-      "tag": "0001_overconfident_patch",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1777318867307,
-      "tag": "0002_even_xavin",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1777642200000,
-      "tag": "0003_ai_classification_default_off",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1778066941559,
-      "tag": "0004_sleepy_wallow",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1778344524575,
-      "tag": "0005_keen_weapon_omega",
+      "when": 1778450542182,
+      "tag": "0000_orange_dust",
       "breakpoints": true
     }
   ]

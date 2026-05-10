@@ -3,7 +3,7 @@ import type { ThreadIdentifier } from "@/features/email/mail/mutations";
 import { fetchEmailDetail } from "@/features/email/mail/data/thread-detail";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
-import { type KeyboardEvent, type ReactNode, useRef } from "react";
+import { type ReactNode, useRef } from "react";
 import { HighlightedText } from "../search/highlighted-text";
 import type { EmailListItem } from "../types";
 import { formatEmailSnippet } from "../utils/formatters";
@@ -80,13 +80,6 @@ export function useEmailRowModel({
 
   const handleOpen = () => onOpen(email);
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      onOpen(email);
-    }
-  };
-
   const hasMetaIcons = isStarred || email.hasCalendar || email.hasAttachment;
 
   return {
@@ -96,7 +89,6 @@ export function useEmailRowModel({
     snippet,
     handleMouseEnter,
     handleOpen,
-    handleKeyDown,
     hasMetaIcons,
     isStarred,
     email,

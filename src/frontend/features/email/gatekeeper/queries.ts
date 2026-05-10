@@ -1,48 +1,31 @@
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
-import { gatekeeperQueryKeys } from "@/features/email/gatekeeper/query-keys";
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
+import { resolveGatekeeperActivatedAt } from "@/features/email/gatekeeper/lib/gatekeeper-activated-at";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { gatekeeperQueryKeys } from "@/features/email/gatekeeper/query-keys";
 import type { EmailListItem, EmailListPage } from "@/features/email/mail/types";
 import { isEmailListInfiniteData } from "@/features/email/mail/utils/email-list-cache";
+import { normalizeEmailAddress } from "@/lib/email";
 import { queryClient } from "@/lib/query-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { InfiniteData, QueryKey } from "@tanstack/react-query";
 
 type GatekeeperPendingState = {
- pendingCount: number;
- items: EmailListItem[];
+  pendingCount: number;
+  items: EmailListItem[];
 };
 
 type GatekeeperDecision = "accept" | "reject";
 
 type GatekeeperDecisionResult = {
- fromAddr: string;
- trustLevel: "trusted" | "blocked";
- decision: GatekeeperDecision;
- providerBlocked: boolean;
- trashedCount: number;
- providerError: string | null;
- requiresReconnect: boolean;
+  fromAddr: string;
+  trustLevel: "trusted" | "blocked";
+  decision: GatekeeperDecision;
+  providerBlocked: boolean;
+  trashedCount: number;
+  providerError: string | null;
+  requiresReconnect: boolean;
 };
-
-function gatekeeperActivatedAtKey(mailboxId: number): string {
- return `gatekeeperActivatedAt:${mailboxId}`;
-}
-
-function normalizeSenderAddress(value: string | null | undefined): string {
- return value?.trim().toLowerCase() ?? "";
-}
-
-async function resolveGatekeeperActivatedAt(mailboxId: number): Promise<number> {
- const key = gatekeeperActivatedAtKey(mailboxId);
- const raw = await localDb.getMeta(key);
- const parsed = raw ? Number(raw) : NaN;
- if (Number.isFinite(parsed) && parsed > 0) return parsed;
-
- const now = Date.now();
- await localDb.setMeta(key, String(now));
- return now;
-}
 
 async function fetchGatekeeperPending(
  mailboxId: number,
@@ -171,17 +154,17 @@ export function useGatekeeperDecision(mailboxId: number) {
  const emailSnapshots = queryClient.getQueriesData<InfiniteData<EmailListPage>>({
  queryKey: emailQueryKeys.all(),
  });
- const sender = normalizeSenderAddress(input.fromAddr);
+ const sender = normalizeEmailAddress(input.fromAddr) ?? "";
 
  queryClient.setQueryData<GatekeeperPendingState | undefined>(
  gatekeeperQueryKeys.pending(mailboxId),
  (current) => {
  if (!current) return current;
  const beforeSenders = new Set(
- current.items.map((item) => normalizeSenderAddress(item.fromAddr)),
+ current.items.map((item) => normalizeEmailAddress(item.fromAddr)),
  );
  const items = current.items.filter(
- (item) => normalizeSenderAddress(item.fromAddr) !== sender,
+ (item) => normalizeEmailAddress(item.fromAddr) !== sender,
  );
  const removedSender = beforeSenders.has(sender);
  return {
@@ -203,10 +186,10 @@ export function useGatekeeperDecision(mailboxId: number) {
  emails:
  input.decision === "reject"
  ? page.emails.filter(
- (item) => normalizeSenderAddress(item.fromAddr) !== sender,
+ (item) => normalizeEmailAddress(item.fromAddr) !== sender,
  )
  : page.emails.map((item) =>
- normalizeSenderAddress(item.fromAddr) === sender
+ normalizeEmailAddress(item.fromAddr) === sender
  ? { ...item, isGatekept: false }
  : item,
  ),

@@ -104,8 +104,8 @@
     "lint": "eslint .",
     "preview": "bun run build && vite preview",
     "db:generate": "bunx drizzle-kit generate --config=drizzle.worker.config.ts",
-    "db:migrate:dev": "bunx wrangler d1 migrations apply petit-db --local",
-    "db:migrate:prod": "bunx wrangler d1 migrations apply petit-db --remote",
+    "db:migrate:dev": "bunx wrangler d1 migrations apply duomo-db --local",
+    "db:migrate:prod": "bunx wrangler d1 migrations apply duomo-db --remote",
     "db:reset:dev": "rm -rf .wrangler/state && bun run db:migrate:dev",
     "scheduler": "while true; do curl -s http://localhost:5173/cdn-cgi/handler/scheduled && echo ' - '$(date); sleep 60; done"
   },

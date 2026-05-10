@@ -2,11 +2,12 @@ import type { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { scheduledEmails } from "../../../db/schema";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 
 export function registerGetScheduledEmails(api: Hono<AppRouteEnv>) {
   api.get("/scheduled", async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
 
     const rows = await db
       .select({
@@ -33,7 +34,7 @@ export function registerGetScheduledEmails(api: Hono<AppRouteEnv>) {
 
   api.delete("/scheduled/:id", async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const id = Number(c.req.param("id"));
 
     if (Number.isNaN(id)) {

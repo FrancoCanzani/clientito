@@ -27,6 +27,7 @@ import { labelQueryKeys } from "@/features/email/labels/query-keys";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { unsubscribe } from "@/features/email/subscriptions/queries";
 import { useAuth } from "@/hooks/use-auth";
+import { shortcutKey } from "@/lib/shortcuts";
 import type { Icon } from "@phosphor-icons/react";
 import {
   ArrowBendDoubleUpLeftIcon,
@@ -367,7 +368,7 @@ export function EmailActions({
     icon: Icon;
     iconWeight?: "fill" | "regular";
     label: string;
-    shortcut?: string;
+    shortcutId?: string;
     action: () => void;
   };
 
@@ -376,7 +377,7 @@ export function EmailActions({
       icon: StarIcon,
       iconWeight: isStarred ? "fill" : "regular",
       label: isStarred ? "Unstar" : "Star",
-      shortcut: "S",
+      shortcutId: "action:star",
       action: () =>
         runCentralAction(isStarred ? "unstar" : "star") ||
         runEmailPatch({ starred: !isStarred }),
@@ -384,7 +385,7 @@ export function EmailActions({
     {
       icon: email.isRead ? EnvelopeSimpleIcon : EnvelopeSimpleOpenIcon,
       label: email.isRead ? "Mark as unread" : "Mark as read",
-      shortcut: "U",
+      shortcutId: "action:toggle-read",
       action: () =>
         runCentralAction(email.isRead ? "mark-unread" : "mark-read", {
           thread: true,
@@ -419,7 +420,7 @@ export function EmailActions({
     <div className="flex items-center gap-1">
       <IconButton
         label={primaryActionLabel}
-        shortcut="E"
+        shortcut={shortcutKey("action:archive")}
         variant="ghost"
         size="icon-sm"
         disabled={actionsPending}
@@ -429,7 +430,7 @@ export function EmailActions({
       </IconButton>
       <IconButton
         label="Delete"
-        shortcut="#"
+        shortcut={shortcutKey("action:trash")}
         variant="ghost"
         size="icon-sm"
         disabled={actionsPending}
@@ -447,7 +448,7 @@ export function EmailActions({
           trigger={
             <IconButton
               label="Label"
-              shortcut="L"
+              shortcut={shortcutKey("action:label")}
               variant="ghost"
               size="icon-sm"
             >
@@ -468,7 +469,7 @@ export function EmailActions({
       <div className="hidden items-center gap-0.5 sm:flex">
         <IconButton
           label="Reply"
-          shortcut="R"
+          shortcut={shortcutKey("action:reply")}
           variant="ghost"
           size="icon-sm"
           onClick={() => onReply?.()}
@@ -497,7 +498,7 @@ export function EmailActions({
         )}
         <IconButton
           label="Forward"
-          shortcut="F"
+          shortcut={shortcutKey("action:forward")}
           variant="ghost"
           size="icon-sm"
           onClick={handleForward}
@@ -524,7 +525,7 @@ export function EmailActions({
             <DropdownMenuItem onSelect={() => onReply?.()}>
               <ArrowBendUpLeftIcon className="size-3.5" />
               <span className="flex-1">Reply</span>
-              <Kbd>R</Kbd>
+              <Kbd>{shortcutKey("action:reply")}</Kbd>
             </DropdownMenuItem>
             {hasAiDraftReply && (
               <DropdownMenuItem onSelect={() => onDraftReply?.()}>
@@ -541,7 +542,7 @@ export function EmailActions({
             <DropdownMenuItem onSelect={handleForward}>
               <ArrowBendUpRightIcon className="size-3.5" />
               <span className="flex-1">Forward</span>
-              <Kbd>F</Kbd>
+              <Kbd>{shortcutKey("action:forward")}</Kbd>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </div>
@@ -556,7 +557,7 @@ export function EmailActions({
               >
                 <IconComponent className="size-3.5" weight={item.iconWeight} />
                 <span className="flex-1">{item.label}</span>
-                {item.shortcut && <Kbd>{item.shortcut}</Kbd>}
+                {item.shortcutId && <Kbd>{shortcutKey(item.shortcutId)}</Kbd>}
               </DropdownMenuItem>
             );
           })}

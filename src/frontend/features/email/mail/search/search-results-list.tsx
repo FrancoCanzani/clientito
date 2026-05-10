@@ -57,26 +57,26 @@ export function SearchResultsList({
  target?.scrollIntoView({ block: "nearest", behavior: "auto" });
  }, [focusedIndex]);
 
- if (query.length < 2) {
- return (
- <Empty className="h-full min-h-full flex-1 justify-center border-0 p-0">
- <EmptyHeader>
- <EmptyTitle>Search your inbox</EmptyTitle>
- <EmptyDescription>
- Start with at least two characters, or pick a suggestion below.
- </EmptyDescription>
- </EmptyHeader>
- </Empty>
- );
- }
+if (query.length < 2) {
+  return (
+  <Empty className="border-0 p-0">
+  <EmptyHeader>
+  <EmptyTitle>Search your inbox</EmptyTitle>
+  <EmptyDescription>
+  Start with at least two characters, or pick a suggestion below.
+  </EmptyDescription>
+  </EmptyHeader>
+  </Empty>
+  );
+  }
 
- if (isPending) {
- return null;
- }
+  if (isPending) {
+  return null;
+  }
 
- if (groups.length === 0) {
- return (
- <Empty className="h-full min-h-full flex-1 justify-center border-0 p-0">
+  if (groups.length === 0) {
+  return (
+  <Empty className="border-0 p-0">
  <EmptyHeader>
  <EmptyTitle>No results</EmptyTitle>
  <EmptyDescription>

@@ -8,6 +8,8 @@ import { TodoActionsPanel } from "@/features/email/todo/components/todo-actions-
 import { TodoQueuePanel } from "@/features/email/todo/components/todo-queue-panel";
 import { TodoReaderPanel } from "@/features/email/todo/components/todo-reader-panel";
 import { useMailCompose } from "@/features/email/mail/compose/compose-context";
+import { buildForwardedEmailHtml } from "@/features/email/mail/utils/build-forwarded-html";
+import { buildReplyInitial } from "@/features/email/mail/utils/reply-compose";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import { useTodoData } from "@/features/email/todo/hooks/use-todo-data";
 import { useTodoDetail } from "@/features/email/todo/hooks/use-todo-detail";
@@ -16,7 +18,7 @@ import {
  MailboxPage,
  MailboxPageBody,
 } from "@/features/email/shell/mailbox-page";
-import { useHotkeys } from "@/hooks/use-hotkeys";
+import { useShortcuts } from "@/hooks/use-shortcuts";
 import { ArrowLeftIcon, CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react";
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
@@ -80,7 +82,7 @@ function TodoView({
  : -1,
  [groups, selectedId],
  );
- const { executeEmailAction, todo } = useMailActions({
+ const { executeEmailAction, snooze, todo } = useMailActions({
  view: todoLabelId,
  mailboxId,
  });
@@ -103,95 +105,150 @@ function TodoView({
  }
  : undefined;
 
- useHotkeys({
- j: {
- enabled: groups.length > 0,
- onKeyDown: () => selectIndex(selectedIndex < 0 ? 0 : selectedIndex + 1),
- },
- ArrowDown: {
- enabled: groups.length > 0,
- onKeyDown: () => selectIndex(selectedIndex < 0 ? 0 : selectedIndex + 1),
- },
- k: {
- enabled: groups.length > 0,
- onKeyDown: () => selectIndex(selectedIndex < 0 ? 0 : selectedIndex - 1),
- },
- ArrowUp: {
- enabled: groups.length > 0,
- onKeyDown: () => selectIndex(selectedIndex < 0 ? 0 : selectedIndex - 1),
- },
- Enter: {
- enabled: groups.length > 0,
- onKeyDown: () => {
- if (selectedIndex < 0) selectIndex(0);
- },
- },
- e: {
- enabled: Boolean(selectedEmail),
- onKeyDown: () => {
- if (selectedEmail) void todo.remove(selectedEmail);
- },
- },
- Delete: {
- enabled: Boolean(selectedEmail),
- onKeyDown: () => {
- if (selectedEmail) void todo.remove(selectedEmail);
- },
- },
- Backspace: {
- enabled: Boolean(selectedEmail),
- onKeyDown: () => {
- if (selectedEmail) void todo.remove(selectedEmail);
- },
- },
- a: {
- enabled: Boolean(selectedEmail),
- onKeyDown: () => {
- if (!selectedEmail) return;
- void executeEmailAction(
- "archive",
- [selectedEmail.id],
- selectedThreadIdentifier,
- ).then(() => todo.remove(selectedEmail));
- },
- },
- u: {
- enabled: Boolean(selectedEmail),
- onKeyDown: () => {
- if (!selectedEmail) return;
- void executeEmailAction(
- selectedEmail.isRead ? "mark-unread" : "mark-read",
- [selectedEmail.id],
- selectedThreadIdentifier,
- );
- },
- },
- c: () => openCompose(),
- "/": (event) => {
- event.preventDefault();
- navigate({
- to: "/$mailboxId/inbox/search",
- params: { mailboxId },
- });
- },
- Escape: {
- enabled: selectedId != null,
- onKeyDown: () => setSelectedId(null),
- },
- });
+  useShortcuts("todo", {
+  "inbox:next": {
+  action: () => selectIndex(selectedIndex < 0 ? 0 : selectedIndex + 1),
+  enabled: groups.length > 0,
+  },
+  "inbox:next-arrow": {
+  action: () => selectIndex(selectedIndex < 0 ? 0 : selectedIndex + 1),
+  enabled: groups.length > 0,
+  },
+  "inbox:prev": {
+  action: () => selectIndex(selectedIndex < 0 ? 0 : selectedIndex - 1),
+  enabled: groups.length > 0,
+  },
+  "inbox:prev-arrow": {
+  action: () => selectIndex(selectedIndex < 0 ? 0 : selectedIndex - 1),
+  enabled: groups.length > 0,
+  },
+  "todo:select": {
+  action: () => {
+  if (selectedIndex < 0) selectIndex(0);
+  },
+  enabled: groups.length > 0,
+  },
+  "action:archive": {
+  action: () => {
+  if (selectedEmail) void todo.remove(selectedEmail);
+  },
+  enabled: Boolean(selectedEmail),
+  },
+  "action:delete": {
+  action: () => {
+  if (selectedEmail) void todo.remove(selectedEmail);
+  },
+  enabled: Boolean(selectedEmail),
+  },
+  "action:backspace": {
+  action: () => {
+  if (selectedEmail) void todo.remove(selectedEmail);
+  },
+  enabled: Boolean(selectedEmail),
+  },
+  "action:archive-todo": {
+  action: () => {
+  if (!selectedEmail) return;
+  void executeEmailAction(
+  "archive",
+  [selectedEmail.id],
+  selectedThreadIdentifier,
+  ).then(() => todo.remove(selectedEmail));
+  },
+  enabled: Boolean(selectedEmail),
+  },
+  "action:toggle-read": {
+  action: () => {
+  if (!selectedEmail) return;
+  void executeEmailAction(
+  selectedEmail.isRead ? "mark-unread" : "mark-read",
+  [selectedEmail.id],
+  selectedThreadIdentifier,
+  );
+  },
+  enabled: Boolean(selectedEmail),
+  },
+  "action:compose": () => openCompose(),
+    "action:reply": {
+      action: () => {
+        if (!selectedEmail) return;
+        openCompose(buildReplyInitial(currentEmail ?? selectedEmail));
+      },
+      enabled: Boolean(selectedEmail),
+    },
+    "action:forward": {
+      action: () => {
+        if (!selectedEmail) return;
+        if (currentEmail) {
+          openCompose({
+            mailboxId: currentEmail.mailboxId ?? mailboxId,
+            subject: currentEmail.subject?.startsWith("Fwd:")
+              ? currentEmail.subject
+              : `Fwd: ${currentEmail.subject ?? ""}`.trim(),
+            bodyHtml: buildForwardedEmailHtml(currentEmail),
+          });
+        } else {
+          openCompose({
+            mailboxId: selectedEmail.mailboxId ?? mailboxId,
+            subject: selectedEmail.subject?.startsWith("Fwd:")
+              ? selectedEmail.subject
+              : `Fwd: ${selectedEmail.subject ?? ""}`.trim(),
+          });
+        }
+      },
+      enabled: Boolean(selectedEmail),
+    },
+    "action:snooze": {
+      action: () => {
+        if (!selectedEmail || !selectedEmail.mailboxId) return;
+        const identifier = selectedEmail.threadId
+          ? {
+              kind: "thread" as const,
+              thread: {
+                threadId: selectedEmail.threadId,
+                mailboxId: selectedEmail.mailboxId,
+                labelIds: selectedEmail.labelIds,
+              },
+            }
+          : {
+              kind: "email" as const,
+              identifier: {
+                id: selectedEmail.id,
+                providerMessageId: selectedEmail.providerMessageId,
+                mailboxId: selectedEmail.mailboxId,
+                labelIds: selectedEmail.labelIds,
+              },
+            };
+        void snooze(identifier, Date.now() + 3600000).then(() =>
+          todo.remove(selectedEmail),
+        );
+      },
+      enabled: Boolean(selectedEmail),
+    },
+  "action:search": () => {
+  navigate({
+  to: "/$mailboxId/inbox/search",
+  params: { mailboxId },
+  });
+  },
+  "action:esc": {
+  action: () => setSelectedId(null),
+  enabled: selectedId != null,
+  },
+  });
 
  if (!todoData.hasEmails && !todoData.isLoading) {
  return (
  <MailboxPage className="max-w-none">
  <MailboxPageBody className="flex items-center justify-center">
- <Empty>
- <EmptyHeader>
- <EmptyTitle>No emails</EmptyTitle>
- <EmptyDescription>
- Messages marked as to-do will show up here.
- </EmptyDescription>
- </EmptyHeader>
- </Empty>
+<Empty>
+          <EmptyHeader>
+            <EmptyTitle>No emails</EmptyTitle>
+            <EmptyDescription>
+              Messages marked as to-do will show up here.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
  </MailboxPageBody>
  </MailboxPage>
  );

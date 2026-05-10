@@ -1,54 +1,23 @@
 import { localDb, type EmailInsert } from "@/db/client";
+import { resolveGatekeeperActivatedAt } from "@/features/email/gatekeeper/lib/gatekeeper-activated-at";
 import { gatekeeperQueryKeys } from "@/features/email/gatekeeper/query-keys";
 import type { EmailListItem } from "@/features/email/mail/types";
 import { prepareEmailHtml } from "@/features/email/mail/utils/prepare-email-html";
+import { hasCalendarBodySignal, isCalendarFilename, isCalendarMimeType, normalizeEmailAddress } from "@/lib/email";
 import { queryClient } from "@/lib/query-client";
-import { enqueueClassificationTasks } from "./classification";
 import type { PulledEmail } from "./types";
 
 const ACTIVE_USER_KEY = "active-user-id";
 
-const CALENDAR_MIME_PREFIXES = [
-  "text/calendar",
-  "application/ics",
-  "application/icalendar",
-  "application/x-ical",
-  "application/vnd.ms-outlook",
-] as const;
-const CALENDAR_BODY_MARKERS = [
-  "begin:vcalendar",
-  "begin:vevent",
-  "method:request",
-  "method:cancel",
-  "method:reply",
-] as const;
-
 type GatekeeperTrustLevel = "trusted" | "blocked" | null;
-
-function hasCalendarMime(value: string | null | undefined): boolean {
-  if (!value) return false;
-  const normalized = value.trim().toLowerCase();
-  return CALENDAR_MIME_PREFIXES.some((prefix) => normalized.startsWith(prefix));
-}
-
-function hasCalendarFilename(value: string | null | undefined): boolean {
-  if (!value) return false;
-  return value.trim().toLowerCase().endsWith(".ics");
-}
-
-function hasCalendarBodySignal(value: string | null | undefined): boolean {
-  if (!value) return false;
-  const normalized = value.toLowerCase();
-  return CALENDAR_BODY_MARKERS.some((marker) => normalized.includes(marker));
-}
 
 function inferHasCalendar(email: PulledEmail): boolean {
   if (email.hasCalendar === true) return true;
   if (
     email.attachments?.some(
       (attachment) =>
-        hasCalendarMime(attachment.mimeType) ||
-        hasCalendarFilename(attachment.filename),
+        isCalendarMimeType(attachment.mimeType) ||
+        isCalendarFilename(attachment.filename),
     )
   ) {
     return true;
@@ -57,34 +26,6 @@ function inferHasCalendar(email: PulledEmail): boolean {
     hasCalendarBodySignal(email.bodyText) ||
     hasCalendarBodySignal(email.bodyHtml)
   );
-}
-
-function normalizeSender(fromAddr: string | null | undefined): string | null {
-  if (!fromAddr) return null;
-  const normalized = fromAddr.trim().toLowerCase();
-  if (!normalized) return null;
-  const bracketMatch = normalized.match(/<([^>]+)>/);
-  const candidate = bracketMatch?.[1]?.trim() ?? normalized;
-  const emailMatch = candidate.match(/[^\s<>()"'`,;:]+@[^\s<>()"'`,;:]+/);
-  if (!emailMatch) return null;
-  return emailMatch[0].toLowerCase();
-}
-
-function gatekeeperActivatedAtKey(mailboxId: number): string {
-  return `gatekeeperActivatedAt:${mailboxId}`;
-}
-
-async function resolveGatekeeperActivatedAt(
-  mailboxId: number,
-): Promise<number> {
-  const key = gatekeeperActivatedAtKey(mailboxId);
-  const raw = await localDb.getMeta(key);
-  const parsed = raw ? Number(raw) : NaN;
-  if (Number.isFinite(parsed) && parsed > 0) return parsed;
-
-  const now = Date.now();
-  await localDb.setMeta(key, String(now));
-  return now;
 }
 
 async function resolveGatekeeperTrust(
@@ -100,7 +41,7 @@ async function resolveGatekeeperTrust(
           (email) =>
             email.direction === "received" && email.labelIds.includes("INBOX"),
         )
-        .map((email) => normalizeSender(email.fromAddr))
+        .map((email) => normalizeEmailAddress(email.fromAddr))
         .filter((value): value is string => Boolean(value)),
     ),
   );
@@ -137,7 +78,7 @@ async function resolveGatekeeperTrust(
         trust
           .map(
             (entry) =>
-              [normalizeSender(entry.sender), entry.trustLevel] as const,
+              [normalizeEmailAddress(entry.sender), entry.trustLevel] as const,
           )
           .filter(
             (entry): entry is [string, GatekeeperTrustLevel] =>
@@ -245,13 +186,8 @@ function pulledToRow(
         : null,
     hasCalendar: inferHasCalendar(email),
     isGatekept,
-    aiCategory: null,
-    aiConfidence: null,
-    aiReason: null,
     aiSummary: null,
     aiDraftReply: null,
-    aiClassifiedAt: null,
-    aiClassificationKey: null,
     aiSplitIds: null,
     createdAt: email.date,
   };
@@ -286,7 +222,7 @@ export async function persistEmails(
       e,
       userId,
       mailboxId,
-      trustBySender.get(normalizeSender(e.fromAddr) ?? "") ?? null,
+      trustBySender.get(normalizeEmailAddress(e.fromAddr) ?? "") ?? null,
       gatekeeperActivatedAt,
     ),
   );
@@ -300,7 +236,6 @@ export async function persistEmails(
     providerIds,
   );
   const byProviderId = new Map(hydrated.map((r) => [r.providerMessageId, r]));
-  enqueueClassificationTasks(pulled, userId, mailboxId);
   return providerIds
     .map((id) => byProviderId.get(id))
     .filter((e): e is NonNullable<typeof e> => e !== undefined);

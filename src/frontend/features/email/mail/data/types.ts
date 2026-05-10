@@ -53,13 +53,11 @@ export type LocalCursor = {
   beforeDate: number;
   beforeId: number;
 };
-export type LegacyLocalCursor = { type: "local"; beforeMs: number };
 export type RemoteCursor = {
   type: "remote";
   token?: string;
-  beforeMs?: number;
 };
-export type DecodedCursor = LocalCursor | LegacyLocalCursor | RemoteCursor;
+export type DecodedCursor = LocalCursor | RemoteCursor;
 
 export type DeltaSyncResponse = {
   status: "ok" | "noop" | "stale";

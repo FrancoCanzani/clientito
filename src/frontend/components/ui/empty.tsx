@@ -3,16 +3,16 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 function Empty({ className, ...props }: React.ComponentProps<"div">) {
- return (
- <div
- data-slot="empty"
- className={cn(
- "mx-auto flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 h-full border-dashed p-6 text-center text-balance",
- className,
- )}
- {...props}
- />
- );
+  return (
+    <div
+      data-slot="empty"
+      className={cn(
+        "mx-auto flex w-full min-w-0 flex-col items-center justify-center gap-4 border-dashed p-6 text-center text-balance min-h-[max(50vh,100%)]",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {

@@ -298,11 +298,37 @@ export async function hardDeleteGmailMessage(
       headers: { Authorization: `Bearer ${accessToken}` },
     },
   );
-  // Gmail returns 204 on success; 404 is fine (already gone).
   if (!response.ok && response.status !== 404) {
     const text = await response.text().catch(() => "");
     throw new Error(
       `Gmail delete failed (${response.status}): ${text || response.statusText}`,
+    );
+  }
+}
+
+export async function batchDeleteGmailMessages(
+  db: Database,
+  mailboxId: number,
+  env: GoogleOAuthConfig,
+  gmailMessageIds: string[],
+): Promise<void> {
+  if (!gmailMessageIds.length) return;
+  const accessToken = await getGmailTokenForMailbox(db, mailboxId, env);
+  const response = await fetch(
+    `${GMAIL_API_BASE}/messages/batchDelete`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ids: gmailMessageIds }),
+    },
+  );
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `Gmail batch delete failed (${response.status}): ${text || response.statusText}`,
     );
   }
 }

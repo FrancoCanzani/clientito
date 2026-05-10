@@ -6,6 +6,7 @@ import { replyReminders } from "../../../db/schema";
 import { GmailDriver } from "../../../lib/gmail/driver";
 import { ensureAwaitingReplyLabel } from "../../../lib/gmail/mailbox/awaiting-reply-label";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 
 const dismissParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
@@ -17,7 +18,7 @@ export function registerDismissReminder(api: Hono<AppRouteEnv>) {
     zValidator("param", dismissParamsSchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const { id } = c.req.valid("param");
 
       const reminder = await db.query.replyReminders.findFirst({

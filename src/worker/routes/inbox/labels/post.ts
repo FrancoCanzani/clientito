@@ -6,6 +6,7 @@ import { mailboxes } from "../../../db/schema";
 import { getGmailTokenForMailbox } from "../../../lib/gmail/client";
 import { createGmailLabel } from "../../../lib/gmail/mailbox/labels";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 
 const createLabelSchema = z.object({
   mailboxId: z.number().int().positive(),
@@ -17,7 +18,7 @@ const createLabelSchema = z.object({
 export function registerCreateLabel(api: Hono<AppRouteEnv>) {
   api.post("/", zValidator("json", createLabelSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const { mailboxId, name, textColor, backgroundColor } = c.req.valid("json");
 
     const mailbox = await db.query.mailboxes.findFirst({

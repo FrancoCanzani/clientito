@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useArchivedData } from "@/features/email/inbox/hooks/use-archived-data";
 import {
   MailListReaderPage,
@@ -7,6 +8,8 @@ import {
 } from "@/features/email/inbox/pages/mail-pane";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { DeleteAllButton } from "@/features/email/mail/list/delete-all-button";
 import { VIEW_LABELS, type EmailFolderView } from "@/features/email/mail/views";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getRouteApi } from "@tanstack/react-router";
@@ -21,7 +24,7 @@ export default function FolderPage() {
     return <ArchivedFolderPage mailboxId={mailboxId} />;
   }
 
-  return <GenericFolderPage mailboxId={mailboxId} folder={folder} />;
+  return <GenericFolderPage mailboxId={mailboxId} folder={folder as EmailFolderView} />;
 }
 
 function ArchivedFolderPage({ mailboxId }: { mailboxId: number }) {
@@ -53,6 +56,7 @@ function FolderView({
   folder: EmailFolderView;
   emailData: ReturnType<typeof useMailViewData>;
 }) {
+  const queryClient = useQueryClient();
   const search = route.useSearch();
   const navigate = route.useNavigate();
   const isMobile = useIsMobile();
@@ -95,6 +99,19 @@ function FolderView({
       selectedEmailId={selectedEmailId}
       enableKeyboardNavigation={!selectedEmailId}
       compact={!isMobile}
+      headerExtraActions={
+        (folder === "spam" || folder === "trash") && emailData.hasEmails ? (
+          <DeleteAllButton
+            folder={folder}
+            mailboxId={mailboxId}
+            onDeleted={() => {
+              queryClient.invalidateQueries({
+                queryKey: emailQueryKeys.list(folder, mailboxId),
+              });
+            }}
+          />
+        ) : null
+      }
     />
   );
 

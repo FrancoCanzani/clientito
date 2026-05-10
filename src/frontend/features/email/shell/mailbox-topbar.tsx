@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Kbd } from "@/components/ui/kbd";
 import type { SplitRule } from "@/db/schema";
 import { FocusWindowToggle } from "@/features/email/focus-window/focus-window-toggle";
 import { useMailCompose } from "@/features/email/mail/compose/compose-context";
@@ -281,7 +282,7 @@ export function MailboxTopbar() {
           type="button"
           onClick={() => openCompose()}
         >
-          New
+          New <Kbd className="bg-card">C</Kbd>
         </Button>
       </div>
       <Dialog
@@ -313,6 +314,7 @@ export function MailboxTopbar() {
                 value={viewName}
                 onChange={(event) => setViewName(event.target.value)}
                 placeholder="Name"
+                className="text-xs h-7 placeholder:text-xs"
                 autoFocus
               />
               <div className="grid gap-2">
@@ -324,6 +326,7 @@ export function MailboxTopbar() {
                       senders: event.target.value,
                     }))
                   }
+                  className="text-xs h-7 placeholder:text-xs"
                   placeholder="Sender contains"
                 />
                 <Input
@@ -334,6 +337,7 @@ export function MailboxTopbar() {
                       domains: event.target.value,
                     }))
                   }
+                  className="text-xs h-7 placeholder:text-xs"
                   placeholder="Domain"
                 />
                 <Input
@@ -344,6 +348,7 @@ export function MailboxTopbar() {
                       recipients: event.target.value,
                     }))
                   }
+                  className="text-xs h-7 placeholder:text-xs"
                   placeholder="Recipient"
                 />
                 <Input
@@ -354,10 +359,11 @@ export function MailboxTopbar() {
                       subjectContains: event.target.value,
                     }))
                   }
+                  className="text-xs h-7 placeholder:text-xs"
                   placeholder="Subject contains"
                 />
               </div>
-              <div className="grid gap-2 pt-1 text-sm">
+              <div className="grid gap-2 pt-1 text-xs">
                 <label className="flex items-center gap-2 text-muted-foreground">
                   <Checkbox
                     checked={ruleForm.hasAttachment}
@@ -387,7 +393,7 @@ export function MailboxTopbar() {
             <DialogFooter>
               <Button
                 type="button"
-                variant="outline"
+                variant="destructive"
                 onClick={() => setCreateOpen(false)}
                 disabled={createViewMutation.isPending}
               >

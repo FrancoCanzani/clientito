@@ -4,6 +4,7 @@ import { z } from "zod";
 import { GmailDriver } from "../../../lib/gmail/driver";
 import { resolveMailbox } from "../../../lib/gmail/mailboxes";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 
 const blockSenderSchema = z.object({
   fromAddr: z.string().min(1).max(320),
@@ -13,7 +14,7 @@ const blockSenderSchema = z.object({
 export function registerPostBlockSender(api: Hono<AppRouteEnv>) {
   api.post("/block", zValidator("json", blockSenderSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const { fromAddr, mailboxId } = c.req.valid("json");
 
     const mailbox = await resolveMailbox(db, user.id, mailboxId);

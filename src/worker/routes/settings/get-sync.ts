@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getMailboxSyncPreferences } from "../../lib/gmail/sync/state";
 import { resolveMailbox } from "../../lib/gmail/mailboxes";
 import type { AppRouteEnv } from "../types";
+import { getUser } from "../../middleware/auth";
 
 const syncSettingsQuerySchema = z.object({
   mailboxId: z.coerce.number().int().positive().optional(),
@@ -15,7 +16,7 @@ export function registerGetSyncSettings(settingsRoutes: Hono<AppRouteEnv>) {
     zValidator("query", syncSettingsQuerySchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const { mailboxId } = c.req.valid("query");
 
       const mailbox = await resolveMailbox(db, user.id, mailboxId);

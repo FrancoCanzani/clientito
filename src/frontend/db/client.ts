@@ -1,8 +1,9 @@
+import { applyLabelPatch, STANDARD_LABELS } from "@/features/email/mail/utils/label-patch";
+import { normalizeEmailAddress } from "@/lib/email";
 import { pendingSubset } from "./pending-lock";
 import type {
   DraftAttachmentKey,
   DraftRow,
-  EmailAICategory,
   EmailInsert,
   LabelInsert,
   SplitRule,
@@ -59,13 +60,9 @@ type EmailRowDb = {
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
   snoozedUntil: number | null;
-  aiCategory: EmailAICategory | null;
-  aiConfidence: number | null;
-  aiReason: string | null;
   aiSummary: string | null;
   aiDraftReply: string | null;
-  aiClassifiedAt: number | null;
-  aiClassificationKey: string | null;
+  aiSplitIds: string | null;
   threadCount?: number | null;
   hasCalendar: number;
   isGatekept: number;
@@ -75,32 +72,10 @@ type EmailRowDb = {
   attachments?: string | null;
 };
 
-const STANDARD_LABELS = {
-  INBOX: "INBOX",
-  SENT: "SENT",
-  SPAM: "SPAM",
-  TRASH: "TRASH",
-  STARRED: "STARRED",
-  UNREAD: "UNREAD",
-} as const;
-
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
-const LEGACY_PARTIAL_CLASSIFICATION_REASON =
-  "Model classified thread using partial signal.";
 
 const snakeToCamel = (s: string) =>
   s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
-
-function normalizeSender(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) return null;
-  const bracketMatch = normalized.match(/<([^>]+)>/);
-  const candidate = bracketMatch?.[1]?.trim() ?? normalized;
-  const emailMatch = candidate.match(/[^\s<>()"'`,;:]+@[^\s<>()"'`,;:]+/);
-  if (!emailMatch) return null;
-  return emailMatch[0].toLowerCase();
-}
 
 function rowsToObjects<T>(res: ExecResult): T[] {
   const keys = res.columns.map(snakeToCamel);
@@ -284,57 +259,7 @@ function applyEmailPatch(
   patch: LocalEmailPatch,
 ): EmailUpdateSet {
   const currentLabelIds = parseLabelIds(current.labelIds);
-  const nextLabelIds = new Set(currentLabelIds);
   const updates: EmailUpdateSet = {};
-
-  const queueAdd = (labelId: string) => nextLabelIds.add(labelId);
-  const queueRemove = (labelId: string) => nextLabelIds.delete(labelId);
-
-  if (patch.isRead !== undefined && patch.isRead !== current.isRead) {
-    updates.isRead = patch.isRead;
-    if (patch.isRead) queueRemove(STANDARD_LABELS.UNREAD);
-    else queueAdd(STANDARD_LABELS.UNREAD);
-  }
-
-  if (patch.archived !== undefined) {
-    if (patch.archived) {
-      queueRemove(STANDARD_LABELS.INBOX);
-    } else if (
-      !nextLabelIds.has(STANDARD_LABELS.TRASH) &&
-      !nextLabelIds.has(STANDARD_LABELS.SPAM)
-    ) {
-      queueAdd(STANDARD_LABELS.INBOX);
-    }
-  }
-
-  if (patch.trashed !== undefined) {
-    if (patch.trashed) {
-      queueAdd(STANDARD_LABELS.TRASH);
-      queueRemove(STANDARD_LABELS.INBOX);
-      queueRemove(STANDARD_LABELS.SPAM);
-    } else {
-      queueRemove(STANDARD_LABELS.TRASH);
-      if (!nextLabelIds.has(STANDARD_LABELS.SPAM))
-        queueAdd(STANDARD_LABELS.INBOX);
-    }
-  }
-
-  if (patch.spam !== undefined) {
-    if (patch.spam) {
-      queueAdd(STANDARD_LABELS.SPAM);
-      queueRemove(STANDARD_LABELS.INBOX);
-      queueRemove(STANDARD_LABELS.TRASH);
-    } else {
-      queueRemove(STANDARD_LABELS.SPAM);
-      if (!nextLabelIds.has(STANDARD_LABELS.TRASH))
-        queueAdd(STANDARD_LABELS.INBOX);
-    }
-  }
-
-  if (patch.starred !== undefined) {
-    if (patch.starred) queueAdd(STANDARD_LABELS.STARRED);
-    else queueRemove(STANDARD_LABELS.STARRED);
-  }
 
   if (patch.snoozedUntil !== undefined)
     updates.snoozedUntil = patch.snoozedUntil;
@@ -348,10 +273,22 @@ function applyEmailPatch(
     return updates;
   }
 
-  const resolvedLabelIds = Array.from(nextLabelIds);
-  if (!areLabelIdsEqual(currentLabelIds, resolvedLabelIds)) {
-    updates.labelIds = JSON.stringify(resolvedLabelIds);
-    Object.assign(updates, labelBooleans(resolvedLabelIds));
+  const result = applyLabelPatch(
+    currentLabelIds,
+    current.isRead,
+    {
+      isRead: patch.isRead,
+      archived: patch.archived,
+      trashed: patch.trashed,
+      spam: patch.spam,
+      starred: patch.starred,
+    },
+  );
+
+  if (patch.isRead !== undefined) updates.isRead = result.isRead;
+  if (!areLabelIdsEqual(currentLabelIds, result.labelIds)) {
+    updates.labelIds = JSON.stringify(result.labelIds);
+    Object.assign(updates, labelBooleans(result.labelIds));
   }
 
   return updates;
@@ -548,28 +485,19 @@ const EMAIL_SUMMARY_SELECT = `
  has_sent,
  has_trash,
  has_spam,
- has_starred,
- created_at,
- unsubscribe_url,
- unsubscribe_email,
- snoozed_until,
- has_calendar,
- is_gatekept,
- ai_category,
- ai_confidence,
- ai_reason,
- ai_summary,
- ai_draft_reply,
- ai_classified_at,
- ai_classification_key
+has_starred,
+  created_at,
+  unsubscribe_url,
+  unsubscribe_email,
+  snoozed_until,
+  has_calendar,
+  is_gatekept,
+  ai_summary,
+  ai_draft_reply
 `;
 
 function toEmailListItem(row: EmailRowDb) {
   const labelIds = parseLabelIds(row.labelIds);
-  const aiReason =
-    row.aiReason?.trim() === LEGACY_PARTIAL_CLASSIFICATION_REASON
-      ? null
-      : (row.aiReason ?? null);
   return {
     id: String(row.id),
     mailboxId: row.mailboxId,
@@ -592,17 +520,8 @@ function toEmailListItem(row: EmailRowDb) {
     snoozedUntil: row.snoozedUntil,
     hasCalendar: toBool(row.hasCalendar),
     isGatekept: toBool(row.isGatekept),
-    aiCategory: row.aiCategory ?? null,
-    aiConfidence:
-      typeof row.aiConfidence === "number"
-        ? row.aiConfidence
-        : row.aiConfidence == null
-          ? null
-          : Number(row.aiConfidence),
-    aiReason,
     aiSummary: row.aiSummary ?? null,
     aiDraftReply: row.aiDraftReply ?? null,
-    aiClassifiedAt: row.aiClassifiedAt ?? null,
     threadCount: Number(row.threadCount ?? 1),
   };
 }
@@ -1058,7 +977,7 @@ export const localDb = {
     decision: "accept" | "reject";
   }): Promise<void> {
     const { userId, mailboxId, fromAddr, decision } = params;
-    const normalized = normalizeSender(fromAddr);
+    const normalized = normalizeEmailAddress(fromAddr);
     if (!normalized) return;
 
     const res = await dbClient.exec(
@@ -1072,7 +991,7 @@ export const localDb = {
       id: number;
       fromAddr: string | null;
       labelIds: string | null;
-    }>(res).filter((row) => normalizeSender(row.fromAddr) === normalized);
+    }>(res).filter((row) => normalizeEmailAddress(row.fromAddr) === normalized);
     if (rows.length === 0) return;
 
     for (const row of rows) {
@@ -1757,7 +1676,7 @@ export const localDb = {
     const seen = new Set<string>();
 
     for (const row of rows) {
-      const normalizedEmail = normalizeSender(row.email);
+      const normalizedEmail = normalizeEmailAddress(row.email);
       if (!normalizedEmail) continue;
       if (seen.has(normalizedEmail)) continue;
       seen.add(normalizedEmail);
@@ -2038,122 +1957,6 @@ export const localDb = {
     }
 
     return Array.from(known);
-  },
-
-  async isThreadClassificationFresh(params: {
-    userId: string;
-    mailboxId: number;
-    threadId: string | null;
-    representativeProviderMessageId: string;
-    classificationKey: string;
-  }): Promise<boolean> {
-    const {
-      userId,
-      mailboxId,
-      threadId,
-      representativeProviderMessageId,
-      classificationKey,
-    } = params;
-
-    const query = threadId
-      ? {
-          sql: `SELECT ai_classification_key, ai_category FROM emails
- WHERE user_id = ? AND mailbox_id = ? AND thread_id = ?
- ORDER BY date DESC LIMIT 1`,
-          params: [userId, mailboxId, threadId] as BindParam[],
-        }
-      : {
-          sql: `SELECT ai_classification_key, ai_category FROM emails
- WHERE user_id = ? AND mailbox_id = ? AND provider_message_id = ?
- LIMIT 1`,
-          params: [
-            userId,
-            mailboxId,
-            representativeProviderMessageId,
-          ] as BindParam[],
-        };
-
-    const res = await dbClient.exec(query.sql, query.params, "get");
-    const row = firstRow<{
-      aiClassificationKey: string | null;
-      aiCategory: EmailAICategory | null;
-    }>(res);
-    return Boolean(
-      row &&
-      row.aiClassificationKey === classificationKey &&
-      row.aiCategory !== null,
-    );
-  },
-
-  async updateThreadClassification(params: {
-    userId: string;
-    mailboxId: number;
-    threadId: string | null;
-    representativeProviderMessageId: string;
-    classificationKey: string;
-    category: EmailAICategory;
-    confidence: number;
-    reason: string;
-    summary: string;
-    draftReply: string;
-    classifiedAt: number;
-  }): Promise<void> {
-    const {
-      userId,
-      mailboxId,
-      threadId,
-      representativeProviderMessageId,
-      classificationKey,
-      category,
-      confidence,
-      reason,
-      summary,
-      draftReply,
-      classifiedAt,
-    } = params;
-
-    if (threadId) {
-      await dbClient.exec(
-        `UPDATE emails
- SET ai_category = ?, ai_confidence = ?, ai_reason = ?, ai_summary = ?,
- ai_draft_reply = ?, ai_classified_at = ?, ai_classification_key = ?
- WHERE user_id = ? AND mailbox_id = ? AND thread_id = ?`,
-        [
-          category,
-          confidence,
-          reason,
-          summary,
-          draftReply,
-          classifiedAt,
-          classificationKey,
-          userId,
-          mailboxId,
-          threadId,
-        ],
-        "run",
-      );
-      return;
-    }
-
-    await dbClient.exec(
-      `UPDATE emails
- SET ai_category = ?, ai_confidence = ?, ai_reason = ?, ai_summary = ?,
- ai_draft_reply = ?, ai_classified_at = ?, ai_classification_key = ?
- WHERE user_id = ? AND mailbox_id = ? AND provider_message_id = ?`,
-      [
-        category,
-        confidence,
-        reason,
-        summary,
-        draftReply,
-        classifiedAt,
-        classificationKey,
-        userId,
-        mailboxId,
-        representativeProviderMessageId,
-      ],
-      "run",
-    );
   },
 
   async deleteEmailsByProviderMessageId(

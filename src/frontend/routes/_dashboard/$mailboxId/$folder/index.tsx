@@ -13,7 +13,6 @@ export const Route = createFileRoute("/_dashboard/$mailboxId/$folder/")({
   params: {
     parse: (raw) => ({ folder: parseEmailFolderParam(raw.folder) }),
   },
-  skipRouteOnParseError: { params: true },
   errorComponent: RouteError,
   component: FolderPage,
 });

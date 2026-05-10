@@ -244,7 +244,7 @@ export function MailReaderPane({
   if (!emailId) {
     return (
       <div className="flex h-full min-h-0 min-w-0 flex-col bg-background">
-        <Empty className="h-full min-h-0 justify-center">
+        <Empty>
           <EmptyHeader>
             <EmptyTitle>Select an email</EmptyTitle>
             <EmptyDescription>{emptyDescription}</EmptyDescription>

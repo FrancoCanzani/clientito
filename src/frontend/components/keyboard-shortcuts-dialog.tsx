@@ -1,102 +1,77 @@
 import { Kbd } from "@/components/ui/kbd";
-import { useHotkeys } from "@/hooks/use-hotkeys";
+import { useShortcuts } from "@/hooks/use-shortcuts";
+import { getAllShortcuts } from "@/lib/shortcuts";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-type ShortcutDefinition = {
- key: string;
- description: string;
-};
+function useShortcutGroups() {
+  return useMemo(() => {
+    const all = getAllShortcuts();
+    const groups = new Map<string, { key: string; description: string }[]>();
 
-type ShortcutGroup = {
- label: string;
- shortcuts: ShortcutDefinition[];
-};
+    for (const def of all) {
+      let list = groups.get(def.category);
+      if (!list) {
+        list = [];
+        groups.set(def.category, list);
+      }
+      list.push({ key: def.key, description: def.label });
+    }
 
-const SHORTCUT_GROUPS: ShortcutGroup[] = [
- {
- label: "Navigation",
- shortcuts: [
- { key: "J", description: "Next email" },
- { key: "K", description: "Previous email" },
- { key: "Enter", description: "Open email" },
- ],
- },
- {
- label: "Actions",
- shortcuts: [
- { key: "E", description: "Mark as done" },
- { key: "R", description: "Reply" },
- { key: "S", description: "Toggle star" },
- { key: "U", description: "Toggle read/unread" },
- { key: "#", description: "Move to trash" },
- { key: "C", description: "Compose new email" },
- { key: "Esc", description: "Go back" },
- ],
- },
- {
- label: "Compose",
- shortcuts: [
- { key: "O", description: "Focus To" },
- { key: "C", description: "Focus Cc" },
- { key: "B", description: "Focus Bcc" },
- { key: "S", description: "Focus subject" },
- { key: "M", description: "Focus message body" },
- { key: "⌘ Enter", description: "Send message" },
- ],
- },
- {
- label: "Global",
- shortcuts: [
- { key: "⌘ K", description: "Command palette" },
- { key: "⌘ B", description: "Toggle sidebar" },
- { key: "⌘ ⇧ ↓", description: "Next account" },
- { key: "⌘ ⇧ ↑", description: "Previous account" },
- { key: "?", description: "Keyboard shortcuts" },
- ],
- },
-];
+    const sorted = Array.from(groups.entries()).sort((a, b) => {
+      if (a[0] === "Global") return -1;
+      if (b[0] === "Global") return 1;
+      return a[0].localeCompare(b[0]);
+    });
+
+    return sorted.map(([label, shortcuts]) => ({
+      label,
+      shortcuts: shortcuts.sort((a, b) => a.key.localeCompare(b.key)),
+    }));
+  }, []);
+}
 
 export function KeyboardShortcutsDialog() {
- const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const groups = useShortcutGroups();
 
- useHotkeys({
- "?": () => setOpen((isOpen) => !isOpen),
- });
+  useShortcuts("global", {
+    "global:keyboard-shortcuts": () => setOpen((isOpen) => !isOpen),
+  });
 
- return (
- <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
- <DialogPrimitive.Portal>
- <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[oklch(12%_0.01_250)]/30 backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
- <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 border border-border bg-background p-5 shadow-xl data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-150">
- <DialogPrimitive.Title className="text-sm font-medium text-foreground">
- Keyboard shortcuts
- </DialogPrimitive.Title>
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[oklch(12%_0.01_250)]/30 backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 border border-border bg-background p-5 shadow-xl data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-150">
+          <DialogPrimitive.Title className="text-sm font-medium text-foreground">
+            Keyboard shortcuts
+          </DialogPrimitive.Title>
 
- <div className="mt-4 space-y-4">
- {SHORTCUT_GROUPS.map((group) => (
- <div key={group.label}>
- <p className="mb-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
- {group.label}
- </p>
- <div className="space-y-1">
- {group.shortcuts.map((shortcut) => (
- <div
- key={shortcut.key}
- className="flex items-center justify-between py-0.5"
- >
- <span className="text-xs text-foreground">
- {shortcut.description}
- </span>
- <Kbd>{shortcut.key}</Kbd>
- </div>
- ))}
- </div>
- </div>
- ))}
- </div>
- </DialogPrimitive.Content>
- </DialogPrimitive.Portal>
- </DialogPrimitive.Root>
- );
+          <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto">
+            {groups.map((group) => (
+              <div key={group.label}>
+                <p className="mb-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {group.label}
+                </p>
+                <div className="space-y-1">
+                  {group.shortcuts.map((shortcut) => (
+                    <div
+                      key={shortcut.key + shortcut.description}
+                      className="flex items-center justify-between py-0.5"
+                    >
+                      <span className="text-xs text-foreground">
+                        {shortcut.description}
+                      </span>
+                      <Kbd>{shortcut.key}</Kbd>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
 }

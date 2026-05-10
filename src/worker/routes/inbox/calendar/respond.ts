@@ -9,6 +9,7 @@ import { isGmailReconnectRequiredError } from "../../../lib/gmail/errors";
 import { getGmailTokenForMailbox } from "../../../lib/gmail/client";
 import { resolveMailbox } from "../../../lib/gmail/mailboxes";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 import { respondCalendarInviteSchema } from "./schemas";
 
 export function registerRespondCalendarInvite(api: Hono<AppRouteEnv>) {
@@ -17,7 +18,7 @@ export function registerRespondCalendarInvite(api: Hono<AppRouteEnv>) {
     zValidator("json", respondCalendarInviteSchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const { mailboxId, inviteUid, response } = c.req.valid("json");
 
       const mailbox = await resolveMailbox(db, user.id, mailboxId);

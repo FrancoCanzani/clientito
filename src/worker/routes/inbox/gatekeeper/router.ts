@@ -3,10 +3,12 @@ import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { trustEntities } from "../../../db/schema";
+import { extractEmailAddress } from "../../../lib/utils";
 import { GmailDriver } from "../../../lib/gmail/driver";
 import { senderHasGmailHistory } from "../../../lib/gmail/mailbox/filters";
 import { resolveMailbox } from "../../../lib/gmail/mailboxes";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 
 const resolveBodySchema = z.object({
   mailboxId: z.number().int().positive(),
@@ -21,16 +23,6 @@ const decisionBodySchema = z.object({
 
 const TRUST_LOOKUP_CHUNK_SIZE = 80;
 const GMAIL_HISTORY_CONCURRENCY = 6;
-
-function normalizeSender(raw: string): string | null {
-  const normalized = raw.trim().toLowerCase();
-  if (!normalized) return null;
-  const bracketMatch = normalized.match(/<([^>]+)>/);
-  const candidate = bracketMatch?.[1]?.trim() ?? normalized;
-  const emailMatch = candidate.match(/[^\s<>()"'`,;:]+@[^\s<>()"'`,;:]+/);
-  if (!emailMatch) return null;
-  return emailMatch[0].toLowerCase();
-}
 
 function getDomain(fromAddr: string): string | null {
   const atIndex = fromAddr.lastIndexOf("@");
@@ -171,14 +163,14 @@ gatekeeperRoutes.post(
   zValidator("json", resolveBodySchema),
   async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const { mailboxId, senders } = c.req.valid("json");
 
     const mailbox = await resolveMailbox(db, user.id, mailboxId);
     if (!mailbox) return c.json({ error: "Mailbox not found" }, 404);
 
     const normalizedSenders = Array.from(
-      new Set(senders.map(normalizeSender).filter((value): value is string => Boolean(value))),
+      new Set(senders.map(extractEmailAddress).filter((value): value is string => Boolean(value))),
     );
 
     if (normalizedSenders.length === 0) {
@@ -267,13 +259,13 @@ gatekeeperRoutes.post(
   zValidator("json", decisionBodySchema),
   async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const { mailboxId, fromAddr, decision } = c.req.valid("json");
 
     const mailbox = await resolveMailbox(db, user.id, mailboxId);
     if (!mailbox) return c.json({ error: "Mailbox not found" }, 404);
 
-    const normalizedSender = normalizeSender(fromAddr);
+    const normalizedSender = extractEmailAddress(fromAddr);
     if (!normalizedSender) return c.json({ error: "Invalid sender address" }, 400);
 
     const trustLevel = decision === "accept" ? "trusted" : "blocked";

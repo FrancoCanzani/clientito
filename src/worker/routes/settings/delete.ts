@@ -2,6 +2,7 @@ import type { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { user } from "../../db/auth-schema";
 import type { AppRouteEnv } from "../types";
+import { getUser } from "../../middleware/auth";
 
 const ATTACHMENT_LIST_LIMIT = 1000;
 
@@ -27,7 +28,7 @@ async function deleteUserAttachments(env: AppRouteEnv["Bindings"], userId: strin
 export function registerDeleteAccount(api: Hono<AppRouteEnv>) {
   api.delete("/account", async (c) => {
     const db = c.get("db");
-    const currentUser = c.get("user")!;
+    const currentUser = getUser(c);
 
     try {
       await deleteUserAttachments(c.env, currentUser.id);

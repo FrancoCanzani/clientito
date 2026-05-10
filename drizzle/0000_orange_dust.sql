@@ -66,7 +66,8 @@ CREATE TABLE `drafts` (
 	`attachment_keys` text,
 	`updated_at` integer NOT NULL,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`mailbox_id`) REFERENCES `mailboxes`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `drafts_user_compose_key_idx` ON `drafts` (`user_id`,`compose_key`);--> statement-breakpoint
@@ -82,6 +83,7 @@ CREATE TABLE `mailboxes` (
 	`history_id` text,
 	`sync_window_months` integer,
 	`sync_cutoff_at` integer,
+	`ai_enabled` integer DEFAULT true NOT NULL,
 	`auth_state` text DEFAULT 'unknown' NOT NULL,
 	`last_successful_sync_at` integer,
 	`last_error_at` integer,
@@ -95,6 +97,24 @@ CREATE INDEX `mailboxes_user_idx` ON `mailboxes` (`user_id`);--> statement-break
 CREATE UNIQUE INDEX `mailboxes_account_idx` ON `mailboxes` (`account_id`);--> statement-breakpoint
 CREATE INDEX `mailboxes_auth_state_idx` ON `mailboxes` (`auth_state`);--> statement-breakpoint
 CREATE INDEX `mailboxes_last_success_idx` ON `mailboxes` (`last_successful_sync_at`);--> statement-breakpoint
+CREATE TABLE `reply_reminders` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`user_id` text NOT NULL,
+	`mailbox_id` integer NOT NULL,
+	`thread_id` text NOT NULL,
+	`sent_message_id` text NOT NULL,
+	`sent_at` integer NOT NULL,
+	`remind_at` integer NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`surfaced_at` integer,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`mailbox_id`) REFERENCES `mailboxes`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `reply_reminders_thread_idx` ON `reply_reminders` (`user_id`,`mailbox_id`,`thread_id`);--> statement-breakpoint
+CREATE INDEX `reply_reminders_due_idx` ON `reply_reminders` (`status`,`remind_at`);--> statement-breakpoint
+CREATE INDEX `reply_reminders_user_status_idx` ON `reply_reminders` (`user_id`,`status`);--> statement-breakpoint
 CREATE TABLE `scheduled_emails` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` text NOT NULL,
@@ -155,5 +175,4 @@ CREATE TABLE `trust_entities` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `trust_entities_unique_entity_idx` ON `trust_entities` (`user_id`,`mailbox_id`,`entity_type`,`entity_value`);--> statement-breakpoint
-CREATE INDEX `trust_entities_user_mailbox_idx` ON `trust_entities` (`user_id`,`mailbox_id`);--> statement-breakpoint
-CREATE INDEX `trust_entities_level_idx` ON `trust_entities` (`trust_level`);
+CREATE INDEX `trust_entities_user_mailbox_idx` ON `trust_entities` (`user_id`,`mailbox_id`);

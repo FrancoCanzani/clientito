@@ -1,10 +1,11 @@
 import { type Context, type Next } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { createMiddleware } from "hono/factory";
 import { eq } from "drizzle-orm";
 import { auth } from "../../../auth";
 import { user as authUser } from "../db/auth-schema";
-import { createDb } from "../db/client";
 import type { AppRouteEnv } from "../routes/types";
+import { createDb } from "../db/client";
 
 export const authMiddleware = createMiddleware<AppRouteEnv>(async (c, next) => {
   c.set("db", createDb(c.env.DB));
@@ -54,4 +55,12 @@ export async function requireAuth(c: Context<AppRouteEnv>, next: Next) {
   }
 
   await next();
+}
+
+export function getUser(c: Context<AppRouteEnv>) {
+  const user = c.get("user");
+  if (!user) {
+    throw new HTTPException(401, { message: "Unauthorized" });
+  }
+  return user;
 }

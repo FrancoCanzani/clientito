@@ -6,6 +6,7 @@ import { mailboxes } from "../../../db/schema";
 import { getGmailTokenForMailbox } from "../../../lib/gmail/client";
 import { deleteGmailLabel } from "../../../lib/gmail/mailbox/labels";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 
 const deleteLabelParamsSchema = z.object({
   labelId: z.string().trim().min(1),
@@ -22,7 +23,7 @@ export function registerDeleteLabel(api: Hono<AppRouteEnv>) {
     zValidator("query", deleteLabelQuerySchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const { labelId } = c.req.valid("param");
       const { mailboxId } = c.req.valid("query");
 

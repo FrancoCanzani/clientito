@@ -7,13 +7,12 @@ import {
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/$folder/email/$emailId")({
- params: {
- parse: (raw) => ({
- folder: parseEmailFolderParam(raw.folder),
- emailId: parseEmailIdParam(raw.emailId),
- }),
- },
- skipRouteOnParseError: { params: true },
- errorComponent: RouteError,
- component: FolderEmailPage,
+  params: {
+    parse: (raw) => ({
+      folder: parseEmailFolderParam(raw.folder),
+      emailId: parseEmailIdParam(raw.emailId),
+    }),
+  },
+  errorComponent: RouteError,
+  component: FolderEmailPage,
 });

@@ -119,7 +119,7 @@ export default function ScreenerPage() {
           {pendingQuery.isLoading ? (
             <PageSpinner />
           ) : pendingSenders.length === 0 ? (
-            <Empty className="min-h-56 justify-center">
+            <Empty>
               <EmptyHeader>
                 <EmptyTitle>No pending senders</EmptyTitle>
                 <EmptyDescription>

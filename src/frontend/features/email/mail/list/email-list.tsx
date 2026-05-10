@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { ArrowClockwiseIcon, SpinnerGapIcon } from "@phosphor-icons/react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MailFilterBar } from "./mail-filter-bar";
 import { MobileEmailRow } from "./mobile-email-row";
 import { SplitEmailRow } from "./split-email-row";
@@ -102,6 +102,7 @@ export function EmailList({
     onAction,
     onCompose: openCompose,
     onSearch: goToSearch,
+    onRefresh: () => void emailData.refreshViewAsync(),
     enabled: enableKeyboardNavigation,
   });
 
@@ -128,12 +129,22 @@ export function EmailList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowHeight]);
 
-  useEffect(() => {
+  const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  useLayoutEffect(() => {
     if (focusedIndex < 0) return;
+    const el = rowRefs.current.get(focusedIndex);
+    if (el) {
+      el.focus({ preventScroll: true });
+    }
     if (focusedIndex < threadGroups.length) {
       virtualizer.scrollToIndex(focusedIndex, { align: "auto" });
     }
-  }, [focusedIndex, threadGroups.length, virtualizer]);
+    // threadGroups.length and virtualizer are intentionally omitted: we only want
+    // to scroll when the user explicitly changes focus (keyboard nav), not when
+    // data appends. virtualizer is omitted because its identity changes every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedIndex]);
 
   useEffect(() => {
     if (!selectedEmailId) return;
@@ -143,7 +154,8 @@ export function EmailList({
     if (idx >= 0) {
       virtualizer.scrollToIndex(idx, { align: "auto" });
     }
-  }, [selectedEmailId, threadGroups, virtualizer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmailId]);
 
   const virtualItems = virtualizer.getVirtualItems();
 
@@ -231,6 +243,13 @@ export function EmailList({
                 return (
                   <div
                     key={group.representative.id}
+                    ref={(el) => {
+                      if (el) {
+                        rowRefs.current.set(virtualItem.index, el);
+                      } else {
+                        rowRefs.current.delete(virtualItem.index);
+                      }
+                    }}
                     className="absolute left-0 w-full"
                     style={{
                       height: virtualItem.size,
@@ -255,7 +274,7 @@ export function EmailList({
           ) : isLoading ? (
             <PageSpinner />
           ) : (
-            <Empty className="min-h-56 justify-center">
+            <Empty>
               <EmptyHeader>
                 <EmptyTitle>{emptyTitle ?? "No emails"}</EmptyTitle>
                 <EmptyDescription>

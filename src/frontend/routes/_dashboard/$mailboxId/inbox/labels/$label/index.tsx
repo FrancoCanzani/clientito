@@ -15,7 +15,6 @@ export const Route = createFileRoute(
   params: {
     parse: (raw) => ({ label: parseInboxLabelParam(raw.label) }),
   },
-  skipRouteOnParseError: { params: true },
   errorComponent: RouteError,
   component: LabelPage,
 });

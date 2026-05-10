@@ -1,51 +1,39 @@
 export type EmailDirection = "sent" | "received";
-export type EmailAICategory =
- | "action_required"
- | "invoice"
- | "notification"
- | "newsletter"
- | "fyi"
- | "unknown";
 
 export type EmailRow = {
- id: number;
- userId: string;
- mailboxId: number | null;
- providerMessageId: string;
- threadId: string | null;
- fromAddr: string;
- fromName: string | null;
- toAddr: string | null;
- ccAddr: string | null;
- subject: string | null;
- snippet: string | null;
- bodyText: string | null;
- bodyHtml: string | null;
- date: number;
- direction: EmailDirection | null;
- isRead: boolean;
- labelIds: string | null;
- hasInbox: boolean;
- hasSent: boolean;
- hasTrash: boolean;
- hasSpam: boolean;
- hasStarred: boolean;
- unsubscribeUrl: string | null;
- unsubscribeEmail: string | null;
- snoozedUntil: number | null;
- inlineAttachments: string | null;
- attachments: string | null;
- hasCalendar: boolean;
- isGatekept: boolean;
- aiCategory: EmailAICategory | null;
- aiConfidence: number | null;
- aiReason: string | null;
- aiSummary: string | null;
- aiDraftReply: string | null;
- aiClassifiedAt: number | null;
- aiClassificationKey: string | null;
- aiSplitIds: string | null;
- createdAt: number;
+  id: number;
+  userId: string;
+  mailboxId: number | null;
+  providerMessageId: string;
+  threadId: string | null;
+  fromAddr: string;
+  fromName: string | null;
+  toAddr: string | null;
+  ccAddr: string | null;
+  subject: string | null;
+  snippet: string | null;
+  bodyText: string | null;
+  bodyHtml: string | null;
+  date: number;
+  direction: EmailDirection | null;
+  isRead: boolean;
+  labelIds: string | null;
+  hasInbox: boolean;
+  hasSent: boolean;
+  hasTrash: boolean;
+  hasSpam: boolean;
+  hasStarred: boolean;
+  unsubscribeUrl: string | null;
+  unsubscribeEmail: string | null;
+  snoozedUntil: number | null;
+  inlineAttachments: string | null;
+  attachments: string | null;
+  hasCalendar: boolean;
+  isGatekept: boolean;
+  aiSummary: string | null;
+  aiDraftReply: string | null;
+  aiSplitIds: string | null;
+  createdAt: number;
 };
 
 export type EmailInsert = Omit<EmailRow, "id"> & { id?: number };

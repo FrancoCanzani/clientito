@@ -12,6 +12,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Toaster } from "sonner";
 import { localDb } from "./db/client";
+import { dbClient } from "./db/worker-client";
 import "./index.css";
 import {
   APP_VERSION,
@@ -24,7 +25,23 @@ import { router } from "./router";
 const APP_VERSION_POLL_MS = 5 * 60 * 1000;
 
 void (async () => {
-  await localDb.ensureReady();
+  try {
+    await localDb.ensureReady();
+  } catch (err) {
+    const concurrentError = dbClient.getConcurrentAccessError();
+    if (concurrentError) {
+      const root = document.getElementById("root")!;
+      root.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:2rem;text-align:center;font-family:system-ui,sans-serif">
+          <div>
+            <h1 style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem">Database in use</h1>
+            <p style="color:#888;font-size:0.875rem;max-width:24rem">${concurrentError}</p>
+          </div>
+        </div>`;
+      return;
+    }
+    throw err;
+  }
   const stored = await localDb.getMeta("schema_version");
   if (stored && stored !== LOCAL_SCHEMA_VERSION) {
     await forceSignOut("schema_version_changed");

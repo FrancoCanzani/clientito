@@ -5,6 +5,7 @@ import { z } from "zod";
 import { replyReminders } from "../../../db/schema";
 import { resolveMailbox } from "../../../lib/gmail/mailboxes";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_DURATION_MS = 90 * ONE_DAY_MS;
@@ -20,7 +21,7 @@ const createReminderSchema = z.object({
 export function registerCreateReminder(api: Hono<AppRouteEnv>) {
   api.post("/", zValidator("json", createReminderSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const { mailboxId, threadId, sentMessageId, sentAt, durationMs } =
       c.req.valid("json");
 

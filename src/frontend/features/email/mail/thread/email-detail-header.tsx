@@ -1,11 +1,12 @@
 import { IconButton } from "@/components/ui/icon-button";
 import type { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import type { EmailDetailItem } from "@/features/email/mail/types";
+import { shortcutKey } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import {
- ArrowLeftIcon,
- CaretDownIcon,
- CaretUpIcon,
+  ArrowLeftIcon,
+  CaretDownIcon,
+  CaretUpIcon,
 } from "@phosphor-icons/react";
 import type { ComposeInitial } from "../types";
 import { EmailActions } from "../list/email-actions";
@@ -48,7 +49,7 @@ export function EmailDetailHeader({
  <div className="flex items-center gap-0.5">
  <IconButton
  label="Back"
- shortcut="Esc"
+  shortcut={shortcutKey("action:esc")}
  variant="ghost"
  size="icon-sm"
  onClick={() => onBack?.()}
@@ -57,7 +58,7 @@ export function EmailDetailHeader({
  </IconButton>
  <IconButton
  label="Previous"
- shortcut="K"
+  shortcut={shortcutKey("detail:prev")}
  variant="ghost"
  size="icon-sm"
  onClick={() => onPrev?.()}
@@ -67,7 +68,7 @@ export function EmailDetailHeader({
  </IconButton>
  <IconButton
  label="Next"
- shortcut="J"
+  shortcut={shortcutKey("detail:next")}
  variant="ghost"
  size="icon-sm"
  onClick={() => onNext?.()}

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { AppRouteEnv } from "../../types";
+import { registerDeleteBatch } from "./delete-batch";
 import { registerDeleteEmail } from "./delete";
 import { registerGetAttachment } from "./get-attachment";
 import { registerGetScheduledEmails } from "./get-scheduled";
@@ -13,6 +14,7 @@ import { registerUploadAttachments } from "./post-attachments";
 const emailsRoutes = new Hono<AppRouteEnv>();
 
 registerBatchPatchEmails(emailsRoutes);
+registerDeleteBatch(emailsRoutes);
 registerGetAttachment(emailsRoutes);
 registerUploadAttachments(emailsRoutes);
 registerGetScheduledEmails(emailsRoutes);

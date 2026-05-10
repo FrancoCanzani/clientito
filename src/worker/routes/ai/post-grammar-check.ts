@@ -4,6 +4,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { z } from "zod";
 import { resolveMailbox } from "../../lib/gmail/mailboxes";
+import { getUser } from "../../middleware/auth";
 import type { AppRouteEnv } from "../types";
 
 const grammarCheckBodySchema = z.object({
@@ -27,7 +28,7 @@ export function registerPostGrammarCheck(app: Hono<AppRouteEnv>) {
     async (c) => {
       const { mailboxId, text } = c.req.valid("json");
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const mailbox = await resolveMailbox(db, user.id, mailboxId);
       if (!mailbox) return c.json({ error: "Mailbox not found" }, 404);
       if (!mailbox.aiEnabled) {

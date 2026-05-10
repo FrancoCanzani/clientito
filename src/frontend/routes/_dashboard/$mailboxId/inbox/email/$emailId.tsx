@@ -4,12 +4,11 @@ import { parseEmailIdParam } from "@/features/email/mail/views";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute(
- "/_dashboard/$mailboxId/inbox/email/$emailId",
+  "/_dashboard/$mailboxId/inbox/email/$emailId",
 )({
- params: {
- parse: (raw) => ({ emailId: parseEmailIdParam(raw.emailId) }),
- },
- skipRouteOnParseError: { params: true },
- errorComponent: RouteError,
- component: InboxEmailPage,
+  params: {
+    parse: (raw) => ({ emailId: parseEmailIdParam(raw.emailId) }),
+  },
+  errorComponent: RouteError,
+  component: InboxEmailPage,
 });

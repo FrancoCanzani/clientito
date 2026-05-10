@@ -20,5 +20,7 @@ export async function handleScheduled(event: ScheduledEvent, env: Env) {
         console.error("Orphaned attachment cleanup failed", err);
       });
       break;
+  default:
+      console.warn(`Unknown cron schedule: ${event.cron}`);
   }
 }

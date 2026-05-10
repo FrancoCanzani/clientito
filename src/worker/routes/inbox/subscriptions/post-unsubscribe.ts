@@ -11,6 +11,7 @@ import {
   normalizeUnsubscribeUrl,
 } from "../../../lib/gmail/subscriptions/service";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 
 const unsubscribeSchema = z.object({
   unsubscribeUrl: z.string().optional(),
@@ -24,7 +25,7 @@ export function registerPostUnsubscribe(api: Hono<AppRouteEnv>) {
     zValidator("json", unsubscribeSchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const { unsubscribeUrl: rawUnsubscribeUrl, unsubscribeEmail: rawUnsubscribeEmail, fromAddr } =
         c.req.valid("json");
       const unsubscribeUrl = normalizeUnsubscribeUrl(rawUnsubscribeUrl);

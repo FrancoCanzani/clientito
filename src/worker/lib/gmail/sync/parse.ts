@@ -1,3 +1,4 @@
+import { hasCalendarBodySignal, isCalendarMimeType, isCalendarFilename } from "../calendar-detection";
 import { parseParticipants } from "../mailbox/participants";
 import {
   extractMessageAttachments,
@@ -11,31 +12,9 @@ import {
 } from "../subscriptions/service";
 import type { GmailMessage } from "../types";
 import { STANDARD_LABELS } from "../types";
+import { extractEmailAddress } from "../../utils";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
-const CALENDAR_MIME_PREFIXES = [
-  "text/calendar",
-  "application/ics",
-  "application/icalendar",
-  "application/x-ical",
-  "application/vnd.ms-outlook",
-] as const;
-const CALENDAR_BODY_MARKERS = [
-  "begin:vcalendar",
-  "begin:vevent",
-  "method:request",
-  "method:cancel",
-  "method:reply",
-] as const;
-
-function extractAddress(headerValue: string | null): string {
-  if (!headerValue) return "";
-  const normalized = headerValue.trim().toLowerCase();
-  const bracketMatch = normalized.match(/<([^>]+)>/);
-  const candidate = bracketMatch?.[1]?.trim() ?? normalized;
-  const emailMatch = candidate.match(/[^\s<>()"'`,;:]+@[^\s<>()"'`,;:]+/);
-  return emailMatch?.[0]?.toLowerCase() ?? "";
-}
 
 export type ParsedInlineAttachment = {
   contentId: string;
@@ -77,17 +56,6 @@ export type ParsedEmail = {
   attachments: ParsedAttachment[];
 };
 
-function isCalendarMimeType(value: string | null | undefined): boolean {
-  if (!value) return false;
-  const normalized = value.trim().toLowerCase();
-  return CALENDAR_MIME_PREFIXES.some((prefix) => normalized.startsWith(prefix));
-}
-
-function isCalendarFilename(value: string | null | undefined): boolean {
-  if (!value) return false;
-  return value.trim().toLowerCase().endsWith(".ics");
-}
-
 function partHasCalendarSignal(part: GmailMessage["payload"]): boolean {
   if (!part) return false;
   if (isCalendarMimeType(part.mimeType) || isCalendarFilename(part.filename)) {
@@ -97,12 +65,6 @@ function partHasCalendarSignal(part: GmailMessage["payload"]): boolean {
     if (partHasCalendarSignal(child)) return true;
   }
   return false;
-}
-
-function bodyHasCalendarSignal(value: string | null | undefined): boolean {
-  if (!value) return false;
-  const normalized = value.toLowerCase();
-  return CALENDAR_BODY_MARKERS.some((marker) => normalized.includes(marker));
 }
 
 /**
@@ -133,8 +95,8 @@ export function parseGmailMessage(
   const rawTo = getHeaderValue(message.payload.headers, "To");
   const rawCc = getHeaderValue(message.payload.headers, "Cc");
   const rawMessageId = getHeaderValue(message.payload.headers, "Message-ID");
-  const fromAddr = extractAddress(rawFrom);
-  const toAddr = extractAddress(rawTo);
+  const fromAddr = extractEmailAddress(rawFrom);
+  const toAddr = extractEmailAddress(rawTo);
 
   if (!fromAddr) return null;
 
@@ -176,8 +138,8 @@ export function parseGmailMessage(
         isCalendarMimeType(attachment.mimeType) ||
         isCalendarFilename(attachment.filename),
     ) ||
-    bodyHasCalendarSignal(bodyText) ||
-    bodyHasCalendarSignal(bodyHtml);
+    hasCalendarBodySignal(bodyText) ||
+    hasCalendarBodySignal(bodyHtml);
   const isRead = !labelIds.includes(STANDARD_LABELS.UNREAD);
   const date = normalizedDate ?? Date.now();
 

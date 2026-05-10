@@ -16,7 +16,6 @@ export const SplitEmailRow = memo(function SplitEmailRow({
     snippet,
     handleMouseEnter,
     handleOpen,
-    handleKeyDown,
     hasMetaIcons,
     isStarred,
     email,
@@ -25,12 +24,11 @@ export const SplitEmailRow = memo(function SplitEmailRow({
   return (
     <div
       role="button"
-      tabIndex={0}
+      tabIndex={-1}
       className="h-full w-full cursor-default text-left text-sm focus:outline-none focus:ring-0"
       onMouseEnter={handleMouseEnter}
       onFocus={handleMouseEnter}
       onClick={handleOpen}
-      onKeyDown={handleKeyDown}
     >
       <div
         className={cn(

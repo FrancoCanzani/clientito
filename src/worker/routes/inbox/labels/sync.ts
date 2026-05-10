@@ -2,9 +2,10 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { z } from "zod";
+import { getUser } from "../../../middleware/auth";
 import { mailboxes } from "../../../db/schema";
 import { getGmailTokenForMailbox } from "../../../lib/gmail/client";
-import { isGmailRateLimitError } from "../../../lib/gmail/errors";
+import { handleGmailError } from "../../../lib/gmail/errors";
 import { listGmailLabels } from "../../../lib/gmail/mailbox/labels";
 import type { AppRouteEnv } from "../../types";
 
@@ -15,7 +16,7 @@ const syncLabelsSchema = z.object({
 export function registerSyncLabels(api: Hono<AppRouteEnv>) {
   api.post("/sync", zValidator("json", syncLabelsSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const { mailboxId } = c.req.valid("json");
 
     const mailbox = await db.query.mailboxes.findFirst({
@@ -44,10 +45,8 @@ export function registerSyncLabels(api: Hono<AppRouteEnv>) {
 
       return c.json({ data }, 200);
     } catch (error) {
-      if (isGmailRateLimitError(error)) {
-        c.header("Retry-After", "60");
-        return c.json({ error: "gmail_rate_limited" }, 429);
-      }
+      const handled = handleGmailError(error, db, mailbox.id, c);
+      if (handled) return handled;
       throw error;
     }
   });

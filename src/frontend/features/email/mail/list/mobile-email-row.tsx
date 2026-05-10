@@ -39,7 +39,6 @@ export const MobileEmailRow = memo(function MobileEmailRow({
     snippet,
     handleMouseEnter,
     handleOpen,
-    handleKeyDown,
     hasMetaIcons,
     isStarred,
     email,
@@ -314,9 +313,9 @@ export const MobileEmailRow = memo(function MobileEmailRow({
       ) : null}
       <div
         role="button"
-        tabIndex={0}
+        tabIndex={-1}
         className={cn(
-          "relative z-10 flex h-full w-full cursor-default flex-col justify-center gap-1 bg-background px-3 py-2 text-left text-sm transition-transform",
+          "relative z-10 flex h-full w-full cursor-default flex-col justify-center gap-1 bg-background px-3 py-2 text-left text-sm transition-transform hover:bg-muted",
           isFocused && "bg-muted",
           isSelected && "bg-muted",
         )}
@@ -328,7 +327,6 @@ export const MobileEmailRow = memo(function MobileEmailRow({
         onMouseEnter={handleMouseEnter}
         onFocus={handleMouseEnter}
         onClick={onRowClick}
-        onKeyDown={handleKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={finalizeGesture}

@@ -3,12 +3,13 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import { drafts } from "../../../db/schema";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 import { upsertDraftBodySchema } from "./schemas";
 
 export function registerPostDrafts(api: Hono<AppRouteEnv>) {
   return api.post("/", zValidator("json", upsertDraftBodySchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const body = c.req.valid("json");
     const now = Date.now();
 

@@ -178,29 +178,39 @@ type SqliteGlobal = typeof globalThis & {
 };
 
 function shouldHideOptionalOpfsWarning(args: unknown[]): boolean {
- const message = args.map((arg) => String(arg)).join(" ");
- return (
- message.includes(SQLITE_OPTIONAL_OPFS_WARNING) &&
- message.includes("Missing SharedArrayBuffer")
- );
+  const message = args.map((arg) => String(arg)).join(" ");
+  return (
+    message.includes(SQLITE_OPTIONAL_OPFS_WARNING) &&
+    message.includes("Missing SharedArrayBuffer")
+  );
+}
+
+function shouldHideSahPoolError(args: unknown[]): boolean {
+  const message = args.map((arg) => String(arg)).join(" ");
+  return (
+    message.includes("opfs-sahpool") ||
+    message.includes("NoModificationAllowedError") ||
+    message.includes("Access Handles cannot be created")
+  );
 }
 
 async function initSqlite3Module() {
- const sqliteGlobal = globalThis as SqliteGlobal;
- const existingConfig = sqliteGlobal.sqlite3ApiConfig;
- const existingWarn = existingConfig?.warn;
- sqliteGlobal.sqlite3ApiConfig = {
- ...existingConfig,
- warn: (...args: unknown[]) => {
- if (shouldHideOptionalOpfsWarning(args)) return;
- if (existingWarn) {
- existingWarn(...args);
- } else {
- console.warn(...args);
- }
- },
- };
- return sqlite3InitModule();
+  const sqliteGlobal = globalThis as SqliteGlobal;
+  const existingConfig = sqliteGlobal.sqlite3ApiConfig;
+  const existingWarn = existingConfig?.warn;
+  sqliteGlobal.sqlite3ApiConfig = {
+    ...existingConfig,
+    warn: (...args: unknown[]) => {
+      if (shouldHideOptionalOpfsWarning(args)) return;
+      if (shouldHideSahPoolError(args)) return;
+      if (existingWarn) {
+        existingWarn(...args);
+      } else {
+        console.warn(...args);
+      }
+    },
+  };
+  return sqlite3InitModule();
 }
 
 async function purgeLegacyOpfsDb(): Promise<void> {
@@ -228,14 +238,30 @@ async function purgeSahPoolDirectory(): Promise<void> {
  }
 }
 
-function isInvalidStateError(error: unknown): boolean {
- return (
- error instanceof DOMException
- ? error.name === "InvalidStateError"
- : error instanceof Error &&
- (error.name === "InvalidStateError" ||
- error.message.includes("invalid state"))
- );
+function isLocalRecoverableError(error: unknown): boolean {
+  if (error instanceof DOMException) {
+    return error.name === "InvalidStateError";
+  }
+  if (error instanceof Error) {
+    return (
+      error.name === "InvalidStateError" ||
+      error.message.includes("invalid state")
+    );
+  }
+  return false;
+}
+
+function isConcurrentAccessError(error: unknown): boolean {
+  if (error instanceof DOMException) {
+    return error.name === "NoModificationAllowedError";
+  }
+  if (error instanceof Error) {
+    return (
+      error.name === "NoModificationAllowedError" ||
+      error.message.includes("Access Handles cannot be created")
+    );
+  }
+  return false;
 }
 
 function closeDb(): void {
@@ -295,34 +321,45 @@ async function ensurePool(): Promise<SAHPoolUtil> {
 }
 
 async function initDb(): Promise<void> {
- if (db) return;
- if (initPromise) return initPromise;
+  if (db) return;
+  if (initPromise) return initPromise;
 
- const initialize = async () => {
- const activePool = await ensurePool();
- db = new activePool.OpfsSAHPoolDb(DB_FILENAME);
- db.exec(PRAGMAS);
- db.exec(SCHEMA_SQL);
- };
+  const initialize = async () => {
+  const activePool = await ensurePool();
+  db = new activePool.OpfsSAHPoolDb(DB_FILENAME);
+  db.exec(PRAGMAS);
+  db.exec(SCHEMA_SQL);
+  };
 
- initPromise = (async () => {
- try {
- await initialize();
- } catch (error) {
- if (!isInvalidStateError(error)) throw error;
- await resetSahPoolAfterInvalidState();
- await initialize();
- }
- })();
+  initPromise = (async () => {
+  try {
+  await initialize();
+  } catch (error) {
+  if (isConcurrentAccessError(error)) {
+  const msg =
+  "Database is open in another tab. Close the other tab and refresh this page.";
+  self.postMessage({ id: -1, ok: false, error: msg });
+  throw new Error(msg);
+  }
+  if (isLocalRecoverableError(error)) {
+  closeDb();
+  pool = null;
+  await resetSahPoolAfterInvalidState();
+  await initialize();
+  return;
+  }
+  throw error;
+  }
+  })();
 
- try {
- await initPromise;
- } catch (error) {
- initPromise = null;
- closeDb();
- pool = null;
- throw error;
- }
+  try {
+  await initPromise;
+  } catch (error) {
+  initPromise = null;
+  closeDb();
+  pool = null;
+  throw error;
+  }
 }
 
 function getStmt(sql: string): PreparedStatement {

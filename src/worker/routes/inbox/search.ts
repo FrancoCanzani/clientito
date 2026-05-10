@@ -8,6 +8,7 @@ import {
 import { resolveMailbox } from "../../lib/gmail/mailboxes";
 import { fetchThreadsAndParse } from "../../lib/gmail/sync/threads";
 import type { AppRouteEnv } from "../types";
+import { getUser } from "../../middleware/auth";
 
 const SEARCH_BATCH_SIZE = 10;
 
@@ -24,7 +25,7 @@ export function registerInboxSearch(api: Hono<AppRouteEnv>) {
     zValidator("json", searchRequestSchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const { mailboxId, q, pageToken, includeJunk } = c.req.valid("json");
 
       const mailbox = await resolveMailbox(db, user.id, mailboxId);

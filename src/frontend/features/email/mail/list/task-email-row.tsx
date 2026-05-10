@@ -9,18 +9,17 @@ export const TaskEmailRow = memo(function TaskEmailRow({
  isSelected = false,
  ...props
 }: EmailRowProps) {
- const {
- threadCount,
- participantLabel,
- subject,
- snippet,
- handleMouseEnter,
- handleOpen,
- handleKeyDown,
- hasMetaIcons,
- isStarred,
- email,
- } = useEmailRowModel(props);
+  const {
+  threadCount,
+  participantLabel,
+  subject,
+  snippet,
+  handleMouseEnter,
+  handleOpen,
+  hasMetaIcons,
+  isStarred,
+  email,
+  } = useEmailRowModel(props);
 
  return (
  <div
@@ -31,11 +30,10 @@ export const TaskEmailRow = memo(function TaskEmailRow({
  isFocused && "bg-muted",
  isSelected && "bg-muted ring-1 ring-border/70",
  )}
- onMouseEnter={handleMouseEnter}
- onFocus={handleMouseEnter}
- onClick={handleOpen}
- onKeyDown={handleKeyDown}
- >
+  onMouseEnter={handleMouseEnter}
+  onFocus={handleMouseEnter}
+  onClick={handleOpen}
+  >
  <span
  className={cn(
  "size-2 shrink-0 bg-muted-foreground/30",

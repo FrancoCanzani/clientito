@@ -11,6 +11,7 @@ import {
   batchModifyGmailMessages,
   modifyGmailThread,
   hardDeleteGmailMessage,
+  batchDeleteGmailMessages,
 } from "./mailbox/send";
 import {
   createBlockSenderFilter,
@@ -109,6 +110,15 @@ export class GmailDriver {
       this.mailboxId,
       this.env,
       messageId,
+    );
+  }
+
+  async hardDeleteBatch(messageIds: string[]): Promise<void> {
+    await batchDeleteGmailMessages(
+      this.db,
+      this.mailboxId,
+      this.env,
+      messageIds,
     );
   }
 

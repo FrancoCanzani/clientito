@@ -6,6 +6,7 @@ import { mailboxes } from "../../db/schema";
 import { getGmailTokenForMailbox } from "../../lib/gmail/client";
 import { getGmailLabel, listGmailLabels } from "../../lib/gmail/mailbox/labels";
 import type { AppRouteEnv } from "../types";
+import { getUser } from "../../middleware/auth";
 
 const unreadCountSchema = z.object({
   mailboxId: z.coerce.number().int().positive(),
@@ -27,7 +28,7 @@ function labelUnreadCount(label: {
 export function registerInboxUnreadCount(api: Hono<AppRouteEnv>) {
   api.get("/unread-count", zValidator("query", unreadCountSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const { mailboxId } = c.req.valid("query");
 
     const mailbox = await db.query.mailboxes.findFirst({
@@ -52,7 +53,7 @@ export function registerInboxUnreadCount(api: Hono<AppRouteEnv>) {
 
   api.get("/view-counts", zValidator("query", unreadCountSchema), async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
     const { mailboxId } = c.req.valid("query");
 
     const mailbox = await db.query.mailboxes.findFirst({

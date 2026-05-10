@@ -4,6 +4,7 @@ import { GmailDriver } from "../../../lib/gmail/driver";
 import { resolveMailbox } from "../../../lib/gmail/mailboxes";
 import { applyEmailPatch } from "./internal/mutation";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 import { patchEmailBodySchema } from "./schemas";
 
 export function registerPatchEmail(api: Hono<AppRouteEnv>) {
@@ -12,7 +13,7 @@ export function registerPatchEmail(api: Hono<AppRouteEnv>) {
     zValidator("json", patchEmailBodySchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const body = c.req.valid("json");
 
       const { providerMessageId, mailboxId, labelIds: currentLabelIds, ...mutation } = body;

@@ -4,12 +4,13 @@ import { hasUsableAccessToken } from "../../lib/gmail/client";
 import { ensureMailbox, ensureGoogleMailboxesForUser } from "../../lib/gmail/mailboxes";
 import { mailboxes } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
+import { getUser } from "../../middleware/auth";
 import { resolveGmailEmail } from "./utils";
 
 export function registerGetSettings(api: Hono<AppRouteEnv>) {
   api.get("/accounts", async (c) => {
     const db = c.get("db");
-    const user = c.get("user")!;
+    const user = getUser(c);
 
     const googleAccounts = await ensureGoogleMailboxesForUser(db, user.id);
 
@@ -60,7 +61,6 @@ export function registerGetSettings(api: Hono<AppRouteEnv>) {
           (mailbox?.syncWindowMonths as 3 | 6 | 12 | null | undefined) ?? null,
         syncCutoffAt: mailbox?.syncCutoffAt ?? null,
         aiEnabled: mailbox?.aiEnabled ?? true,
-        aiClassificationEnabled: mailbox?.aiClassificationEnabled ?? false,
         syncState,
         error: mailbox?.lastErrorMessage ?? null,
         createdAt:

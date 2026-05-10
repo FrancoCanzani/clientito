@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 import { putAttachmentFile } from "./internal/storage";
 
 const MAX_FILES = 10;
@@ -7,7 +8,7 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB (Gmail limit)
 
 export function registerUploadAttachments(api: Hono<AppRouteEnv>) {
   api.post("/attachments", async (c) => {
-    const user = c.get("user")!;
+    const user = getUser(c);
     const env = c.env;
 
     const formData = await c.req.formData();

@@ -4,6 +4,7 @@ import { GmailDriver } from "../../../lib/gmail/driver";
 import { resolveMailbox } from "../../../lib/gmail/mailboxes";
 import { applyEmailPatch } from "./internal/mutation";
 import type { AppRouteEnv } from "../../types";
+import { getUser } from "../../../middleware/auth";
 import { batchPatchEmailsBodySchema } from "./schemas";
 
 type LabelMutationGroup = {
@@ -29,7 +30,7 @@ export function registerBatchPatchEmails(api: Hono<AppRouteEnv>) {
     zValidator("json", batchPatchEmailsBodySchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const body = c.req.valid("json");
 
       const { items, ...mutation } = body;

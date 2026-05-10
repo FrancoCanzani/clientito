@@ -31,45 +31,50 @@ type Pending = {
 };
 
 class DbWorkerClient {
- private worker: Worker | null = null;
- private nextId = 1;
- private pending = new Map<number, Pending>();
- private initPromise: Promise<void> | null = null;
+  private worker: Worker | null = null;
+  private nextId = 1;
+  private pending = new Map<number, Pending>();
+  private initPromise: Promise<void> | null = null;
+  private concurrentAccessError: string | null = null;
 
- private getWorker(): Worker {
- if (this.worker) return this.worker;
- const worker = new Worker(new URL("./db.worker.ts", import.meta.url), {
- type: "module",
- });
- worker.onmessage = (event: MessageEvent<RpcResponse>) => {
- const msg = event.data;
- const pending = this.pending.get(msg.id);
- if (!pending) return;
- this.pending.delete(msg.id);
- if (msg.ok) pending.resolve(msg.result);
- else pending.reject(new Error(msg.error));
- };
- this.worker = worker;
- return worker;
- }
+  private createWorker(): Worker {
+    if (this.worker) return this.worker;
+    const worker = new Worker(new URL("./db.worker.ts", import.meta.url), {
+      type: "module",
+    });
+    worker.onmessage = (event: MessageEvent<RpcResponse>) => {
+      const msg = event.data;
+      if (msg.id === -1 && !msg.ok) {
+        this.concurrentAccessError = msg.error;
+        return;
+      }
+      const pending = this.pending.get(msg.id);
+      if (!pending) return;
+      this.pending.delete(msg.id);
+      if (msg.ok) pending.resolve(msg.result);
+      else pending.reject(new Error(msg.error));
+    };
+    this.worker = worker;
+    return worker;
+  }
 
- private send<T>(req: RpcRequest): Promise<T> {
- const worker = this.getWorker();
- return new Promise<T>((resolve, reject) => {
- this.pending.set(req.id, {
- resolve: (value) => resolve(value as T),
- reject,
- });
- worker.postMessage(req);
- });
- }
+  private send<T>(req: RpcRequest): Promise<T> {
+    const worker = this.createWorker();
+    return new Promise<T>((resolve, reject) => {
+      this.pending.set(req.id, {
+        resolve: (value) => resolve(value as T),
+        reject,
+      });
+      worker.postMessage(req);
+    });
+  }
 
- init(): Promise<void> {
- if (!this.initPromise) {
- this.initPromise = this.send<void>({ id: this.nextId++, type: "init" });
- }
- return this.initPromise;
- }
+  init(): Promise<void> {
+    if (!this.initPromise) {
+      this.initPromise = this.send<void>({ id: this.nextId++, type: "init" });
+    }
+    return this.initPromise;
+  }
 
  async exec(
  sql: string,
@@ -104,7 +109,11 @@ class DbWorkerClient {
  this.initPromise = null;
  }
 
- dispose(): void {
+ getConcurrentAccessError(): string | null {
+    return this.concurrentAccessError;
+  }
+
+  dispose(): void {
  if (this.worker) {
  this.worker.terminate();
  this.worker = null;

@@ -638,6 +638,25 @@ export type CalendarInviteResponseResult = {
   selfResponseStatus: CalendarInviteResponseStatus | null;
 };
 
+export async function deleteAllForever(params: {
+  mailboxId: number;
+  providerMessageIds: string[];
+}): Promise<{ deletedCount: number }> {
+  const response = await fetch("/api/inbox/emails/batch-delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    const json = await response.json().catch(() => null);
+    throw new Error(getErrorMessage(json) ?? "Failed to delete messages");
+  }
+
+  const json = (await response.json()) as { data: { deletedCount: number } };
+  return json.data;
+}
+
 export async function respondToCalendarInvite(input: {
   mailboxId: number;
   inviteUid: string;

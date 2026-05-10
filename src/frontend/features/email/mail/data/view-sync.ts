@@ -34,7 +34,7 @@ const refreshInFlight = new Map<string, Promise<void>>();
 const refreshLastRunAt = new Map<string, number>();
 const VIEW_BACKGROUND_REFRESH_COOLDOWN_MS = 10_000;
 
-async function refreshViewFromServer(
+export async function refreshViewFromServer(
   userId: string,
   mailboxId: number,
   view: string,
@@ -45,9 +45,6 @@ async function refreshViewFromServer(
   if (existing && reason !== "active-view") return existing;
 
   const lastRunAt = refreshLastRunAt.get(key) ?? 0;
-  // A successful background refresh invalidates this same list query. Without a
-  // short per-view cooldown, that invalidation immediately schedules another
-  // background refresh from the first-page fetch and loops forever.
   if (
     reason !== "active-view" &&
     Date.now() - lastRunAt < VIEW_BACKGROUND_REFRESH_COOLDOWN_MS
@@ -61,7 +58,7 @@ async function refreshViewFromServer(
         userId,
         mailboxId,
         view,
-        cursor: { type: "remote" },
+        remoteCursor: { type: "remote" },
         reason,
         invalidateOnSuccess: true,
       });
@@ -92,8 +89,9 @@ async function fetchServerPage(
   userId: string,
   mailboxId: number,
   view: string,
-  cursor: RemoteCursor,
+  remoteCursor: RemoteCursor,
   filters?: MailListFilters,
+  beforeMs?: number,
 ): Promise<ViewPage> {
   const res = await fetch("/api/inbox/view/page", {
     method: "POST",
@@ -101,8 +99,8 @@ async function fetchServerPage(
     body: JSON.stringify({
       mailboxId,
       view,
-      cursor: cursor.token || undefined,
-      beforeMs: cursor.beforeMs,
+      cursor: remoteCursor.token || undefined,
+      beforeMs,
       limit: VIEW_PAGE_SIZE,
       filters,
     }),
@@ -154,11 +152,10 @@ async function fetchServerPage(
     lastError: null,
   });
   const nextCursor = body.cursor
-    ? encodeViewCursor({
-        type: "remote",
-        token: body.cursor,
-        beforeMs: cursor.beforeMs,
-      })
+    ? encodeViewCursor(
+        { type: "remote", token: body.cursor },
+        beforeMs,
+      )
     : null;
   return { emails, cursor: nextCursor };
 }
@@ -170,11 +167,12 @@ type GmailViewSyncTask = {
   userId: string;
   mailboxId: number;
   view: string;
-  cursor: RemoteCursor;
+  remoteCursor: RemoteCursor;
   reason: GmailSyncReason;
   priority: number;
   invalidateOnSuccess: boolean;
   filters?: MailListFilters;
+  beforeMs?: number;
   resolve: (page: ViewPage) => void;
   reject: (error: unknown) => void;
 };
@@ -198,15 +196,16 @@ function getGmailViewSyncKey(params: {
   userId: string;
   mailboxId: number;
   view: string;
-  cursor: RemoteCursor;
+  remoteCursor: RemoteCursor;
   filters?: MailListFilters;
+  beforeMs?: number;
 }): string {
   return [
     params.userId,
     params.mailboxId,
     params.view,
-    params.cursor.token ?? "first",
-    params.cursor.beforeMs ?? "none",
+    params.remoteCursor.token ?? "first",
+    params.beforeMs ?? "none",
     params.filters?.unread ? "u" : "",
     params.filters?.starred ? "s" : "",
     params.filters?.hasAttachment ? "a" : "",
@@ -226,8 +225,9 @@ const gmailViewSyncQueue = new AsyncQueuer<GmailViewSyncTask>(
         task.userId,
         task.mailboxId,
         task.view,
-        task.cursor,
+        task.remoteCursor,
         task.filters,
+        task.beforeMs,
       );
       task.resolve(page);
       if (task.invalidateOnSuccess) {
@@ -244,7 +244,7 @@ const gmailViewSyncQueue = new AsyncQueuer<GmailViewSyncTask>(
   },
   {
     key: "gmail-view-sync",
-    concurrency: 1,
+    concurrency: 4,
     wait: GMAIL_SYNC_WAIT_MS,
     maxSize: GMAIL_SYNC_MAX_SIZE,
     getPriority: (task) => task.priority,
@@ -262,10 +262,11 @@ export function enqueueViewSyncPage(params: {
   userId: string;
   mailboxId: number;
   view: string;
-  cursor: RemoteCursor;
+  remoteCursor: RemoteCursor;
   reason: GmailSyncReason;
   invalidateOnSuccess?: boolean;
   filters?: MailListFilters;
+  beforeMs?: number;
 }): Promise<ViewPage> {
   const key = getGmailViewSyncKey(params);
   const existing = gmailViewSyncInFlight.get(key);
@@ -331,7 +332,7 @@ export function preloadInactiveViews(
         userId,
         mailboxId,
         view,
-        cursor: { type: "remote" },
+        remoteCursor: { type: "remote" },
         reason: "preload",
       }).catch(() => {});
     }

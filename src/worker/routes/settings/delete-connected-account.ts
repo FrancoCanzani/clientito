@@ -5,6 +5,7 @@ import { z } from "zod";
 import { account } from "../../db/auth-schema";
 import { mailboxes } from "../../db/schema";
 import type { AppRouteEnv } from "../types";
+import { getUser } from "../../middleware/auth";
 
 const deleteConnectedAccountParamsSchema = z.object({
   accountId: z.string().min(1),
@@ -16,7 +17,7 @@ export function registerDeleteConnectedAccount(api: Hono<AppRouteEnv>) {
     zValidator("param", deleteConnectedAccountParamsSchema),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user")!;
+      const user = getUser(c);
       const { accountId } = c.req.valid("param");
 
       const targetAccount = await db.query.account.findFirst({

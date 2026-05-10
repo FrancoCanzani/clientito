@@ -1,11 +1,12 @@
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import type {
- EmailDetailItem,
- EmailListItem,
- EmailListPage,
- EmailThreadItem,
+	EmailDetailItem,
+	EmailListItem,
+	EmailListPage,
+	EmailThreadItem,
 } from "@/features/email/mail/types";
 import { isEmailListInfiniteData } from "@/features/email/mail/utils/email-list-cache";
+import { applyLabelPatch, STANDARD_LABELS } from "@/features/email/mail/utils/label-patch";
 import type { QueryClient } from "@tanstack/react-query";
 import type { InfiniteData, QueryKey } from "@tanstack/react-query";
 
@@ -29,12 +30,6 @@ type EmailTarget = {
  threadId?: string;
 };
 
-const LABEL_UNREAD = "UNREAD";
-const LABEL_INBOX = "INBOX";
-const LABEL_TRASH = "TRASH";
-const LABEL_SPAM = "SPAM";
-const LABEL_STARRED = "STARRED";
-
 function targetMatches(email: PatchableEmail, target: {
  ids: Set<string>;
  providerMessageIds: Set<string>;
@@ -48,64 +43,26 @@ function targetMatches(email: PatchableEmail, target: {
 }
 
 export function applyPatchToItem<
- T extends Pick<EmailListItem, "isRead" | "labelIds" | "snoozedUntil">,
+  T extends Pick<EmailListItem, "isRead" | "labelIds" | "snoozedUntil">,
 >(item: T, patch: EmailPatchPayload): T {
- const labels = new Set(item.labelIds);
-
- if (patch.isRead !== undefined) {
- if (patch.isRead) labels.delete(LABEL_UNREAD);
- else labels.add(LABEL_UNREAD);
- }
-
- if (patch.archived !== undefined) {
- if (patch.archived) labels.delete(LABEL_INBOX);
- else if (!labels.has(LABEL_TRASH) && !labels.has(LABEL_SPAM)) labels.add(LABEL_INBOX);
- }
-
- if (patch.trashed !== undefined) {
- if (patch.trashed) {
- labels.add(LABEL_TRASH);
- labels.delete(LABEL_INBOX);
- labels.delete(LABEL_SPAM);
- } else {
- labels.delete(LABEL_TRASH);
- if (!labels.has(LABEL_SPAM)) labels.add(LABEL_INBOX);
- }
- }
-
- if (patch.spam !== undefined) {
- if (patch.spam) {
- labels.add(LABEL_SPAM);
- labels.delete(LABEL_INBOX);
- labels.delete(LABEL_TRASH);
- } else {
- labels.delete(LABEL_SPAM);
- if (!labels.has(LABEL_TRASH)) labels.add(LABEL_INBOX);
- }
- }
-
- if (patch.starred !== undefined) {
- if (patch.starred) labels.add(LABEL_STARRED);
- else labels.delete(LABEL_STARRED);
- }
-
- return {
- ...item,
- isRead: patch.isRead ?? !labels.has(LABEL_UNREAD),
- labelIds: Array.from(labels),
- snoozedUntil:
- patch.snoozedUntil !== undefined ? patch.snoozedUntil : item.snoozedUntil,
- };
+  const result = applyLabelPatch(item.labelIds, !item.labelIds.includes(STANDARD_LABELS.UNREAD), patch);
+  return {
+    ...item,
+    isRead: patch.isRead ?? !result.labelIds.includes(STANDARD_LABELS.UNREAD),
+    labelIds: result.labelIds,
+    snoozedUntil:
+    patch.snoozedUntil !== undefined ? patch.snoozedUntil : item.snoozedUntil,
+  };
 }
 
 export function applyPatchToLabelIds(
  labelIds: string[],
  patch: EmailPatchPayload,
 ): string[] {
- return applyPatchToItem(
- { isRead: !labelIds.includes(LABEL_UNREAD), labelIds, snoozedUntil: null },
- patch,
- ).labelIds;
+return applyPatchToItem(
+    { isRead: !labelIds.includes(STANDARD_LABELS.UNREAD), labelIds, snoozedUntil: null },
+    patch,
+  ).labelIds;
 }
 
 export function removeIdsFromInfiniteData(
