@@ -19,6 +19,7 @@ import type {
 import { buildForwardedEmailHtml } from "@/features/email/mail/utils/build-forwarded-html";
 import { openEmail as openInboxEmail } from "@/features/email/mail/utils/open-email";
 import { isEmailListInfiniteData } from "@/features/email/mail/utils/email-list-cache";
+import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
 import { MailboxPage } from "@/features/email/shell/mailbox-page";
 import { clearFocusedEmail, setFocusedEmail } from "@/hooks/use-focused-email";
 import { useHotkeys } from "@/hooks/use-hotkeys";
@@ -28,21 +29,31 @@ import {
  type InfiniteData,
 } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export function EmailDetailView({
  mailboxId,
  emailId,
  view,
+ inboxMode,
  onNavigateToEmail,
  onClose,
+ listGroups,
+ hasNextPage = false,
+ isFetchingNextPage = false,
+ fetchNextPage,
  embedded = false,
 }: {
  mailboxId: number;
  emailId: string;
  view: string;
+ inboxMode?: "important" | "all";
  onNavigateToEmail: (nextEmailId: string) => void;
  onClose?: () => void;
+ listGroups?: ThreadGroup[];
+ hasNextPage?: boolean;
+ isFetchingNextPage?: boolean;
+ fetchNextPage?: () => Promise<unknown>;
  embedded?: boolean;
 }) {
  const emailQuery = useQuery({
@@ -89,9 +100,14 @@ export function EmailDetailView({
  mailboxId={mailboxId}
  emailId={emailId}
  view={view}
- onNavigateToEmail={onNavigateToEmail}
- onClose={onClose}
- embedded={embedded}
+  inboxMode={inboxMode}
+  onNavigateToEmail={onNavigateToEmail}
+  onClose={onClose}
+  listGroups={listGroups}
+  hasNextPage={hasNextPage}
+  isFetchingNextPage={isFetchingNextPage}
+  fetchNextPage={fetchNextPage}
+  embedded={embedded}
  />
  );
 }
@@ -101,16 +117,26 @@ function EmailDetailPane({
  mailboxId,
  emailId,
  view,
+ inboxMode,
  onNavigateToEmail,
  onClose,
+ listGroups,
+ hasNextPage,
+ isFetchingNextPage,
+ fetchNextPage,
  embedded,
 }: {
  email: EmailDetailItem;
  mailboxId: number;
  emailId: string;
  view: string;
+ inboxMode?: "important" | "all";
  onNavigateToEmail: (nextEmailId: string) => void;
  onClose?: () => void;
+ listGroups?: ThreadGroup[];
+ hasNextPage: boolean;
+ isFetchingNextPage: boolean;
+ fetchNextPage?: () => Promise<unknown>;
  embedded: boolean;
 }) {
  const navigate = useNavigate();
@@ -123,6 +149,8 @@ function EmailDetailPane({
  presentation: embedded ? "panel" : "route",
  });
  const contentRef = useRef<EmailDetailContentHandle>(null);
+ const pendingNextAfterFetchRef = useRef(false);
+ const [isLoadingNextEmail, setIsLoadingNextEmail] = useState(false);
  const currentEmail = email;
 
  useEffect(() => {
@@ -145,12 +173,15 @@ function EmailDetailPane({
  ]);
 
  const orderedEmails = useMemo(() => {
+ if (listGroups) {
+ return listGroups.map((group) => group.representative);
+ }
  const data = queryClient.getQueryData<InfiniteData<EmailListPage>>(
  emailQueryKeys.list(view, mailboxId),
  );
  if (!isEmailListInfiniteData(data)) return [];
  return data.pages.flatMap((page) => page.emails);
- }, [queryClient, mailboxId, view]);
+ }, [listGroups, queryClient, mailboxId, view]);
 
  const orderedIds = useMemo(
  () => orderedEmails.map((item) => item.id),
@@ -161,15 +192,26 @@ function EmailDetailPane({
  [orderedEmails],
  );
 
- const currentIndex = orderedIds.indexOf(emailId);
+ const currentIndex = useMemo(() => {
+ if (listGroups) {
+ const groupIndex = listGroups.findIndex(
+ (group) =>
+ group.representative.id === emailId ||
+ group.emails.some((item) => item.id === emailId),
+ );
+ if (groupIndex !== -1) return groupIndex;
+ }
+
+ return orderedIds.indexOf(emailId);
+ }, [emailId, listGroups, orderedIds]);
  const hasPrev = currentIndex > 0;
  const hasNext = currentIndex >= 0 && currentIndex < orderedIds.length - 1;
+ const canLoadNext =
+ currentIndex >= 0 && !hasNext && hasNextPage && Boolean(fetchNextPage);
+ const canNavigateNext = hasNext || canLoadNext || isLoadingNextEmail;
 
- const goToEmail = useCallback(
- (direction: "prev" | "next") => {
- const nextIndex =
- direction === "next" ? currentIndex + 1 : currentIndex - 1;
- const nextId = orderedIds[nextIndex];
+ const navigateToEmailId = useCallback(
+ (nextId: string) => {
  if (!nextId) return;
 
  const nextEmail = orderedEmailById.get(nextId);
@@ -181,6 +223,7 @@ function EmailDetailPane({
  nextEmail,
  {
  context: view,
+ inboxMode,
  presentation: embedded ? "panel" : "route",
  replace: true,
  },
@@ -191,15 +234,73 @@ function EmailDetailPane({
  onNavigateToEmail(nextId);
  },
  [
- currentIndex,
- orderedIds,
  orderedEmailById,
  queryClient,
  navigate,
  mailboxId,
  view,
+ inboxMode,
  onNavigateToEmail,
  embedded,
+ ],
+ );
+
+ useEffect(() => {
+ if (!pendingNextAfterFetchRef.current) return;
+ if (isFetchingNextPage) return;
+
+ const nextId = orderedIds[currentIndex + 1];
+ if (nextId) {
+ pendingNextAfterFetchRef.current = false;
+ setIsLoadingNextEmail(false);
+ navigateToEmailId(nextId);
+ return;
+ }
+
+ if (!hasNextPage) {
+ pendingNextAfterFetchRef.current = false;
+ setIsLoadingNextEmail(false);
+ }
+ }, [
+ currentIndex,
+ hasNextPage,
+ isFetchingNextPage,
+ navigateToEmailId,
+ orderedIds,
+ ]);
+
+ const goToEmail = useCallback(
+ (direction: "prev" | "next") => {
+ const nextIndex =
+ direction === "next" ? currentIndex + 1 : currentIndex - 1;
+ const nextId = orderedIds[nextIndex];
+ if (nextId) {
+ navigateToEmailId(nextId);
+ return;
+ }
+
+ if (
+ direction === "next" &&
+ currentIndex >= 0 &&
+ hasNextPage &&
+ fetchNextPage &&
+ !isFetchingNextPage
+ ) {
+ pendingNextAfterFetchRef.current = true;
+ setIsLoadingNextEmail(true);
+ void fetchNextPage().catch(() => {
+ pendingNextAfterFetchRef.current = false;
+ setIsLoadingNextEmail(false);
+ });
+ }
+ },
+ [
+ currentIndex,
+ fetchNextPage,
+ hasNextPage,
+ isFetchingNextPage,
+ navigateToEmailId,
+ orderedIds,
  ],
  );
 
@@ -262,11 +363,11 @@ function EmailDetailPane({
 
  useHotkeys({
  j: {
- enabled: hasNext,
+ enabled: canNavigateNext,
  onKeyDown: () => goToEmail("next"),
  },
  ArrowDown: {
- enabled: hasNext,
+ enabled: canNavigateNext,
  onKeyDown: () => goToEmail("next"),
  },
  k: {
@@ -322,7 +423,7 @@ function EmailDetailPane({
  onPrev={() => goToEmail("prev")}
  onNext={() => goToEmail("next")}
  hasPrev={hasPrev}
- hasNext={hasNext}
+ hasNext={canNavigateNext}
  onForward={handleForward}
  onAction={executeEmailAction}
  />

@@ -26,19 +26,18 @@ export const SplitEmailRow = memo(function SplitEmailRow({
     <div
       role="button"
       tabIndex={0}
-      className="h-full w-full cursor-default text-left text-sm"
+      className="h-full w-full cursor-default text-left text-sm focus:outline-none focus:ring-0"
       onMouseEnter={handleMouseEnter}
       onFocus={handleMouseEnter}
       onClick={handleOpen}
       onKeyDown={handleKeyDown}
     >
- <div
- className={cn(
- "flex h-full min-w-0 flex-col justify-center gap-0.5 overflow-hidden border-b border-border/40 px-4 py-1.5 transition-colors hover:bg-muted",
- isFocused && "bg-muted",
- isSelected && "bg-card",
- )}
- >
+      <div
+        className={cn(
+          "flex h-full min-w-0 flex-col justify-center gap-0.5 overflow-hidden border-b border-border/40 px-4 py-1.5 transition-colors hover:bg-muted",
+          (isFocused || isSelected) && "bg-muted",
+        )}
+      >
         <div className="flex min-w-0 items-center gap-1.5">
           {!email.isRead && <span className="sr-only">Unread.</span>}
           <span
@@ -53,7 +52,7 @@ export const SplitEmailRow = memo(function SplitEmailRow({
             <span className="size-1.5 shrink-0 bg-primary" aria-hidden />
           )}
 
-          <div className="ml-auto flex shrink-0 items-center gap-1.5 text-xs leading-[18px] text-muted-foreground">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 text-xs leading-4.5 text-muted-foreground">
             {hasMetaIcons && (
               <div className="flex items-center gap-1">
                 {isStarred && (
@@ -82,7 +81,7 @@ export const SplitEmailRow = memo(function SplitEmailRow({
 
         <div
           className={cn(
-            "truncate text-xs leading-[18px]",
+            "truncate text-xs leading-4.5",
             !email.isRead && "font-medium text-foreground",
           )}
         >

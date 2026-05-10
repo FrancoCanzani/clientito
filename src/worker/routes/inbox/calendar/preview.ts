@@ -1,8 +1,8 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Hono } from "hono";
 import { parseCalendarInviteFromIcs } from "../../../lib/calendar/ics";
-import { isGmailReconnectRequiredError } from "../../../lib/gmail/errors";
 import { GmailDriver } from "../../../lib/gmail/driver";
+import { isGmailReconnectRequiredError } from "../../../lib/gmail/errors";
 import { resolveMailbox } from "../../../lib/gmail/mailboxes";
 import type { AppRouteEnv } from "../../types";
 import { previewCalendarInviteSchema } from "./schemas";
@@ -64,7 +64,10 @@ export function registerPreviewCalendarInvite(api: Hono<AppRouteEnv>) {
               attachment.attachmentId,
             );
             const inviteText = new TextDecoder().decode(bytes);
-            const invite = parseCalendarInviteFromIcs(inviteText, mailbox.email);
+            const invite = parseCalendarInviteFromIcs(
+              inviteText,
+              mailbox.email,
+            );
             if (invite) {
               return c.json({ data: { invite } }, 200);
             }

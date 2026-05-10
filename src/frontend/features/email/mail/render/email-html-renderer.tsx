@@ -1,6 +1,12 @@
 import { openCompose } from "@/features/email/mail/compose/compose-events";
 import { parseMailtoComposeInitial } from "@/features/email/mail/utils/parse-mailto-compose";
+import { useTheme } from "@/hooks/use-theme";
 import { useEffect, useRef } from "react";
+
+type Rgb = { r: number; g: number; b: number };
+
+const DARK_MODE_BACKGROUND: Rgb = { r: 20, g: 20, b: 20 };
+const DEFAULT_LINK_COLOR = "#93c5fd";
 
 const EMAIL_CONTENT_SHADOW_STYLE = `
  :host {
@@ -60,6 +66,102 @@ const EMAIL_CONTENT_SHADOW_STYLE = `
  transform-origin: top left;
  }
 `;
+
+function parseCssColor(color: string): { rgb: Rgb; alpha: number } | null {
+ const rgba = color.match(
+ /^rgba?\(\s*([.\d]+)\s*,\s*([.\d]+)\s*,\s*([.\d]+)(?:\s*,\s*([.\d]+))?\s*\)$/i,
+ );
+ if (!rgba) return null;
+ const r = Number(rgba[1]);
+ const g = Number(rgba[2]);
+ const b = Number(rgba[3]);
+ const alpha = rgba[4] === undefined ? 1 : Number(rgba[4]);
+ if (![r, g, b, alpha].every(Number.isFinite)) return null;
+ return { rgb: { r, g, b }, alpha };
+}
+
+function blendOverBackground(foreground: Rgb, alpha: number, background: Rgb): Rgb {
+ return {
+ r: foreground.r * alpha + background.r * (1 - alpha),
+ g: foreground.g * alpha + background.g * (1 - alpha),
+ b: foreground.b * alpha + background.b * (1 - alpha),
+ };
+}
+
+function relativeLuminance({ r, g, b }: Rgb): number {
+ const channel = (value: number) => {
+ const normalized = value / 255;
+ return normalized <= 0.03928
+ ? normalized / 12.92
+ : ((normalized + 0.055) / 1.055) ** 2.4;
+ };
+ return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+function contrastRatio(a: Rgb, b: Rgb): number {
+ const l1 = relativeLuminance(a);
+ const l2 = relativeLuminance(b);
+ const lighter = Math.max(l1, l2);
+ const darker = Math.min(l1, l2);
+ return (lighter + 0.05) / (darker + 0.05);
+}
+
+function hasVisibleDirectText(element: Element): boolean {
+ return Array.from(element.childNodes).some(
+ (node) => node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()),
+ );
+}
+
+function hasCustomBackground(element: Element): boolean {
+ const parsed = parseCssColor(window.getComputedStyle(element).backgroundColor);
+ return Boolean(parsed && parsed.alpha > 0.02);
+}
+
+function getReadableDarkModeColor(color: Rgb): string {
+ if (contrastRatio(color, DARK_MODE_BACKGROUND) >= 4.5) {
+ return `rgb(${Math.round(color.r)}, ${Math.round(color.g)}, ${Math.round(color.b)})`;
+ }
+
+ const huePreserved = { ...color };
+ for (let i = 0; i < 14; i += 1) {
+ huePreserved.r = Math.min(255, huePreserved.r + 16);
+ huePreserved.g = Math.min(255, huePreserved.g + 16);
+ huePreserved.b = Math.min(255, huePreserved.b + 16);
+ if (contrastRatio(huePreserved, DARK_MODE_BACKGROUND) >= 4.5) {
+ return `rgb(${Math.round(huePreserved.r)}, ${Math.round(huePreserved.g)}, ${Math.round(huePreserved.b)})`;
+ }
+ }
+
+ return "#e5e5e5";
+}
+
+function lightenUnreadableText(root: ParentNode): void {
+ const walk = (element: Element) => {
+ if (hasCustomBackground(element)) return;
+
+ const computed = window.getComputedStyle(element);
+ const parsedColor = parseCssColor(computed.color);
+ if (parsedColor && hasVisibleDirectText(element)) {
+ const color =
+ parsedColor.alpha < 1
+ ? blendOverBackground(parsedColor.rgb, parsedColor.alpha, DARK_MODE_BACKGROUND)
+ : parsedColor.rgb;
+
+ if (contrastRatio(color, DARK_MODE_BACKGROUND) < 4.5) {
+ (element as HTMLElement).style.color =
+ element.tagName === "A" ? DEFAULT_LINK_COLOR : getReadableDarkModeColor(color);
+ }
+ }
+
+ for (const child of Array.from(element.children)) {
+ walk(child);
+ }
+ };
+
+ for (const child of Array.from(root.children)) {
+ walk(child);
+ }
+}
 
 function wrapEmailContent(shadowRoot: ShadowRoot): HTMLElement | null {
  const viewport = document.createElement("div");
@@ -136,6 +238,7 @@ function setupAutoScale(host: HTMLElement, content: HTMLElement): () => void {
 export function EmailHtmlRenderer({ html }: { html: string }) {
  const hostRef = useRef<HTMLDivElement | null>(null);
  const shadowRootRef = useRef<ShadowRoot | null>(null);
+ const { resolved: theme } = useTheme();
 
  useEffect(() => {
  const host = hostRef.current;
@@ -160,8 +263,12 @@ export function EmailHtmlRenderer({ html }: { html: string }) {
  return;
  }
 
+ if (theme === "dark") {
+ lightenUnreadableText(content);
+ }
+
  return setupAutoScale(host, content);
- }, [html]);
+ }, [html, theme]);
 
  useEffect(() => {
  if (!shadowRootRef.current) {

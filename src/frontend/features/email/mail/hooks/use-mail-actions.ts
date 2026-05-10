@@ -114,10 +114,14 @@ export function useMailActions({
   view,
   mailboxId,
   presentation = "route",
+  openContext,
+  inboxMode,
 }: {
   view: string;
   mailboxId: number;
   presentation?: "route" | "panel";
+  openContext?: string;
+  inboxMode?: "important" | "all";
 }) {
   const navigate = mailboxRoute.useNavigate();
   const queryClient = useQueryClient();
@@ -128,11 +132,12 @@ export function useMailActions({
     (email: EmailListItem) => {
       const routeMailboxId = email.mailboxId ?? mailboxId;
       openInboxEmail(queryClient, navigate, routeMailboxId, email, {
-        context: view,
+        context: openContext ?? view,
+        inboxMode,
         presentation,
       });
     },
-    [mailboxId, navigate, presentation, queryClient, view],
+    [inboxMode, mailboxId, navigate, openContext, presentation, queryClient, view],
   );
 
   const mutation = useMutation<void, Error, InboxMutationVars>({

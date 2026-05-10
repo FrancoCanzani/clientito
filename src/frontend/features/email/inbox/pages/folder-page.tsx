@@ -1,15 +1,15 @@
 import {
- ResizableHandle,
- ResizablePanel,
- ResizablePanelGroup,
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import {
- MailListPane,
- MailReaderPane,
-} from "@/features/email/inbox/pages/mail-pane";
 import { useArchivedData } from "@/features/email/inbox/hooks/use-archived-data";
-import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
+import {
+  MailListPane,
+  MailReaderPane,
+} from "@/features/email/inbox/pages/mail-pane";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
+import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
 import { VIEW_LABELS, type EmailFolderView } from "@/features/email/mail/views";
 import { MailboxPage } from "@/features/email/shell/mailbox-page";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -19,139 +19,147 @@ import { useState } from "react";
 const route = getRouteApi("/_dashboard/$mailboxId/$folder/");
 
 export default function FolderPage() {
- const { mailboxId, folder } = route.useParams();
+  const { mailboxId, folder } = route.useParams();
 
- if (folder === "archived") {
- return <ArchivedFolderPage mailboxId={mailboxId} />;
- }
+  if (folder === "archived") {
+    return <ArchivedFolderPage mailboxId={mailboxId} />;
+  }
 
- return <GenericFolderPage mailboxId={mailboxId} folder={folder} />;
+  return <GenericFolderPage mailboxId={mailboxId} folder={folder} />;
 }
 
 function ArchivedFolderPage({ mailboxId }: { mailboxId: number }) {
- const emailData = useArchivedData({ mailboxId });
- return <FolderView mailboxId={mailboxId} folder="archived" emailData={emailData} />;
+  const emailData = useArchivedData({ mailboxId });
+  return (
+    <FolderView mailboxId={mailboxId} folder="archived" emailData={emailData} />
+  );
 }
 
 function GenericFolderPage({
- mailboxId,
- folder,
+  mailboxId,
+  folder,
 }: {
- mailboxId: number;
- folder: EmailFolderView;
+  mailboxId: number;
+  folder: EmailFolderView;
 }) {
- const emailData = useMailViewData({ view: folder, mailboxId });
- return <FolderView mailboxId={mailboxId} folder={folder} emailData={emailData} />;
+  const emailData = useMailViewData({ view: folder, mailboxId });
+  return (
+    <FolderView mailboxId={mailboxId} folder={folder} emailData={emailData} />
+  );
 }
 
 function FolderView({
- mailboxId,
- folder,
- emailData,
+  mailboxId,
+  folder,
+  emailData,
 }: {
- mailboxId: number;
- folder: EmailFolderView;
- emailData: ReturnType<typeof useMailViewData>;
+  mailboxId: number;
+  folder: EmailFolderView;
+  emailData: ReturnType<typeof useMailViewData>;
 }) {
- const search = route.useSearch();
- const navigate = route.useNavigate();
- const isMobile = useIsMobile();
- const [showFilters, setShowFilters] = useState(false);
- const { openEmail, executeEmailAction, snooze } = useMailActions({
- view: folder,
- mailboxId,
- presentation: isMobile ? "route" : "panel",
- });
+  const search = route.useSearch();
+  const navigate = route.useNavigate();
+  const isMobile = useIsMobile();
+  const [showFilters, setShowFilters] = useState(false);
+  const { openEmail, executeEmailAction, snooze } = useMailActions({
+    view: folder,
+    mailboxId,
+    presentation: isMobile ? "route" : "panel",
+  });
 
- const title = (VIEW_LABELS as Record<string, string>)[folder] ?? folder;
- const selectedEmailId = isMobile ? null : (search.emailId ?? null);
+  const title = (VIEW_LABELS as Record<string, string>)[folder] ?? folder;
+  const selectedEmailId = isMobile ? null : (search.emailId ?? null);
 
- const clearSelectedEmail = () =>
- navigate({
- to: "/$mailboxId/$folder",
- params: { mailboxId, folder },
- search: {},
- replace: true,
- });
+  const clearSelectedEmail = () =>
+    navigate({
+      to: "/$mailboxId/$folder",
+      params: { mailboxId, folder },
+      search: {},
+      replace: true,
+    });
 
- const navigateSelectedEmail = (nextEmailId: string) =>
- navigate({
- to: "/$mailboxId/$folder",
- params: { mailboxId, folder },
- search: { emailId: nextEmailId },
- replace: true,
- });
+  const navigateSelectedEmail = (nextEmailId: string) =>
+    navigate({
+      to: "/$mailboxId/$folder",
+      params: { mailboxId, folder },
+      search: { emailId: nextEmailId },
+      replace: true,
+    });
 
- const listPane = (
- <MailListPane
- title={title}
- emailData={emailData}
- showFilters={showFilters}
- onShowFiltersChange={setShowFilters}
- onOpen={openEmail}
- onAction={executeEmailAction}
- onSnooze={(group, timestamp) =>
- group.threadId && group.representative.mailboxId
- ? void snooze(
- {
- kind: "thread",
- thread: {
- threadId: group.threadId,
- mailboxId: group.representative.mailboxId,
- labelIds: group.representative.labelIds,
- },
- },
- timestamp,
- )
- : void snooze(
- {
- kind: "email",
- identifier: {
- id: group.representative.id,
- providerMessageId: group.representative.providerMessageId,
- mailboxId: group.representative.mailboxId ?? mailboxId,
- labelIds: group.representative.labelIds,
- },
- },
- timestamp,
- )
- }
- selectedEmailId={selectedEmailId}
- enableKeyboardNavigation={!selectedEmailId}
- compact={!isMobile}
- />
- );
+  const listPane = (
+    <MailListPane
+      title={title}
+      emailData={emailData}
+      showFilters={showFilters}
+      onShowFiltersChange={setShowFilters}
+      onOpen={openEmail}
+      onAction={executeEmailAction}
+      onSnooze={(group, timestamp) =>
+        group.threadId && group.representative.mailboxId
+          ? void snooze(
+              {
+                kind: "thread",
+                thread: {
+                  threadId: group.threadId,
+                  mailboxId: group.representative.mailboxId,
+                  labelIds: group.representative.labelIds,
+                },
+              },
+              timestamp,
+            )
+          : void snooze(
+              {
+                kind: "email",
+                identifier: {
+                  id: group.representative.id,
+                  providerMessageId: group.representative.providerMessageId,
+                  mailboxId: group.representative.mailboxId ?? mailboxId,
+                  labelIds: group.representative.labelIds,
+                },
+              },
+              timestamp,
+            )
+      }
+      selectedEmailId={selectedEmailId}
+      enableKeyboardNavigation={!selectedEmailId}
+      compact={!isMobile}
+    />
+  );
 
- if (isMobile || !emailData.hasEmails) {
- return <MailboxPage className="max-w-none">{listPane}</MailboxPage>;
- }
+  if (isMobile || !emailData.hasEmails) {
+    return <MailboxPage className="max-w-none">{listPane}</MailboxPage>;
+  }
 
- return (
- <MailboxPage className="max-w-none">
- <ResizablePanelGroup
- orientation="horizontal"
- className="min-h-0 flex-1 overflow-hidden"
- >
- <ResizablePanel
- defaultSize="50%"
- minSize="320px"
- maxSize="65%"
- className="min-w-0"
- >
- {listPane}
- </ResizablePanel>
- <ResizableHandle withHandle />
- <ResizablePanel minSize="360px" defaultSize="50%" className="min-w-0">
- <MailReaderPane
- mailboxId={mailboxId}
- view={folder}
- emailId={selectedEmailId}
- emptyDescription={`Open a message from ${title.toLowerCase()} to read it here.`}
- onClose={clearSelectedEmail}
- onNavigateToEmail={navigateSelectedEmail}
- />
- </ResizablePanel>
- </ResizablePanelGroup>
- </MailboxPage>
- );
+  return (
+    <MailboxPage className="max-w-none">
+      <ResizablePanelGroup
+        orientation="horizontal"
+        className="min-h-0 flex-1 overflow-hidden"
+      >
+        <ResizablePanel
+          defaultSize="50%"
+          minSize="320px"
+          maxSize="65%"
+          className="min-w-0"
+        >
+          {listPane}
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel minSize="360px" defaultSize="50%" className="min-w-0">
+          <MailReaderPane
+            mailboxId={mailboxId}
+            view={folder}
+            emailId={selectedEmailId}
+            emptyDescription={`Open a message from ${title.toLowerCase()} to read it here.`}
+            onClose={clearSelectedEmail}
+            onNavigateToEmail={navigateSelectedEmail}
+            listGroups={emailData.threadGroups}
+            hasNextPage={emailData.hasNextPage}
+            isFetchingNextPage={emailData.isFetchingNextPage}
+            fetchNextPage={emailData.fetchNextPage}
+          />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </MailboxPage>
+  );
 }

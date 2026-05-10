@@ -61,12 +61,12 @@ function AttachmentsSection({
   if (attachments.length === 0) return null;
 
   return (
-    <section className="space-y-2.5 border-t border-border/40 px-5 py-3.5">
+    <section className="space-y-3 border-t border-border/40 px-5 py-4">
       <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
         <PaperclipIcon className="size-3" />
         <span>{formatAttachmentLabel(attachments.length)}</span>
       </div>
-      <div className="divide-y divide-border/50">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(176px,1fr))] gap-3">
         {attachments.map((attachment) => (
           <AttachmentItem
             key={attachment.attachmentId}
@@ -332,7 +332,9 @@ function ThreadMessage({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-          <span className="font-mono text-[10px] tracking-tighter tabular-nums">{formattedDate}</span>
+          <span className="font-mono text-[10px] tracking-tighter tabular-nums">
+            {formattedDate}
+          </span>
           {expanded ? (
             <CaretDownIcon className="size-3" />
           ) : (

@@ -16,7 +16,7 @@ export function viewToGmailFilter(view: string): GmailViewFilter | null {
     case "starred":
       return { labelIds: ["STARRED"] };
     case "important":
-      return { labelIds: ["IMPORTANT"] };
+      return { labelIds: ["INBOX", "IMPORTANT"] };
     case "archived":
       // Keep this predicate in lockstep with the local "archived"/Done view.
       // If Gmail returns sent mail here, sync can spend the first page on rows

@@ -219,8 +219,64 @@ async function purgeLegacyOpfsDb(): Promise<void> {
  }
 }
 
-async function ensurePool(): Promise<SAHPoolUtil> {
- if (pool) return pool;
+async function purgeSahPoolDirectory(): Promise<void> {
+ try {
+ const root = await navigator.storage.getDirectory();
+ await root.removeEntry(SAH_POOL_DIRECTORY, { recursive: true });
+ } catch {
+ /* OPFS unavailable or directory not present */
+ }
+}
+
+function isInvalidStateError(error: unknown): boolean {
+ return (
+ error instanceof DOMException
+ ? error.name === "InvalidStateError"
+ : error instanceof Error &&
+ (error.name === "InvalidStateError" ||
+ error.message.includes("invalid state"))
+ );
+}
+
+function closeDb(): void {
+ for (const stmt of stmtCache.values()) {
+ try {
+ stmt.finalize();
+ } catch {
+ /* ignore */
+ }
+ }
+ stmtCache.clear();
+ if (db) {
+ try {
+ db.close();
+ } catch {
+ /* ignore */
+ }
+ db = null;
+ }
+}
+
+async function resetSahPoolAfterInvalidState(): Promise<void> {
+ closeDb();
+ const activePool = pool;
+ pool = null;
+ if (activePool) {
+ try {
+ await activePool.wipeFiles();
+ } catch {
+ /* pool may already be in an invalid state */
+ }
+ try {
+ activePool.pauseVfs();
+ } catch {
+ /* ignore */
+ }
+ }
+ await purgeSahPoolDirectory();
+}
+
+async function installPool(): Promise<SAHPoolUtil> {
  const sqlite3 = await initSqlite3Module();
  if (typeof sqlite3.installOpfsSAHPoolVfs !== "function") {
  throw new Error("sqlite-wasm SAH-Pool VFS unavailable in this browser");
@@ -233,22 +289,38 @@ async function ensurePool(): Promise<SAHPoolUtil> {
  return pool;
 }
 
+async function ensurePool(): Promise<SAHPoolUtil> {
+ if (pool) return pool;
+ return installPool();
+}
+
 async function initDb(): Promise<void> {
  if (db) return;
  if (initPromise) return initPromise;
 
- initPromise = (async () => {
+ const initialize = async () => {
  const activePool = await ensurePool();
  db = new activePool.OpfsSAHPoolDb(DB_FILENAME);
  db.exec(PRAGMAS);
  db.exec(SCHEMA_SQL);
+ };
+
+ initPromise = (async () => {
+ try {
+ await initialize();
+ } catch (error) {
+ if (!isInvalidStateError(error)) throw error;
+ await resetSahPoolAfterInvalidState();
+ await initialize();
+ }
  })();
 
  try {
  await initPromise;
  } catch (error) {
  initPromise = null;
- db = null;
+ closeDb();
+ pool = null;
  throw error;
  }
 }

@@ -1,5 +1,3 @@
-import type { GmailMessage } from "../types";
-import { STANDARD_LABELS } from "../types";
 import { parseParticipants } from "../mailbox/participants";
 import {
   extractMessageAttachments,
@@ -11,6 +9,8 @@ import {
   normalizeUnsubscribeEmail,
   normalizeUnsubscribeUrl,
 } from "../subscriptions/service";
+import type { GmailMessage } from "../types";
+import { STANDARD_LABELS } from "../types";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
 const CALENDAR_MIME_PREFIXES = [
@@ -195,7 +195,10 @@ export function parseGmailMessage(
     null;
   const fromName = senderParticipant?.name ?? null;
 
-  const rawUnsubscribe = getHeaderValue(message.payload.headers, "List-Unsubscribe");
+  const rawUnsubscribe = getHeaderValue(
+    message.payload.headers,
+    "List-Unsubscribe",
+  );
   let unsubscribeUrl: string | null = null;
   let unsubscribeEmail: string | null = null;
   if (rawUnsubscribe) {

@@ -45,10 +45,8 @@ import { ComposeEditor } from "./compose-editor";
 import { useComposeEmail } from "./compose-email-state";
 import { GrammarDiffView } from "./grammar-diff-view";
 import { RecipientInput } from "./recipient-input";
-import {
-  ReplyReminderPicker,
-} from "./reply-reminder-picker";
 import { formatReminderLabel } from "./reply-reminder-options";
+import { ReplyReminderPicker } from "./reply-reminder-picker";
 import { ScheduleSendPicker } from "./schedule-send-picker";
 
 type ComposeEmailFieldsProps = {
@@ -465,7 +463,7 @@ export function ComposeEmailFields({
           <div className="pointer-events-none absolute inset-x-2 bottom-[calc(100%+0.375rem)] z-20">
             <ComposeDockedToolbar
               editor={bodyEditor}
-              className="pointer-events-auto m-0 border border-border/40 bg-background/98 shadow-xs"
+              className="pointer-events-auto m-0 border border-border/40 shadow-xs"
             />
           </div>
         )}
