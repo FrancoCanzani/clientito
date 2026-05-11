@@ -412,14 +412,6 @@ registerShortcut({
 });
 
 registerShortcut({
-  id: "action:label",
-  key: "l",
-  label: "Label",
-  category: "Actions",
-  contexts: ["email-detail"],
-});
-
-registerShortcut({
   id: "search:next",
   key: "j",
   label: "Next result",
@@ -465,6 +457,14 @@ registerShortcut({
   id: "nav:screener",
   key: "g n",
   label: "Go to screener",
+  category: "Navigation",
+  contexts: ["global"],
+});
+
+registerShortcut({
+  id: "nav:subscriptions",
+  key: "g u",
+  label: "Go to subscriptions",
   category: "Navigation",
   contexts: ["global"],
 });

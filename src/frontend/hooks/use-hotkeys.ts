@@ -1,79 +1,84 @@
-import { useEffect, useEffectEvent } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 import { tinykeys, type KeyBindingMap } from "tinykeys";
 
 type HotkeyHandler = (event: KeyboardEvent) => void;
 
 type HotkeyBinding =
- | HotkeyHandler
- | {
- onKeyDown: HotkeyHandler;
- enabled?: boolean;
- preventDefault?: boolean;
- allowInEditable?: boolean;
- };
+  | HotkeyHandler
+  | {
+      onKeyDown: HotkeyHandler;
+      enabled?: boolean;
+      preventDefault?: boolean;
+      allowInEditable?: boolean;
+    };
 
 type UseHotkeysOptions = {
- enabled?: boolean;
- target?: Window | HTMLElement | null;
- allowInEditable?: boolean;
+  enabled?: boolean;
+  target?: Window | HTMLElement | null;
+  allowInEditable?: boolean;
 };
 
 function isEditableTarget(target: EventTarget | null): boolean {
- return (
- target instanceof HTMLElement &&
- (target.isContentEditable ||
- target.tagName === "INPUT" ||
- target.tagName === "TEXTAREA" ||
- target.tagName === "SELECT")
- );
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA" ||
+      target.tagName === "SELECT")
+  );
 }
 
 function normalizeBinding(binding: HotkeyBinding) {
- return typeof binding === "function" ? { onKeyDown: binding } : binding;
+  return typeof binding === "function" ? { onKeyDown: binding } : binding;
 }
 
 export function useHotkeys(
- bindings: Record<string, HotkeyBinding>,
- options: UseHotkeysOptions = {},
+  bindings: Record<string, HotkeyBinding>,
+  options: UseHotkeysOptions = {},
 ) {
- const {
- enabled = true,
- target = typeof window === "undefined" ? null : window,
- allowInEditable = false,
- } = options;
+  const {
+    enabled = true,
+    target = typeof window === "undefined" ? null : window,
+    allowInEditable = false,
+  } = options;
 
- const keySignature = Object.keys(bindings).join("|");
+  const bindingsRef = useRef(bindings);
+  bindingsRef.current = bindings;
 
- const runBinding = useEffectEvent((key: string, event: KeyboardEvent) => {
- const binding = bindings[key];
- if (!binding) return;
+  const optionsRef = useRef({ enabled, allowInEditable });
+  optionsRef.current = { enabled, allowInEditable };
 
- const {
- onKeyDown,
- enabled: bindingEnabled = true,
- preventDefault = true,
- allowInEditable: allowBindingInEditable = allowInEditable,
- } = normalizeBinding(binding);
+  const runBinding = useEffectEvent((key: string, event: KeyboardEvent) => {
+    const binding = bindingsRef.current[key];
+    if (!binding) return;
 
- if (!bindingEnabled) return;
- if (!allowBindingInEditable && isEditableTarget(event.target)) return;
- if (preventDefault) {
- event.preventDefault();
- }
+    const {
+      onKeyDown,
+      enabled: bindingEnabled = true,
+      preventDefault = true,
+      allowInEditable: allowBindingInEditable = optionsRef.current.allowInEditable,
+    } = normalizeBinding(binding);
 
- onKeyDown(event);
- });
+    if (!bindingEnabled) return;
+    if (!allowBindingInEditable && isEditableTarget(event.target)) return;
+    if (preventDefault) {
+      event.preventDefault();
+    }
 
- useEffect(() => {
- if (!enabled || !target) return;
+    onKeyDown(event);
+  });
 
- const keyBindingMap: KeyBindingMap = Object.fromEntries(
- Object.keys(bindings).map((key) => [
- key,
- (event: KeyboardEvent) => runBinding(key, event),
- ]),
- );
+  useEffect(() => {
+    if (!enabled || !target) return;
 
- return tinykeys(target, keyBindingMap);
- }, [enabled, keySignature, target, bindings]);
+    const keys = Object.keys(bindingsRef.current);
+    const keyBindingMap: KeyBindingMap = Object.fromEntries(
+      keys.map((key) => [
+        key,
+        (event: KeyboardEvent) => runBinding(key, event),
+      ]),
+    );
+
+    return tinykeys(target, keyBindingMap);
+  }, [enabled, target, runBinding]);
 }

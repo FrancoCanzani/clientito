@@ -1,4 +1,4 @@
-import { GMAIL_API_BASE, gmailRequest } from "../client";
+import { gmailMutation, gmailRequest } from "../client";
 import type {
   GmailLabel,
   GmailLabelColor,
@@ -36,21 +36,7 @@ export async function createGmailLabel(
   };
   if (params.color) body.color = params.color;
 
-  const response = await fetch(`${GMAIL_API_BASE}/labels`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`Failed to create Gmail label (${response.status}): ${text}`);
-  }
-
-  return (await response.json()) as GmailLabel;
+  return gmailMutation<GmailLabel>(accessToken, "POST", "/labels", body);
 }
 
 export async function updateGmailLabel(
@@ -58,34 +44,22 @@ export async function updateGmailLabel(
   labelId: string,
   params: { name?: string; color?: GmailLabelColor },
 ): Promise<GmailLabel> {
-  const response = await fetch(`${GMAIL_API_BASE}/labels/${labelId}`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(params),
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`Failed to update Gmail label (${response.status}): ${text}`);
-  }
-
-  return (await response.json()) as GmailLabel;
+  return gmailMutation<GmailLabel>(
+    accessToken,
+    "PATCH",
+    `/labels/${labelId}`,
+    params,
+  );
 }
 
 export async function deleteGmailLabel(
   accessToken: string,
   labelId: string,
 ): Promise<void> {
-  const response = await fetch(`${GMAIL_API_BASE}/labels/${labelId}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-
-  if (!response.ok && response.status !== 404) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`Failed to delete Gmail label (${response.status}): ${text}`);
+  try {
+    await gmailMutation(accessToken, "DELETE", `/labels/${labelId}`);
+  } catch (error) {
+    if (error instanceof Error && /\(404\)/.test(error.message)) return;
+    throw error;
   }
 }

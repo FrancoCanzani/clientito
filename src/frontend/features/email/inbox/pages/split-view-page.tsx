@@ -53,7 +53,7 @@ export default function SplitViewPage() {
   if (!splitView || !splitView.rules) {
     return (
       <MailboxPage>
-        <MailboxPageBody className="flex items-center justify-center">
+        <MailboxPageBody>
           <Empty>
             <EmptyHeader>
               <EmptyTitle>View unavailable</EmptyTitle>

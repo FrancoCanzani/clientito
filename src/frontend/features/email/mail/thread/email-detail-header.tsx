@@ -12,31 +12,31 @@ import type { ComposeInitial } from "../types";
 import { EmailActions } from "../list/email-actions";
 
 export function EmailDetailHeader({
- email,
- onClose,
- onBack,
- onPrev,
- onNext,
- hasPrev = false,
- hasNext = false,
- onForward,
- onAction,
- onReply,
- onDraftReply,
- isScrolled = false,
+  email,
+  onClose,
+  onBack,
+  onPrev,
+  onNext,
+  hasPrev = false,
+  hasNext = false,
+  onForward,
+  onAction,
+  onReply,
+  onDraftReply,
+  isScrolled = false,
 }: {
- email: EmailDetailItem;
- onClose?: () => void;
- onBack?: () => void;
- onPrev?: () => void;
- onNext?: () => void;
- hasPrev?: boolean;
- hasNext?: boolean;
- onForward: (initial: ComposeInitial) => void;
- onAction?: ReturnType<typeof useMailActions>["executeEmailAction"];
- onReply: () => void;
- onDraftReply?: () => void;
- isScrolled?: boolean;
+  email: EmailDetailItem;
+  onClose?: () => void;
+  onBack?: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  onForward: (initial: ComposeInitial) => void;
+  onAction?: ReturnType<typeof useMailActions>["executeEmailAction"];
+  onReply: () => void;
+  onDraftReply?: () => void;
+  isScrolled?: boolean;
 }) {
  return (
  <div
@@ -78,14 +78,14 @@ export function EmailDetailHeader({
  </IconButton>
  </div>
 
- <EmailActions
- email={email}
- onClose={onClose}
- onForward={onForward}
- onAction={onAction}
- onReply={onReply}
- onDraftReply={onDraftReply}
- />
+<EmailActions
+  email={email}
+  onClose={onClose}
+  onForward={onForward}
+  onAction={onAction}
+  onReply={onReply}
+  onDraftReply={onDraftReply}
+/>
  </div>
  </div>
  );

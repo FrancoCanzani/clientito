@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { PageSpinner } from "@/components/page-spinner";
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
 import { useSettingsMutations } from "@/features/settings/hooks/use-settings-mutations";
@@ -7,7 +8,7 @@ import {
   useMailboxes,
   type MailboxAccount,
 } from "@/hooks/use-mailboxes";
-import { ArrowClockwiseIcon, SpinnerGapIcon } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon } from "@phosphor-icons/react";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -44,9 +45,7 @@ export default function MailboxPage() {
   }, []);
 
   return accountsQuery.isPending ? (
-    <div className="flex min-h-40 items-center justify-center">
-      <SpinnerGapIcon className="size-5 animate-spin text-muted-foreground" />
-    </div>
+    <PageSpinner />
   ) : account ? (
     <MailboxDetails
       account={account}
@@ -161,148 +160,39 @@ function MailboxDetails({
         </div>
       </div>
       {account.mailboxId != null && (
-        <MailboxDiagnostics mailboxId={account.mailboxId} />
+        <MailboxCacheSection mailboxId={account.mailboxId} />
       )}
     </div>
   );
 }
 
-type MailboxDiagnosticsState = {
-  localEmailCount: number | null;
-  storageUsage: number | null;
-  storageQuota: number | null;
-  storagePersisted: boolean | null;
-  jsHeapUsed: number | null;
-  jsHeapLimit: number | null;
-};
 
-function MailboxDiagnostics({ mailboxId }: { mailboxId: number }) {
-  const [state, setState] = useState<MailboxDiagnosticsState>({
-    localEmailCount: null,
-    storageUsage: null,
-    storageQuota: null,
-    storagePersisted: null,
-    jsHeapUsed: null,
-    jsHeapLimit: null,
-  });
+
+function MailboxCacheSection({ mailboxId }: { mailboxId: number }) {
+  const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-
     async function load() {
       const userId = await getCurrentUserId();
-      let localEmailCount: number | null = null;
-      if (userId) {
-        try {
-          await localDb.ensureReady();
-          localEmailCount = await localDb.emailCount(userId, mailboxId);
-        } catch {
-          localEmailCount = null;
-        }
-      }
-
-      const estimate = await navigator.storage?.estimate?.().catch(() => null);
-      const storagePersisted =
-        (await navigator.storage?.persisted?.().catch(() => null)) ?? null;
-      const memory = Reflect.get(performance, "memory") as
-        | {
-            usedJSHeapSize?: number;
-            jsHeapSizeLimit?: number;
-          }
-        | undefined;
-
-      if (cancelled) return;
-      setState({
-        localEmailCount,
-        storageUsage:
-          typeof estimate?.usage === "number" ? estimate.usage : null,
-        storageQuota:
-          typeof estimate?.quota === "number" ? estimate.quota : null,
-        storagePersisted,
-        jsHeapUsed:
-          typeof memory?.usedJSHeapSize === "number"
-            ? memory.usedJSHeapSize
-            : null,
-        jsHeapLimit:
-          typeof memory?.jsHeapSizeLimit === "number"
-            ? memory.jsHeapSizeLimit
-            : null,
-      });
+      if (!userId) return;
+      try {
+        await localDb.ensureReady();
+        if (cancelled) return;
+        setCount(await localDb.emailCount(userId, mailboxId));
+      } catch {}
     }
-
     void load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [mailboxId]);
 
   return (
     <div className="border-t border-border/40 py-3">
-      <div className="mb-2 space-y-0.5">
-        <p className="text-xs font-medium">Diagnostics</p>
-        <p className="text-xs text-muted-foreground">
-          Local cache and browser storage for this mailbox.
-        </p>
-      </div>
-      <dl className="grid gap-2 text-xs sm:grid-cols-2">
-        <DiagnosticItem
-          label="Local emails"
-          value={
-            state.localEmailCount == null
-              ? "Unavailable"
-              : state.localEmailCount.toLocaleString()
-          }
-        />
-        <DiagnosticItem
-          label="Storage"
-          value={formatStoragePair(state.storageUsage, state.storageQuota)}
-        />
-        <DiagnosticItem
-          label="Persistent storage"
-          value={
-            state.storagePersisted == null
-              ? "Unavailable"
-              : state.storagePersisted
-                ? "Enabled"
-                : "Not granted"
-          }
-        />
-        <DiagnosticItem
-          label="JS memory"
-          value={formatStoragePair(state.jsHeapUsed, state.jsHeapLimit)}
-        />
-      </dl>
+      <p className="text-xs text-muted-foreground">
+        {count == null ? "" : `${count.toLocaleString()} emails cached locally`}
+      </p>
     </div>
   );
-}
-
-function DiagnosticItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 border border-border/40 px-2.5 py-2">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-mono text-[11px] text-foreground">{value}</dd>
-    </div>
-  );
-}
-
-function formatBytes(bytes: number | null): string | null {
-  if (bytes == null || !Number.isFinite(bytes)) return null;
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB"];
-  let value = bytes / 1024;
-  let unit = units[0]!;
-  for (let i = 1; i < units.length && value >= 1024; i++) {
-    value /= 1024;
-    unit = units[i]!;
-  }
-  return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${unit}`;
-}
-
-function formatStoragePair(used: number | null, limit: number | null): string {
-  const usedText = formatBytes(used);
-  const limitText = formatBytes(limit);
-  if (usedText && limitText) return `${usedText} / ${limitText}`;
-  return usedText ?? "Unavailable";
 }
 
 async function countLocalDrafts(): Promise<number> {

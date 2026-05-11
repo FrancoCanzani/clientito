@@ -12,8 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useShortcuts } from "@/hooks/use-shortcuts";
 import { getMailboxDisplayEmail } from "@/hooks/use-mailboxes";
+import { useShortcuts } from "@/hooks/use-shortcuts";
 import { cn } from "@/lib/utils";
 import {
   CheckIcon,
@@ -419,7 +419,7 @@ export function ComposeEmailFields({
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-1">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
         {reviewState.status === "reviewing" && (
           <GrammarDiffView
             original={reviewState.review.original}

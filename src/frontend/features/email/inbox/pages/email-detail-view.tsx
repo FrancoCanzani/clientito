@@ -74,7 +74,7 @@ export function EmailDetailView({
         : "Unable to load email";
 
     return (
-      <div className="flex h-full w-full items-center justify-center px-6">
+      <div className="flex flex-1 min-h-[50vh] flex-col items-center justify-center px-6">
         <div className="space-y-3 text-center">
           <p className="text-sm font-medium text-foreground">
             Unable to open email

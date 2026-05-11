@@ -79,11 +79,20 @@ async function isRateLimitedResponse(response: Response): Promise<boolean> {
 
 type GmailQueryValue = string | string[] | undefined;
 
+type GmailRequestOptions = {
+  method?: string;
+  body?: string;
+  timeout?: number;
+};
+
 async function gmailRequestRaw(
   accessToken: string,
   path: string,
   query?: Record<string, GmailQueryValue>,
+  options?: GmailRequestOptions,
 ): Promise<Response> {
+  const { method = "GET", body, timeout = 30_000 } = options ?? {};
+
   const url = new URL(`${GMAIL_API_BASE}${path}`);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
@@ -98,14 +107,18 @@ async function gmailRequestRaw(
     }
   }
 
+  const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+
   let attempt = 0;
   while (attempt <= GMAIL_MAX_RATE_LIMIT_RETRIES) {
     let response: Response;
     try {
       response = await fetch(url, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${accessToken}` },
-        signal: AbortSignal.timeout(30_000),
+        method,
+        headers,
+        body: body ?? undefined,
+        signal: AbortSignal.timeout(timeout),
       });
     } catch (error) {
       if (attempt === GMAIL_MAX_RATE_LIMIT_RETRIES) throw error;
@@ -167,10 +180,43 @@ export async function gmailRequest<T>(
     );
   }
 
-  // Gmail occasionally returns 200 with an empty body (e.g. list endpoints with
-  // zero results). Treat that as an empty object rather than letting JSON.parse throw.
   const text = await response.text();
   if (!text) return {} as T;
+  return JSON.parse(text) as T;
+}
+
+export async function gmailMutation<T = void>(
+  accessToken: string,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const response = await gmailRequestRaw(
+    accessToken,
+    path,
+    undefined,
+    {
+      method,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(GOOGLE_RECONNECT_REQUIRED_MESSAGE);
+    }
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `Gmail request failed (${response.status}): ${text || response.statusText}`,
+    );
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const text = await response.text();
+  if (!text) return undefined as T;
   return JSON.parse(text) as T;
 }
 

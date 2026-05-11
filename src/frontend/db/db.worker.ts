@@ -1,15 +1,12 @@
-/// <reference lib="webworker" />
 import sqlite3InitModule, {
- type OpfsSAHPoolDatabase,
- type PreparedStatement,
- type SAHPoolUtil,
- type SqlValue,
+  type OpfsSAHPoolDatabase,
+  type PreparedStatement,
+  type SAHPoolUtil,
+  type SqlValue,
 } from "@sqlite.org/sqlite-wasm";
 
 const DB_FILENAME = "/petit.db";
-const SAH_POOL_DIRECTORY = ".petit-sahpool";
-const SQLITE_OPTIONAL_OPFS_WARNING =
- "Ignoring inability to install OPFS sqlite3_vfs:";
+const SAH_POOL_DIR = ".petit-sahpool";
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS emails (
@@ -138,32 +135,34 @@ CREATE TABLE IF NOT EXISTS _meta (
 `;
 
 const PRAGMAS = `
-PRAGMA journal_mode = MEMORY;
+PRAGMA journal_mode = WAL;
 PRAGMA synchronous = NORMAL;
-PRAGMA cache_size = -8000;
+PRAGMA cache_size = -4000;
 PRAGMA temp_store = MEMORY;
 `;
 
 type BindParam = SqlValue | boolean;
 type ExecMode = "rows" | "run" | "get";
+type ExecResult = { rows: SqlValue[][]; columns: string[] };
 
 type RpcRequest =
- | { id: number; type: "init" }
- | { id: number; type: "deleteDb" }
- | {
- id: number;
- type: "exec";
- payload: { sql: string; params: BindParam[]; mode: ExecMode };
- }
- | {
- id: number;
- type: "batch";
- payload: Array<{ sql: string; params: BindParam[]; mode: ExecMode }>;
- };
+  | { id: number; type: "init" }
+  | { id: number; type: "deleteDb" }
+  | {
+      id: number;
+      type: "exec";
+      payload: { sql: string; params: BindParam[]; mode: ExecMode };
+    }
+  | {
+      id: number;
+      type: "batch";
+      payload: Array<{ sql: string; params: BindParam[]; mode: ExecMode }>;
+      transact?: boolean;
+    };
 
 type RpcResponse =
- | { id: number; ok: true; result: unknown }
- | { id: number; ok: false; error: string };
+  | { id: number; ok: true; result: unknown }
+  | { id: number; ok: false; error: string };
 
 let pool: SAHPoolUtil | null = null;
 let db: OpfsSAHPoolDatabase | null = null;
@@ -171,307 +170,254 @@ let initPromise: Promise<void> | null = null;
 const stmtCache = new Map<string, PreparedStatement>();
 
 type SqliteGlobal = typeof globalThis & {
- sqlite3ApiConfig?: {
- warn?: (...args: unknown[]) => void;
- [key: string]: unknown;
- };
-};
-
-function shouldHideOptionalOpfsWarning(args: unknown[]): boolean {
-  const message = args.map((arg) => String(arg)).join(" ");
-  return (
-    message.includes(SQLITE_OPTIONAL_OPFS_WARNING) &&
-    message.includes("Missing SharedArrayBuffer")
-  );
-}
-
-function shouldHideSahPoolError(args: unknown[]): boolean {
-  const message = args.map((arg) => String(arg)).join(" ");
-  return (
-    message.includes("opfs-sahpool") ||
-    message.includes("NoModificationAllowedError") ||
-    message.includes("Access Handles cannot be created")
-  );
-}
-
-async function initSqlite3Module() {
-  const sqliteGlobal = globalThis as SqliteGlobal;
-  const existingConfig = sqliteGlobal.sqlite3ApiConfig;
-  const existingWarn = existingConfig?.warn;
-  sqliteGlobal.sqlite3ApiConfig = {
-    ...existingConfig,
-    warn: (...args: unknown[]) => {
-      if (shouldHideOptionalOpfsWarning(args)) return;
-      if (shouldHideSahPoolError(args)) return;
-      if (existingWarn) {
-        existingWarn(...args);
-      } else {
-        console.warn(...args);
-      }
-    },
+  sqlite3ApiConfig?: {
+    warn?: (...args: unknown[]) => void;
+    [key: string]: unknown;
   };
-  return sqlite3InitModule();
-}
-
-async function purgeLegacyOpfsDb(): Promise<void> {
- try {
- const root = await navigator.storage.getDirectory();
- const base = DB_FILENAME.replace(/^\//, "");
- for (const name of [base, `${base}-wal`, `${base}-shm`, `${base}-journal`]) {
- try {
- await root.removeEntry(name);
- } catch {
- /* not present */
- }
- }
- } catch {
- /* OPFS unavailable */
- }
-}
-
-async function purgeSahPoolDirectory(): Promise<void> {
- try {
- const root = await navigator.storage.getDirectory();
- await root.removeEntry(SAH_POOL_DIRECTORY, { recursive: true });
- } catch {
- /* OPFS unavailable or directory not present */
- }
-}
-
-function isLocalRecoverableError(error: unknown): boolean {
-  if (error instanceof DOMException) {
-    return error.name === "InvalidStateError";
-  }
-  if (error instanceof Error) {
-    return (
-      error.name === "InvalidStateError" ||
-      error.message.includes("invalid state")
-    );
-  }
-  return false;
-}
-
-function isConcurrentAccessError(error: unknown): boolean {
-  if (error instanceof DOMException) {
-    return error.name === "NoModificationAllowedError";
-  }
-  if (error instanceof Error) {
-    return (
-      error.name === "NoModificationAllowedError" ||
-      error.message.includes("Access Handles cannot be created")
-    );
-  }
-  return false;
-}
-
-function closeDb(): void {
- for (const stmt of stmtCache.values()) {
- try {
- stmt.finalize();
- } catch {
- /* ignore */
- }
- }
- stmtCache.clear();
- if (db) {
- try {
- db.close();
- } catch {
- /* ignore */
- }
- db = null;
- }
-}
-
-async function resetSahPoolAfterInvalidState(): Promise<void> {
- closeDb();
- const activePool = pool;
- pool = null;
- if (activePool) {
- try {
- await activePool.wipeFiles();
- } catch {
- /* pool may already be in an invalid state */
- }
- try {
- activePool.pauseVfs();
- } catch {
- /* ignore */
- }
- }
- await purgeSahPoolDirectory();
-}
-
-async function installPool(): Promise<SAHPoolUtil> {
- const sqlite3 = await initSqlite3Module();
- if (typeof sqlite3.installOpfsSAHPoolVfs !== "function") {
- throw new Error("sqlite-wasm SAH-Pool VFS unavailable in this browser");
- }
- await purgeLegacyOpfsDb();
- pool = await sqlite3.installOpfsSAHPoolVfs({
- directory: SAH_POOL_DIRECTORY,
- initialCapacity: 32,
- });
- return pool;
-}
-
-async function ensurePool(): Promise<SAHPoolUtil> {
- if (pool) return pool;
- return installPool();
-}
+};
 
 async function initDb(): Promise<void> {
   if (db) return;
   if (initPromise) return initPromise;
 
-  const initialize = async () => {
-  const activePool = await ensurePool();
-  db = new activePool.OpfsSAHPoolDb(DB_FILENAME);
-  db.exec(PRAGMAS);
-  db.exec(SCHEMA_SQL);
-  };
-
   initPromise = (async () => {
-  try {
-  await initialize();
-  } catch (error) {
-  if (isConcurrentAccessError(error)) {
-  const msg =
-  "Database is open in another tab. Close the other tab and refresh this page.";
-  self.postMessage({ id: -1, ok: false, error: msg });
-  throw new Error(msg);
-  }
-  if (isLocalRecoverableError(error)) {
-  closeDb();
-  pool = null;
-  await resetSahPoolAfterInvalidState();
-  await initialize();
-  return;
-  }
-  throw error;
-  }
+    const sqliteGlobal = globalThis as SqliteGlobal;
+    sqliteGlobal.sqlite3ApiConfig = {
+      ...sqliteGlobal.sqlite3ApiConfig,
+      warn: (...args: unknown[]) => {
+        const msg = args.join(" ");
+        if (
+          msg.includes("opfs-sahpool") ||
+          msg.includes("NoModificationAllowedError") ||
+          msg.includes("Ignoring inability") ||
+          msg.includes("removeVfs")
+        )
+          return;
+        console.warn(...args);
+      },
+    };
+
+    const sqlite3 = await sqlite3InitModule();
+    if (typeof sqlite3.installOpfsSAHPoolVfs !== "function") {
+      throw new Error("sqlite-wasm SAH-Pool VFS unavailable in this browser");
+    }
+
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        if (typeof sqlite3.removeOpfsSAHPoolVfs === "function") {
+          try {
+            await sqlite3.removeOpfsSAHPoolVfs();
+          } catch {}
+        }
+        pool = await sqlite3.installOpfsSAHPoolVfs({
+          directory: SAH_POOL_DIR,
+          initialCapacity: 32,
+        });
+        break;
+      } catch (e) {
+        lastErr = e;
+        if (attempt < 4)
+          await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+      }
+    }
+    if (!pool) throw lastErr;
+
+    db = new pool.OpfsSAHPoolDb(DB_FILENAME);
+    db.exec(PRAGMAS);
+    db.exec(SCHEMA_SQL);
   })();
 
   try {
-  await initPromise;
-  } catch (error) {
-  initPromise = null;
-  closeDb();
-  pool = null;
-  throw error;
+    await initPromise;
+  } catch (e) {
+    initPromise = null;
+    throw e;
   }
 }
 
 function getStmt(sql: string): PreparedStatement {
- if (!db) throw new Error("DB not initialized");
- const cached = stmtCache.get(sql);
- if (cached) return cached;
- const stmt = db.prepare(sql);
- stmtCache.set(sql, stmt);
- return stmt;
+  if (!db) throw new Error("DB not initialized");
+  const cached = stmtCache.get(sql);
+  if (cached) return cached;
+  const stmt = db.prepare(sql);
+  stmtCache.set(sql, stmt);
+  return stmt;
 }
 
 function normalizeParams(params: BindParam[]): SqlValue[] {
- return params.map((p) => (typeof p === "boolean" ? (p ? 1 : 0) : p));
+  return params.map((p) => (typeof p === "boolean" ? (p ? 1 : 0) : p));
 }
-
-type ExecResult = { rows: SqlValue[][]; columns: string[] };
 
 function exec(sql: string, params: BindParam[], mode: ExecMode): ExecResult {
- if (!db) throw new Error("DB not initialized");
- const stmt = getStmt(sql);
- const rows: SqlValue[][] = [];
- let columns: string[] = [];
- try {
- if (params.length > 0) {
- stmt.bind(normalizeParams(params));
- }
- if (mode === "run") {
- while (stmt.step()) {
- /* drain */
- }
- } else if (mode === "get") {
- if (stmt.step()) {
- columns = stmt.getColumnNames();
- rows.push(stmt.get([]));
- }
- } else {
- let gotColumns = false;
- while (stmt.step()) {
- if (!gotColumns) {
- columns = stmt.getColumnNames();
- gotColumns = true;
- }
- rows.push(stmt.get([]));
- }
- }
- return { rows, columns };
- } finally {
- stmt.reset(true);
- }
+  if (!db) throw new Error("DB not initialized");
+  const stmt = getStmt(sql);
+  const rows: SqlValue[][] = [];
+  let columns: string[] = [];
+  try {
+    if (params.length > 0) stmt.bind(normalizeParams(params));
+    if (mode === "run") {
+      while (stmt.step()) {}
+    } else if (mode === "get") {
+      if (stmt.step()) {
+        columns = stmt.getColumnNames();
+        rows.push(stmt.get([]));
+      }
+    } else {
+      let gotColumns = false;
+      while (stmt.step()) {
+        if (!gotColumns) {
+          columns = stmt.getColumnNames();
+          gotColumns = true;
+        }
+        rows.push(stmt.get([]));
+      }
+    }
+    return { rows, columns };
+  } finally {
+    stmt.reset(true);
+  }
 }
 
-async function deleteDb(): Promise<void> {
- for (const stmt of stmtCache.values()) {
- try {
- stmt.finalize();
- } catch {
- /* ignore */
- }
- }
- stmtCache.clear();
- if (db) {
- try {
- db.close();
- } catch {
- /* ignore */
- }
- db = null;
- }
- initPromise = null;
- if (pool) {
- try {
- await pool.wipeFiles();
- } catch {
- /* ignore */
- }
- }
+function shouldProfile(sql: string): boolean {
+  const s = sql.trimStart().toUpperCase();
+  return (
+    s.startsWith("SELECT") ||
+    s.startsWith("INSERT") ||
+    s.startsWith("UPDATE") ||
+    s.startsWith("DELETE")
+  );
+}
+
+function profileLabel(sql: string): string {
+  const s = sql.trimStart();
+  const firstWord = s.slice(0, s.indexOf(" ")).toUpperCase();
+  const tableHint =
+    /FROM\s+(\w+)/i.exec(s)?.[1] ??
+    /INTO\s+(\w+)/i.exec(s)?.[1] ??
+    /UPDATE\s+(\w+)/i.exec(s)?.[1] ??
+    "";
+  const limit = s.includes("LIMIT 1") ? ":1" : "";
+  return `db.${firstWord}.${tableHint}${limit}`;
+}
+
+function isReadSql(sql: string): boolean {
+  const s = sql.trimStart().toUpperCase();
+  return s.startsWith("SELECT") || s.startsWith("PRAGMA");
 }
 
 async function handle(req: RpcRequest): Promise<unknown> {
- switch (req.type) {
- case "init":
- await initDb();
- return null;
- case "deleteDb":
- await deleteDb();
- return null;
- case "exec":
- await initDb();
- return exec(req.payload.sql, req.payload.params, req.payload.mode);
- case "batch": {
- await initDb();
- const results: ExecResult[] = [];
- for (const step of req.payload) {
- results.push(exec(step.sql, step.params, step.mode));
- }
- return results;
- }
- }
+  switch (req.type) {
+    case "init":
+      await initDb();
+      return null;
+    case "deleteDb": {
+      for (const stmt of stmtCache.values()) {
+        try {
+          stmt.finalize();
+        } catch {}
+      }
+      stmtCache.clear();
+      if (db) {
+        try {
+          db.close();
+        } catch {}
+        db = null;
+      }
+      initPromise = null;
+      if (pool) {
+        try {
+          await pool.wipeFiles();
+        } catch {}
+      }
+      return null;
+    }
+    case "exec": {
+      await initDb();
+      const label = shouldProfile(req.payload.sql)
+        ? profileLabel(req.payload.sql)
+        : "";
+      const t0 = label ? performance.now() : 0;
+      const result = exec(
+        req.payload.sql,
+        req.payload.params,
+        req.payload.mode,
+      );
+      if (label) {
+        const ms = performance.now() - t0;
+        if (ms > 50) console.log(`[db-profile] ${label} ${ms.toFixed(1)}ms`);
+      }
+      return result;
+    }
+    case "batch": {
+      await initDb();
+      if (req.transact) exec("BEGIN IMMEDIATE", [], "run");
+      const results: ExecResult[] = [];
+      for (const step of req.payload)
+        results.push(exec(step.sql, step.params, step.mode));
+      if (req.transact) exec("COMMIT", [], "run");
+      return results;
+    }
+  }
 }
 
-self.onmessage = async (event: MessageEvent<RpcRequest>) => {
- const req = event.data;
- let response: RpcResponse;
- try {
- const result = await handle(req);
- response = { id: req.id, ok: true, result };
- } catch (error) {
- response = {
- id: req.id,
- ok: false,
- error: error instanceof Error ? error.message : String(error),
- };
- }
- self.postMessage(response);
+const readQueue: RpcRequest[] = [];
+const writeQueue: RpcRequest[] = [];
+let processing = false;
+
+function isReadRequest(req: RpcRequest): boolean {
+  if (req.type === "exec") return isReadSql(req.payload.sql);
+  if (req.type === "batch") return req.payload.every((s) => isReadSql(s.sql));
+  return false;
+}
+
+function schedule() {
+  if (processing) return;
+  processing = true;
+  void processQueue();
+}
+
+async function processQueue() {
+  try {
+    while (readQueue.length > 0 || writeQueue.length > 0) {
+      while (readQueue.length > 0) {
+        const req = readQueue.shift()!;
+        try {
+          const result = await handle(req);
+          self.postMessage({ id: req.id, ok: true, result } as RpcResponse);
+        } catch (error) {
+          self.postMessage({
+            id: req.id,
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          } as RpcResponse);
+        }
+      }
+      if (writeQueue.length > 0) {
+        const req = writeQueue.shift()!;
+        try {
+          const result = await handle(req);
+          self.postMessage({ id: req.id, ok: true, result } as RpcResponse);
+        } catch (error) {
+          self.postMessage({
+            id: req.id,
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          } as RpcResponse);
+        }
+      }
+    }
+  } finally {
+    processing = false;
+  }
+}
+
+self.onmessage = (event: MessageEvent<RpcRequest>) => {
+  const req = event.data;
+  if (isReadRequest(req)) {
+    readQueue.push(req);
+  } else {
+    writeQueue.push(req);
+  }
+  schedule();
 };

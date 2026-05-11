@@ -1,6 +1,5 @@
 import type { Database } from "../../../db/client";
-import { GMAIL_API_BASE, getGmailTokenForMailbox } from "../client";
-import { sleep } from "../../utils";
+import { gmailMutation, getGmailTokenForMailbox } from "../client";
 import type { GoogleOAuthConfig } from "../types";
 
 function encodeBase64Url(input: string): string {
@@ -37,79 +36,6 @@ function encodeMimeHeader(value: string): string {
   }
 
   return `=?UTF-8?B?${btoa(binary)}?=`;
-}
-
-const POST_MAX_RETRIES = 5;
-const POST_RETRY_BASE_MS = 1_000;
-const POST_RETRY_MAX_MS = 30_000;
-
-function postRetryDelayMs(attempt: number): number {
-  const exp = Math.min(POST_RETRY_MAX_MS, POST_RETRY_BASE_MS * 2 ** attempt);
-  return Math.min(POST_RETRY_MAX_MS, exp + Math.floor(Math.random() * POST_RETRY_BASE_MS));
-}
-
-async function isModifyRateLimited(response: Response): Promise<boolean> {
-  if (response.status === 429) return true;
-  if (response.status !== 403) return false;
-  const payload = await response.clone().json().catch(() => null) as
-    | { error?: { status?: string; message?: string } }
-    | null;
-  const status = payload?.error?.status?.toLowerCase() ?? "";
-  const msg = payload?.error?.message?.toLowerCase() ?? "";
-  return status === "resource_exhausted" || msg.includes("rate limit") || msg.includes("quota");
-}
-
-async function postGmailModify(
-  accessToken: string,
-  path: string,
-  body: {
-    ids?: string[];
-    addLabelIds?: string[];
-    removeLabelIds?: string[];
-  },
-): Promise<void> {
-  if (!body.addLabelIds?.length && !body.removeLabelIds?.length) {
-    return;
-  }
-
-  const url = `${GMAIL_API_BASE}${path}`;
-  const serializedBody = JSON.stringify(body);
-  const headers = {
-    Authorization: `Bearer ${accessToken}`,
-    "Content-Type": "application/json",
-  };
-
-  for (let attempt = 0; attempt <= POST_MAX_RETRIES; attempt++) {
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: "POST",
-        headers,
-        body: serializedBody,
-        signal: AbortSignal.timeout(60_000),
-      });
-    } catch (error) {
-      if (attempt === POST_MAX_RETRIES) throw error;
-      await sleep(postRetryDelayMs(attempt));
-      continue;
-    }
-
-    if (await isModifyRateLimited(response)) {
-      if (attempt === POST_MAX_RETRIES) {
-        throw new Error(`Gmail modify rate-limited on ${path} after ${POST_MAX_RETRIES} retries.`);
-      }
-      const delayMs = postRetryDelayMs(attempt);
-      console.warn("Gmail API rate-limited on modify, retrying", { path, attempt: attempt + 1, delayMs, status: response.status });
-      await sleep(delayMs);
-      continue;
-    }
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`Gmail modify failed (${response.status}): ${text || response.statusText}`);
-    }
-    return;
-  }
 }
 
 function buildMimeMessage(
@@ -218,24 +144,7 @@ export async function sendGmailMessage(
     requestBody.threadId = input.threadId;
   }
 
-  const response = await fetch(`${GMAIL_API_BASE}/messages/send`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `Gmail send failed (${response.status}): ${body || response.statusText}`,
-    );
-  }
-
-  const result = (await response.json()) as { id: string; threadId: string };
-  return { gmailId: result.id, threadId: result.threadId };
+  return gmailMutation(accessToken, "POST", "/messages/send", requestBody);
 }
 
 export async function batchModifyGmailMessages(
@@ -251,13 +160,15 @@ export async function batchModifyGmailMessages(
     return;
   }
 
+  const uniqueAdd = addLabelIds?.length ? Array.from(new Set(addLabelIds)) : [];
+  const uniqueRemove = removeLabelIds?.length ? Array.from(new Set(removeLabelIds)) : [];
+  if (!uniqueAdd.length && !uniqueRemove.length) return;
+
   const accessToken = await getGmailTokenForMailbox(db, mailboxId, env);
-  await postGmailModify(accessToken, "/messages/batchModify", {
+  await gmailMutation(accessToken, "POST", "/messages/batchModify", {
     ids,
-    addLabelIds: addLabelIds?.length ? Array.from(new Set(addLabelIds)) : [],
-    removeLabelIds: removeLabelIds?.length
-      ? Array.from(new Set(removeLabelIds))
-      : [],
+    addLabelIds: uniqueAdd,
+    removeLabelIds: uniqueRemove,
   });
 }
 
@@ -271,8 +182,9 @@ export async function modifyGmailThread(
 ): Promise<void> {
   if (!gmailThreadId) return;
   const accessToken = await getGmailTokenForMailbox(db, mailboxId, env);
-  await postGmailModify(
+  await gmailMutation(
     accessToken,
+    "POST",
     `/threads/${encodeURIComponent(gmailThreadId)}/modify`,
     {
       addLabelIds: addLabelIds?.length ? Array.from(new Set(addLabelIds)) : [],
@@ -291,18 +203,15 @@ export async function hardDeleteGmailMessage(
 ): Promise<void> {
   if (!gmailMessageId) return;
   const accessToken = await getGmailTokenForMailbox(db, mailboxId, env);
-  const response = await fetch(
-    `${GMAIL_API_BASE}/messages/${encodeURIComponent(gmailMessageId)}`,
-    {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${accessToken}` },
-    },
-  );
-  if (!response.ok && response.status !== 404) {
-    const text = await response.text().catch(() => "");
-    throw new Error(
-      `Gmail delete failed (${response.status}): ${text || response.statusText}`,
+  try {
+    await gmailMutation(
+      accessToken,
+      "DELETE",
+      `/messages/${encodeURIComponent(gmailMessageId)}`,
     );
+  } catch (error) {
+    if (error instanceof Error && /\(404\)/.test(error.message)) return;
+    throw error;
   }
 }
 
@@ -314,21 +223,7 @@ export async function batchDeleteGmailMessages(
 ): Promise<void> {
   if (!gmailMessageIds.length) return;
   const accessToken = await getGmailTokenForMailbox(db, mailboxId, env);
-  const response = await fetch(
-    `${GMAIL_API_BASE}/messages/batchDelete`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ ids: gmailMessageIds }),
-    },
-  );
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(
-      `Gmail batch delete failed (${response.status}): ${text || response.statusText}`,
-    );
-  }
+  await gmailMutation(accessToken, "POST", "/messages/batchDelete", {
+    ids: gmailMessageIds,
+  });
 }

@@ -25,6 +25,10 @@ app.use("*", logger());
 app.use("*", secureHeaders({
   crossOriginEmbedderPolicy: "credentialless",
 }));
+// COEP triggers Chrome's default Permissions-Policy: unload=(), which logs a
+// violation warning even though we never register unload handlers. Opt in
+// explicitly to suppress the noisy console error.
+app.use("*", async (_c, next) => { await next(); _c.header("Permissions-Policy", "unload=(self)"); });
 
 app.use(
   "/api/*",

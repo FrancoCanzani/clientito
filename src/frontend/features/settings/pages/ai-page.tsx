@@ -1,9 +1,9 @@
+import { PageSpinner } from "@/components/page-spinner";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { updateMailboxAiEnabled } from "@/features/settings/mutations";
 import { accountQueryKeys } from "@/features/settings/query-keys";
 import { useMailboxes } from "@/hooks/use-mailboxes";
-import { SpinnerGapIcon } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -14,8 +14,9 @@ export default function AiPage() {
   const queryClient = useQueryClient();
 
   const account =
-    accountsQuery.data?.accounts.find((entry) => entry.mailboxId === mailboxId) ??
-    null;
+    accountsQuery.data?.accounts.find(
+      (entry) => entry.mailboxId === mailboxId,
+    ) ?? null;
 
   const composerMutation = useMutation({
     mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
@@ -29,9 +30,7 @@ export default function AiPage() {
   const aiEnabled = account?.aiEnabled ?? false;
 
   return accountsQuery.isPending ? (
-    <div className="flex min-h-40 items-center justify-center">
-      <SpinnerGapIcon className="size-5 animate-spin text-muted-foreground" />
-    </div>
+    <PageSpinner />
   ) : !account || account.mailboxId == null ? (
     <p className="py-3 text-xs text-muted-foreground">Mailbox not found.</p>
   ) : (

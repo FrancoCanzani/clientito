@@ -448,7 +448,6 @@ export function EmailActions({
           trigger={
             <IconButton
               label="Label"
-              shortcut={shortcutKey("action:label")}
               variant="ghost"
               size="icon-sm"
             >

@@ -1,5 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Hono } from "hono";
+import { isGmailReconnectRequiredError } from "../../../lib/gmail/errors";
 import { GmailDriver } from "../../../lib/gmail/driver";
 import type { AppRouteEnv } from "../../types";
 import { normalizeFilename, normalizeMimeType } from "./utils";
@@ -14,8 +15,6 @@ export function registerGetAttachment(api: Hono<AppRouteEnv>) {
 
       const { providerMessageId, attachmentId, filename, mimeType, inline, mailboxId } =
         c.req.valid("query");
-
-      let reconnectRequired = false;
 
       try {
         const provider = new GmailDriver(db, c.env, mailboxId);
@@ -45,14 +44,7 @@ export function registerGetAttachment(api: Hono<AppRouteEnv>) {
           error,
         });
 
-        try {
-          const provider = new GmailDriver(db, c.env, mailboxId);
-          reconnectRequired = provider.isReconnectError(error);
-        } catch {
-          reconnectRequired = false;
-        }
-
-        if (reconnectRequired) {
+        if (isGmailReconnectRequiredError(error)) {
           return c.json(
             { error: "Provider connection expired. Sign in again." },
             401,

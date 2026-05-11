@@ -1,17 +1,18 @@
 import {
- BookOpenIcon,
- BookmarkSimpleIcon,
- CheckIcon,
- FileDashedIcon,
- FlagIcon,
- GearIcon,
- MagnifyingGlassIcon,
- PaperPlaneTiltIcon,
- ShieldCheckIcon,
- StarIcon,
- TrashIcon,
- TrayIcon,
- WarningCircleIcon,
+  BookOpenIcon,
+  BookmarkSimpleIcon,
+  CheckIcon,
+  EnvelopeIcon,
+  FileDashedIcon,
+  FlagIcon,
+  GearIcon,
+  MagnifyingGlassIcon,
+  PaperPlaneTiltIcon,
+  ShieldCheckIcon,
+  StarIcon,
+  TrashIcon,
+  TrayIcon,
+  WarningCircleIcon,
 } from "@phosphor-icons/react";
 import type {
  EmailFolderView,
@@ -88,13 +89,14 @@ function navigateToLabel(
 }
 
 function navigateToMailboxPath(
- mailboxId: number,
- to:
- | "/$mailboxId/inbox/drafts"
- | "/$mailboxId/inbox/search"
- | "/$mailboxId/triage"
- | "/$mailboxId/todo",
- services: CommandServices,
+  mailboxId: number,
+  to:
+    | "/$mailboxId/inbox/drafts"
+    | "/$mailboxId/inbox/search"
+    | "/$mailboxId/triage"
+    | "/$mailboxId/todo"
+    | "/$mailboxId/subscriptions",
+  services: CommandServices,
 ) {
  services.navigate({
  to,
@@ -208,18 +210,26 @@ const navigationCommands: Command[] = [
  services.close();
  },
  },
- makeNavCommand({
- id: "nav:screener",
- label: "Screener",
- icon: paletteIcon(ShieldCheckIcon),
- keywords: ["screener", "gatekeeper", "senders", "block", "trust"],
- perform: (mailboxId, services) => {
- services.navigate({
- to: "/$mailboxId/screener",
- params: { mailboxId },
- });
- },
- }),
+makeNavCommand({
+    id: "nav:screener",
+    label: "Screener",
+    icon: paletteIcon(ShieldCheckIcon),
+    keywords: ["screener", "gatekeeper", "senders", "block", "trust"],
+    perform: (mailboxId, services) => {
+      services.navigate({
+        to: "/$mailboxId/screener",
+        params: { mailboxId },
+      });
+    },
+  }),
+  makeNavCommand({
+    id: "nav:subscriptions",
+    label: "Subscriptions",
+    icon: paletteIcon(EnvelopeIcon),
+    keywords: ["subscriptions", "newsletter", "unsubscribe", "mailing list"],
+    perform: (mailboxId, services) =>
+      navigateToMailboxPath(mailboxId, "/$mailboxId/subscriptions", services),
+  }),
  {
  id: "nav:settings",
  label: "Settings",

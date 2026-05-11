@@ -1,4 +1,4 @@
-import { GMAIL_API_BASE, getGmailTokenForMailbox, gmailRequest } from "../client";
+import { getGmailTokenForMailbox, gmailMutation, gmailRequest } from "../client";
 import type { Database } from "../../../db/client";
 
 type MailboxSignatureItem = {
@@ -161,24 +161,10 @@ export async function syncMailboxSignatureToGmail(
 
   if (!target?.sendAsEmail) return;
 
-  const response = await fetch(
-    `${GMAIL_API_BASE}/settings/sendAs/${encodeURIComponent(target.sendAsEmail)}`,
-    {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        signature: signatureBody,
-      }),
-    },
+  await gmailMutation(
+    accessToken,
+    "PATCH",
+    `/settings/sendAs/${encodeURIComponent(target.sendAsEmail)}`,
+    { signature: signatureBody },
   );
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(
-      `Failed to sync Gmail signature (${response.status}): ${text || response.statusText}`,
-    );
-  }
 }

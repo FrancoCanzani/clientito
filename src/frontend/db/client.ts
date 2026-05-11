@@ -782,20 +782,27 @@ async function replaceEmailLabelRows(
   }>,
 ): Promise<void> {
   if (rows.length === 0) return;
-  const steps: Array<{ sql: string; params?: BindParam[]; mode?: "run" }> = [];
+  const CHUNK = 100;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const placeholders = chunk.map(() => "?").join(", ");
+    await dbClient.exec(
+      `DELETE FROM email_labels WHERE email_id IN (${placeholders})`,
+      chunk.map((r) => r.id),
+      "run",
+    );
+  }
+  const steps: Array<{ sql: string; params: BindParam[]; mode: "run" }> = [];
   for (const row of rows) {
-    steps.push({
-      sql: "DELETE FROM email_labels WHERE email_id = ?",
-      params: [row.id],
-    });
     for (const labelId of parseLabelIds(row.labelIds)) {
       steps.push({
         sql: "INSERT OR IGNORE INTO email_labels (email_id, user_id, mailbox_id, label_id, date) VALUES (?, ?, ?, ?, ?)",
         params: [row.id, row.userId, row.mailboxId ?? null, labelId, row.date],
+        mode: "run",
       });
     }
   }
-  await dbClient.batch(steps);
+  if (steps.length > 0) await dbClient.batch(steps);
 }
 
 export const localDb = {
@@ -1964,21 +1971,22 @@ export const localDb = {
   ): Promise<void> {
     if (!providerMessageIds.length) return;
     const CHUNK = 50;
+    const steps: Array<{ sql: string; params: BindParam[]; mode: "run" }> = [];
     for (let i = 0; i < providerMessageIds.length; i += CHUNK) {
       const chunk = providerMessageIds.slice(i, i + CHUNK);
       const placeholders = chunk.map(() => "?").join(", ");
-      await dbClient.exec(
-        `DELETE FROM email_labels WHERE email_id IN (SELECT id FROM emails WHERE provider_message_id IN (${placeholders}))`,
-        chunk,
-        "run",
-      );
-      await dbClient.exec(
-        `DELETE FROM emails WHERE provider_message_id IN (${placeholders})`,
-        chunk,
-        "run",
-      );
+      steps.push({
+        sql: `DELETE FROM email_labels WHERE email_id IN (SELECT id FROM emails WHERE provider_message_id IN (${placeholders}))`,
+        params: chunk,
+        mode: "run",
+      });
+      steps.push({
+        sql: `DELETE FROM emails WHERE provider_message_id IN (${placeholders})`,
+        params: chunk,
+        mode: "run",
+      });
     }
-    await replaceEmailLabelRowsByProviderIds(providerMessageIds);
+    await dbClient.batch(steps);
   },
 
   async addLabelToEmails(
@@ -2172,6 +2180,95 @@ export const localDb = {
     );
     const row = firstRow<{ count: number }>(res);
     return Number(row?.count ?? 0);
+  },
+
+  async getSubscriptionSenders(params: {
+    userId: string;
+    mailboxId: number;
+  }): Promise<
+    Array<{
+      fromAddr: string;
+      fromName: string | null;
+      emailCount: number;
+      latestDate: number;
+      latestSubject: string | null;
+      latestSnippet: string | null;
+      unsubscribeUrl: string | null;
+      unsubscribeEmail: string | null;
+    }>
+  > {
+    const { userId, mailboxId } = params;
+    const res = await dbClient.exec(
+      `SELECT LOWER(TRIM(from_addr)) AS addr, from_name, COUNT(*) AS email_count, MAX(date) AS latest_date, subject AS latest_subject, snippet AS latest_snippet, unsubscribe_url, unsubscribe_email
+FROM emails
+WHERE user_id = ? AND mailbox_id = ? AND (unsubscribe_url IS NOT NULL OR unsubscribe_email IS NOT NULL) AND has_trash = 0 AND date > 0
+GROUP BY LOWER(TRIM(from_addr))
+ORDER BY MAX(date) DESC`,
+      [userId, mailboxId],
+      "rows",
+    );
+    const rows = rowsToObjects<{
+      addr: string;
+      fromName: string | null;
+      emailCount: number;
+      latestDate: number;
+      latestSubject: string | null;
+      latestSnippet: string | null;
+      unsubscribeUrl: string | null;
+      unsubscribeEmail: string | null;
+    }>(res);
+    return rows.map((row) => ({
+      fromAddr: row.addr,
+      fromName: row.fromName,
+      emailCount: Number(row.emailCount) || 0,
+      latestDate: Number(row.latestDate) || 0,
+      latestSubject: row.latestSubject,
+      latestSnippet: row.latestSnippet,
+      unsubscribeUrl: row.unsubscribeUrl,
+      unsubscribeEmail: row.unsubscribeEmail,
+    }));
+  },
+
+  async clearUnsubscribeForSender(params: {
+    userId: string;
+    mailboxId: number;
+    fromAddr: string;
+  }): Promise<void> {
+    const { userId, mailboxId, fromAddr } = params;
+    await dbClient.exec(
+      `UPDATE emails SET unsubscribe_url = NULL, unsubscribe_email = NULL WHERE user_id = ? AND mailbox_id = ? AND LOWER(TRIM(from_addr)) = LOWER(TRIM(?))`,
+      [userId, mailboxId, fromAddr],
+      "run",
+    );
+  },
+
+  async clearUnsubscribeForSenders(params: {
+    userId: string;
+    mailboxId: number;
+    fromAddrs: string[];
+  }): Promise<void> {
+    const { userId, mailboxId, fromAddrs } = params;
+    if (fromAddrs.length === 0) return;
+    const placeholders = fromAddrs.map(() => "?").join(", ");
+    const lowered = fromAddrs.map((a) => a.toLowerCase().trim());
+    await dbClient.exec(
+      `UPDATE emails SET unsubscribe_url = NULL, unsubscribe_email = NULL WHERE user_id = ? AND mailbox_id = ? AND LOWER(TRIM(from_addr)) IN (${placeholders})`,
+      [userId, mailboxId, ...lowered],
+      "run",
+    );
+  },
+
+  async trashEmailsFromSender(params: {
+    userId: string;
+    mailboxId: number;
+    fromAddr: string;
+  }): Promise<void> {
+    const { userId, mailboxId, fromAddr } = params;
+    await dbClient.exec(
+      `UPDATE emails SET has_trash = 1, has_inbox = 0, label_ids = NULL WHERE user_id = ? AND mailbox_id = ? AND LOWER(TRIM(from_addr)) = LOWER(TRIM(?)) AND has_trash = 0`,
+      [userId, mailboxId, fromAddr],
+      "run",
+    );
   },
 
   async deleteDatabase(): Promise<void> {

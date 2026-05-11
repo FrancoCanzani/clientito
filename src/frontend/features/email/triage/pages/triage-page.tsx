@@ -25,9 +25,9 @@ import { ComposeEditor } from "@/features/email/mail/compose/compose-editor";
 import { getComposerEditor } from "@/features/email/mail/compose/compose-editor-ref";
 import { useComposeEmail } from "@/features/email/mail/compose/compose-email-state";
 import { RecipientInput } from "@/features/email/mail/compose/recipient-input";
+import { fetchEmailDetail } from "@/features/email/mail/data/thread-detail";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
-import { fetchEmailDetail } from "@/features/email/mail/data/thread-detail";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { MessageBody } from "@/features/email/mail/render/message-body";
 import type {
@@ -41,8 +41,8 @@ import {
   pickReplySource,
 } from "@/features/email/mail/utils/reply-compose";
 import { useAuth } from "@/hooks/use-auth";
-import { useShortcuts } from "@/hooks/use-shortcuts";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
+import { useShortcuts } from "@/hooks/use-shortcuts";
 import { shortcutKey } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { PaperclipIcon, XIcon } from "@phosphor-icons/react";

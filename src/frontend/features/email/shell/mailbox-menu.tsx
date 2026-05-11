@@ -16,6 +16,7 @@ import { shortcutKey } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import {
   ArchiveIcon,
+  BellSlashIcon,
   CheckIcon,
   FileDashedIcon,
   GearSixIcon,
@@ -50,6 +51,7 @@ const sidebarShortcutIds: Record<string, string> = {
   Drafts: "nav:drafts",
   Spam: "nav:spam",
   Trash: "nav:trash",
+  Subscriptions: "nav:subscriptions",
 };
 
 const mailSidebarItems = [
@@ -65,6 +67,11 @@ const mailSidebarItems = [
   { label: "Drafts", icon: FileDashedIcon, to: "/$mailboxId/inbox/drafts" },
   { label: "Spam", icon: WarningIcon, folder: "spam" },
   { label: "Trash", icon: TrashIcon, folder: "trash" },
+  {
+    label: "Subscriptions",
+    icon: BellSlashIcon,
+    to: "/$mailboxId/subscriptions",
+  },
 ] as const;
 
 function getMailboxSwitchRoute(
@@ -106,6 +113,16 @@ function getMailboxSwitchRoute(
   ) {
     return {
       to: "/$mailboxId/inbox/search",
+      getParams: (mailboxId) => ({ mailboxId }),
+    };
+  }
+  if (
+    matches.some(
+      (match) => match.routeId === "/_dashboard/$mailboxId/subscriptions",
+    )
+  ) {
+    return {
+      to: "/$mailboxId/subscriptions",
       getParams: (mailboxId) => ({ mailboxId }),
     };
   }
@@ -368,14 +385,21 @@ function MailboxSidebarContent({
                     ? activeRoute.includes(
                         "/_dashboard/$mailboxId/inbox/search",
                       )
-                    : activeRoute.includes("/_dashboard/$mailboxId/inbox") &&
-                      !activeRoute.includes(
-                        "/_dashboard/$mailboxId/inbox/drafts",
-                      ) &&
-                      !activeRoute.includes(
-                        "/_dashboard/$mailboxId/inbox/search",
-                      ) &&
-                      routeState.label == null;
+                    : item.label === "Subscriptions"
+                      ? activeRoute.includes(
+                          "/_dashboard/$mailboxId/subscriptions",
+                        )
+                      : activeRoute.includes("/_dashboard/$mailboxId/inbox") &&
+                        !activeRoute.includes(
+                          "/_dashboard/$mailboxId/inbox/drafts",
+                        ) &&
+                        !activeRoute.includes(
+                          "/_dashboard/$mailboxId/inbox/search",
+                        ) &&
+                        !activeRoute.includes(
+                          "/_dashboard/$mailboxId/subscriptions",
+                        ) &&
+                        routeState.label == null;
             return "folder" in item ? (
               <Link
                 key={item.label}

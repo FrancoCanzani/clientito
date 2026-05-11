@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
- Popover,
- PopoverContent,
- PopoverTrigger,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
 } from "@/components/ui/popover";
 import { PlusIcon, TagIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -17,24 +17,24 @@ import { fetchLabels } from "../queries";
 import type { Label } from "../types";
 
 type LabelPickerProps = {
- mailboxId: number;
- emailIds: string[];
- appliedLabelIds: string[];
- trigger?: React.ReactNode;
- onDone?: () => void;
+  mailboxId: number;
+  emailIds: string[];
+  appliedLabelIds: string[];
+  trigger?: React.ReactNode;
+  onDone?: () => void;
 };
 
 type ToggleVars = { labelId: string; apply: boolean };
 
 export function LabelPicker({
- mailboxId,
- emailIds,
- appliedLabelIds,
- trigger,
- onDone,
+  mailboxId,
+  emailIds,
+  appliedLabelIds,
+  trigger,
+  onDone,
 }: LabelPickerProps) {
- const [open, setOpen] = useState(false);
- const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
  const [optimisticIds, setOptimisticIds] = useState<Set<string>>(
  new Set(appliedLabelIds),
  );

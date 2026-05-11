@@ -240,7 +240,7 @@ function TodoView({
  if (!todoData.hasEmails && !todoData.isLoading) {
  return (
  <MailboxPage className="max-w-none">
- <MailboxPageBody className="flex items-center justify-center">
+ <MailboxPageBody>
 <Empty>
           <EmptyHeader>
             <EmptyTitle>No emails</EmptyTitle>
