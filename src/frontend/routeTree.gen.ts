@@ -19,6 +19,7 @@ import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsSlugRouteImport } from './routes/docs/$slug'
 import { Route as DashboardMailboxIdRouteRouteImport } from './routes/_dashboard/$mailboxId/route'
 import { Route as DashboardMailboxIdIndexRouteImport } from './routes/_dashboard/$mailboxId/index'
+import { Route as EmailMailboxIdEmailIdRouteImport } from './routes/email/$mailboxId/$emailId'
 import { Route as DashboardMailboxIdTriageRouteImport } from './routes/_dashboard/$mailboxId/triage'
 import { Route as DashboardMailboxIdTodoRouteImport } from './routes/_dashboard/$mailboxId/todo'
 import { Route as DashboardMailboxIdSubscriptionsRouteImport } from './routes/_dashboard/$mailboxId/subscriptions'
@@ -91,6 +92,11 @@ const DashboardMailboxIdIndexRoute = DashboardMailboxIdIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => DashboardMailboxIdRouteRoute,
+} as any)
+const EmailMailboxIdEmailIdRoute = EmailMailboxIdEmailIdRouteImport.update({
+  id: '/email/$mailboxId/$emailId',
+  path: '/email/$mailboxId/$emailId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardMailboxIdTriageRoute =
   DashboardMailboxIdTriageRouteImport.update({
@@ -244,6 +250,7 @@ export interface FileRoutesByFullPath {
   '/$mailboxId/subscriptions': typeof DashboardMailboxIdSubscriptionsRoute
   '/$mailboxId/todo': typeof DashboardMailboxIdTodoRoute
   '/$mailboxId/triage': typeof DashboardMailboxIdTriageRoute
+  '/email/$mailboxId/$emailId': typeof EmailMailboxIdEmailIdRoute
   '/$mailboxId/': typeof DashboardMailboxIdIndexRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
@@ -275,6 +282,7 @@ export interface FileRoutesByTo {
   '/$mailboxId/subscriptions': typeof DashboardMailboxIdSubscriptionsRoute
   '/$mailboxId/todo': typeof DashboardMailboxIdTodoRoute
   '/$mailboxId/triage': typeof DashboardMailboxIdTriageRoute
+  '/email/$mailboxId/$emailId': typeof EmailMailboxIdEmailIdRoute
   '/$mailboxId': typeof DashboardMailboxIdIndexRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
@@ -311,6 +319,7 @@ export interface FileRoutesById {
   '/_dashboard/$mailboxId/subscriptions': typeof DashboardMailboxIdSubscriptionsRoute
   '/_dashboard/$mailboxId/todo': typeof DashboardMailboxIdTodoRoute
   '/_dashboard/$mailboxId/triage': typeof DashboardMailboxIdTriageRoute
+  '/email/$mailboxId/$emailId': typeof EmailMailboxIdEmailIdRoute
   '/_dashboard/$mailboxId/': typeof DashboardMailboxIdIndexRoute
   '/_dashboard/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
   '/_dashboard/$mailboxId/inbox/search': typeof DashboardMailboxIdInboxSearchRoute
@@ -347,6 +356,7 @@ export interface FileRouteTypes {
     | '/$mailboxId/subscriptions'
     | '/$mailboxId/todo'
     | '/$mailboxId/triage'
+    | '/email/$mailboxId/$emailId'
     | '/$mailboxId/'
     | '/$mailboxId/inbox/drafts'
     | '/$mailboxId/inbox/search'
@@ -378,6 +388,7 @@ export interface FileRouteTypes {
     | '/$mailboxId/subscriptions'
     | '/$mailboxId/todo'
     | '/$mailboxId/triage'
+    | '/email/$mailboxId/$emailId'
     | '/$mailboxId'
     | '/$mailboxId/inbox/drafts'
     | '/$mailboxId/inbox/search'
@@ -413,6 +424,7 @@ export interface FileRouteTypes {
     | '/_dashboard/$mailboxId/subscriptions'
     | '/_dashboard/$mailboxId/todo'
     | '/_dashboard/$mailboxId/triage'
+    | '/email/$mailboxId/$emailId'
     | '/_dashboard/$mailboxId/'
     | '/_dashboard/$mailboxId/inbox/drafts'
     | '/_dashboard/$mailboxId/inbox/search'
@@ -441,6 +453,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
+  EmailMailboxIdEmailIdRoute: typeof EmailMailboxIdEmailIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -514,6 +527,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/$mailboxId/'
       preLoaderRoute: typeof DashboardMailboxIdIndexRouteImport
       parentRoute: typeof DashboardMailboxIdRouteRoute
+    }
+    '/email/$mailboxId/$emailId': {
+      id: '/email/$mailboxId/$emailId'
+      path: '/email/$mailboxId/$emailId'
+      fullPath: '/email/$mailboxId/$emailId'
+      preLoaderRoute: typeof EmailMailboxIdEmailIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_dashboard/$mailboxId/triage': {
       id: '/_dashboard/$mailboxId/triage'
@@ -797,6 +817,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
+  EmailMailboxIdEmailIdRoute: EmailMailboxIdEmailIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

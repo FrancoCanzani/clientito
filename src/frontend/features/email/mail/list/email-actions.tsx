@@ -33,14 +33,15 @@ import {
   ArrowBendDoubleUpLeftIcon,
   ArrowBendUpLeftIcon,
   ArrowBendUpRightIcon,
+  ArrowSquareOutIcon,
   BellSlashIcon,
   CheckIcon,
   ClockIcon,
   DotsThreeIcon,
   EnvelopeSimpleIcon,
   EnvelopeSimpleOpenIcon,
+  PrinterIcon,
   ProhibitIcon,
-  SparkleIcon,
   StarIcon,
   TagIcon,
   TrashIcon,
@@ -65,7 +66,6 @@ type EmailActionsProps = {
   onClose?: () => void;
   onForward?: (initial: ComposeInitial) => void;
   onReply?: () => void;
-  onDraftReply?: () => void;
   onAction?: ReturnType<typeof useMailActions>["executeEmailAction"];
 };
 
@@ -82,7 +82,6 @@ export function EmailActions({
   onClose,
   onForward,
   onReply,
-  onDraftReply,
   onAction,
 }: EmailActionsProps) {
   const queryClient = useQueryClient();
@@ -100,7 +99,6 @@ export function EmailActions({
   const hasUnsubscribe = Boolean(
     email.unsubscribeUrl || email.unsubscribeEmail,
   );
-  const hasAiDraftReply = Boolean(email.aiDraftReply?.trim());
   const mailboxId = email.mailboxId;
   const resolvedMailboxId = mailboxId ?? 0;
 
@@ -475,16 +473,6 @@ export function EmailActions({
         >
           <ArrowBendUpLeftIcon className="size-3.5" />
         </IconButton>
-        {hasAiDraftReply && (
-          <IconButton
-            label="Draft reply"
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => onDraftReply?.()}
-          >
-            <SparkleIcon className="size-3.5" />
-          </IconButton>
-        )}
         {showReplyAll && (
           <IconButton
             label="Reply all"
@@ -526,12 +514,6 @@ export function EmailActions({
               <span className="flex-1">Reply</span>
               <Kbd>{shortcutKey("action:reply")}</Kbd>
             </DropdownMenuItem>
-            {hasAiDraftReply && (
-              <DropdownMenuItem onSelect={() => onDraftReply?.()}>
-                <SparkleIcon className="size-3.5" />
-                <span className="flex-1">Draft reply</span>
-              </DropdownMenuItem>
-            )}
             {showReplyAll && (
               <DropdownMenuItem onSelect={handleReplyAll}>
                 <ArrowBendDoubleUpLeftIcon className="size-3.5" />
@@ -606,6 +588,26 @@ export function EmailActions({
           >
             <ProhibitIcon className="size-3.5" />
             <span className="flex-1">Block sender</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {mailboxId != null && (
+            <DropdownMenuItem
+              onSelect={() => {
+                const href = router.buildLocation({
+                  to: "/email/$mailboxId/$emailId",
+                  params: { mailboxId, emailId: email.id },
+                }).href;
+                window.open(href, "_blank", "noopener");
+              }}
+            >
+              <ArrowSquareOutIcon className="size-3.5" />
+              <span className="flex-1">Open in new tab</span>
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem onSelect={() => window.print()}>
+            <PrinterIcon className="size-3.5" />
+            <span className="flex-1">Print</span>
+            <Kbd>⌘P</Kbd>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

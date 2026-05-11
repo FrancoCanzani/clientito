@@ -22,7 +22,6 @@ export function EmailDetailHeader({
   onForward,
   onAction,
   onReply,
-  onDraftReply,
   isScrolled = false,
 }: {
   email: EmailDetailItem;
@@ -35,7 +34,6 @@ export function EmailDetailHeader({
   onForward: (initial: ComposeInitial) => void;
   onAction?: ReturnType<typeof useMailActions>["executeEmailAction"];
   onReply: () => void;
-  onDraftReply?: () => void;
   isScrolled?: boolean;
 }) {
  return (
@@ -84,7 +82,6 @@ export function EmailDetailHeader({
   onForward={onForward}
   onAction={onAction}
   onReply={onReply}
-  onDraftReply={onDraftReply}
 />
  </div>
  </div>

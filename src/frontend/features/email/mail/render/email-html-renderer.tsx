@@ -58,12 +58,29 @@ const EMAIL_CONTENT_SHADOW_STYLE = `
  }
  details[data-quoted-collapsible='true'] > summary::-webkit-details-marker { display: none; }
  details[data-quoted-collapsible='true'][open] > summary { margin-bottom: 8px; }
- [data-email-scale-viewport='true'] { width: 100%; max-width: 100%; min-width: 0; overflow: hidden; }
+  [data-email-scale-viewport='true'] { width: 100%; max-width: 100%; min-width: 0; overflow: hidden; }
  [data-email-scale-content='true'] {
  display: block;
  width: 100%;
  max-width: none;
  transform-origin: top left;
+ }
+ @media print {
+ :host {
+ overflow: visible !important;
+ font-size: 11pt !important;
+ color: black !important;
+ }
+ [data-email-scale-viewport='true'] {
+ overflow: visible !important;
+ }
+ [data-email-scale-content='true'] {
+ transform: none !important;
+ width: auto !important;
+ max-width: 100% !important;
+ }
+ img, table { break-inside: avoid; max-width: 100% !important; }
+ a { color: inherit !important; text-decoration: underline; }
  }
 `;
 

@@ -66,12 +66,7 @@ export function useSubscriptionSenders(mailboxId: number, enabled = true) {
   });
 }
 
-async function refreshAfterMutation(_mailboxId: number) {
-  const userId = await getCurrentUserId();
-  if (userId) {
-    await localDb.clearStale();
-  }
-}
+async function refreshAfterMutation(_mailboxId: number) {}
 
 export function useUnsubscribe(mailboxId: number) {
   const queryClient = useQueryClient();

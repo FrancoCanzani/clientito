@@ -202,9 +202,14 @@ export function EmailThread({
       {showThread ? (
         <>
           <div className="space-y-2">
-            <h1 className="min-w-0 text-xs font-medium text-foreground">
-              {subject}
-            </h1>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <h1 className="min-w-0 text-sm font-medium text-foreground">
+                {subject}
+              </h1>
+              <span className="shrink-0 font-mono text-[10px] tracking-tighter tabular-nums text-muted-foreground">
+                {formattedDate}
+              </span>
+            </div>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 {recipientRows.map((row) => (
@@ -216,9 +221,6 @@ export function EmailThread({
                   </p>
                 ))}
               </div>
-              <span className="shrink-0 font-mono text-[10px] tracking-tighter tabular-nums text-muted-foreground">
-                {formattedDate}
-              </span>
             </div>
           </div>
 

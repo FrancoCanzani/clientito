@@ -4,7 +4,7 @@ import { signOut } from "@/lib/auth-client";
 import { queryClient } from "@/lib/query-client";
 
 export const APP_VERSION = __APP_VERSION__;
-export const LOCAL_SCHEMA_VERSION = "1";
+export const LOCAL_SCHEMA_VERSION = "2";
 
 let bootedOut = false;
 

@@ -91,8 +91,6 @@ export type EmailListItem = {
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
   snoozedUntil: number | null;
-  aiSummary: string | null;
-  aiDraftReply: string | null;
   threadCount?: number;
 };
 

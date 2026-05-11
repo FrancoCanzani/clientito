@@ -105,8 +105,8 @@ export default function SubscriptionsPage() {
   return (
     <MailboxPage className="max-w-none">
       <MailboxPageHeader title="Subscriptions" actions={headerActions} />
-      <MailboxPageBody className="overflow-y-auto">
-        <div className="w-full px-4 pb-3">
+      <MailboxPageBody>
+        <div className="relative min-h-0 w-full flex-1 overflow-y-auto px-4 pb-3">
           {sendersQuery.isLoading ? (
             <PageSpinner />
           ) : sorted.length === 0 ? (

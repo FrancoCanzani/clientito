@@ -11,13 +11,8 @@ import healthRoutes from "./routes/health/router";
 import inboxRoutes from "./routes/inbox/router";
 import settingsRoutes from "./routes/settings/router";
 import splitViewsRoutes from "./routes/split-views/router";
-import draftsRoutes from "./routes/inbox/drafts/router";
 import type { AppRouteEnv } from "./routes/types";
 import { handleScheduled } from "./scheduled";
-import {
-  handleEmailLabelMutations,
-  type EmailLabelMutationMessage,
-} from "./queues/email-label-mutations";
 
 const app = new Hono<AppRouteEnv>();
 
@@ -61,7 +56,6 @@ app.route("/api/health", healthRoutes);
 app.route("/api/inbox", inboxRoutes);
 app.route("/api/ai", aiRoutes);
 
-app.route("/api/inbox/drafts", draftsRoutes);
 app.route("/api/settings", settingsRoutes);
 app.route("/api/split-views", splitViewsRoutes);
 
@@ -71,8 +65,5 @@ export default {
   },
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(handleScheduled(event, env));
-  },
-  async queue(batch: MessageBatch<EmailLabelMutationMessage>, env: Env) {
-    await handleEmailLabelMutations(batch, env);
   },
 };

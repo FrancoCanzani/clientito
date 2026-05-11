@@ -60,9 +60,6 @@ type EmailRowDb = {
   unsubscribeUrl: string | null;
   unsubscribeEmail: string | null;
   snoozedUntil: number | null;
-  aiSummary: string | null;
-  aiDraftReply: string | null;
-  aiSplitIds: string | null;
   threadCount?: number | null;
   hasCalendar: number;
   isGatekept: number;
@@ -490,10 +487,8 @@ has_starred,
   unsubscribe_url,
   unsubscribe_email,
   snoozed_until,
-  has_calendar,
-  is_gatekept,
-  ai_summary,
-  ai_draft_reply
+   has_calendar,
+  is_gatekept
 `;
 
 function toEmailListItem(row: EmailRowDb) {
@@ -520,8 +515,6 @@ function toEmailListItem(row: EmailRowDb) {
     snoozedUntil: row.snoozedUntil,
     hasCalendar: toBool(row.hasCalendar),
     isGatekept: toBool(row.isGatekept),
-    aiSummary: row.aiSummary ?? null,
-    aiDraftReply: row.aiDraftReply ?? null,
     threadCount: Number(row.threadCount ?? 1),
   };
 }

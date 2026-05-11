@@ -39,14 +39,6 @@ CREATE TABLE IF NOT EXISTS emails (
  attachments TEXT,
  has_calendar INTEGER NOT NULL DEFAULT 0,
  is_gatekept INTEGER NOT NULL DEFAULT 0,
- ai_category TEXT,
- ai_confidence REAL,
- ai_reason TEXT,
- ai_summary TEXT,
- ai_draft_reply TEXT,
- ai_classified_at INTEGER,
- ai_classification_key TEXT,
- ai_split_ids TEXT,
  created_at INTEGER NOT NULL
 );
 
@@ -205,11 +197,6 @@ async function initDb(): Promise<void> {
     let lastErr: unknown;
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        if (typeof sqlite3.removeOpfsSAHPoolVfs === "function") {
-          try {
-            await sqlite3.removeOpfsSAHPoolVfs();
-          } catch {}
-        }
         pool = await sqlite3.installOpfsSAHPoolVfs({
           directory: SAH_POOL_DIR,
           initialCapacity: 32,
@@ -257,7 +244,7 @@ function exec(sql: string, params: BindParam[], mode: ExecMode): ExecResult {
   try {
     if (params.length > 0) stmt.bind(normalizeParams(params));
     if (mode === "run") {
-      while (stmt.step()) {}
+      while (stmt.step()) { /* drain */ }
     } else if (mode === "get") {
       if (stmt.step()) {
         columns = stmt.getColumnNames();

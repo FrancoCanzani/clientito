@@ -30,9 +30,6 @@ export type EmailRow = {
   attachments: string | null;
   hasCalendar: boolean;
   isGatekept: boolean;
-  aiSummary: string | null;
-  aiDraftReply: string | null;
-  aiSplitIds: string | null;
   createdAt: number;
 };
 

@@ -1,3 +1,4 @@
+import { useMailCompose } from "@/features/email/mail/compose/compose-context";
 import { useMailboxes } from "@/hooks/use-mailboxes";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useShortcuts } from "@/hooks/use-shortcuts";
@@ -13,6 +14,7 @@ const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 export function useMailboxHotkeys() {
   const { mailboxId } = mailboxRoute.useParams();
   const navigate = useNavigate();
+  const { openCompose } = useMailCompose();
   const accounts = (useMailboxes().data?.accounts ?? []).filter(
     (account): account is typeof account & { mailboxId: number } =>
       account.mailboxId != null,
@@ -67,6 +69,7 @@ export function useMailboxHotkeys() {
         to: "/$mailboxId/screener",
         params: { mailboxId },
       }),
+    "action:compose": () => openCompose(),
   });
 
   const accountBindings: Record<string, () => void> = {};

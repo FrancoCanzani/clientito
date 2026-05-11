@@ -17,7 +17,7 @@ export const mailboxes = sqliteTable(
     accountId: text("account_id").references(() => account.id, {
       onDelete: "cascade",
     }),
-    provider: text("provider").$type<"google" | "outlook">().notNull().default("google"),
+    provider: text("provider").$type<"google">().notNull().default("google"),
     email: text("email"),
     signature: text("signature"),
     templates: text("templates"),
@@ -186,35 +186,5 @@ export const replyReminders = sqliteTable(
     ),
     index("reply_reminders_due_idx").on(table.status, table.remindAt),
     index("reply_reminders_user_status_idx").on(table.userId, table.status),
-  ],
-);
-
-export const drafts = sqliteTable(
-  "drafts",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    composeKey: text("compose_key").notNull(),
-    mailboxId: integer("mailbox_id").references(() => mailboxes.id, {
-      onDelete: "cascade",
-    }),
-    toAddr: text("to_addr").notNull().default(""),
-    ccAddr: text("cc_addr").notNull().default(""),
-    bccAddr: text("bcc_addr").notNull().default(""),
-    subject: text("subject").notNull().default(""),
-    body: text("body").notNull().default(""),
-    forwardedContent: text("forwarded_content").notNull().default(""),
-    threadId: text("thread_id"),
-    attachmentKeys: text("attachment_keys", { mode: "json" }).$type<
-      Array<{ key: string; filename: string; mimeType: string }>
-    >(),
-    updatedAt: integer("updated_at").notNull(),
-    createdAt: integer("created_at").notNull(),
-  },
-  (table) => [
-    uniqueIndex("drafts_user_compose_key_idx").on(table.userId, table.composeKey),
-    index("drafts_user_updated_idx").on(table.userId, table.updatedAt),
   ],
 );

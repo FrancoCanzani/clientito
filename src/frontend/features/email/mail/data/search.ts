@@ -72,34 +72,6 @@ export async function fetchSearchEmails(
   return { emails: local.data, cursor };
 }
 
-export async function fetchRemoteSearchEmails(
-  params: InboxSearchScope & { cursor?: string },
-): Promise<ViewPage> {
-  const userId = await getCurrentUserId();
-  if (!userId || !params.mailboxId) return { emails: [], cursor: null };
-
-  await alignActiveUser(userId);
-
-  const res = await fetch("/api/inbox/search", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      mailboxId: params.mailboxId,
-      q: params.q,
-      pageToken: params.cursor,
-      includeJunk: params.includeJunk ?? false,
-    }),
-  });
-  if (!res.ok) throw new Error(`Search failed: ${res.status}`);
-
-  const body = (await res.json()) as {
-    emails: PulledEmail[];
-    cursor: string | null;
-  };
-  const emails = await persistEmails(body.emails, userId, params.mailboxId);
-  return { emails, cursor: body.cursor };
-}
-
 export async function fetchSearchSuggestions(
   params: InboxSearchScope,
 ): Promise<InboxSearchSuggestionsResponse> {

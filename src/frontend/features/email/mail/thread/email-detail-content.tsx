@@ -55,25 +55,26 @@ export const EmailDetailContent = forwardRef<
   }));
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden">
+    <div
+      data-print-region
+      className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden"
+    >
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
-        <EmailDetailHeader
-          email={email}
-          onClose={onClose}
-          onBack={onBack}
-          onPrev={onPrev}
-          onNext={onNext}
-          hasPrev={hasPrev}
-          hasNext={hasNext}
-          onForward={onForward}
-          onAction={onAction}
-          onReply={() => quickReplyRef.current?.scrollIntoViewAndFocus()}
-          onDraftReply={() => {
-            const draft = email.aiDraftReply?.trim();
-            quickReplyRef.current?.scrollIntoViewAndFocus(draft || undefined);
-          }}
-          isScrolled={isScrolled}
-        />
+        <div data-print-hide>
+          <EmailDetailHeader
+            email={email}
+            onClose={onClose}
+            onBack={onBack}
+            onPrev={onPrev}
+            onNext={onNext}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            onForward={onForward}
+            onAction={onAction}
+            onReply={() => quickReplyRef.current?.scrollIntoViewAndFocus()}
+            isScrolled={isScrolled}
+          />
+        </div>
 
         <div className="w-full space-y-6 px-3 pt-3 pb-24 md:px-6">
           <EmailThread
@@ -81,12 +82,14 @@ export const EmailDetailContent = forwardRef<
             threadMessages={threadMessages}
             threadError={threadError}
           />
-          <QuickReply
-            ref={quickReplyRef}
-            email={email}
-            detail={email}
-            threadMessages={threadMessages}
-          />
+          <div data-print-hide>
+            <QuickReply
+              ref={quickReplyRef}
+              email={email}
+              detail={email}
+              threadMessages={threadMessages}
+            />
+          </div>
         </div>
       </div>
     </div>

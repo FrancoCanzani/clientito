@@ -186,9 +186,6 @@ function pulledToRow(
         : null,
     hasCalendar: inferHasCalendar(email),
     isGatekept,
-    aiSummary: null,
-    aiDraftReply: null,
-    aiSplitIds: null,
     createdAt: email.date,
   };
 }

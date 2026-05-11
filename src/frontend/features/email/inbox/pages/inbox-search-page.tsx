@@ -286,7 +286,8 @@ export default function InboxSearchPage() {
     <MailboxPage className="max-w-none">
       <MailboxPageHeader title="Search" actions={headerActions} />
 
-      <MailboxPageBody className="overflow-y-auto">
+      <MailboxPageBody>
+        <div className="relative min-h-0 flex-1 overflow-y-auto">
         {activeOperators.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 md:px-4">
             {activeOperators.map((operator) => (
@@ -350,6 +351,7 @@ export default function InboxSearchPage() {
           focusedIndex={focusedIndex}
           highlightTerms={highlightTerms}
         />
+        </div>
       </MailboxPageBody>
     </MailboxPage>
   );
