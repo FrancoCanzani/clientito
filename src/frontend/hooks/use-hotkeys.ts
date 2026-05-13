@@ -80,5 +80,5 @@ export function useHotkeys(
     );
 
     return tinykeys(target, keyBindingMap);
-  }, [enabled, target, runBinding]);
+  }, [enabled, target]);
 }

@@ -1,4 +1,3 @@
-import { PageSpinner } from "@/components/page-spinner";
 import {
   Empty,
   EmptyDescription,
@@ -17,12 +16,12 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { ArrowClockwiseIcon, SpinnerGapIcon } from "@phosphor-icons/react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MailFilterBar } from "./mail-filter-bar";
 import { MobileEmailRow } from "./mobile-email-row";
 import { SplitEmailRow } from "./split-email-row";
 import { TaskEmailRow } from "./task-email-row";
+import { useMailListVirtualization } from "./use-mail-list-virtualization";
 import { useMobilePullToRefresh } from "./use-mobile-pull-to-refresh";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
@@ -68,7 +67,10 @@ export function EmailList({
     threadGroups,
     hasNextPage,
     isFetchingNextPage,
-    isLoading,
+    isInitialPagePending,
+    showEmptyState,
+    isFetching,
+    fetchNextPage,
     loadMoreRef,
     filters,
     setFilters,
@@ -116,18 +118,17 @@ export function EmailList({
     },
   });
 
-  const virtualizer = useVirtualizer({
-    count: threadGroups.length,
-    estimateSize: () => rowHeight,
-    overscan: 10,
-    getScrollElement: () => scrollRef.current,
-  });
-
-  useEffect(() => {
-    virtualizer.measure();
-    // virtualizer is intentionally omitted: its identity changes every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rowHeight]);
+  const { virtualizer, virtualItems, virtualCount } =
+    useMailListVirtualization({
+      scrollRef,
+      rowHeight,
+      loadedCount: threadGroups.length,
+      isInitialPagePending,
+      hasNextPage,
+      isFetching,
+      isFetchingNextPage,
+      fetchNextPage,
+    });
 
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
@@ -157,12 +158,7 @@ export function EmailList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmailId]);
 
-  const virtualItems = virtualizer.getVirtualItems();
-
   const showLoadMoreSentinel = hasNextPage || isFetchingNextPage;
-  const loadMoreLabel = isFetchingNextPage
-    ? "Loading more..."
-    : "Scroll for more";
   const pullIndicatorVisible =
     pullToRefresh.pullDistance > 2 || pullToRefresh.isRefreshing;
 
@@ -232,19 +228,21 @@ export function EmailList({
                 : undefined,
           }}
         >
-          {hasEmails ? (
+          {virtualCount > 0 ? (
             <div
               className="relative w-full"
               style={{ height: virtualizer.getTotalSize() }}
             >
               {virtualItems.map((virtualItem) => {
-                const group = threadGroups[virtualItem.index]!;
+                const group = threadGroups[virtualItem.index];
+                const key =
+                  group?.representative.id ?? `blank-${virtualItem.index}`;
 
                 return (
                   <div
-                    key={group.representative.id}
+                    key={key}
                     ref={(el) => {
-                      if (el) {
+                      if (el && group) {
                         rowRefs.current.set(virtualItem.index, el);
                       } else {
                         rowRefs.current.delete(virtualItem.index);
@@ -256,24 +254,29 @@ export function EmailList({
                       transform: `translateY(${virtualItem.start}px)`,
                     }}
                   >
-                    <RowComponent
-                      group={group}
-                      view={view}
-                      onOpen={onOpen}
-                      onAction={onAction}
-                      onSnooze={onSnooze}
-                      isFocused={virtualItem.index === focusedIndex}
-                      isSelected={group.emails.some(
-                        (email) => email.id === selectedEmailId,
-                      )}
-                    />
+                    {group ? (
+                      <RowComponent
+                        group={group}
+                        view={view}
+                        onOpen={onOpen}
+                        onAction={onAction}
+                        onSnooze={onSnooze}
+                        isFocused={virtualItem.index === focusedIndex}
+                        isSelected={group.emails.some(
+                          (email) => email.id === selectedEmailId,
+                        )}
+                      />
+                    ) : (
+                      <BlankEmailRow
+                        listVariant={listVariant}
+                        isMobile={isMobile}
+                      />
+                    )}
                   </div>
                 );
               })}
             </div>
-          ) : isLoading ? (
-            <PageSpinner />
-          ) : (
+          ) : showEmptyState ? (
             <Empty>
               <EmptyHeader>
                 <EmptyTitle>{emptyTitle ?? "No emails"}</EmptyTitle>
@@ -283,19 +286,45 @@ export function EmailList({
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
-          )}
+          ) : null}
 
           {showLoadMoreSentinel && (
             <div
               ref={loadMoreRef}
-              className="p-6 text-center text-xs text-muted-foreground"
-            >
-              {loadMoreLabel}
-            </div>
+              aria-hidden="true"
+              className={cn("h-px w-full", isFetchingNextPage && "h-8")}
+            />
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+function BlankEmailRow({
+  listVariant,
+  isMobile,
+}: {
+  listVariant: "mail" | "task";
+  isMobile: boolean;
+}) {
+  if (listVariant === "task") {
+    return (
+      <div
+        aria-hidden="true"
+        className="mx-3 my-1 h-12 border border-border/30 bg-card/20 md:mx-6"
+      />
+    );
+  }
+
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        "h-full w-full border-b border-border/40 bg-background",
+        isMobile && "px-3 py-2",
+      )}
+    />
   );
 }
 

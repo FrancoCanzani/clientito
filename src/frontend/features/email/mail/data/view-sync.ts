@@ -3,10 +3,12 @@ import { getCurrentUserId } from "@/db/user";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { accountQueryKeys } from "@/features/settings/query-keys";
 import { accountsQueryOptions } from "@/hooks/use-mailboxes";
+import { deviceCapabilities } from "@/lib/device-capabilities";
 import { queryClient } from "@/lib/query-client";
 import { AsyncQueuer } from "@tanstack/pacer/async-queuer";
 import { VIEW_PAGE_SIZE } from "./constants";
 import { alignActiveUser, persistEmails } from "./local-cache";
+import { invalidateInboxQueries, invalidateUnreadCounts } from "./invalidation";
 import { dedup } from "./request-dedup";
 import type {
   DeltaSyncResponse,
@@ -20,11 +22,15 @@ import {
   parseViewSyncStatus,
   setViewSyncStatus,
   viewSyncMetaKey,
+  type ViewSyncStatus,
 } from "./view-sync-status";
 
 const GMAIL_SYNC_WAIT_MS = 0;
-const GMAIL_SYNC_MAX_SIZE = 100;
 const GMAIL_SYNC_DEFAULT_COOLDOWN_MS = 60_000;
+
+function deltaHistoryMetaKey(mailboxId: number): string {
+  return `gmailDeltaHistory:${mailboxId}`;
+}
 
 function refreshKey(mailboxId: number, view: string): string {
   return `view-refresh:${mailboxId}:${view}`;
@@ -146,10 +152,18 @@ async function fetchServerPage(
     emails: PulledEmail[];
     cursor: string | null;
   };
-  const emails = await persistEmails(body.emails, userId, mailboxId);
-  await setViewSyncStatus(mailboxId, view, {
+  const syncStatus: ViewSyncStatus = {
     lastFetchedAt: Date.now(),
     lastError: null,
+  };
+  const emails = await persistEmails(body.emails, userId, mailboxId, {
+    returnHydrated: true,
+    meta: {
+      [viewSyncMetaKey(mailboxId, view)]: JSON.stringify(syncStatus),
+    },
+  });
+  void queryClient.invalidateQueries({
+    queryKey: emailQueryKeys.viewSyncMeta(view, mailboxId),
   });
   const nextCursor = body.cursor
     ? encodeViewCursor(
@@ -244,9 +258,9 @@ const gmailViewSyncQueue = new AsyncQueuer<GmailViewSyncTask>(
   },
   {
     key: "gmail-view-sync",
-    concurrency: 4,
+    concurrency: deviceCapabilities.syncConcurrency,
     wait: GMAIL_SYNC_WAIT_MS,
-    maxSize: GMAIL_SYNC_MAX_SIZE,
+    maxSize: deviceCapabilities.maxSyncQueueSize,
     getPriority: (task) => task.priority,
     throwOnError: false,
     onError: (error, _task, queuer) => {
@@ -318,6 +332,7 @@ export function preloadInactiveViews(
   extraViews: ReadonlyArray<string> = [],
 ): void {
   if (!mailboxId) return;
+  if (!deviceCapabilities.shouldPrefetch) return;
 
   void (async () => {
     const userId = await getCurrentUserId();
@@ -339,6 +354,27 @@ export function preloadInactiveViews(
   })();
 }
 
+export function cancelPreloadViews(mailboxId: number, keepView?: string): void {
+  const allTasks = gmailViewSyncQueue.peekAllItems();
+  const toKeep: GmailViewSyncTask[] = [];
+  for (const task of allTasks) {
+    if (
+      task.reason === "preload" &&
+      task.mailboxId === mailboxId &&
+      (!keepView || task.view !== keepView)
+    ) {
+      gmailViewSyncInFlight.delete(task.key);
+      task.reject(new Error("Cancelled: preload superseded"));
+    } else {
+      toKeep.push(task);
+    }
+  }
+  gmailViewSyncQueue.clear();
+  for (const task of toKeep) {
+    gmailViewSyncQueue.addItem(task);
+  }
+}
+
 export async function runDeltaSync(
   mailboxId: number,
 ): Promise<DeltaSyncResponse | null> {
@@ -348,11 +384,15 @@ export async function runDeltaSync(
     const userId = await getCurrentUserId();
     if (!userId) return null;
     await alignActiveUser(userId);
+    const localHistoryId = await localDb.getMeta(deltaHistoryMetaKey(mailboxId));
 
     const res = await fetch("/api/inbox/sync/delta", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mailboxId }),
+      body: JSON.stringify({
+        mailboxId,
+        historyId: localHistoryId ?? undefined,
+      }),
     });
     if (!res.ok) {
       if (res.status === 401) {
@@ -364,6 +404,18 @@ export async function runDeltaSync(
     }
     const body = (await res.json()) as DeltaSyncResponse;
 
+    if (body.status === "stale") {
+      await localDb.clearMailboxCache(userId, mailboxId);
+      if (body.historyId) {
+        await localDb.setMeta(deltaHistoryMetaKey(mailboxId), body.historyId);
+        void ackDeltaHistory(mailboxId, body.historyId);
+      }
+      invalidateInboxQueries();
+      invalidateUnreadCounts(mailboxId);
+      await refreshViewFromServer(userId, mailboxId, "inbox", "active-view");
+      return body;
+    }
+
     let appliedAnything = false;
 
     if (body.added?.length) {
@@ -372,7 +424,10 @@ export async function runDeltaSync(
     }
 
     if (body.deleted?.length) {
-      await localDb.deleteEmailsByProviderMessageId(body.deleted);
+      await localDb.deleteEmailsByProviderMessageId(body.deleted, {
+        userId,
+        mailboxId,
+      });
       appliedAnything = true;
     }
 
@@ -382,19 +437,43 @@ export async function runDeltaSync(
           await localDb.removeLabelFromEmails(
             [change.providerMessageId],
             labelId,
+            mailboxId,
           );
         }
         for (const labelId of change.addedLabels) {
-          await localDb.addLabelToEmails([change.providerMessageId], labelId);
+          await localDb.addLabelToEmails(
+            [change.providerMessageId],
+            labelId,
+            mailboxId,
+          );
         }
       }
       appliedAnything = true;
     }
 
     if (appliedAnything) {
-      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      invalidateInboxQueries();
+      invalidateUnreadCounts(mailboxId);
+    }
+
+    if (body.historyId) {
+      await localDb.setMeta(deltaHistoryMetaKey(mailboxId), body.historyId);
+      void ackDeltaHistory(mailboxId, body.historyId);
     }
 
     return body;
+  });
+}
+
+async function ackDeltaHistory(
+  mailboxId: number,
+  historyId: string,
+): Promise<void> {
+  await fetch("/api/inbox/sync/delta/ack", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mailboxId, historyId }),
+  }).catch(() => {
+    /* Local history is authoritative; ack only keeps account status fresh. */
   });
 }

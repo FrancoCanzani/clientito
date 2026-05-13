@@ -2,11 +2,12 @@ import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { useGatekeeperPending } from "@/features/email/gatekeeper/queries";
 import { useInboxData } from "@/features/email/inbox/hooks/use-inbox-data";
+import { useMailPanelSelection } from "@/features/email/inbox/hooks/use-mail-panel-selection";
+import { useThreadGroupSnooze } from "@/features/email/inbox/hooks/use-thread-group-snooze";
 import {
   MailListReaderPage,
   MailListPane,
   MailReaderPane,
-  useThreadGroupSnooze,
 } from "@/features/email/inbox/pages/mail-pane";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -43,24 +44,30 @@ export default function InboxPage() {
 
   const gatekeeperPendingQuery = useGatekeeperPending(mailboxId, true);
   const pendingSendersCount = gatekeeperPendingQuery.data?.pendingCount ?? 0;
-  const selectedEmailId = isMobile ? null : (search.emailId ?? null);
   const handleSnooze = useThreadGroupSnooze(mailboxId, snooze);
-
-  const clearSelectedEmail = () =>
-    navigate({
-      to: "/$mailboxId/inbox",
-      params: { mailboxId },
-      search: inboxSearch(inboxMode),
-      replace: true,
-    });
-
-  const navigateSelectedEmail = (nextEmailId: string) =>
-    navigate({
-      to: "/$mailboxId/inbox",
-      params: { mailboxId },
-      search: inboxSearch(inboxMode, nextEmailId),
-      replace: true,
-    });
+  const {
+    selectedEmailId,
+    enableKeyboardNavigation,
+    clearSelectedEmail,
+    navigateSelectedEmail,
+  } = useMailPanelSelection({
+    isMobile,
+    emailId: search.emailId,
+    onClear: () =>
+      navigate({
+        to: "/$mailboxId/inbox",
+        params: { mailboxId },
+        search: inboxSearch(inboxMode),
+        replace: true,
+      }),
+    onNavigate: (nextEmailId) =>
+      navigate({
+        to: "/$mailboxId/inbox",
+        params: { mailboxId },
+        search: inboxSearch(inboxMode, nextEmailId),
+        replace: true,
+      }),
+  });
 
   const setInboxMode = (nextMode: InboxMode) => {
     if (nextMode === inboxMode) return;
@@ -122,7 +129,7 @@ export default function InboxPage() {
       onAction={executeEmailAction}
       onSnooze={handleSnooze}
       selectedEmailId={selectedEmailId}
-      enableKeyboardNavigation={!selectedEmailId}
+      enableKeyboardNavigation={enableKeyboardNavigation}
       compact={!isMobile}
       headerExtraActions={
         <>

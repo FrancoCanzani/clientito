@@ -97,10 +97,12 @@ export function useMailViewData({
 
   const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } =
     emailsQuery;
+  const [loadMoreVisible, setLoadMoreVisible] = useState(false);
   const loadedPages = useMemo(
     () => emailsQuery.data?.pages ?? EMPTY_PAGES,
     [emailsQuery.data?.pages],
   );
+  const hasLoadedEmailPage = loadedPages.length > 0;
 
   const allEmails = useMemo(
     () => loadedPages.flatMap((page) => page.emails),
@@ -144,6 +146,12 @@ export function useMailViewData({
   }, [focusWindow.active, heldDuringFocusCount]);
 
   const hasEmails = threadGroups.length > 0;
+  const isInitialPagePending = !hasLoadedEmailPage && emailsQuery.isFetching;
+  const showEmptyState =
+    hasLoadedEmailPage &&
+    !emailsQuery.isFetching &&
+    !hasEmails &&
+    !(hasNextPage ?? false);
   const syncMeta = viewSyncMetaQuery.data;
   const hasSyncedOnce = syncMeta?.lastFetchedAt != null;
   const needsReconnect =
@@ -163,11 +171,23 @@ export function useMailViewData({
     rootMargin: LOAD_MORE_ROOT_MARGIN,
     threshold: 0.01,
     onChange: (isIntersecting) => {
-      if (!isIntersecting) return;
-      if (isFetching || isFetchingNextPage) return;
-      if (hasNextPage) fetchNextPage();
+      setLoadMoreVisible(isIntersecting);
     },
   });
+
+  useEffect(() => {
+    if (!loadMoreVisible) return;
+    if (!hasNextPage) return;
+    if (isFetching || isFetchingNextPage) return;
+
+    void fetchNextPage();
+  }, [
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    loadMoreVisible,
+  ]);
 
   return {
     view,
@@ -175,10 +195,13 @@ export function useMailViewData({
     hasEmails,
     threadGroups,
     isLoading,
+    isInitialPagePending,
+    showEmptyState,
     isRefreshing,
     needsReconnect,
     isRateLimited,
     isError: emailsQuery.isError,
+    isFetching,
     hasNextPage: hasNextPage ?? false,
     isFetchingNextPage,
     fetchNextPage,

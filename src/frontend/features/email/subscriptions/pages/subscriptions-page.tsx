@@ -1,11 +1,4 @@
 import { PageSpinner } from "@/components/page-spinner";
-import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +9,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import {
   MailboxPage,
   MailboxPageBody,
@@ -37,7 +38,9 @@ export default function SubscriptionsPage() {
   const unsubscribeMut = useUnsubscribe(mailboxId);
   const blockMut = useBlockSender(mailboxId);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [unsubscribeTarget, setUnsubscribeTarget] = useState<string | null>(null);
+  const [unsubscribeTarget, setUnsubscribeTarget] = useState<string | null>(
+    null,
+  );
   const [blockTarget, setBlockTarget] = useState<string | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
 
@@ -72,35 +75,37 @@ export default function SubscriptionsPage() {
     }
   }
 
-  const pendingAddr = (unsubscribeMut.isPending
-    ? unsubscribeMut.variables?.fromAddr
-    : blockMut.isPending
-      ? blockMut.variables?.fromAddr
-      : null
+  const pendingAddr = (
+    unsubscribeMut.isPending
+      ? unsubscribeMut.variables?.fromAddr
+      : blockMut.isPending
+        ? blockMut.variables?.fromAddr
+        : null
   )?.toLowerCase();
 
-  const headerActions = sorted.length > 0
-    ? [
-        someSelected && (
-          <span key="count" className="text-xs text-muted-foreground">
-            {selected.size} selected
-          </span>
-        ),
-        <Button key="toggle" size="sm" variant="outline" onClick={toggleAll}>
-          {allSelected ? "Deselect all" : "Select all"}
-        </Button>,
-        someSelected && (
-          <Button
-            key="bulk"
-            size="sm"
-            variant="outline"
-            onClick={() => setBulkOpen(true)}
-          >
-            Unsubscribe selected
-          </Button>
-        ),
-      ].filter(Boolean)
-    : undefined;
+  const headerActions =
+    sorted.length > 0
+      ? [
+          someSelected && (
+            <span key="count" className="text-xs text-muted-foreground">
+              {selected.size} selected
+            </span>
+          ),
+          <Button key="toggle" size="sm" variant="outline" onClick={toggleAll}>
+            {allSelected ? "Deselect all" : "Select all"}
+          </Button>,
+          someSelected && (
+            <Button
+              key="bulk"
+              size="sm"
+              variant="outline"
+              onClick={() => setBulkOpen(true)}
+            >
+              Unsubscribe selected
+            </Button>
+          ),
+        ].filter(Boolean)
+      : undefined;
 
   return (
     <MailboxPage className="max-w-none">
@@ -120,7 +125,7 @@ export default function SubscriptionsPage() {
               </EmptyHeader>
             </Empty>
           ) : (
-            <div className="divide-y divide-border/40">
+            <div className="divide-y divide-border/40 text-xs">
               {sorted.map((sender) => {
                 const addr = sender.fromAddr.toLowerCase();
                 const isSelected = selected.has(addr);
@@ -128,14 +133,13 @@ export default function SubscriptionsPage() {
 
                 return (
                   <div key={addr} className="flex items-center gap-3 py-2">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isSelected}
-                      onChange={() => toggleSender(addr)}
-                      className="size-3.5 shrink-0 accent-primary"
+                      onCheckedChange={() => toggleSender(addr)}
+                      className="size-3.5 shrink-0"
                     />
-                    <div className="min-w-0 flex-1 truncate text-sm">
-                      <span className="font-medium">
+                    <div className="min-w-0 flex-1 truncate">
+                      <span className="font-medium text-sm">
                         {sender.fromName ?? sender.fromAddr}
                       </span>
                       {sender.fromName && (

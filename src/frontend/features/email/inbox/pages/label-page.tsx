@@ -1,8 +1,9 @@
+import { useMailPanelSelection } from "@/features/email/inbox/hooks/use-mail-panel-selection";
+import { useThreadGroupSnooze } from "@/features/email/inbox/hooks/use-thread-group-snooze";
 import {
   MailListReaderPage,
   MailListPane,
   MailReaderPane,
-  useThreadGroupSnooze,
 } from "@/features/email/inbox/pages/mail-pane";
 import { isInternalLabelName } from "@/features/email/labels/internal-labels";
 import { fetchLabels } from "@/features/email/labels/queries";
@@ -37,24 +38,30 @@ export default function LabelPage() {
     mailboxId,
     presentation: isMobile ? "route" : "panel",
   });
-  const selectedEmailId = isMobile ? null : (search.emailId ?? null);
   const handleSnooze = useThreadGroupSnooze(mailboxId, snooze);
-
-  const clearSelectedEmail = () =>
-    navigate({
-      to: "/$mailboxId/inbox/labels/$label",
-      params: { mailboxId, label },
-      search: {},
-      replace: true,
-    });
-
-  const navigateSelectedEmail = (nextEmailId: string) =>
-    navigate({
-      to: "/$mailboxId/inbox/labels/$label",
-      params: { mailboxId, label },
-      search: { emailId: nextEmailId },
-      replace: true,
-    });
+  const {
+    selectedEmailId,
+    enableKeyboardNavigation,
+    clearSelectedEmail,
+    navigateSelectedEmail,
+  } = useMailPanelSelection({
+    isMobile,
+    emailId: search.emailId,
+    onClear: () =>
+      navigate({
+        to: "/$mailboxId/inbox/labels/$label",
+        params: { mailboxId, label },
+        search: {},
+        replace: true,
+      }),
+    onNavigate: (nextEmailId) =>
+      navigate({
+        to: "/$mailboxId/inbox/labels/$label",
+        params: { mailboxId, label },
+        search: { emailId: nextEmailId },
+        replace: true,
+      }),
+  });
 
   const listPane = (
     <MailListPane
@@ -66,7 +73,7 @@ export default function LabelPage() {
       onAction={executeEmailAction}
       onSnooze={handleSnooze}
       selectedEmailId={selectedEmailId}
-      enableKeyboardNavigation={!selectedEmailId}
+      enableKeyboardNavigation={enableKeyboardNavigation}
       compact={!isMobile}
     />
   );

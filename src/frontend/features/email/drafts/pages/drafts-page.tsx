@@ -79,11 +79,18 @@ export default function DraftsPage() {
           ) : (
             <div className="space-y-1 px-3 py-1.5 md:px-4">
               {drafts.map((draft) => (
-                <button
+                <div
                   key={draft.id}
-                  type="button"
-                  className="group flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
+                  role="button"
+                  tabIndex={0}
+                  className="group flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => openCompose(draftToComposeInitial(draft))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openCompose(draftToComposeInitial(draft));
+                    }
+                  }}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
@@ -114,7 +121,7 @@ export default function DraftsPage() {
                   >
                     <TrashIcon className="size-3.5" />
                   </Button>
-                </button>
+                </div>
               ))}
             </div>
           )}

@@ -52,10 +52,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { useMailActions } from "../hooks/use-mail-actions";
-import { useUndoAction } from "../hooks/use-undo-action";
-import { blockSender, patchEmail, patchThread } from "../mutations";
 import { invalidateInboxQueries } from "../data/invalidation";
+import type { useMailActions } from "../hooks/use-mail-actions";
+import { blockSender, patchEmail } from "../mutations";
 import type { ComposeInitial, EmailDetailItem } from "../types";
 import { buildForwardedEmailHtml } from "../utils/build-forwarded-html";
 import { formatQuotedDate } from "../utils/formatters";
@@ -67,14 +66,6 @@ type EmailActionsProps = {
   onForward?: (initial: ComposeInitial) => void;
   onReply?: () => void;
   onAction?: ReturnType<typeof useMailActions>["executeEmailAction"];
-};
-
-type EmailPatchPayload = Parameters<typeof patchEmail>[1];
-
-type EmailPatchOptions = {
-  successMessage?: string;
-  errorMessage?: string;
-  closeAfter?: boolean;
 };
 
 export function EmailActions({
@@ -135,48 +126,6 @@ export function EmailActions({
         labelIds: email.labelIds,
       }
     : null;
-  const patchThreadOrEmail = (payload: EmailPatchPayload) =>
-    threadIdentifier
-      ? patchThread(threadIdentifier, payload)
-      : patchEmail(emailIdentifier, payload);
-
-  const emailPatchMutation = useMutation({
-    mutationFn: (payload: EmailPatchPayload) =>
-      patchEmail(emailIdentifier, payload),
-  });
-  const threadPatchMutation = useMutation({
-    mutationFn: (payload: EmailPatchPayload) => patchThreadOrEmail(payload),
-  });
-
-  const runEmailPatch = (
-    payload: EmailPatchPayload,
-    opts: EmailPatchOptions = {},
-  ) => {
-    emailPatchMutation.mutate(payload, {
-      onSuccess: () => {
-        if (opts.successMessage) toast.success(opts.successMessage);
-        if (opts.closeAfter) onClose?.();
-      },
-      onError: () => {
-        toast.error(opts.errorMessage ?? "Failed to update");
-      },
-    });
-  };
-
-  const runThreadPatch = (
-    payload: EmailPatchPayload,
-    opts: EmailPatchOptions = {},
-  ) => {
-    threadPatchMutation.mutate(payload, {
-      onSuccess: () => {
-        if (opts.successMessage) toast.success(opts.successMessage);
-        if (opts.closeAfter) onClose?.();
-      },
-      onError: () => {
-        toast.error(opts.errorMessage ?? "Failed to update");
-      },
-    });
-  };
 
   const snoozeMutation = useMutation({
     mutationFn: (timestamp: number | null) =>
@@ -222,7 +171,6 @@ export function EmailActions({
     onError: (error) => toast.error(error.message),
   });
 
-  const undoAction = useUndoAction();
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
   const [unsubscribeConfirmOpen, setUnsubscribeConfirmOpen] = useState(false);
 
@@ -293,8 +241,6 @@ export function EmailActions({
   };
 
   const actionsPending =
-    emailPatchMutation.isPending ||
-    threadPatchMutation.isPending ||
     snoozeMutation.isPending ||
     unsubscribeMutation.isPending ||
     blockSenderMutation.isPending;
@@ -303,7 +249,7 @@ export function EmailActions({
     action: Parameters<NonNullable<typeof onAction>>[0],
     opts: { closeAfter?: boolean; thread?: boolean } = {},
   ) => {
-    if (!onAction) return false;
+    if (!onAction) return;
     void onAction(
       action,
       [email.id],
@@ -313,7 +259,6 @@ export function EmailActions({
         onVisible: opts.closeAfter ? () => onClose?.() : undefined,
       },
     );
-    return true;
   };
 
   const primaryAction = isInInbox
@@ -330,37 +275,20 @@ export function EmailActions({
 
   const handlePrimaryAction = () => {
     if (primaryAction === "not-spam") {
-      return (
-        runCentralAction("not-spam", {
-          closeAfter: true,
-          thread: true,
-        }) ||
-        runThreadPatch(
-          { spam: false },
-          { successMessage: "Moved to inbox", closeAfter: true },
-        )
-      );
-    }
-    return (
-      runCentralAction(primaryAction, {
+      runCentralAction("not-spam", {
         closeAfter: true,
         thread: true,
-      }) ||
-      undoAction({
-        action: () => patchThreadOrEmail({ archived: isInInbox }),
-        onAction: () => onClose?.(),
-        message: isInInbox ? "Marked as done" : "Moved to inbox",
-      })
-    );
+      });
+      return;
+    }
+    runCentralAction(primaryAction, {
+      closeAfter: true,
+      thread: true,
+    });
   };
 
   const handleTrash = () =>
-    runCentralAction("trash", { closeAfter: true, thread: true }) ||
-    undoAction({
-      action: () => patchThreadOrEmail({ trashed: true }),
-      onAction: () => onClose?.(),
-      message: "Moved to trash",
-    });
+    runCentralAction("trash", { closeAfter: true, thread: true });
 
   type MenuAction = {
     icon: Icon;
@@ -377,8 +305,7 @@ export function EmailActions({
       label: isStarred ? "Unstar" : "Star",
       shortcutId: "action:star",
       action: () =>
-        runCentralAction(isStarred ? "unstar" : "star") ||
-        runEmailPatch({ starred: !isStarred }),
+        runCentralAction(isStarred ? "unstar" : "star"),
     },
     {
       icon: email.isRead ? EnvelopeSimpleIcon : EnvelopeSimpleOpenIcon,
@@ -387,29 +314,17 @@ export function EmailActions({
       action: () =>
         runCentralAction(email.isRead ? "mark-unread" : "mark-read", {
           thread: true,
-        }) || runThreadPatch({ isRead: !email.isRead }),
+        }),
     },
     {
       icon: isSpam ? TrayIcon : WarningIcon,
       label: isSpam ? "Not spam" : "Move to spam",
       action: () => {
         if (isSpam) {
-          return (
-            runCentralAction("not-spam", { closeAfter: true, thread: true }) ||
-            runThreadPatch(
-              { spam: false },
-              { successMessage: "Moved to inbox", closeAfter: true },
-            )
-          );
+          runCentralAction("not-spam", { closeAfter: true, thread: true });
+          return;
         }
-        return (
-          runCentralAction("spam", { closeAfter: true, thread: true }) ||
-          undoAction({
-            action: () => patchThreadOrEmail({ spam: true }),
-            onAction: () => onClose?.(),
-            message: "Moved to spam",
-          })
-        );
+        runCentralAction("spam", { closeAfter: true, thread: true });
       },
     },
   ];

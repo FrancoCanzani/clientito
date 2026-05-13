@@ -46,6 +46,7 @@ export default function InboxSearchPage() {
 
   const [query, setSearchQuery] = useState(routeQuery);
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [loadMoreVisible, setLoadMoreVisible] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(() =>
     readRecentSearches(),
   );
@@ -128,6 +129,12 @@ export default function InboxSearchPage() {
     () => resultsQuery.data?.pages.flatMap((page) => page.emails) ?? [],
     [resultsQuery.data],
   );
+  const {
+    hasNextPage: hasMoreSearchResults,
+    isFetching: isFetchingSearchResults,
+    isFetchingNextPage: isFetchingNextSearchPage,
+    fetchNextPage: fetchNextSearchPage,
+  } = resultsQuery;
   const suggestionData = suggestionsQuery.data ?? {
     filters: [],
     contacts: [],
@@ -157,18 +164,23 @@ export default function InboxSearchPage() {
     rootMargin: "1200px 0px",
     threshold: 0.01,
     onChange: (isIntersecting) => {
-      if (
-        !isIntersecting ||
-        !resultsQuery.hasNextPage ||
-        resultsQuery.isFetchingNextPage ||
-        resultsQuery.isFetching
-      ) {
-        return;
-      }
-
-      resultsQuery.fetchNextPage();
+      setLoadMoreVisible(isIntersecting);
     },
   });
+
+  useEffect(() => {
+    if (!loadMoreVisible) return;
+    if (!hasMoreSearchResults) return;
+    if (isFetchingSearchResults || isFetchingNextSearchPage) return;
+
+    void fetchNextSearchPage();
+  }, [
+    fetchNextSearchPage,
+    hasMoreSearchResults,
+    isFetchingSearchResults,
+    isFetchingNextSearchPage,
+    loadMoreVisible,
+  ]);
 
   function handleQueryChange(nextQuery: string) {
     setSearchQuery(nextQuery);

@@ -1,4 +1,5 @@
 import { applyLabelPatch, STANDARD_LABELS } from "@/features/email/mail/utils/label-patch";
+import { deviceCapabilities } from "@/lib/device-capabilities";
 import { normalizeEmailAddress } from "@/lib/email";
 import { pendingSubset } from "./pending-lock";
 import type {
@@ -22,6 +23,7 @@ type LocalEmailPatch = {
   labelIds?: string[] | null;
   bodyText?: string | null;
   bodyHtml?: string | null;
+  preparedBodyHtml?: string | null;
 };
 
 type ViewFilter =
@@ -65,6 +67,7 @@ type EmailRowDb = {
   isGatekept: number;
   bodyText?: string | null;
   bodyHtml?: string | null;
+  preparedBodyHtml?: string | null;
   inlineAttachments?: string | null;
   attachments?: string | null;
 };
@@ -243,8 +246,6 @@ type EmailUpdateSet = {
   hasSpam?: boolean;
   hasStarred?: boolean;
   snoozedUntil?: number | null;
-  bodyText?: string | null;
-  bodyHtml?: string | null;
 };
 
 function applyEmailPatch(
@@ -254,20 +255,19 @@ function applyEmailPatch(
     snoozedUntil: number | null;
   },
   patch: LocalEmailPatch,
-): EmailUpdateSet {
+): { emailUpdate: EmailUpdateSet; bodyUpdate: boolean } {
   const currentLabelIds = parseLabelIds(current.labelIds);
   const updates: EmailUpdateSet = {};
 
   if (patch.snoozedUntil !== undefined)
     updates.snoozedUntil = patch.snoozedUntil;
-  if (patch.bodyText !== undefined) updates.bodyText = patch.bodyText;
-  if (patch.bodyHtml !== undefined) updates.bodyHtml = patch.bodyHtml;
+  const hasBodyUpdate = patch.bodyText !== undefined || patch.bodyHtml !== undefined;
 
   if (patch.labelIds !== undefined) {
     const resolved = patch.labelIds ?? [];
     updates.labelIds = JSON.stringify(resolved);
     Object.assign(updates, labelBooleans(resolved));
-    return updates;
+    return { emailUpdate: updates, bodyUpdate: hasBodyUpdate };
   }
 
   const result = applyLabelPatch(
@@ -288,7 +288,7 @@ function applyEmailPatch(
     Object.assign(updates, labelBooleans(result.labelIds));
   }
 
-  return updates;
+  return { emailUpdate: updates, bodyUpdate: hasBodyUpdate };
 }
 
 const EMAIL_COL_MAP: Record<keyof EmailUpdateSet, string> = {
@@ -300,8 +300,6 @@ const EMAIL_COL_MAP: Record<keyof EmailUpdateSet, string> = {
   hasSpam: "has_spam",
   hasStarred: "has_starred",
   snoozedUntil: "snoozed_until",
-  bodyText: "body_text",
-  bodyHtml: "body_html",
 };
 
 function buildEmailUpdate(updates: EmailUpdateSet): {
@@ -320,6 +318,41 @@ function buildEmailUpdate(updates: EmailUpdateSet): {
   }
   if (parts.length === 0) return null;
   return { setClause: parts.join(", "), params };
+}
+
+function buildBodyUpdateStepsFromPatch(
+  emailIds: number[],
+  patch: LocalEmailPatch,
+): Array<{ sql: string; params: BindParam[]; mode: "run" }> {
+  const bodyFields: string[] = [];
+  const bodyParams: BindParam[] = [];
+  if (patch.bodyText !== undefined) {
+    bodyFields.push("body_text = ?");
+    bodyParams.push(patch.bodyText ?? null);
+  }
+  if (patch.bodyHtml !== undefined) {
+    bodyFields.push("body_html = ?");
+    bodyParams.push(patch.bodyHtml ?? null);
+  }
+  if (patch.preparedBodyHtml !== undefined) {
+    bodyFields.push("prepared_body_html = ?");
+    bodyParams.push(patch.preparedBodyHtml ?? null);
+  }
+  if (bodyFields.length === 0 || emailIds.length === 0) return [];
+
+  const steps: Array<{ sql: string; params: BindParam[]; mode: "run" }> = [];
+  const placeholders = emailIds.map(() => "?").join(", ");
+  steps.push({
+    sql: `INSERT OR IGNORE INTO email_bodies (email_id) VALUES ${emailIds.map(() => "(?)").join(", ")}`,
+    params: [...emailIds],
+    mode: "run",
+  });
+  steps.push({
+    sql: `UPDATE email_bodies SET ${bodyFields.join(", ")} WHERE email_id IN (${placeholders})`,
+    params: [...bodyParams, ...emailIds],
+    mode: "run",
+  });
+  return steps;
 }
 
 type SqlFragment = { sql: string; params: BindParam[] };
@@ -711,14 +744,14 @@ async function updateEmailByIds(
   set: EmailUpdateSet,
 ): Promise<void> {
   const update = buildEmailUpdate(set);
-  if (!update) return;
-  if (emailIds.length === 0) return;
-  const placeholders = emailIds.map(() => "?").join(", ");
-  await dbClient.exec(
-    `UPDATE emails SET ${update.setClause} WHERE user_id = ? AND id IN (${placeholders})`,
-    [...update.params, userId, ...emailIds],
-    "run",
-  );
+  if (update && emailIds.length > 0) {
+    const placeholders = emailIds.map(() => "?").join(", ");
+    await dbClient.exec(
+      `UPDATE emails SET ${update.setClause} WHERE user_id = ? AND id IN (${placeholders})`,
+      [...update.params, userId, ...emailIds],
+      "run",
+    );
+  }
   if (set.labelIds !== undefined) {
     await replaceEmailLabelRowsByIds(userId, emailIds);
   }
@@ -747,12 +780,13 @@ async function replaceEmailLabelRowsByIds(
 
 async function replaceEmailLabelRowsByProviderIds(
   providerMessageIds: string[],
+  mailboxId: number,
 ): Promise<void> {
   if (providerMessageIds.length === 0) return;
   const placeholders = providerMessageIds.map(() => "?").join(", ");
   const res = await dbClient.exec(
-    `SELECT id, user_id, mailbox_id, label_ids, date FROM emails WHERE provider_message_id IN (${placeholders})`,
-    providerMessageIds,
+    `SELECT id, user_id, mailbox_id, label_ids, date FROM emails WHERE mailbox_id = ? AND provider_message_id IN (${placeholders})`,
+    [mailboxId, ...providerMessageIds],
     "rows",
   );
   const rows = rowsToObjects<{
@@ -1097,12 +1131,13 @@ export const localDb = {
  )`,
       [userId, mailboxId, "received", gatekeeperActivatedAt],
       "run",
+      
     );
   },
 
   async getEmailDetail(userId: string, emailId: number) {
     const res = await dbClient.exec(
-      `SELECT ${EMAIL_SUMMARY_SELECT}, body_text, body_html, inline_attachments, attachments FROM emails WHERE user_id = ? AND id = ? LIMIT 1`,
+      `SELECT ${EMAIL_SUMMARY_SELECT}, b.body_text, b.body_html, b.prepared_body_html, b.inline_attachments, b.attachments FROM emails LEFT JOIN email_bodies b ON b.email_id = emails.id WHERE emails.user_id = ? AND emails.id = ? LIMIT 1`,
       [userId, emailId],
       "get",
     );
@@ -1119,7 +1154,7 @@ export const localDb = {
       bodyText: row.bodyText ?? null,
       bodyHtml: row.bodyHtml ?? null,
       resolvedBodyText: row.bodyText ?? null,
-      resolvedBodyHtml: row.bodyHtml ?? null,
+      resolvedBodyHtml: row.preparedBodyHtml ?? row.bodyHtml ?? null,
       attachments,
       inlineAttachments,
     };
@@ -1131,12 +1166,12 @@ export const localDb = {
     limit: number,
   ): Promise<Array<{ threadId: string; mailboxId: number }>> {
     const res = await dbClient.exec(
-      `SELECT thread_id AS threadId, mailbox_id AS mailboxId, MAX(date) AS lastDate
- FROM emails
- WHERE user_id = ? AND mailbox_id = ?
- AND thread_id IS NOT NULL
- AND body_text IS NULL AND body_html IS NULL
- GROUP BY thread_id, mailbox_id
+      `SELECT emails.thread_id AS threadId, emails.mailbox_id AS mailboxId, MAX(emails.date) AS lastDate
+ FROM emails LEFT JOIN email_bodies b ON b.email_id = emails.id
+ WHERE emails.user_id = ? AND emails.mailbox_id = ?
+ AND emails.thread_id IS NOT NULL
+ AND b.email_id IS NULL
+ GROUP BY emails.thread_id, emails.mailbox_id
  ORDER BY lastDate DESC
  LIMIT ?`,
       [userId, mailboxId, limit],
@@ -1147,7 +1182,7 @@ export const localDb = {
 
   async getEmailThread(userId: string, threadId: string) {
     const res = await dbClient.exec(
-      `SELECT ${EMAIL_SUMMARY_SELECT}, body_text, body_html, inline_attachments, attachments FROM emails WHERE user_id = ? AND thread_id = ? ORDER BY date ASC`,
+      `SELECT ${EMAIL_SUMMARY_SELECT}, b.body_text, b.body_html, b.prepared_body_html, b.inline_attachments, b.attachments FROM emails LEFT JOIN email_bodies b ON b.email_id = emails.id WHERE emails.user_id = ? AND emails.thread_id = ? ORDER BY emails.date ASC`,
       [userId, threadId],
       "rows",
     );
@@ -1156,6 +1191,7 @@ export const localDb = {
       ...toEmailListItem(row),
       bodyText: row.bodyText ?? null,
       bodyHtml: row.bodyHtml ?? null,
+      resolvedBodyHtml: row.preparedBodyHtml ?? row.bodyHtml ?? null,
       inlineAttachments: parseInlineAttachments(row.inlineAttachments),
       attachments: toEmailAttachments(
         row.attachments,
@@ -1163,6 +1199,47 @@ export const localDb = {
         row.mailboxId ?? null,
       ),
     }));
+  },
+
+  async getEmailThreadMeta(userId: string, threadId: string) {
+    const res = await dbClient.exec(
+      `SELECT ${EMAIL_SUMMARY_SELECT} FROM emails WHERE user_id = ? AND thread_id = ? ORDER BY date ASC`,
+      [userId, threadId],
+      "rows",
+    );
+    return rowsToObjects<EmailRowDb>(res).map(toEmailListItem);
+  },
+
+  async getEmailThreadBodies(userId: string, threadId: string) {
+    const res = await dbClient.exec(
+      `SELECT emails.id, emails.provider_message_id, emails.mailbox_id, b.body_text, b.body_html, b.prepared_body_html, b.inline_attachments, b.attachments FROM emails LEFT JOIN email_bodies b ON b.email_id = emails.id WHERE emails.user_id = ? AND emails.thread_id = ? ORDER BY emails.date ASC`,
+      [userId, threadId],
+      "rows",
+    );
+    const rows = rowsToObjects<{
+      id: number;
+      providerMessageId: string;
+      mailboxId: number | null;
+      bodyText: string | null;
+      bodyHtml: string | null;
+      preparedBodyHtml: string | null;
+      inlineAttachments: string | null;
+      attachments: string | null;
+    }>(res);
+    return new Map(
+      rows.map((row) => [
+        String(row.id),
+        {
+          id: String(row.id),
+          providerMessageId: row.providerMessageId,
+          bodyText: row.bodyText ?? null,
+          bodyHtml: row.bodyHtml ?? null,
+          preparedBodyHtml: row.preparedBodyHtml ?? row.bodyHtml ?? null,
+          inlineAttachments: parseInlineAttachments(row.inlineAttachments),
+          attachments: toEmailAttachments(row.attachments, row.providerMessageId, row.mailboxId ?? null),
+        },
+      ]),
+    );
   },
 
   async getDrafts(userId: string, mailboxId?: number) {
@@ -1278,7 +1355,7 @@ export const localDb = {
       snoozedUntil: number | null;
     }>(res);
     if (!row) return;
-    const updates = applyEmailPatch(
+    const { emailUpdate, bodyUpdate } = applyEmailPatch(
       {
         isRead: toBool(row.isRead),
         labelIds: row.labelIds,
@@ -1286,7 +1363,11 @@ export const localDb = {
       },
       patch,
     );
-    await updateEmailByIds(userId, [emailId], updates);
+    await updateEmailByIds(userId, [emailId], emailUpdate);
+    if (bodyUpdate) {
+      const bodySteps = buildBodyUpdateStepsFromPatch([emailId], patch);
+      if (bodySteps.length > 0) await dbClient.batch(bodySteps);
+    }
   },
 
   async updateEmails(
@@ -1310,7 +1391,7 @@ export const localDb = {
     if (rows.length === 0) return;
 
     for (const current of rows) {
-      const updates = applyEmailPatch(
+      const { emailUpdate, bodyUpdate } = applyEmailPatch(
         {
           isRead: toBool(current.isRead),
           labelIds: current.labelIds,
@@ -1318,7 +1399,11 @@ export const localDb = {
         },
         patch,
       );
-      await updateEmailByIds(userId, [current.id], updates);
+      await updateEmailByIds(userId, [current.id], emailUpdate);
+      if (bodyUpdate) {
+        const bodySteps = buildBodyUpdateStepsFromPatch([current.id], patch);
+        if (bodySteps.length > 0) await dbClient.batch(bodySteps);
+      }
     }
   },
 
@@ -1341,7 +1426,7 @@ export const localDb = {
     if (rows.length === 0) return;
 
     for (const current of rows) {
-      const updates = applyEmailPatch(
+      const { emailUpdate, bodyUpdate } = applyEmailPatch(
         {
           isRead: toBool(current.isRead),
           labelIds: current.labelIds,
@@ -1349,22 +1434,28 @@ export const localDb = {
         },
         patch,
       );
-      await updateEmailByIds(userId, [current.id], updates);
+      await updateEmailByIds(userId, [current.id], emailUpdate);
+      if (bodyUpdate) {
+        const bodySteps = buildBodyUpdateStepsFromPatch([current.id], patch);
+        if (bodySteps.length > 0) await dbClient.batch(bodySteps);
+      }
     }
   },
 
-  async insertEmails(rows: EmailInsert[]): Promise<void> {
+  async insertEmails(
+    rows: EmailInsert[],
+    options?: { meta?: Record<string, string> },
+  ): Promise<void> {
     if (!rows.length) return;
-    const CHUNK = 50;
-    const INSERT_COLUMNS = `
+    const CHUNK = deviceCapabilities.insertChunkSize;
+    const EMAIL_COLUMNS = `
  id, user_id, mailbox_id, provider_message_id, thread_id, from_addr, from_name,
- to_addr, cc_addr, subject, snippet, body_text, body_html, date, direction,
+ to_addr, cc_addr, subject, snippet, date, direction,
  is_read, label_ids, has_inbox, has_sent, has_trash, has_spam, has_starred,
- unsubscribe_url, unsubscribe_email, snoozed_until, inline_attachments, attachments, has_calendar, is_gatekept, created_at`;
-    const TUPLE =
-      "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+ unsubscribe_url, unsubscribe_email, snoozed_until, has_calendar, is_gatekept, created_at`;
+    const EMAIL_TUPLE =
+      "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-    // Fields that ARE safe to overwrite (immutable from the user's point of view).
     const CONFLICT_SAFE = `
  from_addr = excluded.from_addr,
  from_name = excluded.from_name,
@@ -1372,13 +1463,8 @@ export const localDb = {
  cc_addr = excluded.cc_addr,
  subject = excluded.subject,
  snippet = excluded.snippet,
- body_text = COALESCE(excluded.body_text, emails.body_text),
- body_html = COALESCE(excluded.body_html, emails.body_html),
- inline_attachments = excluded.inline_attachments,
- attachments = excluded.attachments,
  has_calendar = excluded.has_calendar,
  is_gatekept = excluded.is_gatekept`;
-    // Fields we overwrite only when the row has no pending local mutation.
     const CONFLICT_MUTABLE = `
  is_read = excluded.is_read,
  label_ids = excluded.label_ids,
@@ -1389,10 +1475,8 @@ export const localDb = {
  has_starred = excluded.has_starred,
  snoozed_until = excluded.snoozed_until`;
 
-    function rowParams(row: EmailInsert): BindParam[] {
-      const ids = normalizeLabelIds(
-        row.labelIds as unknown as string | string[] | null,
-      );
+    function emailParams(row: EmailInsert): BindParam[] {
+      const ids = normalizeLabelIds(row.labelIds);
       const bools = labelBooleans(ids);
       return [
         row.id ?? null,
@@ -1406,8 +1490,6 @@ export const localDb = {
         row.ccAddr ?? null,
         row.subject ?? null,
         row.snippet ?? null,
-        row.bodyText ?? null,
-        row.bodyHtml ?? null,
         row.date,
         row.direction ?? null,
         boolParam(row.isRead ?? false),
@@ -1420,54 +1502,164 @@ export const localDb = {
         row.unsubscribeUrl ?? null,
         row.unsubscribeEmail ?? null,
         row.snoozedUntil ?? null,
-        row.inlineAttachments ?? null,
-        row.attachments ?? null,
         boolParam(row.hasCalendar ?? false),
         boolParam(row.isGatekept ?? false),
         row.createdAt,
       ];
     }
 
-    async function insertBatch(batch: EmailInsert[], includeMutable: boolean) {
-      if (batch.length === 0) return;
+    function emailInsertStep(
+      batch: EmailInsert[],
+      includeMutable: boolean,
+    ): { sql: string; params: BindParam[]; mode: "run" } | null {
+      if (batch.length === 0) return null;
       const values: string[] = [];
       const params: BindParam[] = [];
       for (const row of batch) {
-        values.push(TUPLE);
-        params.push(...rowParams(row));
+        values.push(EMAIL_TUPLE);
+        params.push(...emailParams(row));
       }
       const setClause = includeMutable
         ? `${CONFLICT_SAFE},\n${CONFLICT_MUTABLE}`
         : CONFLICT_SAFE;
-      await dbClient.exec(
-        `INSERT INTO emails (${INSERT_COLUMNS}) VALUES ${values.join(", ")}
- ON CONFLICT (provider_message_id) DO UPDATE SET ${setClause}`,
+      return {
+        sql: `INSERT INTO emails (${EMAIL_COLUMNS}) VALUES ${values.join(", ")}
+ ON CONFLICT (user_id, mailbox_id, provider_message_id) DO UPDATE SET ${setClause}`,
         params,
-        "run",
-      );
+        mode: "run",
+      };
     }
 
+    function bodyStepsFor(
+      batch: EmailInsert[],
+    ): Array<{ sql: string; params: BindParam[]; mode: "run" }> {
+      const out: Array<{ sql: string; params: BindParam[]; mode: "run" }> = [];
+      for (const row of batch) {
+        if (row.bodyText == null && row.bodyHtml == null) continue;
+        const preparedHtml = row.preparedBodyHtml ?? row.bodyHtml ?? null;
+        if (row.id != null) {
+          out.push({
+            sql: "INSERT OR REPLACE INTO email_bodies (email_id, body_text, body_html, prepared_body_html, inline_attachments, attachments) VALUES (?, ?, ?, ?, ?, ?)",
+            params: [
+              row.id,
+              row.bodyText ?? null,
+              row.bodyHtml ?? null,
+              preparedHtml,
+              row.inlineAttachments ?? null,
+              row.attachments ?? null,
+            ],
+            mode: "run",
+          });
+        } else {
+          out.push({
+            sql: "INSERT OR REPLACE INTO email_bodies (email_id, body_text, body_html, prepared_body_html, inline_attachments, attachments) SELECT id, ?, ?, ?, ?, ? FROM emails WHERE user_id = ? AND mailbox_id = ? AND provider_message_id = ?",
+            params: [
+              row.bodyText ?? null,
+              row.bodyHtml ?? null,
+              preparedHtml,
+              row.inlineAttachments ?? null,
+              row.attachments ?? null,
+              row.userId,
+              row.mailboxId ?? null,
+              row.providerMessageId,
+            ],
+            mode: "run",
+          });
+        }
+      }
+      return out;
+    }
+
+    const metaEntries = Object.entries(options?.meta ?? {});
+    const META_SQL =
+      "INSERT INTO _meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = ?";
+
+    // Two transactional batches per chunk: (1) emails + bodies upsert, then
+    // (2) label DELETE + INSERTs against the now-known row ids. Meta updates
+    // (when provided) ride along on the last chunk's label batch so they
+    // commit atomically with the data and do not pay a separate queue wait.
     for (let i = 0; i < rows.length; i += CHUNK) {
+      const isLastChunk = i + CHUNK >= rows.length;
       const chunk = rows.slice(i, i + CHUNK);
       const locked = pendingSubset(chunk.map((r) => r.providerMessageId));
-
-      if (locked.size === 0) {
-        await insertBatch(chunk, true);
-        continue;
-      }
-
       const free: EmailInsert[] = [];
       const pending: EmailInsert[] = [];
       for (const row of chunk) {
         if (locked.has(row.providerMessageId)) pending.push(row);
         else free.push(row);
       }
-      await insertBatch(free, true);
-      await insertBatch(pending, false);
+
+      const upsertSteps: Array<{
+        sql: string;
+        params: BindParam[];
+        mode: "run";
+      }> = [];
+      const freeStep = emailInsertStep(free, true);
+      if (freeStep) upsertSteps.push(freeStep);
+      upsertSteps.push(...bodyStepsFor(free));
+      const pendingStep = emailInsertStep(pending, false);
+      if (pendingStep) upsertSteps.push(pendingStep);
+      upsertSteps.push(...bodyStepsFor(pending));
+      if (upsertSteps.length > 0) {
+        await dbClient.batch(upsertSteps, { transact: true });
+      }
+
+      // Locked rows kept their existing label_ids (excluded from CONFLICT_SAFE),
+      // so this SELECT carries the right source of truth for both partitions.
+      const providerIds = chunk.map((r) => r.providerMessageId);
+      const placeholders = providerIds.map(() => "?").join(", ");
+      const chunkUserId = chunk[0]!.userId;
+      const chunkMailboxId = chunk[0]!.mailboxId ?? null;
+      const labelRowsRes = await dbClient.exec(
+        `SELECT id, user_id, mailbox_id, label_ids, date FROM emails WHERE user_id = ? AND mailbox_id IS ? AND provider_message_id IN (${placeholders})`,
+        [chunkUserId, chunkMailboxId, ...providerIds],
+        "rows",
+      );
+      const labelRows = rowsToObjects<{
+        id: number;
+        userId: string;
+        mailboxId: number | null;
+        labelIds: string | null;
+        date: number;
+      }>(labelRowsRes);
+
+      const labelSteps: Array<{
+        sql: string;
+        params: BindParam[];
+        mode: "run";
+      }> = [];
+      if (labelRows.length > 0) {
+        const idPlaceholders = labelRows.map(() => "?").join(", ");
+        labelSteps.push({
+          sql: `DELETE FROM email_labels WHERE email_id IN (${idPlaceholders})`,
+          params: labelRows.map((r) => r.id),
+          mode: "run",
+        });
+        for (const row of labelRows) {
+          for (const labelId of parseLabelIds(row.labelIds)) {
+            labelSteps.push({
+              sql: "INSERT OR IGNORE INTO email_labels (email_id, user_id, mailbox_id, label_id, date) VALUES (?, ?, ?, ?, ?)",
+              params: [
+                row.id,
+                row.userId,
+                row.mailboxId ?? null,
+                labelId,
+                row.date,
+              ],
+              mode: "run",
+            });
+          }
+        }
+      }
+      if (isLastChunk && metaEntries.length > 0) {
+        for (const [key, value] of metaEntries) {
+          labelSteps.push({ sql: META_SQL, params: [key, value, value], mode: "run" });
+        }
+      }
+      if (labelSteps.length > 0) {
+        await dbClient.batch(labelSteps, { transact: true });
+      }
     }
-    await replaceEmailLabelRowsByProviderIds(
-      rows.map((row) => row.providerMessageId),
-    );
   },
 
   async searchEmails(params: {
@@ -1827,9 +2019,9 @@ export const localDb = {
 
       await dbClient.exec(
         `INSERT INTO labels (gmail_id, user_id, mailbox_id, name, type, text_color, background_color, messages_total, messages_unread, synced_at)
- VALUES ${values.join(", ")}
- ON CONFLICT (gmail_id) DO UPDATE SET
- name = excluded.name,
+	 VALUES ${values.join(", ")}
+	 ON CONFLICT (user_id, mailbox_id, gmail_id) DO UPDATE SET
+	 name = excluded.name,
  type = excluded.type,
  text_color = excluded.text_color,
  background_color = excluded.background_color,
@@ -1838,15 +2030,21 @@ export const localDb = {
  synced_at = excluded.synced_at`,
         params,
         "run",
+        
       );
     }
   },
 
-  async deleteLabel(gmailId: string): Promise<void> {
+  async deleteLabel(
+    userId: string,
+    mailboxId: number,
+    gmailId: string,
+  ): Promise<void> {
     await dbClient.exec(
-      `DELETE FROM labels WHERE gmail_id = ?`,
-      [gmailId],
+      `DELETE FROM labels WHERE user_id = ? AND mailbox_id = ? AND gmail_id = ?`,
+      [userId, mailboxId, gmailId],
       "run",
+      
     );
   },
 
@@ -1869,16 +2067,44 @@ export const localDb = {
   },
 
   async clear(): Promise<void> {
-    await dbClient.batch([
-      { sql: "DELETE FROM labels" },
-      { sql: "DELETE FROM drafts" },
-      { sql: "DELETE FROM emails" },
-      { sql: "DELETE FROM _meta" },
-    ]);
+    await dbClient.batch(
+      [
+        { sql: "DELETE FROM email_labels" },
+        { sql: "DELETE FROM labels" },
+        { sql: "DELETE FROM drafts" },
+        { sql: "DELETE FROM emails" },
+        { sql: "DELETE FROM _meta" },
+      ],
+    );
+  },
+
+  async clearMailboxCache(userId: string, mailboxId: number): Promise<void> {
+    await dbClient.batch(
+      [
+        {
+          sql: "DELETE FROM email_labels WHERE email_id IN (SELECT id FROM emails WHERE user_id = ? AND mailbox_id = ?)",
+          params: [userId, mailboxId],
+        },
+        {
+          sql: "DELETE FROM emails WHERE user_id = ? AND mailbox_id = ?",
+          params: [userId, mailboxId],
+        },
+        {
+          sql: "DELETE FROM labels WHERE user_id = ? AND mailbox_id = ?",
+          params: [userId, mailboxId],
+        },
+        {
+          sql: "DELETE FROM _meta WHERE key = ? OR key LIKE ?",
+          params: [`gmailDeltaHistory:${mailboxId}`, `viewSyncMeta:${mailboxId}:%`],
+        },
+      ],
+      { transact: true },
+    );
   },
 
   async getEmailsByProviderMessageIds(
     userId: string,
+    mailboxId: number,
     providerMessageIds: string[],
   ) {
     if (providerMessageIds.length === 0) return [];
@@ -1888,13 +2114,37 @@ export const localDb = {
       const chunk = providerMessageIds.slice(i, i + CHUNK);
       const placeholders = chunk.map(() => "?").join(", ");
       const res = await dbClient.exec(
-        `SELECT ${EMAIL_SUMMARY_SELECT} FROM emails WHERE user_id = ? AND provider_message_id IN (${placeholders})`,
-        [userId, ...chunk],
+        `SELECT ${EMAIL_SUMMARY_SELECT} FROM emails WHERE user_id = ? AND mailbox_id = ? AND provider_message_id IN (${placeholders})`,
+        [userId, mailboxId, ...chunk],
         "rows",
       );
       all.push(...rowsToObjects<EmailRowDb>(res));
     }
     return all.map(toEmailListItem);
+  },
+
+  async getEmailIdsByProviderMessageIds(
+    userId: string,
+    mailboxId: number,
+    providerMessageIds: string[],
+  ): Promise<Map<string, { id: number; threadId: string | null }>> {
+    if (providerMessageIds.length === 0) return new Map();
+    const CHUNK = 100;
+    const result = new Map<string, { id: number; threadId: string | null }>();
+    for (let i = 0; i < providerMessageIds.length; i += CHUNK) {
+      const chunk = providerMessageIds.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => "?").join(", ");
+      const res = await dbClient.exec(
+        `SELECT id, provider_message_id, thread_id FROM emails WHERE user_id = ? AND mailbox_id = ? AND provider_message_id IN (${placeholders})`,
+        [userId, mailboxId, ...chunk],
+        "rows",
+      );
+      for (const row of res.rows) {
+        const pmId = row[1] as string;
+        result.set(pmId, { id: row[0] as number, threadId: row[2] as string | null });
+      }
+    }
+    return result;
   },
 
   async getKnownSenders(params: {
@@ -1961,21 +2211,33 @@ export const localDb = {
 
   async deleteEmailsByProviderMessageId(
     providerMessageIds: string[],
+    scope?: { userId?: string; mailboxId?: number },
   ): Promise<void> {
     if (!providerMessageIds.length) return;
     const CHUNK = 50;
     const steps: Array<{ sql: string; params: BindParam[]; mode: "run" }> = [];
+    const scopeSql = [
+      scope?.userId ? "user_id = ?" : null,
+      scope?.mailboxId != null ? "mailbox_id = ?" : null,
+    ]
+      .filter(Boolean)
+      .join(" AND ");
+    const scopedWherePrefix = scopeSql ? `${scopeSql} AND ` : "";
+    const scopeParams: BindParam[] = [
+      ...(scope?.userId ? [scope.userId] : []),
+      ...(scope?.mailboxId != null ? [scope.mailboxId] : []),
+    ];
     for (let i = 0; i < providerMessageIds.length; i += CHUNK) {
       const chunk = providerMessageIds.slice(i, i + CHUNK);
       const placeholders = chunk.map(() => "?").join(", ");
       steps.push({
-        sql: `DELETE FROM email_labels WHERE email_id IN (SELECT id FROM emails WHERE provider_message_id IN (${placeholders}))`,
-        params: chunk,
+        sql: `DELETE FROM email_labels WHERE email_id IN (SELECT id FROM emails WHERE ${scopedWherePrefix}provider_message_id IN (${placeholders}))`,
+        params: [...scopeParams, ...chunk],
         mode: "run",
       });
       steps.push({
-        sql: `DELETE FROM emails WHERE provider_message_id IN (${placeholders})`,
-        params: chunk,
+        sql: `DELETE FROM emails WHERE ${scopedWherePrefix}provider_message_id IN (${placeholders})`,
+        params: [...scopeParams, ...chunk],
         mode: "run",
       });
     }
@@ -1985,12 +2247,13 @@ export const localDb = {
   async addLabelToEmails(
     providerMessageIds: string[],
     labelId: string,
+    mailboxId: number,
   ): Promise<void> {
     if (!providerMessageIds.length) return;
     const placeholders = providerMessageIds.map(() => "?").join(", ");
     const res = await dbClient.exec(
-      `SELECT id, label_ids FROM emails WHERE provider_message_id IN (${placeholders})`,
-      providerMessageIds,
+      `SELECT id, label_ids FROM emails WHERE mailbox_id = ? AND provider_message_id IN (${placeholders})`,
+      [mailboxId, ...providerMessageIds],
       "rows",
     );
     const rows = rowsToObjects<{ id: number; labelIds: string | null }>(res);
@@ -2013,18 +2276,19 @@ export const localDb = {
         "run",
       );
     }
-    await replaceEmailLabelRowsByProviderIds(providerMessageIds);
+    await replaceEmailLabelRowsByProviderIds(providerMessageIds, mailboxId);
   },
 
   async removeLabelFromEmails(
     providerMessageIds: string[],
     labelId: string,
+    mailboxId: number,
   ): Promise<void> {
     if (!providerMessageIds.length) return;
     const placeholders = providerMessageIds.map(() => "?").join(", ");
     const res = await dbClient.exec(
-      `SELECT id, label_ids FROM emails WHERE provider_message_id IN (${placeholders})`,
-      providerMessageIds,
+      `SELECT id, label_ids FROM emails WHERE mailbox_id = ? AND provider_message_id IN (${placeholders})`,
+      [mailboxId, ...providerMessageIds],
       "rows",
     );
     const rows = rowsToObjects<{ id: number; labelIds: string | null }>(res);
@@ -2047,7 +2311,7 @@ export const localDb = {
         "run",
       );
     }
-    await replaceEmailLabelRowsByProviderIds(providerMessageIds);
+    await replaceEmailLabelRowsByProviderIds(providerMessageIds, mailboxId);
   },
 
   async listSplitViews(userId: string): Promise<SplitViewRow[]> {
@@ -2135,6 +2399,7 @@ export const localDb = {
       `DELETE FROM split_views WHERE user_id = ?`,
       [userId],
       "run",
+      
     );
     for (const view of views) {
       await this.upsertSplitView(view);

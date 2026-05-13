@@ -3,6 +3,7 @@ import { localDb } from "@/db/client";
 import { clearPending, markPending } from "@/db/pending-lock";
 import { getCurrentUserId } from "@/db/user";
 import { queryClient } from "@/lib/query-client";
+import { invalidateInboxQueries, invalidateEmailDetail, invalidateEmailThread } from "./data/invalidation";
 import {
   applyMailPatchToCaches,
   applyPatchToLabelIds,
@@ -289,6 +290,7 @@ async function patchEmails(
   try {
     beforeLocal = await localDb.getEmailsByProviderMessageIds(
       userId,
+      mailboxId,
       providerIds,
     );
     localPatchTask = applyLocalPatch(userId, toNumericIds(emailIds), data);
@@ -344,11 +346,9 @@ async function patchEmails(
     if (!requestSucceeded) {
       await rollbackLocalPatch(userId, beforeLocal);
       restoreInboxUnreadCount(mailboxId, unreadCountSnapshot);
-      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      invalidateInboxQueries();
       for (const id of emailIds) {
-        void queryClient.invalidateQueries({
-          queryKey: emailQueryKeys.detail(id),
-        });
+        invalidateEmailDetail(id);
       }
     } else {
       invalidateInboxUnreadCount(mailboxId);
@@ -422,10 +422,8 @@ export async function patchThread(
     if (!requestSucceeded) {
       await rollbackLocalPatch(userId, beforeLocal);
       restoreInboxUnreadCount(thread.mailboxId, unreadCountSnapshot);
-      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
-      void queryClient.invalidateQueries({
-        queryKey: emailQueryKeys.thread(thread.threadId),
-      });
+      invalidateInboxQueries();
+      invalidateEmailThread(thread.threadId);
     } else {
       invalidateInboxUnreadCount(thread.mailboxId);
       if (data.snoozedUntil !== undefined) {
@@ -465,7 +463,10 @@ export async function deleteEmailForever(
 
   let requestSucceeded = false;
   try {
-    await localDb.deleteEmailsByProviderMessageId([email.providerMessageId]);
+    await localDb.deleteEmailsByProviderMessageId([email.providerMessageId], {
+      userId,
+      mailboxId: email.mailboxId,
+    });
   } catch (error) {
     console.warn("Failed to remove email locally", error);
   }

@@ -33,7 +33,7 @@ export function DeleteAllButton({
       const ids = all.emails.map((e) => e.providerMessageId);
       if (!ids.length) return;
       await deleteAllForever({ mailboxId, providerMessageIds: ids });
-      await localDb.deleteEmailsByProviderMessageId(ids);
+      await localDb.deleteEmailsByProviderMessageId(ids, { mailboxId });
     },
     onSuccess: () => {
       toast.success(

@@ -16,13 +16,19 @@ import type { AppRouteEnv } from "../types";
 
 const deltaSyncSchema = z.object({
   mailboxId: z.number().int().positive(),
+  historyId: z.string().min(1).optional(),
+});
+
+const deltaAckSchema = z.object({
+  mailboxId: z.number().int().positive(),
+  historyId: z.string().min(1),
 });
 
 export function registerInboxSyncDelta(api: Hono<AppRouteEnv>) {
   api.post("/sync/delta", zValidator("json", deltaSyncSchema), async (c) => {
     const db = c.get("db");
     const user = getUser(c);
-    const { mailboxId } = c.req.valid("json");
+    const { mailboxId, historyId: clientHistoryId } = c.req.valid("json");
 
     const mailbox = await resolveMailbox(db, user.id, mailboxId);
     if (!mailbox) return c.json({ error: "No mailbox found" }, 400);
@@ -33,24 +39,24 @@ export function registerInboxSyncDelta(api: Hono<AppRouteEnv>) {
         GOOGLE_CLIENT_SECRET: c.env.GOOGLE_CLIENT_SECRET,
       });
 
-      const advanceCursor = async (
-        historyId: string,
-        touchSyncedAt: boolean,
-      ) => {
+      const markMailboxHealthy = async () => {
         await db
           .update(mailboxes)
           .set({
-            historyId,
-            ...(touchSyncedAt ? { lastSuccessfulSyncAt: Date.now() } : {}),
+            authState: "ok",
+            lastErrorAt: null,
+            lastErrorMessage: null,
             updatedAt: Date.now(),
           })
           .where(eq(mailboxes.id, mailbox.id));
       };
 
-      if (!mailbox.historyId) {
+      const startHistoryId = clientHistoryId ?? null;
+
+      if (!startHistoryId) {
         const profile = await getGmailProfile(accessToken);
         const newHistoryId = profile.historyId ?? null;
-        if (newHistoryId) await advanceCursor(newHistoryId, false);
+        await markMailboxHealthy();
         return c.json({
           status: "noop" as const,
           added: [],
@@ -60,12 +66,12 @@ export function registerInboxSyncDelta(api: Hono<AppRouteEnv>) {
         });
       }
 
-      const result = await pullDeltaSync(accessToken, mailbox.historyId);
+      const result = await pullDeltaSync(accessToken, startHistoryId);
 
       if (result.status === "stale") {
         const profile = await getGmailProfile(accessToken);
         const newHistoryId = profile.historyId ?? result.newHistoryId ?? null;
-        if (newHistoryId) await advanceCursor(newHistoryId, false);
+        await markMailboxHealthy();
         return c.json({
           status: "stale" as const,
           added: [],
@@ -76,7 +82,7 @@ export function registerInboxSyncDelta(api: Hono<AppRouteEnv>) {
       }
 
       if (result.status === "noop") {
-        await advanceCursor(result.newHistoryId, true);
+        await markMailboxHealthy();
         return c.json({
           status: "noop" as const,
           added: [],
@@ -86,7 +92,7 @@ export function registerInboxSyncDelta(api: Hono<AppRouteEnv>) {
         });
       }
 
-      await advanceCursor(result.newHistoryId, true);
+      await markMailboxHealthy();
 
       if (result.added.length > 0) {
         await markRepliedReminders(
@@ -118,5 +124,28 @@ export function registerInboxSyncDelta(api: Hono<AppRouteEnv>) {
       if (handled) return handled;
       throw error;
     }
+  });
+
+  api.post("/sync/delta/ack", zValidator("json", deltaAckSchema), async (c) => {
+    const db = c.get("db");
+    const user = getUser(c);
+    const { mailboxId, historyId } = c.req.valid("json");
+
+    const mailbox = await resolveMailbox(db, user.id, mailboxId);
+    if (!mailbox) return c.json({ error: "No mailbox found" }, 400);
+
+    await db
+      .update(mailboxes)
+      .set({
+        historyId,
+        lastSuccessfulSyncAt: Date.now(),
+        lastErrorAt: null,
+        lastErrorMessage: null,
+        authState: "ok",
+        updatedAt: Date.now(),
+      })
+      .where(eq(mailboxes.id, mailbox.id));
+
+    return c.json({ ok: true });
   });
 }

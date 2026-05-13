@@ -78,5 +78,43 @@ export async function fetchEmailThread(
 ): Promise<EmailThreadItem[]> {
   const userId = await getCurrentUserId();
   if (!userId) return [];
-  return localDb.getEmailThread(userId, threadId);
+  const meta = await localDb.getEmailThreadMeta(userId, threadId);
+  if (meta.length === 0) return [];
+
+  const withBodies = meta.map((item): EmailThreadItem => ({
+    ...item,
+    bodyText: null,
+    bodyHtml: null,
+    resolvedBodyText: null,
+    resolvedBodyHtml: null,
+    inlineAttachments: [],
+    attachments: [],
+  }));
+
+  localDb.getEmailThreadBodies(userId, threadId).then((bodies) => {
+    const cached = queryClient.getQueryData<EmailThreadItem[]>(
+      emailQueryKeys.thread(threadId),
+    );
+    if (!cached || cached.length === 0) return;
+    let changed = false;
+    const updated = cached.map((email) => {
+      const body = bodies.get(email.id);
+      if (!body || email.bodyHtml) return email;
+      changed = true;
+      return {
+        ...email,
+        bodyText: body.bodyText,
+        bodyHtml: body.bodyHtml,
+        resolvedBodyText: body.bodyText,
+        resolvedBodyHtml: body.bodyHtml,
+        inlineAttachments: body.inlineAttachments,
+        attachments: body.attachments,
+      } as EmailThreadItem;
+    });
+    if (changed) {
+      queryClient.setQueryData(emailQueryKeys.thread(threadId), updated);
+    }
+  });
+
+  return withBodies;
 }

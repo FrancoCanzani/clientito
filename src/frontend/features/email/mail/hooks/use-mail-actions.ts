@@ -7,6 +7,7 @@ import {
   type ThreadIdentifier,
 } from "@/features/email/mail/mutations";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { invalidateInboxQueries, invalidateEmailDetail } from "@/features/email/mail/data/invalidation";
 import type {
   EmailDetailItem,
   EmailListItem,
@@ -105,6 +106,10 @@ type InboxMutationVars = {
   thread?: ThreadIdentifier;
 };
 
+export type MailSnoozeTarget =
+  | { kind: "email"; identifier: EmailIdentifier }
+  | { kind: "thread"; thread: ThreadIdentifier };
+
 export type ExecuteMailActionOptions = {
   identifiers?: EmailIdentifier[];
   onVisible?: () => void;
@@ -163,12 +168,9 @@ export function useMailActions({
     },
     onError: (error, { ids }) => {
       toast.error(error instanceof Error ? error.message : "Action failed");
-      // Re-sync to roll back optimistic cache and local DB state.
-      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      invalidateInboxQueries();
       for (const id of ids) {
-        void queryClient.invalidateQueries({
-          queryKey: emailQueryKeys.detail(id),
-        });
+        invalidateEmailDetail(id);
       }
     },
   });
@@ -290,12 +292,7 @@ export function useMailActions({
   const todo = useTodoLabel(mailboxId);
 
   const snooze = useCallback(
-    async (
-      target:
-        | { kind: "email"; identifier: EmailIdentifier }
-        | { kind: "thread"; thread: ThreadIdentifier },
-      timestamp: number | null,
-    ) => {
+    async (target: MailSnoozeTarget, timestamp: number | null) => {
       try {
         if (target.kind === "thread") {
           await patchThread(target.thread, { snoozedUntil: timestamp });
@@ -330,7 +327,7 @@ export function useMailActions({
           ? `Unsubscribed — ${archived} ${archived === 1 ? "email" : "emails"} archived`
           : "Unsubscribed",
       );
-      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      invalidateInboxQueries();
     },
     onError: (error: Error) => toast.error(error.message),
   });

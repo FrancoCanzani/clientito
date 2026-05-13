@@ -6,10 +6,8 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import type { SplitRule } from "@/db/schema";
-import {
-  MailListPane,
-  useThreadGroupSnooze,
-} from "@/features/email/inbox/pages/mail-pane";
+import { useThreadGroupSnooze } from "@/features/email/inbox/hooks/use-thread-group-snooze";
+import { MailListPane } from "@/features/email/inbox/pages/mail-pane";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
 import {

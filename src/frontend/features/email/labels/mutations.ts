@@ -56,8 +56,8 @@ export async function deleteLabel(labelId: string, mailboxId: number): Promise<v
 }
 
 export async function applyLabel(providerMessageIds: string[], labelId: string, mailboxId: number): Promise<void> {
- applyLabelToCaches(queryClient, providerMessageIds, labelId, true);
- await localDb.addLabelToEmails(providerMessageIds, labelId);
+	 applyLabelToCaches(queryClient, providerMessageIds, labelId, true);
+	 await localDb.addLabelToEmails(providerMessageIds, labelId, mailboxId);
 
  const response = await fetch("/api/inbox/labels/apply", {
  method: "POST",
@@ -69,9 +69,9 @@ export async function applyLabel(providerMessageIds: string[], labelId: string, 
  }),
  });
  if (!response.ok) {
- // Rollback local change
- applyLabelToCaches(queryClient, providerMessageIds, labelId, false);
- await localDb.removeLabelFromEmails(providerMessageIds, labelId);
+	 // Rollback local change
+	 applyLabelToCaches(queryClient, providerMessageIds, labelId, false);
+	 await localDb.removeLabelFromEmails(providerMessageIds, labelId, mailboxId);
  invalidateInboxQueries();
  await throwOnError(response, "Failed to apply label");
  }
@@ -79,8 +79,8 @@ export async function applyLabel(providerMessageIds: string[], labelId: string, 
 }
 
 export async function removeLabel(providerMessageIds: string[], labelId: string, mailboxId: number): Promise<void> {
- applyLabelToCaches(queryClient, providerMessageIds, labelId, false);
- await localDb.removeLabelFromEmails(providerMessageIds, labelId);
+	 applyLabelToCaches(queryClient, providerMessageIds, labelId, false);
+	 await localDb.removeLabelFromEmails(providerMessageIds, labelId, mailboxId);
 
  const response = await fetch("/api/inbox/labels/remove", {
  method: "POST",
@@ -92,9 +92,9 @@ export async function removeLabel(providerMessageIds: string[], labelId: string,
  }),
  });
  if (!response.ok) {
- // Rollback local change
- applyLabelToCaches(queryClient, providerMessageIds, labelId, true);
- await localDb.addLabelToEmails(providerMessageIds, labelId);
+	 // Rollback local change
+	 applyLabelToCaches(queryClient, providerMessageIds, labelId, true);
+	 await localDb.addLabelToEmails(providerMessageIds, labelId, mailboxId);
  invalidateInboxQueries();
  await throwOnError(response, "Failed to remove label");
  }

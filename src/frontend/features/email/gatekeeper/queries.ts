@@ -3,6 +3,7 @@ import { getCurrentUserId } from "@/db/user";
 import { resolveGatekeeperActivatedAt } from "@/features/email/gatekeeper/lib/gatekeeper-activated-at";
 import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import { gatekeeperQueryKeys } from "@/features/email/gatekeeper/query-keys";
+import { invalidateInboxQueries } from "@/features/email/mail/data/invalidation";
 import type { EmailListItem, EmailListPage } from "@/features/email/mail/types";
 import { isEmailListInfiniteData } from "@/features/email/mail/utils/email-list-cache";
 import { normalizeEmailAddress } from "@/lib/email";
@@ -210,11 +211,11 @@ export function useGatekeeperDecision(mailboxId: number) {
  queryClient.setQueryData(queryKey, data);
  }
  },
- onSuccess: async () => {
- await Promise.all([
- queryClient.invalidateQueries({ queryKey: gatekeeperQueryKeys.pending(mailboxId) }),
- queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() }),
- ]);
- },
+onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: gatekeeperQueryKeys.pending(mailboxId) }),
+        invalidateInboxQueries(),
+      ]);
+    },
  });
 }

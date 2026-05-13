@@ -139,7 +139,6 @@ export function MailboxTopbar() {
     queryKey: emailQueryKeys.viewCounts(mailboxId),
     queryFn: () => fetchViewUnreadCounts(mailboxId),
     staleTime: 60_000,
-    refetchOnWindowFocus: true,
   });
   const viewCounts = viewCountsQuery.data;
   const pinnedViews = useMemo(
@@ -295,7 +294,7 @@ export function MailboxTopbar() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
           <form
             className="space-y-4"
             onSubmit={(event) => {

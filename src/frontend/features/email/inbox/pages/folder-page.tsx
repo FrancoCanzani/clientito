@@ -1,10 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useArchivedData } from "@/features/email/inbox/hooks/use-archived-data";
+import { useMailPanelSelection } from "@/features/email/inbox/hooks/use-mail-panel-selection";
+import { useThreadGroupSnooze } from "@/features/email/inbox/hooks/use-thread-group-snooze";
 import {
   MailListReaderPage,
   MailListPane,
   MailReaderPane,
-  useThreadGroupSnooze,
 } from "@/features/email/inbox/pages/mail-pane";
 import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
 import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
@@ -68,24 +69,30 @@ function FolderView({
   });
 
   const title = VIEW_LABELS[folder];
-  const selectedEmailId = isMobile ? null : (search.emailId ?? null);
   const handleSnooze = useThreadGroupSnooze(mailboxId, snooze);
-
-  const clearSelectedEmail = () =>
-    navigate({
-      to: "/$mailboxId/$folder",
-      params: { mailboxId, folder },
-      search: {},
-      replace: true,
-    });
-
-  const navigateSelectedEmail = (nextEmailId: string) =>
-    navigate({
-      to: "/$mailboxId/$folder",
-      params: { mailboxId, folder },
-      search: { emailId: nextEmailId },
-      replace: true,
-    });
+  const {
+    selectedEmailId,
+    enableKeyboardNavigation,
+    clearSelectedEmail,
+    navigateSelectedEmail,
+  } = useMailPanelSelection({
+    isMobile,
+    emailId: search.emailId,
+    onClear: () =>
+      navigate({
+        to: "/$mailboxId/$folder",
+        params: { mailboxId, folder },
+        search: {},
+        replace: true,
+      }),
+    onNavigate: (nextEmailId) =>
+      navigate({
+        to: "/$mailboxId/$folder",
+        params: { mailboxId, folder },
+        search: { emailId: nextEmailId },
+        replace: true,
+      }),
+  });
 
   const listPane = (
     <MailListPane
@@ -97,7 +104,7 @@ function FolderView({
       onAction={executeEmailAction}
       onSnooze={handleSnooze}
       selectedEmailId={selectedEmailId}
-      enableKeyboardNavigation={!selectedEmailId}
+      enableKeyboardNavigation={enableKeyboardNavigation}
       compact={!isMobile}
       headerExtraActions={
         (folder === "spam" || folder === "trash") && emailData.hasEmails ? (

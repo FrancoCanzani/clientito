@@ -107,13 +107,12 @@ if (query.length < 2) {
  </div>
  ))}
 
- {hasNextPage && (
+ {(hasNextPage || isFetchingNextPage) && (
  <div
  ref={loadMoreRef}
- className="p-6 text-center text-xs text-muted-foreground"
- >
- {isFetchingNextPage ? "Loading more…" : "Scroll for more results"}
- </div>
+ aria-hidden="true"
+ className={isFetchingNextPage ? "h-8 w-full" : "h-px w-full"}
+ />
  )}
  </div>
  );
