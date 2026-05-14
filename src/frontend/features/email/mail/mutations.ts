@@ -26,6 +26,32 @@ function getErrorMessage(payload: unknown): string | null {
   return typeof error === "string" ? error : null;
 }
 
+export function sanitizeMutationError(
+  err: unknown,
+  fallback: string,
+): { message: string; needsReconnect: boolean } {
+  const raw = err instanceof Error ? err.message : String(err);
+  const lower = raw.toLowerCase();
+  const needsReconnect =
+    lower.includes("insufficient") ||
+    lower.includes("scope") ||
+    lower.includes("permission");
+  if (needsReconnect) {
+    return {
+      message: "Reconnect Gmail to finish this action.",
+      needsReconnect: true,
+    };
+  }
+  if (lower.includes("network") || lower.includes("failed to fetch")) {
+    return {
+      message: "Network issue — please try again.",
+      needsReconnect: false,
+    };
+  }
+  console.error("[mutation error]", err);
+  return { message: fallback, needsReconnect: false };
+}
+
 function throwApiError(payload: unknown, fallback: string): never {
   throw new Error(getErrorMessage(payload) ?? fallback);
 }
@@ -70,7 +96,12 @@ function toNumericIds(ids: string[]): number[] {
 
 function isUnreadInboxLabelSet(labelIds: string[]): boolean {
   const labels = new Set(labelIds);
-  return labels.has(LABEL_INBOX) && labels.has(LABEL_UNREAD);
+  return (
+    labels.has(LABEL_INBOX) &&
+    labels.has(LABEL_UNREAD) &&
+    !labels.has(LABEL_SPAM) &&
+    !labels.has(LABEL_TRASH)
+  );
 }
 
 function computeEmailUnreadDelta(

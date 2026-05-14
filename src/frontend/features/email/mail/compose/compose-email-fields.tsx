@@ -247,8 +247,11 @@ export function ComposeEmailFields({
       },
       "compose:focus-subject": () => setFocusedField("subject"),
       "compose:focus-body": () => setFocusedField("body"),
+      "compose:send": () => {
+        if (canSend && !isPending) send();
+      },
     },
-    { target: rootRef.current },
+    { target: rootRef.current, allowInEditable: true },
   );
 
   return (

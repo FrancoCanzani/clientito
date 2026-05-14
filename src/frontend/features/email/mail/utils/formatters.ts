@@ -9,6 +9,16 @@ const ZERO_WIDTH_CHARS_RE = /[\u200B\u200C\u200D\u2060\uFEFF]/g;
 const FORMAT_CONTROL_CHARS_RE = /[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
 const LEADING_NON_ALNUM_RE = /^[^\p{L}\p{N}]+/u;
 
+export function formatRecipientList(raw: string): string {
+ const parts = raw
+ .split(",")
+ .map((p) => p.trim())
+ .filter(Boolean);
+ if (parts.length <= 1) return parts[0] ?? raw;
+ if (parts.length === 2) return `${parts[0]}, ${parts[1]}`;
+ return `${parts[0]} +${parts.length - 1} more`;
+}
+
 export function formatInboxRowDate(timestamp: number): string {
  const date = new Date(timestamp);
  if (isToday(date)) {

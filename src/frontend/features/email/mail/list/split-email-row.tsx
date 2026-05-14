@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { CalendarIcon, PaperclipIcon, StarIcon } from "@phosphor-icons/react";
 import { memo } from "react";
 import { formatInboxRowDate } from "../utils/formatters";
+import { EmailRowContextMenu } from "./email-row-context-menu";
 import { type EmailRowProps, useEmailRowModel } from "./email-row-model";
 
 export const SplitEmailRow = memo(function SplitEmailRow({
@@ -14,7 +15,6 @@ export const SplitEmailRow = memo(function SplitEmailRow({
     participantLabel,
     subject,
     snippet,
-    handleMouseEnter,
     handleOpen,
     hasMetaIcons,
     isStarred,
@@ -22,18 +22,21 @@ export const SplitEmailRow = memo(function SplitEmailRow({
   } = useEmailRowModel(props);
 
   return (
+    <EmailRowContextMenu
+      group={props.group}
+      view={props.view}
+      onAction={props.onAction}
+    >
     <div
       role="button"
       tabIndex={-1}
       className="h-full w-full cursor-default text-left text-sm focus:outline-none focus:ring-0"
-      onMouseEnter={handleMouseEnter}
-      onFocus={handleMouseEnter}
       onClick={handleOpen}
     >
       <div
         className={cn(
           "flex h-full min-w-0 flex-col justify-center gap-0.5 overflow-hidden border-b border-border/40 px-4 py-1.5 transition-colors hover:bg-muted",
-          (isFocused || isSelected) && "bg-muted",
+          isSelected && "bg-muted",
         )}
       >
         <div className="flex min-w-0 items-center gap-1.5">
@@ -93,5 +96,6 @@ export const SplitEmailRow = memo(function SplitEmailRow({
         )}
       </div>
     </div>
+    </EmailRowContextMenu>
   );
 });

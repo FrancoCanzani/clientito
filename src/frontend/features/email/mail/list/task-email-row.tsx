@@ -14,7 +14,6 @@ export const TaskEmailRow = memo(function TaskEmailRow({
   participantLabel,
   subject,
   snippet,
-  handleMouseEnter,
   handleOpen,
   hasMetaIcons,
   isStarred,
@@ -27,11 +26,8 @@ export const TaskEmailRow = memo(function TaskEmailRow({
  tabIndex={0}
  className={cn(
  "mx-3 my-1 flex h-12 cursor-default items-center gap-3 border border-border/40 bg-card/50 px-3 text-left transition-colors hover:bg-muted/70 md:mx-6",
- isFocused && "bg-muted",
  isSelected && "bg-muted ring-1 ring-border/70",
  )}
-  onMouseEnter={handleMouseEnter}
-  onFocus={handleMouseEnter}
   onClick={handleOpen}
   >
  <span

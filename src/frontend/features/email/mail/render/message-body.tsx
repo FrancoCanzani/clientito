@@ -1,6 +1,9 @@
 import { memo, useState } from "react";
 import type { EmailBodySource } from "../types";
-import { EmailHtmlRenderer } from "./email-html-renderer";
+import {
+  EmailHtmlRenderer,
+  type EmailBodyOverflowMode,
+} from "./email-html-renderer";
 
 type PlainTextSections = {
   visibleText: string;
@@ -81,14 +84,16 @@ function PlainTextEmailRenderer({ text }: { text: string }) {
 
 export const MessageBody = memo(function MessageBody({
   detail,
+  overflowMode = "contained",
 }: {
   detail?: EmailBodySource | null;
+  overflowMode?: EmailBodyOverflowMode;
 }) {
   const bodyHtml = detail?.resolvedBodyHtml ?? detail?.bodyHtml;
   const bodyText = detail?.resolvedBodyText ?? detail?.bodyText;
 
   if (bodyHtml) {
-    return <EmailHtmlRenderer html={bodyHtml} />;
+    return <EmailHtmlRenderer html={bodyHtml} overflowMode={overflowMode} />;
   }
 
   if (!bodyText) {

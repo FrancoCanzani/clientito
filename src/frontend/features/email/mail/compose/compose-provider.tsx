@@ -18,8 +18,14 @@ export function MailComposeProvider({ children }: { children: ReactNode }) {
 
  const openCompose = useCallback(
  (nextInitial?: ComposeInitial) => {
+ const composeKey =
+ nextInitial?.composeKey ??
+ (nextInitial?.threadId
+ ? `reply:${nextInitial.threadId}`
+ : `new:${crypto.randomUUID()}`);
  setInitial({
  ...nextInitial,
+ composeKey,
  mailboxId: nextInitial?.mailboxId ?? activeMailboxId,
  });
  setIsOpen(true);

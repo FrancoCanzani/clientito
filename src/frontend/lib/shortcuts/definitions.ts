@@ -50,22 +50,6 @@ registerShortcut({
 });
 
 registerShortcut({
-  id: "nav:triage",
-  key: "g f",
-  label: "Go to triage",
-  category: "Navigation",
-  contexts: ["global"],
-});
-
-registerShortcut({
-  id: "nav:todo",
-  key: "g t",
-  label: "Go to to-do",
-  category: "Navigation",
-  contexts: ["global"],
-});
-
-registerShortcut({
   id: "nav:drafts",
   key: "g d",
   label: "Go to drafts",
@@ -136,7 +120,7 @@ registerShortcut({
   key: "j",
   label: "Next email",
   category: "Navigation",
-  contexts: ["inbox-list", "todo"],
+  contexts: ["inbox-list"],
 });
 
 registerShortcut({
@@ -144,7 +128,7 @@ registerShortcut({
   key: "ArrowDown",
   label: "Next email",
   category: "Navigation",
-  contexts: ["inbox-list", "todo"],
+  contexts: ["inbox-list"],
 });
 
 registerShortcut({
@@ -152,7 +136,7 @@ registerShortcut({
   key: "k",
   label: "Previous email",
   category: "Navigation",
-  contexts: ["inbox-list", "todo"],
+  contexts: ["inbox-list"],
 });
 
 registerShortcut({
@@ -160,7 +144,7 @@ registerShortcut({
   key: "ArrowUp",
   label: "Previous email",
   category: "Navigation",
-  contexts: ["inbox-list", "todo"],
+  contexts: ["inbox-list"],
 });
 
 registerShortcut({
@@ -176,7 +160,7 @@ registerShortcut({
   key: "e",
   label: "Mark as done",
   category: "Actions",
-  contexts: ["inbox-list", "email-detail", "triage", "todo"],
+  contexts: ["inbox-list", "email-detail"],
 });
 
 registerShortcut({
@@ -184,7 +168,7 @@ registerShortcut({
   key: "r",
   label: "Reply",
   category: "Actions",
-  contexts: ["email-detail", "triage", "todo"],
+  contexts: ["email-detail"],
 });
 
 registerShortcut({
@@ -192,7 +176,7 @@ registerShortcut({
   key: "f",
   label: "Forward",
   category: "Actions",
-  contexts: ["email-detail", "todo"],
+  contexts: ["email-detail"],
 });
 
 registerShortcut({
@@ -208,7 +192,7 @@ registerShortcut({
   key: "u",
   label: "Toggle read / unread",
   category: "Actions",
-  contexts: ["inbox-list", "email-detail", "todo"],
+  contexts: ["inbox-list", "email-detail"],
 });
 
 registerShortcut({
@@ -216,7 +200,7 @@ registerShortcut({
   key: "#",
   label: "Move to trash",
   category: "Actions",
-  contexts: ["inbox-list", "email-detail", "triage"],
+  contexts: ["inbox-list", "email-detail"],
 });
 
 registerShortcut({
@@ -232,23 +216,7 @@ registerShortcut({
   key: "/",
   label: "Search",
   category: "Actions",
-  contexts: ["inbox-list", "todo"],
-});
-
-registerShortcut({
-  id: "action:snooze",
-  key: "s",
-  label: "Snooze",
-  category: "Actions",
-  contexts: ["triage", "todo"],
-});
-
-registerShortcut({
-  id: "action:todo",
-  key: "t",
-  label: "Add to to-do",
-  category: "Actions",
-  contexts: ["triage"],
+  contexts: ["inbox-list"],
 });
 
 registerShortcut({
@@ -256,7 +224,7 @@ registerShortcut({
   key: "Escape",
   label: "Go back / close",
   category: "Actions",
-  contexts: ["global", "email-detail", "triage", "todo", "search"],
+  contexts: ["global", "email-detail", "search"],
 });
 
 registerShortcut({
@@ -289,54 +257,6 @@ registerShortcut({
   label: "Previous email",
   category: "Navigation",
   contexts: ["email-detail"],
-});
-
-registerShortcut({
-  id: "triage:advance",
-  key: "j",
-  label: "Next email",
-  category: "Navigation",
-  contexts: ["triage"],
-});
-
-registerShortcut({
-  id: "triage:advance-arrow",
-  key: "ArrowDown",
-  label: "Next email",
-  category: "Navigation",
-  contexts: ["triage"],
-});
-
-registerShortcut({
-  id: "triage:advance-arrow-right",
-  key: "ArrowRight",
-  label: "Next email",
-  category: "Navigation",
-  contexts: ["triage"],
-});
-
-registerShortcut({
-  id: "triage:prev",
-  key: "k",
-  label: "Previous email",
-  category: "Navigation",
-  contexts: ["triage"],
-});
-
-registerShortcut({
-  id: "triage:prev-arrow",
-  key: "ArrowUp",
-  label: "Previous email",
-  category: "Navigation",
-  contexts: ["triage"],
-});
-
-registerShortcut({
-  id: "triage:prev-arrow-left",
-  key: "ArrowLeft",
-  label: "Previous email",
-  category: "Navigation",
-  contexts: ["triage"],
 });
 
 registerShortcut({
@@ -380,35 +300,12 @@ registerShortcut({
 });
 
 registerShortcut({
-  id: "todo:select",
-  key: "Enter",
-  label: "Select email",
-  category: "Navigation",
-  contexts: ["todo"],
-});
-
-registerShortcut({
-  id: "action:delete",
-  key: "Delete",
-  label: "Remove from to-do",
-  category: "Actions",
-  contexts: ["todo"],
-});
-
-registerShortcut({
-  id: "action:backspace",
-  key: "Backspace",
-  label: "Remove from to-do",
-  category: "Actions",
-  contexts: ["todo"],
-});
-
-registerShortcut({
-  id: "action:archive-todo",
-  key: "a",
-  label: "Archive and remove from to-do",
-  category: "Actions",
-  contexts: ["todo"],
+  id: "compose:send",
+  key: "$mod+Enter",
+  label: "Send email",
+  category: "Compose",
+  contexts: ["compose"],
+  allowInEditable: true,
 });
 
 registerShortcut({

@@ -11,6 +11,7 @@ import { groupEmailsByThread } from "@/features/email/mail/utils/group-emails-by
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { RefCallback } from "react";
 import { useEffect, useMemo, useRef } from "react";
+import { BlankEmailRow } from "../list/blank-email-row";
 import { MobileEmailRow } from "../list/mobile-email-row";
 import { SplitEmailRow } from "../list/split-email-row";
 
@@ -71,7 +72,15 @@ if (query.length < 2) {
   }
 
   if (isPending) {
-  return null;
+  return (
+  <div className="w-full">
+  {Array.from({ length: 12 }).map((_, i) => (
+  <div key={i} className={isMobile ? undefined : "h-21"}>
+  <BlankEmailRow isMobile={isMobile} />
+  </div>
+  ))}
+  </div>
+  );
   }
 
   if (groups.length === 0) {

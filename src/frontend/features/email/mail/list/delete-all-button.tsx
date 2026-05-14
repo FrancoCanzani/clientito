@@ -11,8 +11,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { localDb } from "@/db/client";
 import { fetchAllLocalViewEmails } from "@/features/email/mail/data/view-pages";
-import { deleteAllForever } from "@/features/email/mail/mutations";
-import { useMutation } from "@tanstack/react-query";
+import {
+  deleteAllForever,
+  sanitizeMutationError,
+} from "@/features/email/mail/mutations";
+import { invalidateInboxQueries } from "@/features/email/mail/data/invalidation";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import type { EmailListPage } from "@/features/email/mail/types";
+import { removeIdsFromInfiniteData } from "@/features/email/mail/utils/optimistic-mail-state";
+import {
+  type InfiniteData,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -26,14 +37,30 @@ export function DeleteAllButton({
   onDeleted: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async () => {
       const all = await fetchAllLocalViewEmails({ mailboxId, view: folder });
-      const ids = all.emails.map((e) => e.providerMessageId);
-      if (!ids.length) return;
-      await deleteAllForever({ mailboxId, providerMessageIds: ids });
-      await localDb.deleteEmailsByProviderMessageId(ids, { mailboxId });
+      const providerIds = all.emails.map((e) => e.providerMessageId);
+      const idSet = new Set(all.emails.map((e) => e.id));
+      if (!providerIds.length) return { providerIds: [] as string[], idSet };
+
+      queryClient.setQueriesData<InfiniteData<EmailListPage> | undefined>(
+        { queryKey: emailQueryKeys.list(folder, mailboxId) },
+        (current) => removeIdsFromInfiniteData(current, idSet),
+      );
+
+      try {
+        await deleteAllForever({ mailboxId, providerMessageIds: providerIds });
+        await localDb.deleteEmailsByProviderMessageId(providerIds, {
+          mailboxId,
+        });
+        return { providerIds, idSet };
+      } catch (error) {
+        invalidateInboxQueries();
+        throw error;
+      }
     },
     onSuccess: () => {
       toast.success(
@@ -45,7 +72,8 @@ export function DeleteAllButton({
       onDeleted();
     },
     onError: (err) => {
-      toast.error(err.message || "Failed to delete messages");
+      const { message } = sanitizeMutationError(err, "Failed to delete messages");
+      toast.error(message);
     },
   });
 

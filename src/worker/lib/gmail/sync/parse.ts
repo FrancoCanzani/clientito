@@ -12,7 +12,7 @@ import {
 } from "../subscriptions/service";
 import type { GmailMessage } from "../types";
 import { STANDARD_LABELS } from "../types";
-import { extractEmailAddress } from "../../utils";
+import { extractEmailAddress, extractEmailAddressList } from "../../utils";
 
 const HAS_ATTACHMENT_LABEL = "HAS_ATTACHMENT";
 
@@ -96,7 +96,8 @@ export function parseGmailMessage(
   const rawCc = getHeaderValue(message.payload.headers, "Cc");
   const rawMessageId = getHeaderValue(message.payload.headers, "Message-ID");
   const fromAddr = extractEmailAddress(rawFrom);
-  const toAddr = extractEmailAddress(rawTo);
+  const toList = extractEmailAddressList(rawTo);
+  const toAddr = toList.length > 0 ? toList.join(", ") : null;
 
   if (!fromAddr) return null;
 

@@ -1,39 +1,53 @@
-import { isInternalLabelName } from "@/features/email/labels/internal-labels";
-import { fetchLabels } from "@/features/email/labels/queries";
-import { labelQueryKeys } from "@/features/email/labels/query-keys";
-import { preloadInactiveViews } from "@/features/email/mail/data/view-sync";
-import { useQuery } from "@tanstack/react-query";
+import { useInboxData } from "@/features/email/inbox/hooks/use-inbox-data";
+import { fetchLocalViewPage } from "@/features/email/mail/data/view-pages";
+import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import type { EmailListPage } from "@/features/email/mail/types";
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
-const PRELOAD_DELAY_MS = 2_000;
-const MAX_PRELOAD_LABELS = 8;
+const PRELOAD_DELAY_MS = 1_000;
+const PRELOAD_VIEWS = [
+  "inbox",
+  "sent",
+  "archived",
+  "starred",
+  "spam",
+  "trash",
+] as const;
 
 export function useViewPreload() {
+  const queryClient = useQueryClient();
   const { mailboxId: rawMailboxId } = mailboxRoute.useParams();
   const mailboxId = Number(rawMailboxId);
-
-  const labelsQuery = useQuery({
-    queryKey: labelQueryKeys.list(mailboxId),
-    queryFn: () => fetchLabels(mailboxId),
-    enabled: Number.isFinite(mailboxId) && mailboxId > 0,
-    staleTime: 60_000,
-  });
-  const labels = labelsQuery.data;
+  const inboxData = useInboxData({ mailboxId, view: "important" });
+  const inboxReady = inboxData.hasEmails && !inboxData.isLoading;
 
   useEffect(() => {
     if (!Number.isFinite(mailboxId) || mailboxId <= 0) return;
-    const preloadTimer = window.setTimeout(() => {
-      const labelGmailIds = (labels ?? [])
-        .filter((label) => !isInternalLabelName(label.name))
-        .slice(0, MAX_PRELOAD_LABELS)
-        .map((label) => label.gmailId);
-      preloadInactiveViews(mailboxId, labelGmailIds);
+    if (!inboxReady) return;
+
+    const timer = window.setTimeout(() => {
+      for (const view of PRELOAD_VIEWS) {
+        const queryKey = emailQueryKeys.list(view, mailboxId);
+        if (queryClient.getQueryData(queryKey)) continue;
+
+        void fetchLocalViewPage({ mailboxId, view })
+          .then((page) => {
+            if (page.emails.length === 0) return;
+            queryClient.setQueryData<InfiniteData<EmailListPage>>(queryKey, {
+              pages: [page],
+              pageParams: [""],
+            });
+          })
+          .catch(() => {});
+      }
     }, PRELOAD_DELAY_MS);
+
     return () => {
-      window.clearTimeout(preloadTimer);
+      window.clearTimeout(timer);
     };
-  }, [mailboxId, labels]);
+  }, [mailboxId, inboxReady, queryClient]);
 }

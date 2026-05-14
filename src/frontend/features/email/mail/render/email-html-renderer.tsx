@@ -4,6 +4,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { useEffect, useRef } from "react";
 
 type Rgb = { r: number; g: number; b: number };
+export type EmailBodyOverflowMode = "contained" | "page";
 
 const DARK_MODE_BACKGROUND: Rgb = { r: 20, g: 20, b: 20 };
 const DEFAULT_LINK_COLOR = "#93c5fd";
@@ -15,13 +16,19 @@ const EMAIL_CONTENT_SHADOW_STYLE = `
  max-width: 100%;
  color: inherit;
  font-family: inherit;
- font-size: 12px;
- line-height: 1.45;
+ font-size: 14px;
+ line-height: 1.5;
  overflow-x: auto;
  overflow-y: hidden;
  -webkit-overflow-scrolling: touch;
  overflow-wrap: normal;
  word-break: normal;
+ }
+ table, td, th { font-size: inherit; }
+ font[size] { font-size: inherit !important; }
+ :host([data-overflow-mode='page']) {
+ overflow: visible;
+ max-width: none;
  }
  *, *::before, *::after { box-sizing: border-box; }
  :host > * { max-width: 100%; }
@@ -58,7 +65,10 @@ const EMAIL_CONTENT_SHADOW_STYLE = `
  }
  details[data-quoted-collapsible='true'] > summary::-webkit-details-marker { display: none; }
  details[data-quoted-collapsible='true'][open] > summary { margin-bottom: 8px; }
-  [data-email-scale-viewport='true'] { width: 100%; max-width: 100%; min-width: 0; overflow: hidden; }
+ [data-email-scale-viewport='true'] { width: 100%; max-width: 100%; min-width: 0; overflow: hidden; }
+ :host([data-overflow-mode='page']) [data-email-scale-viewport='true'] {
+ overflow: visible;
+ }
  [data-email-scale-content='true'] {
  display: block;
  width: 100%;
@@ -252,7 +262,13 @@ function setupAutoScale(host: HTMLElement, content: HTMLElement): () => void {
  };
 }
 
-export function EmailHtmlRenderer({ html }: { html: string }) {
+export function EmailHtmlRenderer({
+ html,
+ overflowMode = "contained",
+}: {
+ html: string;
+ overflowMode?: EmailBodyOverflowMode;
+}) {
  const hostRef = useRef<HTMLDivElement | null>(null);
  const shadowRootRef = useRef<ShadowRoot | null>(null);
  const { resolved: theme } = useTheme();
@@ -265,6 +281,12 @@ export function EmailHtmlRenderer({ html }: { html: string }) {
  shadowRootRef.current =
  host.shadowRoot ?? host.attachShadow({ mode: "open" });
  }, []);
+
+ useEffect(() => {
+ const host = hostRef.current;
+ if (!host) return;
+ host.setAttribute("data-overflow-mode", overflowMode);
+ }, [overflowMode]);
 
  useEffect(() => {
  if (!shadowRootRef.current) {

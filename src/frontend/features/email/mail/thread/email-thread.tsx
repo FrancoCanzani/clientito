@@ -12,12 +12,14 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AttachmentItem } from "../compose/attachment-item";
+import type { EmailBodyOverflowMode } from "../render/email-html-renderer";
 import { MessageBody } from "../render/message-body";
 import {
   formatEmailDetailDate,
   formatEmailThreadDate,
 } from "../utils/formatters";
 import { CalendarInviteCard } from "./calendar-invite-card";
+import { EmailHeaderDetails } from "./email-header-details";
 
 function normalizeCid(value: string): string {
   return value.trim().replace(/^<|>$/g, "").toLowerCase();
@@ -66,11 +68,13 @@ function AttachmentsSection({
         <PaperclipIcon className="size-3" />
         <span>{formatAttachmentLabel(attachments.length)}</span>
       </div>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(176px,1fr))] gap-3">
-        {attachments.map((attachment) => (
+      <div className="flex flex-wrap items-start gap-2">
+        {attachments.map((attachment, index) => (
           <AttachmentItem
             key={attachment.attachmentId}
             attachment={attachment}
+            previewAttachments={attachments}
+            previewIndex={index}
           />
         ))}
       </div>
@@ -109,10 +113,14 @@ export function EmailThread({
   email,
   threadMessages,
   threadError,
+  overflowMode = "contained",
+  onReplyToMessage,
 }: {
   email: EmailDetailItem;
   threadMessages: EmailThreadItem[];
   threadError: boolean;
+  overflowMode?: EmailBodyOverflowMode;
+  onReplyToMessage?: (message: EmailThreadItem) => void;
 }) {
   const [expansionOverrides, setExpansionOverrides] = useState<
     Map<string, boolean>
@@ -246,6 +254,8 @@ export function EmailThread({
                     body={isSelected ? email : threadEmail}
                     expanded={isExpanded(threadEmail.id)}
                     onToggle={() => toggleMessage(threadEmail.id)}
+                    onReply={onReplyToMessage}
+                    overflowMode={overflowMode}
                     attachments={
                       isSelected
                         ? visibleAttachments
@@ -264,7 +274,13 @@ export function EmailThread({
           </div>
         </>
       ) : (
-        <article className="overflow-x-auto border border-border/40 bg-card shadow-xs">
+        <article
+          className={
+            overflowMode === "page"
+              ? "border border-border/40 bg-card shadow-xs"
+              : "overflow-x-auto border border-border/40 bg-card shadow-xs"
+          }
+        >
           <header className="space-y-2 px-5 pt-5 pb-4">
             <div className="flex items-baseline justify-between gap-3">
               <h1 className="min-w-0 truncate text-xs font-medium text-foreground">
@@ -286,7 +302,7 @@ export function EmailThread({
             </div>
           </header>
           <div className="border-t border-border/40 p-5">
-            <MessageBody detail={email} />
+            <MessageBody detail={email} overflowMode={overflowMode} />
           </div>
 
           {hasAttachments && (
@@ -303,13 +319,17 @@ function ThreadMessage({
   body,
   expanded,
   onToggle,
+  onReply,
   attachments,
+  overflowMode,
 }: {
   email: EmailThreadItem;
   body?: EmailBodySource | null;
   expanded: boolean;
   onToggle: () => void;
+  onReply?: (message: EmailThreadItem) => void;
   attachments: EmailAttachment[];
+  overflowMode: EmailBodyOverflowMode;
 }) {
   const formattedDate = formatEmailThreadDate(email.date);
   const senderName = formatSenderLabel(email);
@@ -317,23 +337,37 @@ function ThreadMessage({
   const hasAttachments = attachments.length > 0;
 
   return (
-    <div className="overflow-x-auto border border-border/40 bg-card shadow-xs">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
-      >
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-foreground">
-            {expanded ? senderFull : senderName}
-          </p>
-          {expanded && email.toAddr && (
-            <p className="truncate text-xs text-muted-foreground">
-              To: {email.toAddr}
+    <div
+      className={
+        overflowMode === "page"
+          ? "border border-border/40 bg-card shadow-xs"
+          : "overflow-x-auto border border-border/40 bg-card shadow-xs"
+      }
+    >
+      <div className="flex w-full items-center gap-3 px-4 py-3 text-left">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left transition-colors hover:opacity-80"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-foreground">
+              {expanded ? senderFull : senderName}
             </p>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+            {expanded && email.toAddr && (
+              <p className="truncate text-xs text-muted-foreground">
+                To: {email.toAddr}
+              </p>
+            )}
+          </div>
+        </button>
+        {expanded && <EmailHeaderDetails email={email} />}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={expanded ? "Collapse message" : "Expand message"}
+          className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
           <span className="font-mono text-[10px] tracking-tighter tabular-nums">
             {formattedDate}
           </span>
@@ -342,16 +376,28 @@ function ThreadMessage({
           ) : (
             <CaretRightIcon className="size-3" />
           )}
-        </div>
-      </button>
+        </button>
+      </div>
 
       {expanded && (
         <>
           <div className="border-t border-border/40 px-5 pb-5 pt-4">
-            <MessageBody detail={body ?? email} />
+            <MessageBody detail={body ?? email} overflowMode={overflowMode} />
           </div>
 
           {hasAttachments && <AttachmentsSection attachments={attachments} />}
+
+          {onReply && (
+            <div className="border-t border-border/40 px-4 py-2">
+              <button
+                type="button"
+                onClick={() => onReply(email)}
+                className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Reply
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

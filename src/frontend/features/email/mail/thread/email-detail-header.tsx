@@ -38,8 +38,9 @@ export function EmailDetailHeader({
 }) {
  return (
  <div
+ data-print-hide
  className={cn(
- "sticky top-0 z-20 flex min-h-10 shrink-0 items-center justify-between gap-3 border-b bg-background px-3 py-1.5 md:px-4",
+ "flex min-h-10 shrink-0 items-center justify-between gap-3 border-b bg-background px-3 py-1.5 md:px-4",
  isScrolled ? "border-border/40" : "border-transparent",
  )}
  >

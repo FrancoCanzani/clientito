@@ -24,7 +24,6 @@ import {
 } from "@/features/email/shell/mailbox-page";
 import { useShortcuts } from "@/hooks/use-shortcuts";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
-import { cn } from "@/lib/utils";
 import { XIcon } from "@phosphor-icons/react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
@@ -236,21 +235,8 @@ export default function InboxSearchPage() {
     },
   });
 
-  const showSearchingIndicator =
-    resultsQuery.isFetching && normalizeQuery(scope.q).length >= 2;
-
   const headerActions = (
     <>
-      <span
-        className={cn(
-          "text-xs text-muted-foreground",
-          showSearchingIndicator ? "visible" : "invisible",
-        )}
-        aria-live="polite"
-        aria-hidden={!showSearchingIndicator}
-      >
-        Searching…
-      </span>
       <Button
         type="button"
         variant={"secondary"}

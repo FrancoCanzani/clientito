@@ -174,7 +174,7 @@ async function fetchServerPage(
   return { emails, cursor: nextCursor };
 }
 
-type GmailSyncReason = "active-view" | "active-page" | "background" | "preload";
+type GmailSyncReason = "active-view" | "active-page" | "background";
 
 type GmailViewSyncTask = {
   key: string;
@@ -203,7 +203,7 @@ function getGmailViewSyncPriority(
   if (view === "sent" || view === "starred" || view === "important") return 400;
   if (view === "archived") return 250;
   if (view === "spam" || view === "trash") return 100;
-  return reason === "preload" ? 10 : 200;
+  return 200;
 }
 
 function getGmailViewSyncKey(params: {
@@ -317,61 +317,6 @@ export async function enqueueActiveViewSync(params: {
     );
   } catch {
     /* Active sync is best-effort; the list can render cached local data. */
-  }
-}
-
-const HARDCODED_PRELOAD_VIEWS: ReadonlyArray<string> = [
-  "sent",
-  "archived",
-  "starred",
-  "important",
-];
-
-export function preloadInactiveViews(
-  mailboxId: number,
-  extraViews: ReadonlyArray<string> = [],
-): void {
-  if (!mailboxId) return;
-  if (!deviceCapabilities.shouldPrefetch) return;
-
-  void (async () => {
-    const userId = await getCurrentUserId();
-    if (!userId) return;
-    await alignActiveUser(userId);
-
-    const seen = new Set<string>();
-    for (const view of [...HARDCODED_PRELOAD_VIEWS, ...extraViews]) {
-      if (!view || seen.has(view)) continue;
-      seen.add(view);
-      void enqueueViewSyncPage({
-        userId,
-        mailboxId,
-        view,
-        remoteCursor: { type: "remote" },
-        reason: "preload",
-      }).catch(() => {});
-    }
-  })();
-}
-
-export function cancelPreloadViews(mailboxId: number, keepView?: string): void {
-  const allTasks = gmailViewSyncQueue.peekAllItems();
-  const toKeep: GmailViewSyncTask[] = [];
-  for (const task of allTasks) {
-    if (
-      task.reason === "preload" &&
-      task.mailboxId === mailboxId &&
-      (!keepView || task.view !== keepView)
-    ) {
-      gmailViewSyncInFlight.delete(task.key);
-      task.reject(new Error("Cancelled: preload superseded"));
-    } else {
-      toKeep.push(task);
-    }
-  }
-  gmailViewSyncQueue.clear();
-  for (const task of toKeep) {
-    gmailViewSyncQueue.addItem(task);
   }
 }
 

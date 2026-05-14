@@ -66,7 +66,7 @@ export type InboxUnreadCount = {
 
 export type ViewUnreadCounts = {
  inbox: InboxUnreadCount;
- todo: InboxUnreadCount;
+ important: InboxUnreadCount;
 };
 
 export type EmailListItem = {

@@ -8,7 +8,9 @@ export async function handleScheduled(event: ScheduledEvent, env: Env) {
 
   switch (event.cron) {
     case "*/1 * * * *":
-      await processScheduledEmails(db, env);
+      await processScheduledEmails(db, env).catch((err) => {
+        console.error("Scheduled email processing failed", err);
+      });
       break;
     case "*/15 * * * *":
       await surfaceReplyReminders(db, env).catch((err) => {

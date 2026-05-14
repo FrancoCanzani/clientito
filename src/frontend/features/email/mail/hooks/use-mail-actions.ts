@@ -20,7 +20,6 @@ import {
   removeIdsFromInfiniteData,
 } from "@/features/email/mail/utils/optimistic-mail-state";
 import { unsubscribe } from "@/features/email/subscriptions/queries";
-import { useTodoLabel } from "@/features/email/todo/hooks/use-todo-label";
 import {
   useMutation,
   useQueryClient,
@@ -86,8 +85,6 @@ const THREAD_LEVEL_ACTIONS = new Set<MailAction>([
   "trash",
   "spam",
   "not-spam",
-  "mark-read",
-  "mark-unread",
 ]);
 
 const actionMessages: Partial<Record<MailAction, string>> = {
@@ -289,8 +286,6 @@ export function useMailActions({
     [mailboxId, mutation, queryClient, undoAction, view],
   );
 
-  const todo = useTodoLabel(mailboxId);
-
   const snooze = useCallback(
     async (target: MailSnoozeTarget, timestamp: number | null) => {
       try {
@@ -336,7 +331,6 @@ export function useMailActions({
     openEmail,
     executeEmailAction,
     snooze,
-    todo,
     unsubscribe: unsubscribeMutation,
   };
 }

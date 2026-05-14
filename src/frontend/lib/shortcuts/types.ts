@@ -2,8 +2,6 @@ export type ShortcutContext =
   | "global"
   | "inbox-list"
   | "email-detail"
-  | "triage"
-  | "todo"
   | "compose"
   | "command-palette"
   | "search"

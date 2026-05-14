@@ -25,6 +25,22 @@ export async function getGmailLabel(
   });
 }
 
+export async function countMessagesWithLabels(
+  accessToken: string,
+  labelIds: string[],
+): Promise<number> {
+  const response = await gmailRequest<{ resultSizeEstimate?: number }>(
+    accessToken,
+    "/messages",
+    {
+      labelIds,
+      maxResults: "1",
+      fields: "resultSizeEstimate",
+    },
+  );
+  return response.resultSizeEstimate ?? 0;
+}
+
 export async function createGmailLabel(
   accessToken: string,
   params: { name: string; color?: GmailLabelColor },

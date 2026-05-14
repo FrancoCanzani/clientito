@@ -87,13 +87,16 @@ export default function FullEmailPage() {
   return (
     <div
       data-print-region
-      className="mx-auto w-full max-w-3xl px-4 py-6 md:py-10"
+      className="h-dvh w-full overflow-auto print:h-auto print:overflow-visible"
     >
-      <EmailThread
-        email={email}
-        threadMessages={threadMessages}
-        threadError={threadQuery.isError}
-      />
+      <div className="mx-auto w-full max-w-3xl px-4 py-6 md:py-10">
+        <EmailThread
+          email={email}
+          threadMessages={threadMessages}
+          threadError={threadQuery.isError}
+          overflowMode="page"
+        />
+      </div>
     </div>
   );
 }

@@ -6,19 +6,6 @@ import {
 import { fetchThreadsAndParse } from "./threads";
 import type { ParsedEmail } from "./parse";
 
-export const HISTORY_METADATA_HEADERS = [
-  "From",
-  "To",
-  "Cc",
-  "Subject",
-  "Date",
-  "Message-ID",
-  "In-Reply-To",
-  "References",
-  "Reply-To",
-  "List-Unsubscribe",
-];
-
 const MAX_HISTORY_PAGES = 25;
 const MAX_AFFECTED_THREADS_BEFORE_STALE = 2_000;
 
@@ -146,10 +133,6 @@ export async function pullDeltaSync(
       accessToken,
       Array.from(affectedThreadIds),
       null,
-      {
-        format: "metadata",
-        metadataHeaders: HISTORY_METADATA_HEADERS,
-      },
     );
     if (deletedMessageIds.size > 0) {
       added = added.filter((m) => !deletedMessageIds.has(m.providerMessageId));

@@ -26,10 +26,6 @@ export function useMailboxHotkeys() {
   useShortcuts("global", {
     "nav:inbox": () =>
       navigate({ to: "/$mailboxId/inbox", params: { mailboxId } }),
-    "nav:triage": () =>
-      navigate({ to: "/$mailboxId/triage", params: { mailboxId } }),
-    "nav:todo": () =>
-      navigate({ to: "/$mailboxId/todo", params: { mailboxId } }),
     "nav:drafts": () =>
       navigate({ to: "/$mailboxId/inbox/drafts", params: { mailboxId } }),
     "nav:settings": () =>
@@ -97,22 +93,6 @@ type SwitchTarget = {
 function deriveSwitchTarget(
   matches: ReturnType<typeof useRouterState>["matches"],
 ): SwitchTarget {
-  if (
-    matches.some((match) => match.routeId === "/_dashboard/$mailboxId/triage")
-  ) {
-    return {
-      to: "/$mailboxId/triage",
-      getParams: (mailboxId) => ({ mailboxId }),
-    };
-  }
-  if (
-    matches.some((match) => match.routeId === "/_dashboard/$mailboxId/todo")
-  ) {
-    return {
-      to: "/$mailboxId/todo",
-      getParams: (mailboxId) => ({ mailboxId }),
-    };
-  }
   if (
     matches.some(
       (match) => match.routeId === "/_dashboard/$mailboxId/inbox/drafts",

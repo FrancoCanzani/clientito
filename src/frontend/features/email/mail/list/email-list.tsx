@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { ArrowClockwiseIcon, SpinnerGapIcon } from "@phosphor-icons/react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { BlankEmailRow } from "./blank-email-row";
 import { MailFilterBar } from "./mail-filter-bar";
 import { MobileEmailRow } from "./mobile-email-row";
 import { SplitEmailRow } from "./split-email-row";
@@ -67,7 +68,8 @@ export function EmailList({
     threadGroups,
     hasNextPage,
     isFetchingNextPage,
-    isInitialPagePending,
+    isInitialViewPending,
+    isFirstMailboxSync,
     showEmptyState,
     isFetching,
     fetchNextPage,
@@ -105,7 +107,7 @@ export function EmailList({
     onCompose: openCompose,
     onSearch: goToSearch,
     onRefresh: () => void emailData.refreshViewAsync(),
-    enabled: enableKeyboardNavigation,
+    enabled: enableKeyboardNavigation && !emailData.isPlaceholderData,
   });
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -118,17 +120,17 @@ export function EmailList({
     },
   });
 
-  const { virtualizer, virtualItems, virtualCount } =
-    useMailListVirtualization({
+  const { virtualizer, virtualItems, virtualCount } = useMailListVirtualization(
+    {
       scrollRef,
       rowHeight,
       loadedCount: threadGroups.length,
-      isInitialPagePending,
       hasNextPage,
       isFetching,
       isFetchingNextPage,
       fetchNextPage,
-    });
+    },
+  );
 
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
@@ -233,6 +235,16 @@ export function EmailList({
               className="relative w-full"
               style={{ height: virtualizer.getTotalSize() }}
             >
+              {focusedIndex >= 0 && focusedIndex < threadGroups.length && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-0 z-0 w-full bg-muted transition-transform duration-150 ease-out motion-reduce:transition-none"
+                  style={{
+                    height: rowHeight,
+                    transform: `translateY(${focusedIndex * rowHeight}px)`,
+                  }}
+                />
+              )}
               {virtualItems.map((virtualItem) => {
                 const group = threadGroups[virtualItem.index];
                 const key =
@@ -276,6 +288,25 @@ export function EmailList({
                 );
               })}
             </div>
+          ) : isInitialViewPending ? (
+            <div className="relative w-full">
+              {Array.from({ length: 15 }).map((_, i) => (
+                <div
+                  key={`init-skel-${i}`}
+                  style={{ height: rowHeight }}
+                >
+                  <BlankEmailRow
+                    listVariant={listVariant}
+                    isMobile={isMobile}
+                  />
+                </div>
+              ))}
+              {isFirstMailboxSync && (
+                <p className="px-4 py-3 text-center text-xs text-muted-foreground">
+                  Getting your mailbox ready — your first sync can take a moment.
+                </p>
+              )}
+            </div>
           ) : showEmptyState ? (
             <Empty>
               <EmptyHeader>
@@ -298,33 +329,6 @@ export function EmailList({
         </div>
       </div>
     </div>
-  );
-}
-
-function BlankEmailRow({
-  listVariant,
-  isMobile,
-}: {
-  listVariant: "mail" | "task";
-  isMobile: boolean;
-}) {
-  if (listVariant === "task") {
-    return (
-      <div
-        aria-hidden="true"
-        className="mx-3 my-1 h-12 border border-border/30 bg-card/20 md:mx-6"
-      />
-    );
-  }
-
-  return (
-    <div
-      aria-hidden="true"
-      className={cn(
-        "h-full w-full border-b border-border/40 bg-background",
-        isMobile && "px-3 py-2",
-      )}
-    />
   );
 }
 

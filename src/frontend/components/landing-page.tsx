@@ -432,7 +432,7 @@ export function LandingPage() {
  </Link>
  {isAuthenticated && preferredMailboxId ? (
  <Link
- to="/$mailboxId/triage"
+ to="/$mailboxId/inbox"
  params={{ mailboxId: preferredMailboxId }}
  className="text-foreground hover:underline underline-offset-4"
  >

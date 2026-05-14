@@ -20,8 +20,6 @@ import { Route as DocsSlugRouteImport } from './routes/docs/$slug'
 import { Route as DashboardMailboxIdRouteRouteImport } from './routes/_dashboard/$mailboxId/route'
 import { Route as DashboardMailboxIdIndexRouteImport } from './routes/_dashboard/$mailboxId/index'
 import { Route as EmailMailboxIdEmailIdRouteImport } from './routes/email/$mailboxId/$emailId'
-import { Route as DashboardMailboxIdTriageRouteImport } from './routes/_dashboard/$mailboxId/triage'
-import { Route as DashboardMailboxIdTodoRouteImport } from './routes/_dashboard/$mailboxId/todo'
 import { Route as DashboardMailboxIdSubscriptionsRouteImport } from './routes/_dashboard/$mailboxId/subscriptions'
 import { Route as DashboardMailboxIdScreenerRouteImport } from './routes/_dashboard/$mailboxId/screener'
 import { Route as DashboardMailboxIdSettingsRouteRouteImport } from './routes/_dashboard/$mailboxId/settings/route'
@@ -30,6 +28,7 @@ import { Route as DashboardMailboxIdInboxIndexRouteImport } from './routes/_dash
 import { Route as DashboardMailboxIdFolderIndexRouteImport } from './routes/_dashboard/$mailboxId/$folder/index'
 import { Route as DashboardMailboxIdSettingsTemplatesRouteImport } from './routes/_dashboard/$mailboxId/settings/templates'
 import { Route as DashboardMailboxIdSettingsSignaturesRouteImport } from './routes/_dashboard/$mailboxId/settings/signatures'
+import { Route as DashboardMailboxIdSettingsPerformanceRouteImport } from './routes/_dashboard/$mailboxId/settings/performance'
 import { Route as DashboardMailboxIdSettingsMailboxRouteImport } from './routes/_dashboard/$mailboxId/settings/mailbox'
 import { Route as DashboardMailboxIdSettingsLabelsRouteImport } from './routes/_dashboard/$mailboxId/settings/labels'
 import { Route as DashboardMailboxIdSettingsDangerRouteImport } from './routes/_dashboard/$mailboxId/settings/danger'
@@ -98,17 +97,6 @@ const EmailMailboxIdEmailIdRoute = EmailMailboxIdEmailIdRouteImport.update({
   path: '/email/$mailboxId/$emailId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardMailboxIdTriageRoute =
-  DashboardMailboxIdTriageRouteImport.update({
-    id: '/triage',
-    path: '/triage',
-    getParentRoute: () => DashboardMailboxIdRouteRoute,
-  } as any)
-const DashboardMailboxIdTodoRoute = DashboardMailboxIdTodoRouteImport.update({
-  id: '/todo',
-  path: '/todo',
-  getParentRoute: () => DashboardMailboxIdRouteRoute,
-} as any)
 const DashboardMailboxIdSubscriptionsRoute =
   DashboardMailboxIdSubscriptionsRouteImport.update({
     id: '/subscriptions',
@@ -155,6 +143,12 @@ const DashboardMailboxIdSettingsSignaturesRoute =
   DashboardMailboxIdSettingsSignaturesRouteImport.update({
     id: '/signatures',
     path: '/signatures',
+    getParentRoute: () => DashboardMailboxIdSettingsRouteRoute,
+  } as any)
+const DashboardMailboxIdSettingsPerformanceRoute =
+  DashboardMailboxIdSettingsPerformanceRouteImport.update({
+    id: '/performance',
+    path: '/performance',
     getParentRoute: () => DashboardMailboxIdSettingsRouteRoute,
   } as any)
 const DashboardMailboxIdSettingsMailboxRoute =
@@ -248,8 +242,6 @@ export interface FileRoutesByFullPath {
   '/$mailboxId/settings': typeof DashboardMailboxIdSettingsRouteRouteWithChildren
   '/$mailboxId/screener': typeof DashboardMailboxIdScreenerRoute
   '/$mailboxId/subscriptions': typeof DashboardMailboxIdSubscriptionsRoute
-  '/$mailboxId/todo': typeof DashboardMailboxIdTodoRoute
-  '/$mailboxId/triage': typeof DashboardMailboxIdTriageRoute
   '/email/$mailboxId/$emailId': typeof EmailMailboxIdEmailIdRoute
   '/$mailboxId/': typeof DashboardMailboxIdIndexRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
@@ -260,6 +252,7 @@ export interface FileRoutesByFullPath {
   '/$mailboxId/settings/danger': typeof DashboardMailboxIdSettingsDangerRoute
   '/$mailboxId/settings/labels': typeof DashboardMailboxIdSettingsLabelsRoute
   '/$mailboxId/settings/mailbox': typeof DashboardMailboxIdSettingsMailboxRoute
+  '/$mailboxId/settings/performance': typeof DashboardMailboxIdSettingsPerformanceRoute
   '/$mailboxId/settings/signatures': typeof DashboardMailboxIdSettingsSignaturesRoute
   '/$mailboxId/settings/templates': typeof DashboardMailboxIdSettingsTemplatesRoute
   '/$mailboxId/$folder/': typeof DashboardMailboxIdFolderIndexRoute
@@ -280,8 +273,6 @@ export interface FileRoutesByTo {
   '/docs': typeof DocsIndexRoute
   '/$mailboxId/screener': typeof DashboardMailboxIdScreenerRoute
   '/$mailboxId/subscriptions': typeof DashboardMailboxIdSubscriptionsRoute
-  '/$mailboxId/todo': typeof DashboardMailboxIdTodoRoute
-  '/$mailboxId/triage': typeof DashboardMailboxIdTriageRoute
   '/email/$mailboxId/$emailId': typeof EmailMailboxIdEmailIdRoute
   '/$mailboxId': typeof DashboardMailboxIdIndexRoute
   '/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
@@ -292,6 +283,7 @@ export interface FileRoutesByTo {
   '/$mailboxId/settings/danger': typeof DashboardMailboxIdSettingsDangerRoute
   '/$mailboxId/settings/labels': typeof DashboardMailboxIdSettingsLabelsRoute
   '/$mailboxId/settings/mailbox': typeof DashboardMailboxIdSettingsMailboxRoute
+  '/$mailboxId/settings/performance': typeof DashboardMailboxIdSettingsPerformanceRoute
   '/$mailboxId/settings/signatures': typeof DashboardMailboxIdSettingsSignaturesRoute
   '/$mailboxId/settings/templates': typeof DashboardMailboxIdSettingsTemplatesRoute
   '/$mailboxId/$folder': typeof DashboardMailboxIdFolderIndexRoute
@@ -317,8 +309,6 @@ export interface FileRoutesById {
   '/_dashboard/$mailboxId/settings': typeof DashboardMailboxIdSettingsRouteRouteWithChildren
   '/_dashboard/$mailboxId/screener': typeof DashboardMailboxIdScreenerRoute
   '/_dashboard/$mailboxId/subscriptions': typeof DashboardMailboxIdSubscriptionsRoute
-  '/_dashboard/$mailboxId/todo': typeof DashboardMailboxIdTodoRoute
-  '/_dashboard/$mailboxId/triage': typeof DashboardMailboxIdTriageRoute
   '/email/$mailboxId/$emailId': typeof EmailMailboxIdEmailIdRoute
   '/_dashboard/$mailboxId/': typeof DashboardMailboxIdIndexRoute
   '/_dashboard/$mailboxId/inbox/drafts': typeof DashboardMailboxIdInboxDraftsRoute
@@ -329,6 +319,7 @@ export interface FileRoutesById {
   '/_dashboard/$mailboxId/settings/danger': typeof DashboardMailboxIdSettingsDangerRoute
   '/_dashboard/$mailboxId/settings/labels': typeof DashboardMailboxIdSettingsLabelsRoute
   '/_dashboard/$mailboxId/settings/mailbox': typeof DashboardMailboxIdSettingsMailboxRoute
+  '/_dashboard/$mailboxId/settings/performance': typeof DashboardMailboxIdSettingsPerformanceRoute
   '/_dashboard/$mailboxId/settings/signatures': typeof DashboardMailboxIdSettingsSignaturesRoute
   '/_dashboard/$mailboxId/settings/templates': typeof DashboardMailboxIdSettingsTemplatesRoute
   '/_dashboard/$mailboxId/$folder/': typeof DashboardMailboxIdFolderIndexRoute
@@ -354,8 +345,6 @@ export interface FileRouteTypes {
     | '/$mailboxId/settings'
     | '/$mailboxId/screener'
     | '/$mailboxId/subscriptions'
-    | '/$mailboxId/todo'
-    | '/$mailboxId/triage'
     | '/email/$mailboxId/$emailId'
     | '/$mailboxId/'
     | '/$mailboxId/inbox/drafts'
@@ -366,6 +355,7 @@ export interface FileRouteTypes {
     | '/$mailboxId/settings/danger'
     | '/$mailboxId/settings/labels'
     | '/$mailboxId/settings/mailbox'
+    | '/$mailboxId/settings/performance'
     | '/$mailboxId/settings/signatures'
     | '/$mailboxId/settings/templates'
     | '/$mailboxId/$folder/'
@@ -386,8 +376,6 @@ export interface FileRouteTypes {
     | '/docs'
     | '/$mailboxId/screener'
     | '/$mailboxId/subscriptions'
-    | '/$mailboxId/todo'
-    | '/$mailboxId/triage'
     | '/email/$mailboxId/$emailId'
     | '/$mailboxId'
     | '/$mailboxId/inbox/drafts'
@@ -398,6 +386,7 @@ export interface FileRouteTypes {
     | '/$mailboxId/settings/danger'
     | '/$mailboxId/settings/labels'
     | '/$mailboxId/settings/mailbox'
+    | '/$mailboxId/settings/performance'
     | '/$mailboxId/settings/signatures'
     | '/$mailboxId/settings/templates'
     | '/$mailboxId/$folder'
@@ -422,8 +411,6 @@ export interface FileRouteTypes {
     | '/_dashboard/$mailboxId/settings'
     | '/_dashboard/$mailboxId/screener'
     | '/_dashboard/$mailboxId/subscriptions'
-    | '/_dashboard/$mailboxId/todo'
-    | '/_dashboard/$mailboxId/triage'
     | '/email/$mailboxId/$emailId'
     | '/_dashboard/$mailboxId/'
     | '/_dashboard/$mailboxId/inbox/drafts'
@@ -434,6 +421,7 @@ export interface FileRouteTypes {
     | '/_dashboard/$mailboxId/settings/danger'
     | '/_dashboard/$mailboxId/settings/labels'
     | '/_dashboard/$mailboxId/settings/mailbox'
+    | '/_dashboard/$mailboxId/settings/performance'
     | '/_dashboard/$mailboxId/settings/signatures'
     | '/_dashboard/$mailboxId/settings/templates'
     | '/_dashboard/$mailboxId/$folder/'
@@ -535,20 +523,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmailMailboxIdEmailIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_dashboard/$mailboxId/triage': {
-      id: '/_dashboard/$mailboxId/triage'
-      path: '/triage'
-      fullPath: '/$mailboxId/triage'
-      preLoaderRoute: typeof DashboardMailboxIdTriageRouteImport
-      parentRoute: typeof DashboardMailboxIdRouteRoute
-    }
-    '/_dashboard/$mailboxId/todo': {
-      id: '/_dashboard/$mailboxId/todo'
-      path: '/todo'
-      fullPath: '/$mailboxId/todo'
-      preLoaderRoute: typeof DashboardMailboxIdTodoRouteImport
-      parentRoute: typeof DashboardMailboxIdRouteRoute
-    }
     '/_dashboard/$mailboxId/subscriptions': {
       id: '/_dashboard/$mailboxId/subscriptions'
       path: '/subscriptions'
@@ -603,6 +577,13 @@ declare module '@tanstack/react-router' {
       path: '/signatures'
       fullPath: '/$mailboxId/settings/signatures'
       preLoaderRoute: typeof DashboardMailboxIdSettingsSignaturesRouteImport
+      parentRoute: typeof DashboardMailboxIdSettingsRouteRoute
+    }
+    '/_dashboard/$mailboxId/settings/performance': {
+      id: '/_dashboard/$mailboxId/settings/performance'
+      path: '/performance'
+      fullPath: '/$mailboxId/settings/performance'
+      preLoaderRoute: typeof DashboardMailboxIdSettingsPerformanceRouteImport
       parentRoute: typeof DashboardMailboxIdSettingsRouteRoute
     }
     '/_dashboard/$mailboxId/settings/mailbox': {
@@ -706,6 +687,7 @@ interface DashboardMailboxIdSettingsRouteRouteChildren {
   DashboardMailboxIdSettingsDangerRoute: typeof DashboardMailboxIdSettingsDangerRoute
   DashboardMailboxIdSettingsLabelsRoute: typeof DashboardMailboxIdSettingsLabelsRoute
   DashboardMailboxIdSettingsMailboxRoute: typeof DashboardMailboxIdSettingsMailboxRoute
+  DashboardMailboxIdSettingsPerformanceRoute: typeof DashboardMailboxIdSettingsPerformanceRoute
   DashboardMailboxIdSettingsSignaturesRoute: typeof DashboardMailboxIdSettingsSignaturesRoute
   DashboardMailboxIdSettingsTemplatesRoute: typeof DashboardMailboxIdSettingsTemplatesRoute
   DashboardMailboxIdSettingsIndexRoute: typeof DashboardMailboxIdSettingsIndexRoute
@@ -724,6 +706,8 @@ const DashboardMailboxIdSettingsRouteRouteChildren: DashboardMailboxIdSettingsRo
       DashboardMailboxIdSettingsLabelsRoute,
     DashboardMailboxIdSettingsMailboxRoute:
       DashboardMailboxIdSettingsMailboxRoute,
+    DashboardMailboxIdSettingsPerformanceRoute:
+      DashboardMailboxIdSettingsPerformanceRoute,
     DashboardMailboxIdSettingsSignaturesRoute:
       DashboardMailboxIdSettingsSignaturesRoute,
     DashboardMailboxIdSettingsTemplatesRoute:
@@ -740,8 +724,6 @@ interface DashboardMailboxIdRouteRouteChildren {
   DashboardMailboxIdSettingsRouteRoute: typeof DashboardMailboxIdSettingsRouteRouteWithChildren
   DashboardMailboxIdScreenerRoute: typeof DashboardMailboxIdScreenerRoute
   DashboardMailboxIdSubscriptionsRoute: typeof DashboardMailboxIdSubscriptionsRoute
-  DashboardMailboxIdTodoRoute: typeof DashboardMailboxIdTodoRoute
-  DashboardMailboxIdTriageRoute: typeof DashboardMailboxIdTriageRoute
   DashboardMailboxIdIndexRoute: typeof DashboardMailboxIdIndexRoute
   DashboardMailboxIdInboxDraftsRoute: typeof DashboardMailboxIdInboxDraftsRoute
   DashboardMailboxIdInboxSearchRoute: typeof DashboardMailboxIdInboxSearchRoute
@@ -760,8 +742,6 @@ const DashboardMailboxIdRouteRouteChildren: DashboardMailboxIdRouteRouteChildren
       DashboardMailboxIdSettingsRouteRouteWithChildren,
     DashboardMailboxIdScreenerRoute: DashboardMailboxIdScreenerRoute,
     DashboardMailboxIdSubscriptionsRoute: DashboardMailboxIdSubscriptionsRoute,
-    DashboardMailboxIdTodoRoute: DashboardMailboxIdTodoRoute,
-    DashboardMailboxIdTriageRoute: DashboardMailboxIdTriageRoute,
     DashboardMailboxIdIndexRoute: DashboardMailboxIdIndexRoute,
     DashboardMailboxIdInboxDraftsRoute: DashboardMailboxIdInboxDraftsRoute,
     DashboardMailboxIdInboxSearchRoute: DashboardMailboxIdInboxSearchRoute,

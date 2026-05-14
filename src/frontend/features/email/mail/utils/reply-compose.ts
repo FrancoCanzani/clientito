@@ -1,6 +1,6 @@
 import type {
  ComposeInitial,
- EmailDetailItem,
+ EmailBodySource,
  EmailListItem,
 } from "../types";
 import { formatQuotedDate } from "./formatters";
@@ -12,7 +12,7 @@ export function buildReplySubject(subject: string | null): string {
 
 export function buildReplyInitial(
  email: EmailListItem,
- detail?: EmailDetailItem | null,
+ detail?: EmailBodySource | null,
 ): ComposeInitial {
  const originalFrom = email.fromName
  ? `${email.fromName} &lt;${email.fromAddr}&gt;`

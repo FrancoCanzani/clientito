@@ -1,6 +1,7 @@
 import { PageContainer } from "@/components/page-container";
 import { cn } from "@/lib/utils";
 import { useContext, useRef, useState, type ReactNode } from "react";
+import { MailboxSidebarTrigger } from "./mailbox-menu";
 import {
   MailboxScrolledContext,
   MailboxSetScrolledContext,
@@ -47,7 +48,10 @@ export function MailboxPageHeader({
         className,
       )}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="md:hidden">
+          <MailboxSidebarTrigger />
+        </div>
         <h1 className="shrink-0 truncate">{title}</h1>
       </div>
       {actions && (

@@ -146,7 +146,14 @@ export function useMailViewData({
   }, [focusWindow.active, heldDuringFocusCount]);
 
   const hasEmails = threadGroups.length > 0;
-  const isInitialPagePending = !hasLoadedEmailPage && emailsQuery.isFetching;
+  const hasLoadedRows = allEmails.length > 0;
+  const isInitialViewPending = !hasLoadedEmailPage && emailsQuery.isFetching;
+  const isFirstMailboxSync = Boolean(
+    account &&
+      !hasLoadedRows &&
+      !hasActiveFilters &&
+      (account.hasSynced === false || account.syncState === "ready_to_sync"),
+  );
   const showEmptyState =
     hasLoadedEmailPage &&
     !emailsQuery.isFetching &&
@@ -195,12 +202,15 @@ export function useMailViewData({
     hasEmails,
     threadGroups,
     isLoading,
-    isInitialPagePending,
+    isInitialPagePending: isInitialViewPending,
+    isInitialViewPending,
+    isFirstMailboxSync,
     showEmptyState,
     isRefreshing,
     needsReconnect,
     isRateLimited,
     isError: emailsQuery.isError,
+    isPlaceholderData: emailsQuery.isPlaceholderData,
     isFetching,
     hasNextPage: hasNextPage ?? false,
     isFetchingNextPage,

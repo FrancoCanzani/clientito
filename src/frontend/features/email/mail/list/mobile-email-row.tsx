@@ -37,7 +37,6 @@ export const MobileEmailRow = memo(function MobileEmailRow({
     participantLabel,
     subject,
     snippet,
-    handleMouseEnter,
     handleOpen,
     hasMetaIcons,
     isStarred,
@@ -324,8 +323,6 @@ export const MobileEmailRow = memo(function MobileEmailRow({
           transition: isDragging ? "none" : SWIPE_SETTLE_TRANSITION,
           touchAction: "pan-y",
         }}
-        onMouseEnter={handleMouseEnter}
-        onFocus={handleMouseEnter}
         onClick={onRowClick}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

@@ -1,5 +1,6 @@
 import { drizzle } from "drizzle-orm/d1";
 import * as authSchema from "./auth-schema";
+import { createResilientD1 } from "./d1-resilient";
 import * as appSchema from "./schema";
 
 const schema = {
@@ -8,7 +9,7 @@ const schema = {
 };
 
 export function createDb(d1: D1Database) {
-  return drizzle(d1, { schema, casing: "snake_case" });
+  return drizzle(createResilientD1(d1), { schema, casing: "snake_case" });
 }
 
 export type Database = ReturnType<typeof createDb>;

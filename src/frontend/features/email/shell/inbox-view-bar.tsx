@@ -8,12 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Kbd } from "@/components/ui/kbd";
 import type { SplitRule } from "@/db/schema";
-import { FocusWindowToggle } from "@/features/email/focus-window/focus-window-toggle";
-import { useMailCompose } from "@/features/email/mail/compose/compose-context";
-import { fetchViewUnreadCounts } from "@/features/email/mail/data/unread-counts";
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
 import {
   createMailboxSplitView,
   fetchSplitViews,
@@ -23,21 +18,11 @@ import { cn } from "@/lib/utils";
 import { PlusIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, getRouteApi, useRouterState } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { MailboxSidebarTrigger } from "./mailbox-menu";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
-const TABS = [
-  { id: "triage", label: "Triage", to: "/$mailboxId/triage" as const },
-  { id: "todo", label: "To do", to: "/$mailboxId/todo" as const },
-  { id: "inbox", label: "Inbox", to: "/$mailboxId/inbox" as const },
-];
-
-const BASE_DOCUMENT_TITLE = "Duomo";
-
-type TabId = (typeof TABS)[number]["id"];
 type CreateViewPayload = { name: string; rules: SplitRule | null };
 type ViewRuleForm = {
   senders: string;
@@ -70,50 +55,22 @@ function buildSplitRule(form: ViewRuleForm): SplitRule | null {
   const recipients = parseRuleList(form.recipients);
   const subjectContains = parseRuleList(form.subjectContains);
   const rule: SplitRule = {};
-
   if (senders.length) rule.senders = senders;
   if (domains.length) rule.domains = domains;
   if (recipients.length) rule.recipients = recipients;
   if (subjectContains.length) rule.subjectContains = subjectContains;
   if (form.hasAttachment) rule.hasAttachment = true;
   if (form.fromMailingList) rule.fromMailingList = true;
-
   return Object.keys(rule).length > 0 ? rule : null;
 }
 
-function formatUnreadCount(count: number): string {
-  if (count > 99) return "99+";
-  return String(count);
-}
-
-function useActiveTab(): TabId | null {
-  return useRouterState({
-    select: (state) => {
-      const matches = state.matches;
-      if (matches.some((m) => m.routeId === "/_dashboard/$mailboxId/triage"))
-        return "triage";
-      if (matches.some((m) => m.routeId === "/_dashboard/$mailboxId/todo"))
-        return "todo";
-      if (
-        matches.some((m) =>
-          m.routeId.startsWith("/_dashboard/$mailboxId/views"),
-        )
-      )
-        return null;
-      const inboxRoot = matches.some(
-        (m) =>
-          m.routeId.startsWith("/_dashboard/$mailboxId/inbox") ||
-          m.routeId.startsWith("/_dashboard/$mailboxId/$folder"),
-      );
-      if (inboxRoot) return "inbox";
-      return null;
-    },
-  });
-}
-
-export function MailboxTopbar() {
+export function InboxViewBar() {
   const { mailboxId } = mailboxRoute.useParams();
-  const activeTab = useActiveTab();
+  const queryClient = useQueryClient();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [viewName, setViewName] = useState("");
+  const [ruleForm, setRuleForm] = useState<ViewRuleForm>(EMPTY_RULE_FORM);
+
   const activeViewId = useRouterState({
     select: (state) => {
       const match = state.matches.find((m) =>
@@ -124,23 +81,12 @@ export function MailboxTopbar() {
       return typeof viewId === "string" ? viewId : null;
     },
   });
-  const { openCompose } = useMailCompose();
-  const queryClient = useQueryClient();
-  const [createOpen, setCreateOpen] = useState(false);
-  const [viewName, setViewName] = useState("");
-  const [ruleForm, setRuleForm] = useState<ViewRuleForm>(EMPTY_RULE_FORM);
 
   const splitViewsQuery = useQuery({
     queryKey: splitViewQueryKeys.all(),
     queryFn: fetchSplitViews,
     staleTime: 60_000,
   });
-  const viewCountsQuery = useQuery({
-    queryKey: emailQueryKeys.viewCounts(mailboxId),
-    queryFn: () => fetchViewUnreadCounts(mailboxId),
-    staleTime: 60_000,
-  });
-  const viewCounts = viewCountsQuery.data;
   const pinnedViews = useMemo(
     () =>
       (splitViewsQuery.data ?? [])
@@ -172,118 +118,33 @@ export function MailboxTopbar() {
     },
   });
 
-  const tabRefs = useRef<(HTMLAnchorElement | null)[]>([]);
-  const sliderRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const index = TABS.findIndex((t) => t.id === activeTab);
-    const el = tabRefs.current[index];
-
-    if (!el || !sliderRef.current) return;
-
-    sliderRef.current.style.setProperty("--w", `${el.offsetWidth}px`);
-    sliderRef.current.style.setProperty("--x", `${el.offsetLeft}px`);
-  }, [
-    activeTab,
-    viewCounts?.inbox.messagesUnread,
-    viewCounts?.todo.messagesUnread,
-  ]);
-
-  useEffect(() => {
-    const unread = viewCounts?.inbox.messagesUnread ?? 0;
-    document.title =
-      unread > 0
-        ? `(${formatUnreadCount(unread)}) ${BASE_DOCUMENT_TITLE}`
-        : BASE_DOCUMENT_TITLE;
-
-    return () => {
-      document.title = BASE_DOCUMENT_TITLE;
-    };
-  }, [viewCounts?.inbox.messagesUnread]);
-
   return (
-    <header className="flex shrink-0 items-center gap-1 border-b border-border/40 bg-background p-2">
-      <div className="md:hidden">
-        <MailboxSidebarTrigger />
-      </div>
-
-      <nav className="relative flex h-8 items-center" aria-label="Primary">
-        <div
-          ref={sliderRef}
-          className="pointer-events-none absolute inset-y-0.5 left-0 bg-muted transition-[width,transform] duration-200 ease-out"
-          style={{
-            width: "var(--w)",
-            transform: "translateX(var(--x))",
-          }}
-        />
-
-        {TABS.map((tab, i) => {
-          const unread =
-            tab.id === "inbox"
-              ? (viewCounts?.inbox.messagesUnread ?? 0)
-              : tab.id === "todo"
-                ? (viewCounts?.todo.messagesUnread ?? 0)
-                : 0;
-          return (
-            <Link
-              key={tab.id}
-              ref={(el) => {
-                tabRefs.current[i] = el;
-              }}
-              to={tab.to}
-              params={{ mailboxId }}
-              preload="viewport"
-              className={cn(
-                "z-10 inline-flex h-7 items-center gap-1 px-3 text-center text-sm transition-all duration-150 ease-out hover:text-primary",
-                activeTab == tab.id ? "text-primary" : "text-muted-foreground",
-              )}
-            >
-              <span>{tab.label}</span>
-              {unread > 0 && (
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  ({formatUnreadCount(unread)})
-                </span>
-              )}
-            </Link>
-          );
-        })}
-        {pinnedViews.map((view) => (
-          <Link
-            key={view.id}
-            to="/$mailboxId/views/$viewId"
-            params={{ mailboxId, viewId: view.id }}
-            preload="viewport"
-            className={cn(
-              "z-10 inline-flex h-7 max-w-34 items-center px-3 text-center text-sm transition-all duration-150 ease-out hover:text-primary",
-              activeViewId === view.id
-                ? "bg-muted text-primary"
-                : "text-muted-foreground",
-            )}
-          >
-            <span className="truncate">{view.name}</span>
-          </Link>
-        ))}
-        <button
-          type="button"
-          onClick={() => setCreateOpen(true)}
-          className="z-10 ml-1 inline-flex size-7 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          aria-label="Create view"
-          title="Create view"
+    <>
+      {pinnedViews.map((view) => (
+        <Link
+          key={view.id}
+          to="/$mailboxId/views/$viewId"
+          params={{ mailboxId, viewId: view.id }}
+          preload="viewport"
+          className={cn(
+            "inline-flex h-7 max-w-34 items-center px-2 text-center text-sm transition-colors hover:text-primary",
+            activeViewId === view.id
+              ? "bg-muted text-primary"
+              : "text-muted-foreground",
+          )}
         >
-          <PlusIcon className="size-3.5" />
-        </button>
-      </nav>
-
-      <div className="ml-auto flex items-center gap-1">
-        <FocusWindowToggle />
-        <Button
-          variant={"secondary"}
-          type="button"
-          onClick={() => openCompose()}
-        >
-          New <Kbd className="bg-card">C</Kbd>
-        </Button>
-      </div>
+          <span className="truncate">{view.name}</span>
+        </Link>
+      ))}
+      <button
+        type="button"
+        onClick={() => setCreateOpen(true)}
+        className="inline-flex size-7 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        aria-label="Create view"
+        title="Create view"
+      >
+        <PlusIcon className="size-3.5" />
+      </button>
       <Dialog
         open={createOpen}
         onOpenChange={(open) => {
@@ -408,6 +269,6 @@ export function MailboxTopbar() {
           </form>
         </DialogContent>
       </Dialog>
-    </header>
+    </>
   );
 }

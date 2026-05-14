@@ -312,9 +312,7 @@ export function EmailActions({
       label: email.isRead ? "Mark as unread" : "Mark as read",
       shortcutId: "action:toggle-read",
       action: () =>
-        runCentralAction(email.isRead ? "mark-unread" : "mark-read", {
-          thread: true,
-        }),
+        runCentralAction(email.isRead ? "mark-unread" : "mark-read"),
     },
     {
       icon: isSpam ? TrayIcon : WarningIcon,

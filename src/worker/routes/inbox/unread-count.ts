@@ -4,15 +4,16 @@ import type { Hono } from "hono";
 import { z } from "zod";
 import { mailboxes } from "../../db/schema";
 import { getGmailTokenForMailbox } from "../../lib/gmail/client";
-import { getGmailLabel, listGmailLabels } from "../../lib/gmail/mailbox/labels";
+import {
+  countMessagesWithLabels,
+  getGmailLabel,
+} from "../../lib/gmail/mailbox/labels";
 import type { AppRouteEnv } from "../types";
 import { getUser } from "../../middleware/auth";
 
 const unreadCountSchema = z.object({
   mailboxId: z.coerce.number().int().positive(),
 });
-
-const TODO_LABEL_NAME = "Duomo/To do";
 
 function labelUnreadCount(label: {
   messagesUnread?: number;
@@ -66,22 +67,22 @@ export function registerInboxUnreadCount(api: Hono<AppRouteEnv>) {
       GOOGLE_CLIENT_SECRET: c.env.GOOGLE_CLIENT_SECRET,
     });
 
-    const [inbox, labels] = await Promise.all([
+    const [inbox, importantUnreadInInbox] = await Promise.all([
       getGmailLabel(accessToken, "INBOX"),
-      listGmailLabels(accessToken),
+      countMessagesWithLabels(accessToken, ["IMPORTANT", "INBOX", "UNREAD"]).catch(
+        () => 0,
+      ),
     ]);
-    const todoLabel = labels.find(
-      (label) => label.name?.toLowerCase() === TODO_LABEL_NAME.toLowerCase(),
-    );
-    const todo = todoLabel
-      ? await getGmailLabel(accessToken, todoLabel.id)
-      : null;
 
     return c.json(
       {
         data: {
           inbox: labelUnreadCount(inbox),
-          todo: todo ? labelUnreadCount(todo) : labelUnreadCount({}),
+          important: {
+            messagesUnread: importantUnreadInInbox,
+            threadsUnread: importantUnreadInInbox,
+            syncedAt: Date.now(),
+          },
         },
       },
       200,

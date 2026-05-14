@@ -104,16 +104,18 @@ export function useMailHotkeys({
       "action:toggle-read": {
         action: () => {
           if (!focusedEmail) return;
+          const groupEmails = focusedGroup?.emails ?? [focusedEmail];
+          if (focusedEmail.isRead) {
+            const newestReceived = [...groupEmails]
+              .filter((e) => e.direction !== "sent")
+              .sort((a, b) => b.date - a.date)[0];
+            const target = newestReceived ?? groupEmails[0] ?? focusedEmail;
+            onAction("mark-unread", [target.id]);
+            return;
+          }
           onAction(
-            focusedEmail.isRead ? "mark-unread" : "mark-read",
-            focusedGroup?.emails.map((email) => email.id) ?? [focusedEmail.id],
-            focusedGroup?.threadId && focusedEmail.mailboxId
-              ? {
-                  threadId: focusedGroup.threadId,
-                  mailboxId: focusedEmail.mailboxId,
-                  labelIds: focusedEmail.labelIds,
-                }
-              : undefined,
+            "mark-read",
+            groupEmails.map((email) => email.id),
           );
         },
         enabled: enabled && Boolean(focusedEmail),
@@ -192,42 +194,37 @@ export function useMailHotkeys({
     return () => clearFocusedEmail();
   }, []);
 
-  useEffect(() => {
-    setFocusedId(null);
-  }, [view]);
-
-  // Reset focus when the list is fully swapped out (e.g. view change → empty).
-  useEffect(() => {
-    if (!enabled || groups.length === 0) setFocusedId(null);
-  }, [enabled, groups.length]);
-
   const initializedRef = useRef(false);
-
-  useEffect(() => {
-    initializedRef.current = false;
-  }, [view]);
 
   useEffect(() => {
     if (!enabled || groups.length === 0) {
       initializedRef.current = false;
+      setFocusedId((current) => (current === null ? current : null));
       return;
     }
+
     if (initializedRef.current) return;
+
     const newestReceivedId =
       groups.find((group) => group.representative.direction === "received")
         ?.representative.id ?? null;
     const defaultId = newestReceivedId ?? groups[0]?.representative.id ?? null;
     if (!defaultId) return;
+
+    initializedRef.current = true;
     setFocusedId((current) => {
-      const exists = current
-        ? groups.some((group) => group.representative.id === current)
-        : false;
+      if (current === null) {
+        onFocusChange?.(defaultId);
+        return defaultId;
+      }
+      const exists = groups.some(
+        (group) => group.representative.id === current,
+      );
       const next = exists ? current : defaultId;
       if (next !== current) onFocusChange?.(next);
-      initializedRef.current = true;
       return next;
     });
-  }, [enabled, groups, onFocusChange, view]);
+  }, [enabled, groups, onFocusChange]);
 
   return { focusedIndex: enabled ? focusedIndex : -1, setFocusedId };
 }

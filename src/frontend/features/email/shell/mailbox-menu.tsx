@@ -10,6 +10,7 @@ import {
 import { isInternalLabelName } from "@/features/email/labels/internal-labels";
 import { fetchLabels } from "@/features/email/labels/queries";
 import { labelQueryKeys } from "@/features/email/labels/query-keys";
+import { useMailCompose } from "@/features/email/mail/compose/compose-context";
 import { beginGmailConnection } from "@/features/onboarding/mutations";
 import { getMailboxDisplayEmail, useMailboxes } from "@/hooks/use-mailboxes";
 import { shortcutKey } from "@/lib/shortcuts";
@@ -22,6 +23,7 @@ import {
   GearSixIcon,
   ListIcon,
   MagnifyingGlassIcon,
+  NotePencilIcon,
   PaperPlaneTiltIcon,
   PlusIcon,
   StarIcon,
@@ -80,22 +82,6 @@ function getMailboxSwitchRoute(
   to: string;
   getParams: (mailboxId: number) => Record<string, unknown>;
 } {
-  if (
-    matches.some((match) => match.routeId === "/_dashboard/$mailboxId/triage")
-  ) {
-    return {
-      to: "/$mailboxId/triage",
-      getParams: (mailboxId) => ({ mailboxId }),
-    };
-  }
-  if (
-    matches.some((match) => match.routeId === "/_dashboard/$mailboxId/todo")
-  ) {
-    return {
-      to: "/$mailboxId/todo",
-      getParams: (mailboxId) => ({ mailboxId }),
-    };
-  }
   if (
     matches.some(
       (match) => match.routeId === "/_dashboard/$mailboxId/inbox/drafts",
@@ -292,6 +278,7 @@ function MailboxSidebarContent({
   const switchRoute = useRouterState({
     select: (state) => getMailboxSwitchRoute(state.matches),
   });
+  const { openCompose } = useMailCompose();
   const activeRoute = routeState.routeIds.join(" ");
   const activeAccount = accounts.find(
     (account) => account.mailboxId === mailboxId,
@@ -374,6 +361,39 @@ function MailboxSidebarContent({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
+        <SidebarSection title="Compose" hideTitle expanded={expanded}>
+          <button
+            type="button"
+            title="New email"
+            className={cn(
+              "flex h-8 w-full items-center gap-3 overflow-hidden border border-dashed border-blue-900/40 px-2 text-left text-xs text-blue-900 transition-colors hover:bg-blue-900/5",
+              "dark:border-blue-50/40 dark:text-blue-50 dark:hover:bg-blue-50/5",
+            )}
+            onClick={() => {
+              openCompose();
+              onNavigate?.();
+            }}
+          >
+            <NotePencilIcon className="size-3.5 shrink-0" />
+            <span
+              className={cn(
+                "min-w-0 flex-1 truncate opacity-0 transition-opacity duration-100 group-hover/sidebar:opacity-100",
+                expanded && "opacity-100",
+              )}
+            >
+              New
+            </span>
+            <Kbd
+              className={cn(
+                "hidden group-hover/sidebar:inline-flex",
+                expanded && "inline-flex",
+              )}
+            >
+              {shortcutKey("action:compose")}
+            </Kbd>
+          </button>
+        </SidebarSection>
+
         <SidebarSection title="Mail" hideTitle expanded={expanded}>
           {mailSidebarItems.map((item) => {
             const active =

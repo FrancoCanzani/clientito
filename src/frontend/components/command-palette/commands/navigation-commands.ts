@@ -1,6 +1,5 @@
 import {
   BookOpenIcon,
-  BookmarkSimpleIcon,
   CheckIcon,
   EnvelopeIcon,
   FileDashedIcon,
@@ -93,8 +92,6 @@ function navigateToMailboxPath(
   to:
     | "/$mailboxId/inbox/drafts"
     | "/$mailboxId/inbox/search"
-    | "/$mailboxId/triage"
-    | "/$mailboxId/todo"
     | "/$mailboxId/subscriptions",
   services: CommandServices,
 ) {
@@ -113,22 +110,6 @@ const navigationCommands: Command[] = [
  keywords: ["inbox", "home"],
  when: (ctx) => ctx.currentView !== "inbox",
  perform: (mailboxId, services) => navigateToInbox(mailboxId, services),
- }),
- makeNavCommand({
- id: "nav:triage",
- label: "Triage",
- icon: paletteIcon(FlagIcon),
- keywords: ["triage", "process", "focus"],
- perform: (mailboxId, services) =>
- navigateToMailboxPath(mailboxId, "/$mailboxId/triage", services),
- }),
- makeNavCommand({
- id: "nav:todo",
- label: "To do",
- icon: paletteIcon(BookmarkSimpleIcon),
- keywords: ["todo", "to-do", "task"],
- perform: (mailboxId, services) =>
- navigateToMailboxPath(mailboxId, "/$mailboxId/todo", services),
  }),
  makeNavCommand({
  id: "nav:important",

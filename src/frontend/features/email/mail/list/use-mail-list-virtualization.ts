@@ -8,7 +8,6 @@ export function useMailListVirtualization({
   scrollRef,
   rowHeight,
   loadedCount,
-  isInitialPagePending,
   hasNextPage,
   isFetching,
   isFetchingNextPage,
@@ -17,19 +16,16 @@ export function useMailListVirtualization({
   scrollRef: RefObject<HTMLDivElement | null>;
   rowHeight: number;
   loadedCount: number;
-  isInitialPagePending: boolean;
   hasNextPage: boolean;
   isFetching: boolean;
   isFetchingNextPage: boolean;
   fetchNextPage: () => Promise<unknown>;
 }) {
   const placeholderCount =
-    isInitialPagePending || hasNextPage || isFetchingNextPage
+    loadedCount > 0 && (hasNextPage || isFetchingNextPage)
       ? VIEW_PAGE_SIZE
       : 0;
-  const virtualCount = isInitialPagePending
-    ? placeholderCount
-    : loadedCount + placeholderCount;
+  const virtualCount = loadedCount + placeholderCount;
 
   const virtualizer = useVirtualizer({
     count: virtualCount,

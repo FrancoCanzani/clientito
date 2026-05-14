@@ -149,18 +149,6 @@ function isLabelScopedQuery(queryKey: QueryKey, labelId: string) {
  return queryKey[0] === "emails" && queryKey[1] === labelId;
 }
 
-function isTodoQueryForLabel(
- queryKey: QueryKey,
- data: InfiniteData<EmailListPage & { label?: { gmailId?: string } | null }>,
- labelId: string,
-) {
- return (
- queryKey[0] === "emails" &&
- queryKey[1] === "todo" &&
- data.pages.some((page) => page.label?.gmailId === labelId)
- );
-}
-
 function patchLabelListData<T extends EmailListPage>(
  queryKey: QueryKey,
  current: InfiniteData<T> | undefined,
@@ -169,12 +157,7 @@ function patchLabelListData<T extends EmailListPage>(
  apply: boolean,
 ): InfiniteData<T> | undefined {
  if (!current) return current;
- const maybeTodoData =
- current as InfiniteData<EmailListPage & { label?: { gmailId?: string } | null }>;
- const shouldRemove =
- !apply &&
- (isLabelScopedQuery(queryKey, labelId) ||
- isTodoQueryForLabel(queryKey, maybeTodoData, labelId));
+ const shouldRemove = !apply && isLabelScopedQuery(queryKey, labelId);
 
  let changed = false;
  const pages = current.pages.map((page) => {

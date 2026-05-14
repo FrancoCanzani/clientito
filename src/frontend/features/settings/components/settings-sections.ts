@@ -6,6 +6,7 @@ export type SettingsSectionTo =
   | "/$mailboxId/settings/templates"
   | "/$mailboxId/settings/labels"
   | "/$mailboxId/settings/ai"
+  | "/$mailboxId/settings/performance"
   | "/$mailboxId/settings/danger";
 
 export type SettingsSection = {
@@ -17,7 +18,7 @@ export type SettingsSection = {
   destructive?: boolean;
 };
 
-export type SettingsGroup = "General" | "Mail" | "Safety";
+export type SettingsGroup = "General" | "Mail" | "Diagnostics" | "Safety";
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   {
@@ -71,6 +72,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     description: "Control AI-powered features for this mailbox.",
   },
   {
+    to: "/$mailboxId/settings/performance",
+    routeId: "/_dashboard/$mailboxId/settings/performance",
+    group: "Diagnostics",
+    title: "Performance",
+    description:
+      "Latency stats for local DB and worker operations. Useful for spotting regressions.",
+  },
+  {
     to: "/$mailboxId/settings/danger",
     routeId: "/_dashboard/$mailboxId/settings/danger",
     group: "Safety",
@@ -83,6 +92,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
 export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   "General",
   "Mail",
+  "Diagnostics",
   "Safety",
 ];
 

@@ -2,9 +2,13 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
 import * as authSchema from "./src/worker/db/auth-schema";
+import { createResilientD1 } from "./src/worker/db/d1-resilient";
 
 export function auth(env: Env) {
-  const db = drizzle(env.DB, { schema: authSchema, casing: "snake_case" });
+  const db = drizzle(createResilientD1(env.DB), {
+    schema: authSchema,
+    casing: "snake_case",
+  });
 
   return betterAuth({
     database: drizzleAdapter(db, {
@@ -24,6 +28,7 @@ export function auth(env: Env) {
           "openid",
           "email",
           "profile",
+          "https://mail.google.com/",
           "https://www.googleapis.com/auth/gmail.readonly",
           "https://www.googleapis.com/auth/gmail.modify",
           "https://www.googleapis.com/auth/gmail.send",

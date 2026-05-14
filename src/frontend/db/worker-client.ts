@@ -1,4 +1,5 @@
 import * as Comlink from "comlink";
+import dedicatedWorkerUrl from "./db.dedicated-worker.ts?worker&url";
 import sharedWorkerUrl from "./db.shared-worker.ts?worker&url";
 import {
   clearStats as clearTabStats,
@@ -46,11 +47,6 @@ function profileLabel(sql: string): string {
   return `db.${word}.${table}${s.includes("LIMIT 1") ? ":1" : ""}`;
 }
 
-const DEDICATED_WORKER_URL = new URL(
-  "./db.dedicated-worker.ts",
-  import.meta.url,
-);
-
 type Connection = {
   terminate: () => void;
   api: Comlink.Remote<WorkerApi>;
@@ -61,7 +57,7 @@ type OwnerApi = WorkerApi & {
 };
 
 function connectDedicated(): Connection {
-  const worker = new Worker(DEDICATED_WORKER_URL, { type: "module" });
+  const worker = new Worker(dedicatedWorkerUrl, { type: "module" });
   return {
     terminate: () => worker.terminate(),
     api: Comlink.wrap<WorkerApi>(worker),

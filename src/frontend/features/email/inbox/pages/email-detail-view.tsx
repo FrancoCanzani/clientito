@@ -20,7 +20,6 @@ import { buildForwardedEmailHtml } from "@/features/email/mail/utils/build-forwa
 import { isEmailListInfiniteData } from "@/features/email/mail/utils/email-list-cache";
 import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
 import { openEmail as openInboxEmail } from "@/features/email/mail/utils/open-email";
-import { MailboxPage } from "@/features/email/shell/mailbox-page";
 import { clearFocusedEmail, setFocusedEmail } from "@/hooks/use-focused-email";
 import { useShortcuts } from "@/hooks/use-shortcuts";
 import {
@@ -416,7 +415,7 @@ function EmailDetailPane({
       void executeEmailAction(
         currentEmail.isRead ? "mark-unread" : "mark-read",
         [currentEmail.id],
-        threadIdentifier ?? undefined,
+        undefined,
         { identifiers: [emailIdentifier] },
       );
     },
@@ -424,8 +423,8 @@ function EmailDetailPane({
     "action:esc": () => goBack(),
   });
 
-  const content = (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+  return (
+    <div className="flex h-full min-h-0 min-w-0 flex-col bg-background">
       <EmailDetailContent
         ref={contentRef}
         email={currentEmail}
@@ -439,9 +438,8 @@ function EmailDetailPane({
         hasNext={canNavigateNext}
         onForward={handleForward}
         onAction={executeEmailAction}
+        embedded={embedded}
       />
     </div>
   );
-
-  return embedded ? content : <MailboxPage>{content}</MailboxPage>;
 }
