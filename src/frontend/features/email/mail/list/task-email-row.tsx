@@ -5,7 +5,7 @@ import { formatInboxRowDate } from "../utils/formatters";
 import { type EmailRowProps, useEmailRowModel } from "./email-row-model";
 
 export const TaskEmailRow = memo(function TaskEmailRow({
- isFocused = false,
+ isFocused: _isFocused = false,
  isSelected = false,
  ...props
 }: EmailRowProps) {

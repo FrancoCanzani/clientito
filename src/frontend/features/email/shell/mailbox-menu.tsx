@@ -381,7 +381,7 @@ function MailboxSidebarContent({
                 expanded && "opacity-100",
               )}
             >
-              New
+              New email
             </span>
             <Kbd
               className={cn(

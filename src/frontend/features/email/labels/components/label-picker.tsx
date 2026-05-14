@@ -8,13 +8,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { PlusIcon, TagIcon } from "@phosphor-icons/react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { applyLabel, createLabel, removeLabel } from "../mutations";
 import { isInternalLabelName } from "../internal-labels";
 import { fetchLabels } from "../queries";
 import type { Label } from "../types";
+import { invalidateInboxQueries } from "../../mail/data/invalidation";
 
 type LabelPickerProps = {
   mailboxId: number;
@@ -33,11 +34,18 @@ export function LabelPicker({
   trigger,
   onDone,
 }: LabelPickerProps) {
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+ const [search, setSearch] = useState("");
  const [optimisticIds, setOptimisticIds] = useState<Set<string>>(
  new Set(appliedLabelIds),
  );
+ const optimisticIdsRef = useRef(new Set(appliedLabelIds));
+
+ function setOptimisticLabelIds(next: Set<string>) {
+ optimisticIdsRef.current = next;
+ setOptimisticIds(next);
+ }
 
  const labelsQuery = useQuery({
  queryKey: labelQueryKeys.list(mailboxId),
@@ -55,15 +63,24 @@ export function LabelPicker({
  ? applyLabel(emailIds, labelId, mailboxId)
  : removeLabel(emailIds, labelId, mailboxId),
  onMutate: ({ labelId, apply }) => {
- const previous = optimisticIds;
+ const previous = new Set(optimisticIdsRef.current);
  const next = new Set(previous);
  if (apply) next.add(labelId);
  else next.delete(labelId);
- setOptimisticIds(next);
+ setOptimisticLabelIds(next);
  return { previous };
  },
+ onSuccess: async () => {
+ invalidateInboxQueries();
+ await Promise.all([
+ queryClient.invalidateQueries({ queryKey: ["emails"] }),
+ queryClient.invalidateQueries({ queryKey: labelQueryKeys.list(mailboxId) }),
+ queryClient.invalidateQueries({ queryKey: ["email-detail"] }),
+ queryClient.invalidateQueries({ queryKey: ["email-thread"] }),
+ ]);
+ },
  onError: (error, _vars, context) => {
- if (context) setOptimisticIds(context.previous);
+ if (context) setOptimisticLabelIds(context.previous);
  toast.error(error.message || "Failed to update label");
  },
  });
@@ -75,8 +92,17 @@ export function LabelPicker({
  return label;
  },
  onSuccess: (label) => {
- setOptimisticIds((prev) => new Set(prev).add(label.gmailId));
+ const next = new Set(optimisticIdsRef.current);
+ next.add(label.gmailId);
+ setOptimisticLabelIds(next);
  setSearch("");
+ invalidateInboxQueries();
+ void Promise.all([
+ queryClient.invalidateQueries({ queryKey: ["emails"] }),
+ queryClient.invalidateQueries({ queryKey: labelQueryKeys.list(mailboxId) }),
+ queryClient.invalidateQueries({ queryKey: ["email-detail"] }),
+ queryClient.invalidateQueries({ queryKey: ["email-thread"] }),
+ ]);
  },
  onError: (error: Error) => {
  toast.error(error.message || "Failed to create label");
@@ -111,7 +137,7 @@ export function LabelPicker({
  onOpenChange={(v) => {
  setOpen(v);
  if (v) {
- setOptimisticIds(new Set(appliedLabelIds));
+ setOptimisticLabelIds(new Set(appliedLabelIds));
  } else {
  setSearch("");
  onDone?.();

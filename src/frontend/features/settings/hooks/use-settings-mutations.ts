@@ -23,6 +23,9 @@ export function useSettingsMutations({
  const addAccountMutation = useMutation({
  mutationFn: () =>
  beginGmailConnection(`${window.location.pathname}?connected=1`),
+ onSuccess: async () => {
+ await queryClient.invalidateQueries({ queryKey: accountQueryKeys.all() });
+ },
  onError: () => toast.error("Failed to connect Gmail account"),
  });
 

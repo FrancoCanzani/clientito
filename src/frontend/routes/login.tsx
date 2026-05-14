@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { GMAIL_SCOPES } from "@/features/onboarding/mutations";
 import { signIn } from "@/lib/auth-client";
+import { queryClient } from "@/lib/query-client";
 import { CircleNotchIcon, GoogleLogoIcon } from "@phosphor-icons/react";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -22,6 +23,9 @@ function LoginRoute() {
       if (result?.error) {
         throw new Error(result.error.message || "Google sign in failed.");
       }
+    },
+    onSuccess: () => {
+      queryClient.clear();
     },
     onError: (error) => {
       toast.error(error.message);

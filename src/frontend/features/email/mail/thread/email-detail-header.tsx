@@ -55,6 +55,7 @@ export function EmailDetailHeader({
  >
  <ArrowLeftIcon className="size-3.5" />
  </IconButton>
+ <div className="hidden items-center gap-0.5 md:flex">
  <IconButton
  label="Previous"
   shortcut={shortcutKey("detail:prev")}
@@ -75,6 +76,7 @@ export function EmailDetailHeader({
  >
  <CaretDownIcon className="size-3.5" />
  </IconButton>
+ </div>
  </div>
 
 <EmailActions

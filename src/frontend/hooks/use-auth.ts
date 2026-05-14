@@ -1,5 +1,6 @@
 import { forceSignOut } from "@/lib/app-version";
 import { useSession } from "@/lib/auth-client";
+import { queryClient } from "@/lib/query-client";
 import { useMutation } from "@tanstack/react-query";
 
 export function useAuth() {
@@ -17,5 +18,8 @@ export function useAuth() {
 export function useLogout() {
  return useMutation({
  mutationFn: () => forceSignOut("user_logout"),
+ onSuccess: () => {
+ queryClient.clear();
+ },
  });
 }

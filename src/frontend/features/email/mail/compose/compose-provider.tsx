@@ -2,65 +2,129 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import type { ComposeInitial } from "../types";
+import {
+  MailComposeContext,
+  type ComposerMode,
+  type ComposerState,
+  type ComposerWindow,
+} from "./compose-context";
+import { ComposeDock } from "./compose-dock";
+import { getComposePanelKey } from "./compose-email-state";
 import { registerOpenComposeListener } from "./compose-events";
-import { MailComposeContext } from "./compose-context";
-import { ComposePanel } from "./compose-panel";
+
+const MAX_EXPANDED_DOCK = 3;
 
 export function MailComposeProvider({ children }: { children: ReactNode }) {
- const router = useRouter();
- const [isOpen, setIsOpen] = useState(false);
- const [initial, setInitial] = useState<ComposeInitial | undefined>();
- const mailboxIdParam = router.state.matches.find(
- (match) => match.routeId === "/_dashboard/$mailboxId",
- )?.params.mailboxId;
- const activeMailboxId =
- mailboxIdParam != null ? Number(mailboxIdParam) : undefined;
+  const router = useRouter();
+  const [composers, setComposers] = useState<ComposerWindow[]>([]);
+  const mailboxIdParam = router.state.matches.find(
+    (match) => match.routeId === "/_dashboard/$mailboxId",
+  )?.params.mailboxId;
+  const activeMailboxId =
+    mailboxIdParam != null ? Number(mailboxIdParam) : undefined;
 
- const openCompose = useCallback(
- (nextInitial?: ComposeInitial) => {
- const composeKey =
- nextInitial?.composeKey ??
- (nextInitial?.threadId
- ? `reply:${nextInitial.threadId}`
- : `new:${crypto.randomUUID()}`);
- setInitial({
- ...nextInitial,
- composeKey,
- mailboxId: nextInitial?.mailboxId ?? activeMailboxId,
- });
- setIsOpen(true);
- },
- [activeMailboxId],
- );
+  const openCompose = useCallback(
+    (nextInitial?: ComposeInitial) => {
+      const seededInitial: ComposeInitial = {
+        ...nextInitial,
+        mailboxId: nextInitial?.mailboxId ?? activeMailboxId,
+      };
+      const hasStableIdentity =
+        Boolean(nextInitial?.composeKey) || Boolean(nextInitial?.threadId);
+      const id = hasStableIdentity
+        ? getComposePanelKey(seededInitial)
+        : `new:${crypto.randomUUID()}`;
+      const initialWithKey: ComposeInitial = {
+        ...seededInitial,
+        composeKey: id,
+      };
 
- const closeCompose = useCallback(() => {
- setIsOpen(false);
- setInitial(undefined);
- }, []);
+      setComposers((prev) => {
+        const existing = prev.find((c) => c.id === id);
+        if (existing) {
+          const rest = prev.filter((c) => c.id !== id);
+          return [
+            ...rest,
+            { ...existing, state: "expanded" },
+          ];
+        }
 
- useEffect(
- () =>
- registerOpenComposeListener((nextInitial) => {
- openCompose(nextInitial);
- }),
- [openCompose],
- );
+        const next: ComposerWindow = {
+          id,
+          initial: initialWithKey,
+          mode: "dock",
+          state: "expanded",
+        };
 
- const value = useMemo(
- () => ({ openCompose, closeCompose, isOpen, initial }),
- [openCompose, closeCompose, isOpen, initial],
- );
+        const merged = [...prev, next];
+        const expandedDock = merged.filter(
+          (c) => c.mode === "dock" && c.state === "expanded",
+        );
+        if (expandedDock.length > MAX_EXPANDED_DOCK) {
+          const toMinimize = expandedDock
+            .slice(0, expandedDock.length - MAX_EXPANDED_DOCK)
+            .map((c) => c.id);
+          return merged.map((c) =>
+            toMinimize.includes(c.id) && c.id !== next.id
+              ? { ...c, state: "minimized" as ComposerState }
+              : c,
+          );
+        }
+        return merged;
+      });
+    },
+    [activeMailboxId],
+  );
 
- return (
- <MailComposeContext.Provider value={value}>
- {children}
- <ComposePanel
- open={isOpen}
- initial={initial}
- onOpenChange={(open) => {
- if (!open) closeCompose();
- }}
- />
- </MailComposeContext.Provider>
- );
+  const closeCompose = useCallback((id: string) => {
+    setComposers((prev) => prev.filter((c) => c.id !== id));
+  }, []);
+
+  const setComposerMode = useCallback((id: string, mode: ComposerMode) => {
+    setComposers((prev) =>
+      prev.map((c) =>
+        c.id === id ? { ...c, mode, state: "expanded" as ComposerState } : c,
+      ),
+    );
+  }, []);
+
+  const setComposerState = useCallback(
+    (id: string, state: ComposerState) => {
+      setComposers((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, state } : c)),
+      );
+    },
+    [],
+  );
+
+  useEffect(
+    () =>
+      registerOpenComposeListener((nextInitial) => {
+        openCompose(nextInitial);
+      }),
+    [openCompose],
+  );
+
+  const value = useMemo(
+    () => ({
+      composers,
+      openCompose,
+      closeCompose,
+      setComposerMode,
+      setComposerState,
+    }),
+    [composers, openCompose, closeCompose, setComposerMode, setComposerState],
+  );
+
+  return (
+    <MailComposeContext.Provider value={value}>
+      {children}
+      <ComposeDock
+        composers={composers}
+        closeCompose={closeCompose}
+        setComposerMode={setComposerMode}
+        setComposerState={setComposerState}
+      />
+    </MailComposeContext.Provider>
+  );
 }

@@ -132,6 +132,11 @@ export function EmailActions({
       patchEmail(emailIdentifier, { snoozedUntil: timestamp }),
     onSuccess: (_data, timestamp) => {
       toast.success(timestamp ? "Snoozed" : "Unsnoozed");
+      invalidateEmails();
+      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      void queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.detail(email.id),
+      });
       if (timestamp && mailboxId != null) {
         void navigate({ to: "/$mailboxId/inbox", params: { mailboxId } });
       }
@@ -142,6 +147,16 @@ export function EmailActions({
   const removeLabelMutation = useMutation({
     mutationFn: (labelId: string) =>
       removeLabel([email.providerMessageId], labelId, resolvedMailboxId),
+    onSuccess: () => {
+      invalidateEmails();
+      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      void queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.detail(email.id),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: labelQueryKeys.list(resolvedMailboxId),
+      });
+    },
     onError: (error: Error) =>
       toast.error(error.message || "Failed to remove label"),
   });
@@ -154,6 +169,10 @@ export function EmailActions({
         unsubscribeEmail: email.unsubscribeEmail ?? undefined,
       }),
     onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      void queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.detail(email.id),
+      });
       if (result.method === "manual" && result.url) {
         window.open(result.url, "_blank", "noopener,noreferrer");
         toast.info("Opened unsubscribe page in a new tab");
@@ -187,6 +206,10 @@ export function EmailActions({
           : "Sender blocked",
       );
       invalidateEmails();
+      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      void queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.detail(email.id),
+      });
       onClose?.();
     },
     onError: (error: Error) => toast.error(error.message),

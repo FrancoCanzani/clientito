@@ -6,7 +6,7 @@ import { EmailRowContextMenu } from "./email-row-context-menu";
 import { type EmailRowProps, useEmailRowModel } from "./email-row-model";
 
 export const SplitEmailRow = memo(function SplitEmailRow({
-  isFocused = false,
+  isFocused: _isFocused = false,
   isSelected = false,
   ...props
 }: EmailRowProps) {

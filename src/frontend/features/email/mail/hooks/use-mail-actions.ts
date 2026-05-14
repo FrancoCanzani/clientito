@@ -170,6 +170,19 @@ export function useMailActions({
         invalidateEmailDetail(id);
       }
     },
+    onSuccess: (_data, { ids, thread }) => {
+      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      if (thread?.threadId) {
+        void queryClient.invalidateQueries({
+          queryKey: emailQueryKeys.thread(thread.threadId),
+        });
+      }
+      for (const id of ids) {
+        void queryClient.invalidateQueries({
+          queryKey: emailQueryKeys.detail(id),
+        });
+      }
+    },
   });
 
   const executeEmailAction = useCallback(
@@ -291,8 +304,16 @@ export function useMailActions({
       try {
         if (target.kind === "thread") {
           await patchThread(target.thread, { snoozedUntil: timestamp });
+          void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+          void queryClient.invalidateQueries({
+            queryKey: emailQueryKeys.thread(target.thread.threadId),
+          });
         } else {
           await patchEmail(target.identifier, { snoozedUntil: timestamp });
+          void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+          void queryClient.invalidateQueries({
+            queryKey: emailQueryKeys.detail(target.identifier.id),
+          });
         }
       } catch (error) {
         toast.error(
@@ -300,7 +321,7 @@ export function useMailActions({
         );
       }
     },
-    [],
+    [queryClient],
   );
 
   const unsubscribeMutation = useMutation({
@@ -310,7 +331,11 @@ export function useMailActions({
         unsubscribeUrl: email.unsubscribeUrl ?? undefined,
         unsubscribeEmail: email.unsubscribeEmail ?? undefined,
       }),
-    onSuccess: (result) => {
+    onSuccess: (result, email) => {
+      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      void queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.detail(email.id),
+      });
       if (result.method === "manual" && result.url) {
         window.open(result.url, "_blank", "noopener,noreferrer");
         toast.info("Opened unsubscribe page");
