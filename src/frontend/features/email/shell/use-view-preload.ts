@@ -1,7 +1,7 @@
 import { useInboxData } from "@/features/email/inbox/hooks/use-inbox-data";
-import { fetchLocalViewPage } from "@/features/email/mail/data/view-pages";
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
-import type { EmailListPage } from "@/features/email/mail/types";
+import { fetchLocalViewPage } from "@/features/email/mail/shared/data/view-pages";
+import { emailQueryKeys } from "@/features/email/mail/shared/query-keys";
+import type { EmailListPage } from "@/features/email/mail/shared/types";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect } from "react";

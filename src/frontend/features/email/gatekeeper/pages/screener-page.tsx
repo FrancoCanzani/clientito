@@ -10,8 +10,8 @@ import {
   useGatekeeperDecision,
   useGatekeeperPending,
 } from "@/features/email/gatekeeper/queries";
-import type { EmailListItem } from "@/features/email/mail/types";
-import { formatInboxRowDate } from "@/features/email/mail/utils/formatters";
+import type { EmailListItem } from "@/features/email/mail/shared/types";
+import { formatInboxRowDate } from "@/features/email/mail/shared/utils/formatters";
 import {
   MailboxPage,
   MailboxPageBody,

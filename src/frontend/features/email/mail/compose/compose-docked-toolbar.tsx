@@ -7,13 +7,13 @@ import { cn } from "@/lib/utils";
 import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
 import { Fragment, useCallback, useMemo, useRef, useState } from "react";
-import { getComposeToolbarGroups } from "./compose-toolbar-commands";
+import { getComposeToolbarGroups } from "@/features/email/mail/compose/compose-toolbar-commands";
 import {
   HeadingSelect,
   LinkEditor,
   ToolbarButton,
-} from "./compose-toolbar-shared";
-import { normalizeLink } from "./compose-toolbar-utils";
+} from "@/features/email/mail/compose/compose-toolbar-shared";
+import { normalizeLink } from "@/features/email/mail/compose/compose-toolbar-utils";
 
 export function ComposeDockedToolbar({
   editor,

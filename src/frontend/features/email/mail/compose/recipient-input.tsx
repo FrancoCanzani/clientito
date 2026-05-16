@@ -1,4 +1,4 @@
-import { fetchContactSuggestions } from "@/features/email/mail/data/contacts";
+import { fetchContactSuggestions } from "@/features/email/mail/shared/data/contacts";
 import { XIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
@@ -19,90 +19,56 @@ type RecipientInputProps = {
  onAdvanceFocus?: () => void;
 };
 
-function parseRecipients(raw: string): string[] {
+function parseRecipientsFromString(raw: string): string[] {
  return raw
  .split(",")
- .flatMap((s) => {
- const recipient = s.trim();
- return recipient ? [recipient] : [];
- });
+ .map((s) => s.trim())
+ .filter(Boolean);
 }
 
-function parseEmailAddressesFromString(raw: string): string[] {
- const matches: string[] = [];
- for (const match of raw.matchAll(
- /<?([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})>?/gi,
- )) {
- const email = match[1]?.trim();
- if (email) matches.push(email);
+function extractEmailsFromText(raw: string): {
+ valid: string[];
+ invalid: string[];
+} {
+ const valid: string[] = [];
+ const invalid: string[] = [];
+
+ const withBrackets = Array.from(
+ raw.matchAll(/<([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})>/gi),
+ ).map((m) => m[1]!.trim());
+ if (withBrackets.length > 0) {
+ return { valid: withBrackets, invalid: [] };
  }
 
- if (matches.length > 0) {
- return matches;
- }
-
- return raw
+ const parts = raw
  .split(/[\n,;\s]+/)
- .flatMap((part) => {
- const email = part.trim();
- return email && emailSchema.safeParse(email).success ? [email] : [];
- });
-}
+ .map((part) => part.trim())
+ .filter(Boolean);
 
-function dedupeRecipients(emails: string[]): string[] {
- const seen = new Set<string>();
- const deduped: string[] = [];
-
- for (const email of emails) {
- const normalized = email.trim();
- const key = normalized.toLowerCase();
- if (!normalized || seen.has(key)) continue;
- seen.add(key);
- deduped.push(normalized);
+ for (const part of parts) {
+ if (emailSchema.safeParse(part).success) valid.push(part);
+ else invalid.push(part);
  }
 
- return deduped;
+ return { valid, invalid };
 }
 
-function joinRecipients(emails: string[]): string {
- return emails.join(", ");
+function dedupeEmails(emails: string[]): string[] {
+ const seen = new Set<string>();
+ const result: string[] = [];
+ for (const email of emails) {
+ const key = email.trim().toLowerCase();
+ if (!key || seen.has(key)) continue;
+ seen.add(key);
+ result.push(email.trim());
+ }
+ return result;
 }
 
 function formatRecipientLabel(email: string, name?: string | null): string {
  const trimmedName = name?.trim();
- if (!trimmedName) return email;
+ if (!trimmedName || trimmedName === email) return email;
  return `${trimmedName} <${email}>`;
-}
-
-function estimateChipWidth(label: string): number {
- return Math.min(label.length, 48) * 7 + 26;
-}
-
-function buildCollapsedPreview(labels: string[], containerWidth: number): string {
- if (labels.length === 0) return "";
- if (containerWidth <= 0) {
- const remaining = Math.max(labels.length - 1, 0);
- return remaining > 0 ? `${labels[0]} +${remaining} more` : labels[0];
- }
-
- const allowance = Math.max(120, containerWidth - 20);
- let used = 0;
- let visibleCount = 0;
-
- for (const label of labels) {
- const next = estimateChipWidth(label);
- if (visibleCount > 0 && used + next > allowance) {
- break;
- }
- used += next;
- visibleCount += 1;
- }
-
- const visible = labels.slice(0, Math.max(visibleCount, 1));
- const hiddenCount = Math.max(labels.length - visible.length, 0);
- const base = visible.join(", ");
-
- return hiddenCount > 0 ? `${base} +${hiddenCount} more` : base;
 }
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
@@ -118,131 +84,96 @@ export function RecipientInput({
  onAdvanceFocus,
 }: RecipientInputProps) {
  const { mailboxId } = mailboxRoute.useParams();
- const chips = useMemo(() => parseRecipients(value), [value]);
+
+ const [chips, setChips] = useState<string[]>(() =>
+ parseRecipientsFromString(value),
+ );
  const [inputValue, setInputValue] = useState("");
  const [open, setOpen] = useState(false);
  const [selectedIndex, setSelectedIndex] = useState(0);
- const [nameMap, setNameMap] = useState<Map<string, string>>(new Map());
- const [isInputFocused, setIsInputFocused] = useState(Boolean(autoFocus));
- const [editingIndex, setEditingIndex] = useState<number | null>(null);
- const [editingValue, setEditingValue] = useState("");
- const [containerWidth, setContainerWidth] = useState(0);
- const containerRef = useRef<HTMLDivElement>(null);
+ const nameMapRef = useRef<Map<string, string>>(new Map());
  const inputRef = useRef<HTMLInputElement>(null);
- const editingInputRef = useRef<HTMLInputElement>(null);
+ const containerRef = useRef<HTMLDivElement>(null);
+ const lastEmittedRef = useRef(value);
 
- const [debouncedInput] = useDebounce(inputValue, 100);
+ useEffect(() => {
+ const incoming = parseRecipientsFromString(value);
+ if (value === lastEmittedRef.current) return;
+ setChips(dedupeEmails(incoming));
+ }, [value]);
+
+ useEffect(() => {
+ const next = chips.join(", ");
+ if (next === lastEmittedRef.current) return;
+ lastEmittedRef.current = next;
+ onChange(next);
+ }, [chips, onChange]);
+
+ const [debouncedInput] = useDebounce(inputValue, 80);
  const debouncedQuery = debouncedInput.trim();
 
  const { data } = useQuery({
- queryKey: ["contact-suggestions", mailboxId ?? "all-mailboxes", debouncedQuery],
- queryFn: () => fetchContactSuggestions(debouncedQuery, 8, mailboxId ?? undefined),
+ queryKey: [
+ "contact-suggestions",
+ mailboxId ?? "all-mailboxes",
+ debouncedQuery,
+ ],
+ queryFn: () =>
+ fetchContactSuggestions(debouncedQuery, 8, mailboxId ?? undefined),
  enabled: debouncedQuery.length >= 1,
- staleTime: 30_000,
- gcTime: 60_000,
+ staleTime: 5 * 60_000,
+ gcTime: 10 * 60_000,
  });
 
- const suggestions = data ?? [];
+ const suggestions = useMemo(() => {
+ const list = data ?? [];
+ const chipSet = new Set(chips.map((c) => c.toLowerCase()));
+ return list.filter((s) => !chipSet.has(s.email.toLowerCase()));
+ }, [data, chips]);
+
  const activeIndex = Math.min(
  selectedIndex,
  Math.max(suggestions.length - 1, 0),
  );
  const showDropdown =
- open &&
- editingIndex === null &&
- suggestions.length > 0 &&
- inputValue.trim().length >= 1;
+ open && suggestions.length > 0 && inputValue.trim().length >= 1;
 
- const chipLabels = useMemo(
- () =>
- chips.map((email) =>
- formatRecipientLabel(email, nameMap.get(email)),
- ),
- [chips, nameMap],
- );
- const collapsedPreview = useMemo(
- () => buildCollapsedPreview(chipLabels, containerWidth),
- [chipLabels, containerWidth],
- );
- const showCollapsedPreview =
- !isInputFocused &&
- editingIndex === null &&
- inputValue.length === 0 &&
- chips.length > 0;
-
- const advanceFocus = () => {
- onAdvanceFocus?.();
- };
-
- const setRecipients = useCallback(
- (nextRecipients: string[]) => {
- onChange(joinRecipients(dedupeRecipients(nextRecipients)));
- },
- [onChange],
- );
+ const addChips = useCallback((emails: string[]) => {
+ if (emails.length === 0) return;
+ setChips((current) => dedupeEmails([...current, ...emails]));
+ }, []);
 
  const commitEmail = useCallback(
  (email: string, name?: string | null) => {
  const trimmed = email.trim();
- if (!trimmed) {
- setInputValue("");
- return;
- }
+ if (!trimmed) return;
  if (!emailSchema.safeParse(trimmed).success) return;
- if (name) {
- setNameMap((prev) => new Map(prev).set(trimmed, name));
- }
- setRecipients([...chips, trimmed]);
+ if (name) nameMapRef.current.set(trimmed, name);
+ addChips([trimmed]);
  setInputValue("");
  setOpen(false);
  setSelectedIndex(0);
  },
- [chips, setRecipients],
+ [addChips],
  );
 
- const removeChip = useCallback(
- (index: number) => {
- setRecipients(chips.filter((_, i) => i !== index));
- if (editingIndex === index) {
- setEditingIndex(null);
- setEditingValue("");
- }
- },
- [chips, editingIndex, setRecipients],
- );
-
- const commitEditedChip = useCallback(
- (index: number, rawValue: string) => {
- const trimmed = rawValue.trim();
- if (!trimmed) {
- removeChip(index);
- return;
- }
- if (!emailSchema.safeParse(trimmed).success) {
- setEditingIndex(null);
- setEditingValue("");
- return;
- }
-
- const next = chips.map((chip, i) => (i === index ? trimmed : chip));
- setRecipients(next);
- setEditingIndex(null);
- setEditingValue("");
- },
- [chips, removeChip, setRecipients],
- );
+ const removeChip = useCallback((index: number) => {
+ setChips((current) => current.filter((_, i) => i !== index));
+ }, []);
 
  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
  const next = e.target.value;
  if (next.includes(",")) {
  const parts = next.split(",");
  for (const part of parts.slice(0, -1)) {
- if (part.trim()) commitEmail(part.trim());
+ const trimmed = part.trim();
+ if (trimmed && emailSchema.safeParse(trimmed).success) {
+ commitEmail(trimmed);
+ }
  }
  setInputValue(parts[parts.length - 1]);
  return;
  }
-
  setInputValue(next);
  setOpen(true);
  setSelectedIndex(0);
@@ -250,23 +181,21 @@ export function RecipientInput({
 
  const handleInputPaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
  const raw = event.clipboardData.getData("text/plain");
- const parsed = parseEmailAddressesFromString(raw);
- if (parsed.length === 0) {
- return;
- }
+ if (!/[\n,;]/.test(raw) && !raw.includes("<")) return;
+
+ const { valid, invalid } = extractEmailsFromText(raw);
+ if (valid.length === 0 && invalid.length === 0) return;
 
  event.preventDefault();
- setRecipients([...chips, ...parsed]);
- setInputValue("");
+ addChips(valid);
+ setInputValue(invalid.join(", "));
  setOpen(false);
  setSelectedIndex(0);
  };
 
- const handleKeyDown = (e: React.KeyboardEvent) => {
- if (editingIndex !== null) {
- return;
- }
+ const advanceFocus = () => onAdvanceFocus?.();
 
+ const handleKeyDown = (e: React.KeyboardEvent) => {
  if (e.key === "Backspace" && inputValue === "" && chips.length > 0) {
  removeChip(chips.length - 1);
  return;
@@ -280,23 +209,19 @@ export function RecipientInput({
  }
  if (e.key === "ArrowUp") {
  e.preventDefault();
- setSelectedIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
+ setSelectedIndex(
+ (i) => (i - 1 + suggestions.length) % suggestions.length,
+ );
  return;
  }
  if (e.key === "Enter" && suggestions[activeIndex]) {
  e.preventDefault();
- commitEmail(
- suggestions[activeIndex].email,
- suggestions[activeIndex].name,
- );
+ commitEmail(suggestions[activeIndex].email, suggestions[activeIndex].name);
  return;
  }
  if (e.key === "Tab" && suggestions[activeIndex]) {
  e.preventDefault();
- commitEmail(
- suggestions[activeIndex].email,
- suggestions[activeIndex].name,
- );
+ commitEmail(suggestions[activeIndex].email, suggestions[activeIndex].name);
  advanceFocus();
  return;
  }
@@ -307,33 +232,29 @@ export function RecipientInput({
  commitEmail(inputValue);
  return;
  }
-
  if (e.key === "Tab" && inputValue.trim()) {
  e.preventDefault();
  commitEmail(inputValue);
  advanceFocus();
  return;
  }
-
  if (e.key === "Escape") setOpen(false);
  };
 
- const commitInputOnBlur = () => {
- if (inputValue.trim()) commitEmail(inputValue);
- setTimeout(() => {
- setOpen(false);
- setIsInputFocused(false);
- }, 120);
+ const handleInputBlur = () => {
+ if (inputValue.trim() && emailSchema.safeParse(inputValue.trim()).success) {
+ commitEmail(inputValue);
+ }
+ setTimeout(() => setOpen(false), 120);
  };
 
  useEffect(() => {
  if (!open) return;
  const onClick = (e: MouseEvent) => {
- const target = e.target;
  if (
  containerRef.current &&
- target instanceof Node &&
- !containerRef.current.contains(target)
+ e.target instanceof Node &&
+ !containerRef.current.contains(e.target)
  ) {
  setOpen(false);
  }
@@ -343,23 +264,7 @@ export function RecipientInput({
  }, [open]);
 
  useEffect(() => {
- if (!containerRef.current || typeof ResizeObserver === "undefined") {
- return;
- }
-
- const observer = new ResizeObserver((entries) => {
- const entry = entries[0];
- if (!entry) return;
- setContainerWidth(entry.contentRect.width);
- });
-
- observer.observe(containerRef.current);
- return () => observer.disconnect();
- }, []);
-
- useEffect(() => {
  if (!isFocused) return;
- setIsInputFocused(true);
  setOpen(true);
  onFocusField?.();
  requestAnimationFrame(() => inputRef.current?.focus());
@@ -367,106 +272,49 @@ export function RecipientInput({
 
  useEffect(() => {
  if (!showDropdown) return;
- const selector = `[data-suggestion-index="${activeIndex}"]`;
- const target = containerRef.current?.querySelector(selector);
- if (!(target instanceof HTMLElement)) return;
+ const target = containerRef.current?.querySelector(
+ `[data-suggestion-index="${activeIndex}"]`,
+ );
+ if (target instanceof HTMLElement) {
  target.scrollIntoView({ block: "nearest" });
+ }
  }, [activeIndex, showDropdown]);
-
- useEffect(() => {
- if (editingIndex === null) return;
- requestAnimationFrame(() => editingInputRef.current?.focus());
- }, [editingIndex]);
 
  return (
  <div ref={containerRef} className="relative w-full">
  <div
  className="flex max-h-24 flex-wrap items-center gap-1 overflow-y-auto"
  onClick={() => {
- setIsInputFocused(true);
- setOpen(true);
  onFocusField?.();
  inputRef.current?.focus();
  }}
  >
- {showCollapsedPreview ? (
- <button
- type="button"
- aria-label={`Edit ${chips.length} ${placeholder} recipient${chips.length === 1 ? "" : "s"}`}
- className="max-w-full truncate px-0.5 py-1 text-left text-xs text-muted-foreground/80 transition-colors hover:text-foreground"
- onClick={() => {
- setIsInputFocused(true);
- setOpen(true);
- onFocusField?.();
- requestAnimationFrame(() => inputRef.current?.focus());
- }}
- >
- {collapsedPreview}
- </button>
- ) : (
- chips.map((email, i) => {
- const displayName = nameMap.get(email);
+ {chips.map((email, i) => {
+ const displayName = nameMapRef.current.get(email);
  const displayLabel = formatRecipientLabel(email, displayName);
- const isEditing = editingIndex === i;
-
  return (
  <span
- key={email}
- className="group/chip inline-flex h-5 max-w-72 items-center gap-1 bg-primary/10 py-0 pr-0.5 pl-1.5 text-[11px] text-foreground/90 ring-1 ring-primary/15 transition-colors hover:bg-primary/15"
+ key={`${email}-${i}`}
+ className="inline-flex h-5 max-w-72 items-center gap-1 bg-primary/10 py-0 pr-0.5 pl-1.5 text-[11px] text-foreground/90 ring-1 ring-primary/15"
  title={email}
  >
- {isEditing ? (
- <input
- ref={editingInputRef}
- type="text"
- value={editingValue}
- onChange={(event) => setEditingValue(event.target.value)}
- onBlur={() => commitEditedChip(i, editingValue)}
- onKeyDown={(event) => {
- if (event.key === "Enter" || event.key === "Tab") {
- event.preventDefault();
- commitEditedChip(i, editingValue);
- }
- if (event.key === "Escape") {
- event.preventDefault();
- setEditingIndex(null);
- setEditingValue("");
- }
- }}
- className="min-w-10 max-w-36 bg-transparent text-xs outline-none"
- />
- ) : (
- <button
- type="button"
- className="max-w-64 truncate text-left"
- onMouseDown={(event) => event.preventDefault()}
- onClick={(event) => {
- event.stopPropagation();
- setEditingIndex(i);
- setEditingValue(email);
- setOpen(false);
- }}
- >
- {displayLabel}
- </button>
- )}
+ <span className="max-w-64 truncate">{displayLabel}</span>
  <button
  type="button"
  aria-label={`Remove ${displayLabel}`}
- className="ml-0.5 flex size-4 shrink-0 items-center justify-center text-muted-foreground/70 transition-colors hover:bg-primary/20 hover:text-foreground"
- onMouseDown={(event) => event.preventDefault()}
- onClick={(event) => {
- event.stopPropagation();
+ className="ml-0.5 flex size-4 shrink-0 items-center justify-center text-foreground/60 hover:bg-primary/25 hover:text-foreground"
+ onMouseDown={(e) => e.preventDefault()}
+ onClick={(e) => {
+ e.stopPropagation();
  removeChip(i);
  }}
  tabIndex={-1}
  >
- <XIcon className="size-2" />
+ <XIcon className="size-2.5" />
  </button>
  </span>
  );
- })
- )}
+ })}
 
  <input
  ref={inputRef}
@@ -476,20 +324,19 @@ export function RecipientInput({
  value={inputValue}
  onChange={handleInputChange}
  onFocus={() => {
- setIsInputFocused(true);
  setOpen(true);
  onFocusField?.();
  }}
- onBlur={commitInputOnBlur}
+ onBlur={handleInputBlur}
  onKeyDown={handleKeyDown}
  onPaste={handleInputPaste}
  autoFocus={autoFocus}
- className={`min-w-20 flex-1 bg-transparent py-1 text-[11px] outline-none placeholder:text-muted-foreground/50 ${showCollapsedPreview ? "sr-only" : ""} ${inputClassName ?? ""}`}
+ className={`min-w-20 flex-1 bg-transparent py-1 text-[11px] outline-none placeholder:text-muted-foreground/50 ${inputClassName ?? ""}`}
  />
  </div>
 
  {showDropdown && (
- <div className="absolute top-full left-0 z-50 mt-1 w-full max-h-44 overflow-y-auto border border-border bg-popover shadow-sm">
+ <div className="absolute top-full left-0 z-50 mt-1 max-h-44 w-full overflow-y-auto border border-border bg-popover shadow-sm">
  {suggestions.map((suggestion, i) => (
  <button
  key={suggestion.email}
@@ -499,9 +346,7 @@ export function RecipientInput({
  i === activeIndex ? "bg-muted" : "hover:bg-muted/50"
  }`}
  onMouseDown={(e) => e.preventDefault()}
- onClick={() => {
- commitEmail(suggestion.email, suggestion.name);
- }}
+ onClick={() => commitEmail(suggestion.email, suggestion.name)}
  onMouseEnter={() => setSelectedIndex(i)}
  >
  <div className="min-w-0 flex-1">

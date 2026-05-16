@@ -13,7 +13,7 @@ import {
  getComposerSelection,
  plainTextToHtml,
  setComposerBody,
-} from "./compose-editor-ref";
+} from "@/features/email/mail/compose/compose-editor-ref";
 
 export type ComposerAiActionId =
  | "grammar"

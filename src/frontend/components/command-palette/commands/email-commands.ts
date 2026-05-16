@@ -1,9 +1,11 @@
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
-import { invalidateInboxQueries } from "@/features/email/mail/data/invalidation";
-import { patchEmail, type EmailIdentifier } from "@/features/email/mail/mutations";
-import type { EmailListItem, EmailListPage } from "@/features/email/mail/types";
-import { isEmailListInfiniteData } from "@/features/email/mail/utils/email-list-cache";
+import { emitOpenInTab } from "@/features/email/inbox/hooks/tab-events";
+import { emailQueryKeys } from "@/features/email/mail/shared/query-keys";
+import { invalidateInboxQueries } from "@/features/email/mail/shared/data/invalidation";
+import { patchEmail, type EmailIdentifier } from "@/features/email/mail/shared/mutations";
+import type { EmailListItem, EmailListPage } from "@/features/email/mail/shared/types";
+import { isEmailListInfiniteData } from "@/features/email/mail/list/email-list-cache";
 import {
+  ArrowSquareOutIcon,
   CheckIcon,
   ClockIcon,
   EnvelopeOpenIcon,
@@ -107,7 +109,25 @@ function key(id: string) {
   return shortcutKey(id);
 }
 
+const isInboxRoute = (ctx: CommandContext) =>
+  ctx.currentRouteId.startsWith("/_dashboard/$mailboxId/inbox");
+
 const emailCommands: Command[] = [
+  {
+  id: "email:open-in-tab",
+  label: "Open in new tab",
+  icon: paletteIcon(ArrowSquareOutIcon),
+  group: "email",
+  shortcut: key("inbox:open-in-tab"),
+  keywords: ["tab", "open", "split"],
+  when: (ctx) =>
+    hasEmail(ctx) && !ctx.isMobile && isInboxRoute(ctx),
+  perform: (ctx, services) => {
+    if (!ctx.selectedEmailId) return;
+    services.close();
+    emitOpenInTab(ctx.selectedEmailId);
+  },
+  },
   {
   id: "email:done",
   label: "Mark as done",

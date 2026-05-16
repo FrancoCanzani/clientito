@@ -7,7 +7,7 @@ import {
   XIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import type { DraftStatus } from "../hooks/use-draft";
+import type { DraftStatus } from "@/features/email/mail/compose/use-draft";
 
 function DraftStatusIndicator({ status }: { status: DraftStatus }) {
   if (status !== "saved") return null;

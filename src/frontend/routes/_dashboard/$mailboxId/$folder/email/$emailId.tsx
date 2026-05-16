@@ -3,7 +3,7 @@ import FolderEmailPage from "@/features/email/inbox/pages/folder-email-page";
 import {
  parseEmailFolderParam,
  parseEmailIdParam,
-} from "@/features/email/mail/views";
+} from "@/features/email/mail/shared/views";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_dashboard/$mailboxId/$folder/email/$emailId")({

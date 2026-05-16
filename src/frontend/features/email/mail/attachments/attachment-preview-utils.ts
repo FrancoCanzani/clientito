@@ -1,4 +1,4 @@
-import type { EmailAttachment } from "../types";
+import type { EmailAttachment } from "@/features/email/mail/shared/types";
 
 const IMAGE_EXTENSIONS = new Set([
   "apng",

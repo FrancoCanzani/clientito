@@ -122,6 +122,9 @@ export type DraftAttachmentKey = {
   key: string;
   filename: string;
   mimeType: string;
+  size?: number;
+  disposition?: "attachment" | "inline";
+  contentId?: string;
 };
 
 export type DraftRow = {

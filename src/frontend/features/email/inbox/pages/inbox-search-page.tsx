@@ -1,11 +1,20 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   fetchSearchEmails,
   fetchSearchSuggestions,
-} from "@/features/email/mail/data/search";
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
+} from "@/features/email/mail/shared/data/search";
+import { useMailActions } from "@/features/email/mail/shared/hooks/use-mail-actions";
+import { emailQueryKeys } from "@/features/email/mail/shared/query-keys";
 import { extractHighlightTerms } from "@/features/email/mail/search/highlight-terms";
 import {
   parseSearchOperators,
@@ -22,12 +31,12 @@ import {
   MailboxPageBody,
   MailboxPageHeader,
 } from "@/features/email/shell/mailbox-page";
-import { useShortcuts } from "@/hooks/use-shortcuts";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
+import { useShortcuts } from "@/hooks/use-shortcuts";
 import { XIcon } from "@phosphor-icons/react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
 
 const searchRoute = getRouteApi("/_dashboard/$mailboxId/inbox/search");
@@ -35,6 +44,22 @@ const searchRoute = getRouteApi("/_dashboard/$mailboxId/inbox/search");
 function normalizeQuery(query: string) {
   return query.trim().replace(/\s+/g, " ");
 }
+
+const SEARCH_INSERTIONS = [
+  { label: "From", value: "from:" },
+  { label: "To", value: "to:" },
+  { label: "Cc", value: "cc:" },
+  { label: "Subject", value: "subject:" },
+  { label: "After", value: "after:" },
+  { label: "Before", value: "before:" },
+] as const;
+
+const SEARCH_FILTERS = [
+  { label: "Has attachment", value: "has:attachment" },
+  { label: "Unread", value: "is:unread" },
+  { label: "Starred", value: "is:starred" },
+  { label: "Sent", value: "is:sent" },
+] as const;
 
 export default function InboxSearchPage() {
   const { mailboxId } = searchRoute.useParams();
@@ -44,11 +69,14 @@ export default function InboxSearchPage() {
   const routeQuery = search.q ?? "";
 
   const [query, setSearchQuery] = useState(routeQuery);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [searchTokenMenuKey, setSearchTokenMenuKey] = useState(0);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [loadMoreVisible, setLoadMoreVisible] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(() =>
     readRecentSearches(),
   );
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const { openEmail, executeEmailAction } = useMailActions({
     view: "inbox",
     mailboxId,
@@ -144,6 +172,7 @@ export default function InboxSearchPage() {
     (query.trim().length > 0 &&
       (suggestionData.contacts.length > 0 ||
         suggestionData.subjects.length > 0));
+  const showSearchSuggestions = isSearchFocused && hasSearchSuggestions;
   const showRecentSearches =
     !hasSearchSuggestions &&
     query.trim().length === 0 &&
@@ -225,6 +254,18 @@ export default function InboxSearchPage() {
     commitQuery(next);
   }
 
+  function appendSearchToken(token: string) {
+    const next = [query.trim(), token].filter(Boolean).join(" ");
+    handleQueryChange(next);
+    setSearchTokenMenuKey((current) => current + 1);
+    requestAnimationFrame(() => {
+      const input = searchInputRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(next.length, next.length);
+    });
+  }
+
   useShortcuts("search", {
     "search:next": () => moveFocus(1),
     "search:prev": () => moveFocus(-1),
@@ -239,7 +280,7 @@ export default function InboxSearchPage() {
     <>
       <Button
         type="button"
-        variant={"secondary"}
+        variant="secondary"
         onClick={() =>
           navigate({
             search: (prev) => ({
@@ -253,11 +294,40 @@ export default function InboxSearchPage() {
       >
         Junk {search.includeJunk ? "on" : "off"}
       </Button>
-      <div className="min-w-40 flex-1 max-w-80">
+      <Select key={searchTokenMenuKey} onValueChange={appendSearchToken}>
+        <SelectTrigger size="sm" className="h-7">
+          <SelectValue placeholder="Add" />
+        </SelectTrigger>
+        <SelectContent align="end">
+          <SelectGroup>
+            <SelectLabel>Fields</SelectLabel>
+            {SEARCH_INSERTIONS.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+          <SelectGroup>
+            <SelectLabel>Filters</SelectLabel>
+            {SEARCH_FILTERS.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <div className="relative min-w-40 max-w-80 flex-1">
         <Input
+          ref={searchInputRef}
           className="h-7 text-xs"
           value={query}
           autoFocus
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={showSearchSuggestions}
+          onFocus={() => setIsSearchFocused(true)}
+          onBlur={() => setIsSearchFocused(false)}
           onChange={(event) => handleQueryChange(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
@@ -276,6 +346,21 @@ export default function InboxSearchPage() {
           placeholder="Search mail"
           spellCheck={false}
         />
+        {showSearchSuggestions && (
+          <div
+            className="absolute inset-x-0 top-[calc(100%+0.375rem)] z-20"
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            <SearchSuggestionsList
+              query={query.trim()}
+              suggestions={suggestionData}
+              onSelectQuery={(nextQuery) => {
+                commitQuery(nextQuery);
+                setIsSearchFocused(false);
+              }}
+            />
+          </div>
+        )}
       </div>
     </>
   );
@@ -286,69 +371,57 @@ export default function InboxSearchPage() {
 
       <MailboxPageBody>
         <div className="relative min-h-0 flex-1 overflow-y-auto">
-        {activeOperators.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 md:px-4">
-            {activeOperators.map((operator) => (
-              <button
-                key={operator.raw}
-                type="button"
-                onClick={() => removeOperatorFromQuery(operator.raw)}
-                className="inline-flex items-center gap-1 border border-border/40 bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <span className="font-medium text-foreground/80">
-                  {operator.key}:
-                </span>
-                <span className="truncate max-w-40">{operator.value}</span>
-                <XIcon className="size-2.5" />
-              </button>
-            ))}
-          </div>
-        )}
-
-        {hasSearchSuggestions && (
-          <div className="px-3 py-3 md:px-4">
-            <SearchSuggestionsList
-              query={query.trim()}
-              suggestions={suggestionData}
-              onSelectQuery={(nextQuery) => {
-                commitQuery(nextQuery);
-              }}
-            />
-          </div>
-        )}
-
-        {showRecentSearches && (
-          <div className="space-y-2 px-3 py-3 md:px-4">
-            <p className="text-xs text-muted-foreground">Recent</p>
-            <div className="flex flex-wrap gap-2">
-              {recentSearches.map((entry) => (
-                <Button
-                  key={entry}
+          {activeOperators.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 md:px-4">
+              {activeOperators.map((operator) => (
+                <button
+                  key={operator.raw}
                   type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => commitQuery(entry)}
+                  onClick={() => removeOperatorFromQuery(operator.raw)}
+                  className="inline-flex items-center gap-1 border border-border/40 bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                  <span className="max-w-56 truncate">{entry}</span>
-                </Button>
+                  <span className="font-medium text-foreground/80">
+                    {operator.key}:
+                  </span>
+                  <span className="max-w-40 truncate">{operator.value}</span>
+                  <XIcon className="size-2.5" />
+                </button>
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        <SearchResultsList
-          query={routeQuery.trim()}
-          results={results}
-          mailboxId={mailboxId}
-          isPending={resultsQuery.isPending}
-          hasNextPage={resultsQuery.hasNextPage ?? false}
-          isFetchingNextPage={resultsQuery.isFetchingNextPage}
-          loadMoreRef={loadMoreRef}
-          onOpenEmail={openEmail}
-          onAction={executeEmailAction}
-          focusedIndex={focusedIndex}
-          highlightTerms={highlightTerms}
-        />
+          {showRecentSearches && (
+            <div className="space-y-2 px-3 py-3 md:px-4">
+              <p className="text-xs text-muted-foreground">Recent</p>
+              <div className="flex flex-wrap gap-2">
+                {recentSearches.map((entry) => (
+                  <Button
+                    key={entry}
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => commitQuery(entry)}
+                  >
+                    <span className="max-w-56 truncate">{entry}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <SearchResultsList
+            query={routeQuery.trim()}
+            results={results}
+            mailboxId={mailboxId}
+            isPending={resultsQuery.isPending}
+            hasNextPage={resultsQuery.hasNextPage ?? false}
+            isFetchingNextPage={resultsQuery.isFetchingNextPage}
+            loadMoreRef={loadMoreRef}
+            onOpenEmail={openEmail}
+            onAction={executeEmailAction}
+            focusedIndex={focusedIndex}
+            highlightTerms={highlightTerms}
+          />
         </div>
       </MailboxPageBody>
     </MailboxPage>

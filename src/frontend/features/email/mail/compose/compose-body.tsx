@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import type { ComposeInitial } from "../types";
-import { ComposeEmailFields } from "./compose-email-fields";
-import { useComposeEmail } from "./compose-email-state";
-import { ComposeShell } from "./compose-shell";
+import type { ComposeInitial } from "@/features/email/mail/shared/types";
+import { ComposeEmailFields } from "@/features/email/mail/compose/compose-email-fields";
+import { useComposeEmail } from "@/features/email/mail/compose/compose-email-state";
+import { ComposeShell } from "@/features/email/mail/compose/compose-shell";
 
 export type ComposeBodyProps = {
   initial?: ComposeInitial;

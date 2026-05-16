@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
-import type { ComposeInitial } from "../types";
-import { openCompose as emitOpenCompose } from "./compose-events";
+import type { ComposeInitial } from "@/features/email/mail/shared/types";
+import { openCompose as emitOpenCompose } from "@/features/email/mail/compose/compose-events";
 
 export type ComposerMode = "modal" | "dock";
 export type ComposerState = "expanded" | "minimized";

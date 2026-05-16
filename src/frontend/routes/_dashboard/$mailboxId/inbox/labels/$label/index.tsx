@@ -1,6 +1,6 @@
 import { Error as RouteError } from "@/components/error";
 import LabelPage from "@/features/email/inbox/pages/label-page";
-import { parseInboxLabelParam } from "@/features/email/mail/views";
+import { parseInboxLabelParam } from "@/features/email/mail/shared/views";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 

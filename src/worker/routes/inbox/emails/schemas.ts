@@ -67,6 +67,8 @@ export const sendEmailBodySchema = z.object({
         key: z.string(),
         filename: z.string(),
         mimeType: z.string(),
+        disposition: z.enum(["attachment", "inline"]).optional(),
+        contentId: z.string().optional(),
       }),
     )
     .optional(),

@@ -4,9 +4,9 @@ import { useMailCompose } from "@/features/email/mail/compose/compose-context";
 import {
   fetchEmailDetail,
   fetchEmailThread,
-} from "@/features/email/mail/data/thread-detail";
-import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
+} from "@/features/email/mail/shared/data/thread-detail";
+import { useMailActions } from "@/features/email/mail/shared/hooks/use-mail-actions";
+import { emailQueryKeys } from "@/features/email/mail/shared/query-keys";
 import {
   EmailDetailContent,
   type EmailDetailContentHandle,
@@ -15,11 +15,11 @@ import type {
   ComposeInitial,
   EmailDetailItem,
   EmailListPage,
-} from "@/features/email/mail/types";
-import { buildForwardedEmailHtml } from "@/features/email/mail/utils/build-forwarded-html";
-import { isEmailListInfiniteData } from "@/features/email/mail/utils/email-list-cache";
-import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
-import { openEmail as openInboxEmail } from "@/features/email/mail/utils/open-email";
+} from "@/features/email/mail/shared/types";
+import { buildForwardedEmailHtml } from "@/features/email/mail/thread/build-forwarded-html";
+import { isEmailListInfiniteData } from "@/features/email/mail/list/email-list-cache";
+import type { ThreadGroup } from "@/features/email/mail/thread/group-emails-by-thread";
+import { openEmail as openInboxEmail } from "@/features/email/mail/shared/utils/open-email";
 import { clearFocusedEmail, setFocusedEmail } from "@/hooks/use-focused-email";
 import { useShortcuts } from "@/hooks/use-shortcuts";
 import {
@@ -42,6 +42,11 @@ export function EmailDetailView({
   isFetchingNextPage = false,
   fetchNextPage,
   embedded = false,
+  onNextTab,
+  onPrevTab,
+  onCloseTab,
+  canSwitchTab = false,
+  canCloseTab = false,
 }: {
   mailboxId: number;
   emailId: string;
@@ -54,6 +59,11 @@ export function EmailDetailView({
   isFetchingNextPage?: boolean;
   fetchNextPage?: () => Promise<unknown>;
   embedded?: boolean;
+  onNextTab?: () => void;
+  onPrevTab?: () => void;
+  onCloseTab?: () => void;
+  canSwitchTab?: boolean;
+  canCloseTab?: boolean;
 }) {
   const emailQuery = useQuery({
     queryKey: emailQueryKeys.detail(emailId),
@@ -109,6 +119,11 @@ export function EmailDetailView({
       isFetchingNextPage={isFetchingNextPage}
       fetchNextPage={fetchNextPage}
       embedded={embedded}
+      onNextTab={onNextTab}
+      onPrevTab={onPrevTab}
+      onCloseTab={onCloseTab}
+      canSwitchTab={canSwitchTab}
+      canCloseTab={canCloseTab}
     />
   );
 }
@@ -126,6 +141,11 @@ function EmailDetailPane({
   isFetchingNextPage,
   fetchNextPage,
   embedded,
+  onNextTab,
+  onPrevTab,
+  onCloseTab,
+  canSwitchTab = false,
+  canCloseTab = false,
 }: {
   email: EmailDetailItem;
   mailboxId: number;
@@ -139,6 +159,11 @@ function EmailDetailPane({
   isFetchingNextPage: boolean;
   fetchNextPage?: () => Promise<unknown>;
   embedded: boolean;
+  onNextTab?: () => void;
+  onPrevTab?: () => void;
+  onCloseTab?: () => void;
+  canSwitchTab?: boolean;
+  canCloseTab?: boolean;
 }) {
   const navigate = useNavigate();
   const router = useRouter();
@@ -380,7 +405,6 @@ function EmailDetailPane({
       enabled: hasPrev,
     },
     "action:reply": () => contentRef.current?.triggerReply(),
-    "action:compose": () => openCompose(),
     "action:forward": () => handleForward(),
     "action:archive": () => {
       void executeEmailAction(
@@ -421,6 +445,18 @@ function EmailDetailPane({
     },
     "action:reply-all": () => contentRef.current?.triggerReply(),
     "action:esc": () => goBack(),
+    "reader:next-tab": {
+      action: () => onNextTab?.(),
+      enabled: canSwitchTab && Boolean(onNextTab),
+    },
+    "reader:prev-tab": {
+      action: () => onPrevTab?.(),
+      enabled: canSwitchTab && Boolean(onPrevTab),
+    },
+    "reader:close-tab": {
+      action: () => onCloseTab?.(),
+      enabled: canCloseTab && Boolean(onCloseTab),
+    },
   });
 
   return (

@@ -1,33 +1,17 @@
 import type { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { createOpenAI } from "@ai-sdk/openai";
-import { generateText } from "ai";
 import { z } from "zod";
+import { runRewrite } from "../../lib/ai/rewrite";
 import { resolveMailbox } from "../../lib/gmail/mailboxes";
 import { getUser } from "../../middleware/auth";
 import type { AppRouteEnv } from "../types";
+import { handleAiRouteError } from "./utils";
 
 const rewriteBodySchema = z.object({
   mailboxId: z.number().int().positive(),
   text: z.string().trim().min(1).max(20000),
-  instruction: z.enum([
-    "improve",
-    "formal",
-    "casual",
-    "shorten",
-  ]),
+  instruction: z.enum(["improve", "formal", "casual", "shorten"]),
 });
-
-const INSTRUCTIONS: Record<z.infer<typeof rewriteBodySchema>["instruction"], string> = {
-  improve:
-    "Improve the clarity, flow, and readability of the given text. Fix any errors. Keep the original meaning and tone. Output ONLY the rewritten text.",
-  formal:
-    "Rewrite the given text in a formal, professional tone. Keep the original meaning. Output ONLY the rewritten text.",
-  casual:
-    "Rewrite the given text in a casual, friendly tone. Keep the original meaning. Output ONLY the rewritten text.",
-  shorten:
-    "Make the given text more concise without losing its meaning. Remove filler words and unnecessary phrases. Output ONLY the rewritten text.",
-};
 
 export function registerPostRewrite(app: Hono<AppRouteEnv>) {
   app.post(
@@ -39,23 +23,19 @@ export function registerPostRewrite(app: Hono<AppRouteEnv>) {
       const user = getUser(c);
       const mailbox = await resolveMailbox(db, user.id, mailboxId);
       if (!mailbox) return c.json({ error: "Mailbox not found" }, 404);
-      if (!mailbox.aiEnabled) {
-        return c.json({ error: "AI features are disabled for this mailbox" }, 403);
-      }
-      const openai = createOpenAI({ apiKey: c.env.OPENAI_API_KEY });
 
       try {
-        const result = await generateText({
-          model: openai.responses("gpt-5.4-mini"),
-          system: INSTRUCTIONS[instruction],
-          prompt: text,
-          maxOutputTokens: 4000,
+        const rewritten = await runRewrite({
+          env: c.env,
+          db,
+          userId: user.id,
+          mailbox,
+          text,
+          instruction,
         });
-
-        return c.json({ rewritten: result.text.trim() }, 200);
+        return c.json({ rewritten }, 200);
       } catch (error) {
-        console.error("Rewrite failed", { instruction, error });
-        return c.json({ error: "Rewrite unavailable" }, 503 as never);
+        return handleAiRouteError(c, error, "Rewrite unavailable");
       }
     },
   );

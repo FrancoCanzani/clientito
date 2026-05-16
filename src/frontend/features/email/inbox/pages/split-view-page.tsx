@@ -8,8 +8,8 @@ import {
 } from "@/components/ui/empty";
 import type { SplitRule } from "@/db/schema";
 import { useThreadGroupSnooze } from "@/features/email/inbox/hooks/use-thread-group-snooze";
-import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
-import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
+import { useMailActions } from "@/features/email/mail/shared/hooks/use-mail-actions";
+import { useMailViewData } from "@/features/email/mail/shared/hooks/use-mail-view-data";
 import { EmailList } from "@/features/email/mail/list/email-list";
 import { MailFilterBar } from "@/features/email/mail/list/mail-filter-bar";
 import { ViewSyncStatusControl } from "@/features/email/mail/list/view-sync-status";

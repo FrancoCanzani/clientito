@@ -46,6 +46,8 @@ export type SendParams = {
     filename: string;
     mimeType: string;
     content: ArrayBuffer;
+    disposition?: "attachment" | "inline";
+    contentId?: string;
   }>;
 };
 

@@ -91,6 +91,7 @@ export function useShortcuts(
   for (const def of defs) {
     const handler = handlers[def.id];
     if (!handler) continue;
+    if (!def.contexts.includes(context)) continue;
 
     const { action: _action, enabled: bindingEnabled } = normalizeHandler(handler);
 

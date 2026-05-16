@@ -1,5 +1,5 @@
-import { fetchContactSuggestions } from "@/features/email/mail/data/contacts";
-import type { ContactSuggestion } from "@/features/email/mail/types";
+import { fetchContactSuggestions } from "@/features/email/mail/shared/data/contacts";
+import type { ContactSuggestion } from "@/features/email/mail/shared/types";
 
 export type PeopleResult = {
   id: string;

@@ -10,15 +10,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { localDb } from "@/db/client";
-import { fetchAllLocalViewEmails } from "@/features/email/mail/data/view-pages";
+import { fetchAllLocalViewEmails } from "@/features/email/mail/shared/data/view-pages";
 import {
   deleteAllForever,
   sanitizeMutationError,
-} from "@/features/email/mail/mutations";
-import { invalidateInboxQueries } from "@/features/email/mail/data/invalidation";
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
-import type { EmailListPage } from "@/features/email/mail/types";
-import { removeIdsFromInfiniteData } from "@/features/email/mail/utils/optimistic-mail-state";
+} from "@/features/email/mail/shared/mutations";
+import { invalidateInboxQueries } from "@/features/email/mail/shared/data/invalidation";
+import { emailQueryKeys } from "@/features/email/mail/shared/query-keys";
+import type { EmailListPage } from "@/features/email/mail/shared/types";
+import { removeIdsFromInfiniteData } from "@/features/email/mail/shared/utils/optimistic-mail-state";
 import {
   type InfiniteData,
   useMutation,

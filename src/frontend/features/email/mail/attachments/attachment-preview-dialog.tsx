@@ -8,10 +8,10 @@ import {
   XIcon,
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { EmailAttachment } from "../types";
-import { formatBytes } from "../utils/formatters";
-import { AttachmentPreviewDisplay } from "./attachment-preview-display";
-import { getAttachmentPreview } from "./attachment-preview-utils";
+import type { EmailAttachment } from "@/features/email/mail/shared/types";
+import { formatBytes } from "@/features/email/mail/shared/utils/formatters";
+import { AttachmentPreviewDisplay } from "@/features/email/mail/attachments/attachment-preview-display";
+import { getAttachmentPreview } from "@/features/email/mail/attachments/attachment-preview-utils";
 
 type AttachmentPreviewDialogProps = {
   attachments: EmailAttachment[];

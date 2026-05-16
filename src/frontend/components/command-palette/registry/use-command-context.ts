@@ -1,6 +1,6 @@
 import { isComposerOpen } from "@/features/email/mail/compose/compose-editor-ref";
-import { isEmailView } from "@/features/email/mail/views";
-import { getPreferredMailboxId } from "@/features/email/mail/utils/mailbox";
+import { isEmailView } from "@/features/email/mail/shared/views";
+import { getPreferredMailboxId } from "@/features/email/mail/shared/utils/mailbox";
 import { useFocusedEmail } from "@/hooks/use-focused-email";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMailboxes } from "@/hooks/use-mailboxes";

@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/popover";
 import { CheckIcon, BellSlashIcon } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
-import { REPLY_REMINDER_OPTIONS } from "./reply-reminder-options";
+import { REPLY_REMINDER_OPTIONS } from "@/features/email/mail/compose/reply-reminder-options";
 
 type ReplyReminderPickerProps = {
  value: number | null;

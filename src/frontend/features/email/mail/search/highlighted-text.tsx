@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { buildHighlightRegex } from "./highlight-terms";
+import { buildHighlightRegex } from "@/features/email/mail/search/highlight-terms";
 
 export function HighlightedText({
  text,

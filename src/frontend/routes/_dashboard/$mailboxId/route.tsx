@@ -29,6 +29,7 @@ export const Route = createFileRoute("/_dashboard/$mailboxId")({
       throw notFound();
     }
   },
+
   component: () => (
     <MailboxLayout>
       <Outlet />

@@ -1,4 +1,4 @@
-import type { ComposeInitial } from "../types";
+import type { ComposeInitial } from "@/features/email/mail/shared/types";
 
 const openComposeListeners = new Set<(initial?: ComposeInitial) => void>();
 let hasPending = false;

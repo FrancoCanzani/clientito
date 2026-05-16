@@ -28,3 +28,23 @@ export function removeOperator(query: string, raw: string): string {
  .replace(/\s+/g, " ")
  .trim();
 }
+
+function quoteOperatorValue(value: string): string {
+ return /\s/.test(value) ? `"${value}"` : value;
+}
+
+export function replaceOperator(
+ query: string,
+ key: string,
+ value: string | null,
+): string {
+ const remaining = parseSearchOperators(query)
+ .filter((operator) => operator.key !== key)
+ .reduce((nextQuery, operator) => removeOperator(nextQuery, operator.raw), query);
+
+ const nextOperator = value?.trim()
+ ? `${key}:${quoteOperatorValue(value.trim())}`
+ : "";
+
+ return [remaining.trim(), nextOperator].filter(Boolean).join(" ").trim();
+}

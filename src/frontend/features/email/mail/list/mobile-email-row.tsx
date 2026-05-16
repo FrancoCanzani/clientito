@@ -18,8 +18,8 @@ import {
   useState,
   type PointerEvent,
 } from "react";
-import { formatInboxRowDate } from "../utils/formatters";
-import { useEmailRowModel, type EmailRowProps } from "./email-row-model";
+import { formatInboxRowDate } from "@/features/email/mail/shared/utils/formatters";
+import { useEmailRowModel, type EmailRowProps } from "@/features/email/mail/list/email-row-model";
 
 const SWIPE_COMMIT_DISTANCE = 84;
 const SWIPE_MAX_DISTANCE = 148;

@@ -1,5 +1,5 @@
-import type { EmailListItem } from "@/features/email/mail/types";
-import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
+import type { EmailListItem } from "@/features/email/mail/shared/types";
+import type { ThreadGroup } from "@/features/email/mail/thread/group-emails-by-thread";
 
 const IMPORTANT_KEYWORDS = [
   "2fa",

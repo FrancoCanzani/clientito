@@ -2,7 +2,7 @@ import {
   emailQueryKeys,
   draftQueryKeys,
   scheduledEmailQueryKeys,
-} from "@/features/email/mail/query-keys";
+} from "@/features/email/mail/shared/query-keys";
 import {
   useMailboxes,
   type MailboxAccount,
@@ -13,27 +13,36 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { useAttachmentUpload } from "../hooks/use-attachment-upload";
-import { loadDraft, useDraft } from "../hooks/use-draft";
-import { useUndoSend } from "../hooks/use-undo-send";
-import { createReplyReminder, sendEmail } from "../mutations";
-import { invalidateInboxQueries } from "../data/invalidation";
-import { fetchViewPage } from "../data/view-pages";
-import type { ComposeInitial, DraftState } from "../types";
+import { useAttachmentUpload } from "@/features/email/mail/compose/use-attachment-upload";
+import { loadDraft, useDraft } from "@/features/email/mail/compose/use-draft";
+import { useUndoSend } from "@/features/email/mail/shared/hooks/use-undo-send";
+import { createReplyReminder, sendEmail } from "@/features/email/mail/shared/mutations";
+import { invalidateInboxQueries } from "@/features/email/mail/shared/data/invalidation";
+import { fetchViewPage } from "@/features/email/mail/shared/data/view-pages";
+import {
+  buildOptimisticSentItem,
+  buildOptimisticThreadItem,
+  insertOptimisticIntoSentList,
+  insertOptimisticIntoThread,
+  makeOptimisticProviderId,
+  removeOptimisticFromSentList,
+  removeOptimisticFromThread,
+} from "@/features/email/mail/shared/utils/optimistic-send";
+import type { ComposeInitial, DraftState } from "@/features/email/mail/shared/types";
 import {
   appendTemplateToBody,
   applySignatureToBody,
   combineComposeBody,
   detectInsertedSignatureId,
   splitForwardedContent,
-} from "./compose-body-transforms";
-import { openCompose } from "./compose-events";
+} from "@/features/email/mail/compose/compose-body-transforms";
+import { openCompose } from "@/features/email/mail/compose/compose-events";
 import {
   buildTemplateContext,
   countUnresolved,
   interpolateHtml,
   interpolatePlain,
-} from "./template-interpolation";
+} from "@/features/email/mail/compose/template-interpolation";
 
 type UseComposeEmailOptions = {
   onQueued?: () => void;
@@ -45,6 +54,8 @@ type AttachmentKey = {
   filename: string;
   mimeType: string;
   size?: number;
+  disposition?: "attachment" | "inline";
+  contentId?: string;
 };
 
 type SendEmailResult = {
@@ -70,17 +81,51 @@ function buildEmailPayload(
   attachmentKeys?: AttachmentKey[],
   scheduledFor?: number,
 ) {
+  const sendBody = replaceInlineImagePreviewSources(
+    combineComposeBody(bodyOverride, snap.forwardedContent),
+  );
   return {
     mailboxId: snap.mailboxId ?? undefined,
     to: snap.to,
     cc: snap.cc.trim().length > 0 ? snap.cc.trim() : undefined,
     bcc: snap.bcc.trim().length > 0 ? snap.bcc.trim() : undefined,
     subject: snap.subject,
-    body: combineComposeBody(bodyOverride, snap.forwardedContent),
+    body: sendBody,
     threadId,
     attachments: attachmentKeys,
     ...(scheduledFor != null && { scheduledFor }),
   };
+}
+
+function replaceInlineImagePreviewSources(content: string): string {
+  if (!content.includes("data-content-id")) return content;
+  if (typeof DOMParser === "undefined") return content;
+  const doc = new DOMParser().parseFromString(content, "text/html");
+  doc.body.querySelectorAll("img[data-content-id]").forEach((image) => {
+    const contentId = image.getAttribute("data-content-id");
+    if (contentId) image.setAttribute("src", `cid:${contentId}`);
+  });
+  return doc.body.innerHTML;
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function getInlineAttachmentKeys(content: string): Set<string> {
+  if (!content.includes("data-inline-attachment-key")) return new Set();
+  if (typeof DOMParser === "undefined") return new Set();
+  const doc = new DOMParser().parseFromString(content, "text/html");
+  return new Set(
+    Array.from(doc.body.querySelectorAll("img[data-inline-attachment-key]"))
+      .map((image) => image.getAttribute("data-inline-attachment-key"))
+      .filter((key): key is string => Boolean(key)),
+  );
 }
 
 function createComposeDraft(initial?: ComposeInitial) {
@@ -95,6 +140,7 @@ function createComposeDraft(initial?: ComposeInitial) {
     subject: initial?.subject ?? "",
     body,
     forwardedContent,
+    attachmentKeys: initial?.attachmentKeys ?? [],
   };
 }
 
@@ -136,6 +182,8 @@ export function useComposeEmail(
         filename: file.filename,
         mimeType: file.mimeType,
         size: file.size ?? 0,
+        disposition: file.disposition ?? "attachment",
+        contentId: file.contentId,
       })),
     [initial?.attachmentKeys],
   );
@@ -151,6 +199,15 @@ export function useComposeEmail(
 
   const threadId = initial?.threadId;
   const { mailboxId, to, cc, bcc, subject, body, forwardedContent } = draft;
+
+  useEffect(() => {
+    const nextKeys = attachments.getAttachmentKeys();
+    setDraft((current) =>
+      JSON.stringify(current.attachmentKeys) === JSON.stringify(nextKeys)
+        ? current
+        : { ...current, attachmentKeys: nextKeys },
+    );
+  }, [attachments.files, attachments.getAttachmentKeys]);
 
   const viewSentEmail = useCallback(
     async (result: unknown) => {
@@ -201,6 +258,16 @@ export function useComposeEmail(
       if (cancelled) return;
 
       if (savedDraft) {
+        attachments.replaceFiles(
+          (savedDraft.attachmentKeys ?? []).map((file) => ({
+            key: file.key,
+            filename: file.filename,
+            mimeType: file.mimeType,
+            size: file.size ?? 0,
+            disposition: file.disposition ?? "attachment",
+            contentId: file.contentId,
+          })),
+        );
         setDraft({
           mailboxId: savedDraft.mailboxId ?? null,
           to: savedDraft.to ?? "",
@@ -209,6 +276,7 @@ export function useComposeEmail(
           subject: savedDraft.subject ?? "",
           body: savedDraft.body ?? "",
           forwardedContent: savedDraft.forwardedContent ?? "",
+          attachmentKeys: savedDraft.attachmentKeys ?? [],
         });
         bodyRef.current = savedDraft.body ?? "";
       } else {
@@ -222,7 +290,7 @@ export function useComposeEmail(
     return () => {
       cancelled = true;
     };
-  }, [composeKey, initialDraft]);
+  }, [attachments.replaceFiles, composeKey, initialDraft]);
 
   const serverDraft = useDraft(composeKey, draft);
   const availableMailboxes = useMemo(
@@ -314,6 +382,15 @@ export function useComposeEmail(
 
   const setBody = (value: string) => {
     bodyRef.current = value;
+    const activeInlineKeys = getInlineAttachmentKeys(value);
+    for (const file of attachments.files) {
+      if (
+        file.disposition === "inline" &&
+        !activeInlineKeys.has(file.key)
+      ) {
+        attachments.removeFile(file.key);
+      }
+    }
     setDraft((current) => ({ ...current, body: value }));
   };
 
@@ -385,6 +462,21 @@ export function useComposeEmail(
     setDraft(initialDraft);
   }, [attachments, initialDraft, serverDraft]);
 
+  const uploadInlineImages = useCallback(
+    async (files: File[]) => {
+      const uploaded = (await attachments.addFiles(files, "inline")) ?? [];
+      const previews = await Promise.all(files.map(fileToDataUrl));
+      return uploaded.map((file, index) => ({
+        src: previews[index],
+        key: file.key,
+        contentId: file.contentId!,
+        filename: file.filename,
+        mimeType: file.mimeType,
+      }));
+    },
+    [attachments],
+  );
+
   // Snapshot draft state at trigger time so the undo-send closure captures
   // the values that were current when the user pressed Send.
   const draftSnapshotRef = useRef(draft);
@@ -392,6 +484,19 @@ export function useComposeEmail(
   const attachmentSnapshotRef = useRef<AttachmentKey[] | undefined>(undefined);
   const [replyReminderMs, setReplyReminderMs] = useState<number | null>(null);
   const replyReminderSnapshotRef = useRef<number | null>(null);
+  const optimisticRef = useRef<{
+    providerMessageId: string;
+    mailboxId: number;
+    threadId: string;
+  } | null>(null);
+
+  const clearOptimistic = useCallback(() => {
+    const opt = optimisticRef.current;
+    if (!opt) return;
+    removeOptimisticFromSentList(queryClient, opt.mailboxId, opt.providerMessageId);
+    removeOptimisticFromThread(queryClient, opt.threadId, opt.providerMessageId);
+    optimisticRef.current = null;
+  }, [queryClient]);
 
   const undoSend = useUndoSend({
     onSend: async () => {
@@ -430,6 +535,7 @@ export function useComposeEmail(
       return result;
     },
     onUndo: () => {
+      clearOptimistic();
       const snapshot = draftSnapshotRef.current;
       openCompose({
         mailboxId: snapshot.mailboxId,
@@ -448,6 +554,7 @@ export function useComposeEmail(
     },
     onView: viewSentEmail,
     onSuccess: () => {
+      clearOptimistic();
       clearDraft();
       invalidateInboxQueries();
       queryClient.invalidateQueries({
@@ -461,13 +568,13 @@ export function useComposeEmail(
       options?.onSent?.();
     },
     onError: (error) => {
+      clearOptimistic();
       setSendPending(false);
       toast.error(error.message);
     },
   });
 
   const send = useCallback(() => {
-    // Snapshot current state before triggering
     draftSnapshotRef.current = { ...draft };
     bodySnapshotRef.current = bodyRef.current;
     attachmentSnapshotRef.current =
@@ -475,10 +582,72 @@ export function useComposeEmail(
         ? attachments.files.map((file) => ({ ...file }))
         : undefined;
     replyReminderSnapshotRef.current = replyReminderMs;
+
+    const snapshot = draftSnapshotRef.current;
+    if (snapshot.mailboxId != null && activeMailbox) {
+      const providerMessageId = makeOptimisticProviderId();
+      const fromAddr =
+        activeMailbox.email ?? activeMailbox.gmailEmail ?? user?.email ?? "";
+      const fromName = user?.name ?? null;
+      const combinedBody = combineComposeBody(
+        bodySnapshotRef.current,
+        snapshot.forwardedContent,
+      );
+      const item = buildOptimisticSentItem(
+        {
+          mailboxId: snapshot.mailboxId,
+          fromAddr,
+          fromName,
+          to: snapshot.to,
+          cc: snapshot.cc,
+          bcc: snapshot.bcc,
+          subject: snapshot.subject,
+          body: combinedBody,
+          threadId: threadId ?? undefined,
+          hasAttachment: (attachmentSnapshotRef.current?.length ?? 0) > 0,
+        },
+        providerMessageId,
+      );
+      const threadItem = buildOptimisticThreadItem(
+        {
+          mailboxId: snapshot.mailboxId,
+          fromAddr,
+          fromName,
+          to: snapshot.to,
+          cc: snapshot.cc,
+          bcc: snapshot.bcc,
+          subject: snapshot.subject,
+          body: combinedBody,
+          threadId: threadId ?? undefined,
+          hasAttachment: (attachmentSnapshotRef.current?.length ?? 0) > 0,
+        },
+        item,
+      );
+      insertOptimisticIntoSentList(queryClient, snapshot.mailboxId, item);
+      insertOptimisticIntoThread(queryClient, item.threadId ?? "", threadItem);
+      optimisticRef.current = {
+        providerMessageId,
+        mailboxId: snapshot.mailboxId,
+        threadId: item.threadId ?? "",
+      };
+    }
+
     setSendPending(true);
     options?.onQueued?.();
     undoSend.trigger();
-  }, [draft, attachments, undoSend, options, replyReminderMs]);
+  }, [
+    activeMailbox,
+    attachments,
+    uploadInlineImages,
+    draft,
+    options,
+    queryClient,
+    replyReminderMs,
+    threadId,
+    undoSend,
+    user?.email,
+    user?.name,
+  ]);
 
   const scheduleSend = useCallback(
     async (scheduledFor: number) => {
@@ -545,6 +714,7 @@ export function useComposeEmail(
     setReplyReminderMs,
     isPending: sendPending,
     attachments,
+    uploadInlineImages,
     signatures,
     selectedSignatureId,
     applySignatureById,

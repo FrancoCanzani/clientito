@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
-import type { ComposeInitial } from "../types";
-import { ComposeBody } from "./compose-body";
+import type { ComposeInitial } from "@/features/email/mail/shared/types";
+import { ComposeBody } from "@/features/email/mail/compose/compose-body";
 
 export function ComposeModalFrame({
   initial,

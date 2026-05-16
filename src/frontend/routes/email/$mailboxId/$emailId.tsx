@@ -1,6 +1,6 @@
 import { Error as RouteError } from "@/components/error";
 import FullEmailPage from "@/features/email/full-view/full-email-page";
-import { parseEmailIdParam } from "@/features/email/mail/views";
+import { parseEmailIdParam } from "@/features/email/mail/shared/views";
 import { getDashboardGate } from "@/features/onboarding/dashboard-gate";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 

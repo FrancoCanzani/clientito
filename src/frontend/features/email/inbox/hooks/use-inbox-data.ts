@@ -1,5 +1,5 @@
-import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
-import type { EmailListPage } from "@/features/email/mail/types";
+import { useMailViewData } from "@/features/email/mail/shared/hooks/use-mail-view-data";
+import type { EmailListPage } from "@/features/email/mail/shared/types";
 
 export type InboxDataView = "inbox" | "important";
 

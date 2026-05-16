@@ -16,8 +16,8 @@ import { EmailDetailView } from "@/features/email/inbox/pages/email-detail-view"
 import { isInternalLabelName } from "@/features/email/labels/internal-labels";
 import { fetchLabels } from "@/features/email/labels/queries";
 import { labelQueryKeys } from "@/features/email/labels/query-keys";
-import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
-import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
+import { useMailActions } from "@/features/email/mail/shared/hooks/use-mail-actions";
+import { useMailViewData } from "@/features/email/mail/shared/hooks/use-mail-view-data";
 import { EmailList } from "@/features/email/mail/list/email-list";
 import { MailFilterBar } from "@/features/email/mail/list/mail-filter-bar";
 import { ViewSyncStatusControl } from "@/features/email/mail/list/view-sync-status";

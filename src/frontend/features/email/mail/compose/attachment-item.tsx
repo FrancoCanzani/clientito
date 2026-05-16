@@ -5,14 +5,14 @@ import {
   WarningCircleIcon,
 } from "@phosphor-icons/react";
 import { useState } from "react";
-import { AttachmentPreviewDialog } from "../attachments/attachment-preview-dialog";
+import { AttachmentPreviewDialog } from "@/features/email/mail/attachments/attachment-preview-dialog";
 import {
   downloadEmailAttachment,
   getAttachmentBadgeClass,
   getAttachmentLabel,
-} from "../attachments/attachment-preview-utils";
-import type { EmailAttachment } from "../types";
-import { formatBytes } from "../utils/formatters";
+} from "@/features/email/mail/attachments/attachment-preview-utils";
+import type { EmailAttachment } from "@/features/email/mail/shared/types";
+import { formatBytes } from "@/features/email/mail/shared/utils/formatters";
 
 export function AttachmentItem({
   attachment,

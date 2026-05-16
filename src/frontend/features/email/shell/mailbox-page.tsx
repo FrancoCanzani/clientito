@@ -1,7 +1,7 @@
 import { PageContainer } from "@/components/page-container";
 import { cn } from "@/lib/utils";
 import { useContext, useRef, useState, type ReactNode } from "react";
-import { MailboxSidebarTrigger } from "./mailbox-menu";
+import { MailboxSidebarTrigger } from "./mailbox-sidebar";
 import {
   MailboxScrolledContext,
   MailboxSetScrolledContext,

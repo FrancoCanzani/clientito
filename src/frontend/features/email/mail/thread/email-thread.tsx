@@ -4,22 +4,25 @@ import type {
   EmailDetailItem,
   EmailListItem,
   EmailThreadItem,
-} from "@/features/email/mail/types";
+} from "@/features/email/mail/shared/types";
 import {
   CaretDownIcon,
   CaretRightIcon,
   PaperclipIcon,
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AttachmentItem } from "../compose/attachment-item";
-import type { EmailBodyOverflowMode } from "../render/email-html-renderer";
-import { MessageBody } from "../render/message-body";
+import type { ReactNode } from "react";
+import { SenderName } from "@/features/email/mail/sender/sender-name";
+import { AttachmentItem } from "@/features/email/mail/compose/attachment-item";
+import type { EmailBodyOverflowMode } from "@/features/email/mail/render/email-html-renderer";
+import { MessageBody } from "@/features/email/mail/render/message-body";
 import {
   formatEmailDetailDate,
   formatEmailThreadDate,
-} from "../utils/formatters";
-import { CalendarInviteCard } from "./calendar-invite-card";
-import { EmailHeaderDetails } from "./email-header-details";
+} from "@/features/email/mail/shared/utils/formatters";
+import { CalendarInviteCard } from "@/features/email/mail/thread/calendar-invite-card";
+import { DraftThreadMessage } from "@/features/email/mail/thread/draft-thread-message";
+import { MessageActions } from "@/features/email/mail/thread/message-actions";
 
 function normalizeCid(value: string): string {
   return value.trim().replace(/^<|>$/g, "").toLowerCase();
@@ -114,13 +117,21 @@ export function EmailThread({
   threadMessages,
   threadError,
   overflowMode = "contained",
+  summary,
+  scrollToLatestOnMount = true,
   onReplyToMessage,
+  onReplyAllToMessage,
+  onForwardMessage,
 }: {
   email: EmailDetailItem;
   threadMessages: EmailThreadItem[];
   threadError: boolean;
   overflowMode?: EmailBodyOverflowMode;
+  summary?: ReactNode;
+  scrollToLatestOnMount?: boolean;
   onReplyToMessage?: (message: EmailThreadItem) => void;
+  onReplyAllToMessage?: (message: EmailThreadItem) => void;
+  onForwardMessage?: (message: EmailThreadItem) => void;
 }) {
   const [expansionOverrides, setExpansionOverrides] = useState<
     Map<string, boolean>
@@ -178,13 +189,15 @@ export function EmailThread({
   }, [email.id, email.threadId]);
 
   useEffect(() => {
+    if (!scrollToLatestOnMount) return;
+
     requestAnimationFrame(() => {
       latestMessageRef.current?.scrollIntoView({
         block: "start",
         behavior: "auto",
       });
     });
-  }, [email.id, orderedThreadMessages.length]);
+  }, [email.id, orderedThreadMessages.length, scrollToLatestOnMount]);
 
   const isExpanded = (messageId: string) =>
     expansionOverrides.get(messageId) ?? defaultExpandedIds.has(messageId);
@@ -232,6 +245,8 @@ export function EmailThread({
             </div>
           </div>
 
+          {summary}
+
           <div className="space-y-3">
             {orderedThreadMessages.map((threadEmail) => {
               const isSelected = threadEmail.id === email.id;
@@ -249,25 +264,31 @@ export function EmailThread({
                       : undefined
                   }
                 >
-                  <ThreadMessage
-                    email={threadEmail}
-                    body={isSelected ? email : threadEmail}
-                    expanded={isExpanded(threadEmail.id)}
-                    onToggle={() => toggleMessage(threadEmail.id)}
-                    onReply={onReplyToMessage}
-                    overflowMode={overflowMode}
-                    attachments={
-                      isSelected
-                        ? visibleAttachments
-                        : (threadEmail.attachments ?? []).filter(
-                            (attachment) =>
-                              !shouldHideInlineImageAttachment(
-                                attachment,
-                                threadReferencedCids,
-                              ),
-                          )
-                    }
-                  />
+                  {threadEmail.isDraft ? (
+                    <DraftThreadMessage draft={threadEmail} />
+                  ) : (
+                    <ThreadMessage
+                      email={threadEmail}
+                      body={isSelected ? email : threadEmail}
+                      expanded={isExpanded(threadEmail.id)}
+                      onToggle={() => toggleMessage(threadEmail.id)}
+                      onReply={onReplyToMessage}
+                      onReplyAll={onReplyAllToMessage}
+                      onForward={onForwardMessage}
+                      overflowMode={overflowMode}
+                      attachments={
+                        isSelected
+                          ? visibleAttachments
+                          : (threadEmail.attachments ?? []).filter(
+                              (attachment) =>
+                                !shouldHideInlineImageAttachment(
+                                  attachment,
+                                  threadReferencedCids,
+                                ),
+                            )
+                      }
+                    />
+                  )}
                 </div>
               );
             })}
@@ -320,6 +341,8 @@ function ThreadMessage({
   expanded,
   onToggle,
   onReply,
+  onReplyAll,
+  onForward,
   attachments,
   overflowMode,
 }: {
@@ -328,6 +351,8 @@ function ThreadMessage({
   expanded: boolean;
   onToggle: () => void;
   onReply?: (message: EmailThreadItem) => void;
+  onReplyAll?: (message: EmailThreadItem) => void;
+  onForward?: (message: EmailThreadItem) => void;
   attachments: EmailAttachment[];
   overflowMode: EmailBodyOverflowMode;
 }) {
@@ -345,23 +370,26 @@ function ThreadMessage({
       }
     >
       <div className="flex w-full items-center gap-3 px-4 py-3 text-left">
-        <button
-          type="button"
+        <div
           onClick={onToggle}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left transition-colors hover:opacity-80"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left transition-colors hover:opacity-80"
         >
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-foreground">
+            <SenderName
+              email={email.fromAddr}
+              name={email.fromName}
+              showHoverCard={email.direction !== "sent"}
+              className="block truncate text-sm font-medium text-foreground hover:underline"
+            >
               {expanded ? senderFull : senderName}
-            </p>
+            </SenderName>
             {expanded && email.toAddr && (
               <p className="truncate text-xs text-muted-foreground">
                 To: {email.toAddr}
               </p>
             )}
           </div>
-        </button>
-        {expanded && <EmailHeaderDetails email={email} />}
+        </div>
         <button
           type="button"
           onClick={onToggle}
@@ -387,16 +415,13 @@ function ThreadMessage({
 
           {hasAttachments && <AttachmentsSection attachments={attachments} />}
 
-          {onReply && (
-            <div className="border-t border-border/40 px-4 py-2">
-              <button
-                type="button"
-                onClick={() => onReply(email)}
-                className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Reply
-              </button>
-            </div>
+          {onReply && onReplyAll && onForward && (
+            <MessageActions
+              message={email}
+              onReply={onReply}
+              onReplyAll={onReplyAll}
+              onForward={onForward}
+            />
           )}
         </>
       )}

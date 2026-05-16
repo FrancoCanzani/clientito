@@ -1,5 +1,5 @@
 import { openCompose } from "@/features/email/mail/compose/compose-events";
-import { parseMailtoComposeInitial } from "@/features/email/mail/utils/parse-mailto-compose";
+import { parseMailtoComposeInitial } from "@/features/email/mail/shared/utils/parse-mailto-compose";
 import { useTheme } from "@/hooks/use-theme";
 import { useEffect, useRef } from "react";
 
@@ -8,6 +8,16 @@ export type EmailBodyOverflowMode = "contained" | "page";
 
 const DARK_MODE_BACKGROUND: Rgb = { r: 20, g: 20, b: 20 };
 const DEFAULT_LINK_COLOR = "#93c5fd";
+
+function upgradeInsecureAssetUrls(html: string): string {
+ if (!html.includes("http://")) return html;
+ return html
+ .replace(
+ /(\s(?:src|background|poster|srcset|data-src)\s*=\s*["'])http:\/\//gi,
+ "$1https://",
+ )
+ .replace(/url\(\s*(["']?)http:\/\//gi, "url($1https://");
+}
 
 const EMAIL_CONTENT_SHADOW_STYLE = `
  :host {
@@ -295,7 +305,7 @@ export function EmailHtmlRenderer({
 
  const shadowRoot = shadowRootRef.current;
  const host = hostRef.current;
- shadowRoot.innerHTML = `<style>${EMAIL_CONTENT_SHADOW_STYLE}</style>${html}`;
+ shadowRoot.innerHTML = `<style>${EMAIL_CONTENT_SHADOW_STYLE}</style>${upgradeInsecureAssetUrls(html)}`;
 
  const content = wrapEmailContent(shadowRoot);
  if (!host || !content) {

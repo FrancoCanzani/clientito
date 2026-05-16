@@ -1,87 +1,85 @@
-import { Button } from "@/components/ui/button";
-import type { InboxSearchSuggestionsResponse } from "@/features/email/mail/types";
+import type { InboxSearchSuggestionsResponse } from "@/features/email/mail/shared/types";
+
+type SearchSuggestionItem = {
+  id: string;
+  section: string;
+  label: string;
+  detail?: string | null;
+  query: string;
+};
 
 export function SearchSuggestionsList({
- query,
- suggestions,
- onSelectQuery,
+  query,
+  suggestions,
+  onSelectQuery,
 }: {
- query: string;
- suggestions: InboxSearchSuggestionsResponse;
- onSelectQuery: (query: string) => void;
+  query: string;
+  suggestions: InboxSearchSuggestionsResponse;
+  onSelectQuery: (query: string) => void;
 }) {
- const topFilters = suggestions.filters.slice(0, 4);
- const topContacts = query ? suggestions.contacts.slice(0, 6) : [];
- const topSubjects = query ? suggestions.subjects.slice(0, 4) : [];
- const hasAny =
- topFilters.length > 0 || topContacts.length > 0 || topSubjects.length > 0;
+  const items: SearchSuggestionItem[] = [
+    ...(query
+      ? suggestions.contacts.slice(0, 6).map((suggestion) => ({
+          id: suggestion.id,
+          section: "People",
+          label: suggestion.name || suggestion.email,
+          detail: suggestion.name ? suggestion.email : null,
+          query: suggestion.query,
+        }))
+      : []),
+    ...(query
+      ? suggestions.subjects.slice(0, 4).map((suggestion) => ({
+          id: suggestion.id,
+          section: "Subjects",
+          label: suggestion.subject,
+          detail: null,
+          query: suggestion.query,
+        }))
+      : []),
+    ...suggestions.filters.slice(0, 4).map((suggestion) => ({
+      id: suggestion.id,
+      section: "Filters",
+      label: suggestion.label,
+      detail: suggestion.description,
+      query: suggestion.query,
+    })),
+  ];
 
- if (!hasAny) {
- return;
- }
+  if (items.length === 0) return null;
 
- return (
- <div className="space-y-4">
- {topFilters.length > 0 && (
- <div className="space-y-2">
- <p className="text-xs text-muted-foreground">Try</p>
- <div className="flex flex-wrap gap-2">
- {topFilters.map((suggestion) => (
- <Button
- key={suggestion.id}
- type="button"
- variant="secondary"
- size="sm"
- onClick={() => onSelectQuery(suggestion.query)}
- >
- <span className="max-w-56 truncate">{suggestion.query}</span>
- </Button>
- ))}
- </div>
- </div>
- )}
+  let previousSection: string | null = null;
 
- {topContacts.length > 0 && (
- <div className="space-y-2">
- <p className="text-xs text-muted-foreground">People</p>
- <div className="flex flex-wrap gap-2">
- {topContacts.map((suggestion) => (
- <Button
- key={suggestion.id}
- type="button"
- variant="secondary"
- size="sm"
- onClick={() => onSelectQuery(suggestion.query)}
- >
- <span className="max-w-48 truncate">
- {suggestion.name || suggestion.email}
- </span>
- </Button>
- ))}
- </div>
- </div>
- )}
+  return (
+    <div
+      role="listbox"
+      className="overflow-hidden border border-border bg-background shadow-lg"
+    >
+      {items.map((item) => {
+        const showSection = item.section !== previousSection;
+        previousSection = item.section;
 
- {topSubjects.length > 0 && (
- <div className="space-y-2">
- <p className="text-xs text-muted-foreground">Recent subjects</p>
- <div className="flex flex-wrap gap-2">
- {topSubjects.map((suggestion) => (
- <Button
- key={suggestion.id}
- type="button"
- variant="secondary"
- size="sm"
- onClick={() => onSelectQuery(suggestion.query)}
- >
- <span className="max-w-[18rem] truncate">
- {suggestion.subject}
- </span>
- </Button>
- ))}
- </div>
- </div>
- )}
- </div>
- );
+        return (
+          <div key={item.id}>
+            {showSection && (
+              <div className="px-2 pb-1 pt-2 text-[10px] font-medium text-muted-foreground">
+                {item.section}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => onSelectQuery(item.query)}
+              className="flex w-full items-center justify-between gap-3 px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted"
+            >
+              <span className="min-w-0 truncate">{item.label}</span>
+              {item.detail && (
+                <span className="max-w-48 truncate text-[11px] text-muted-foreground">
+                  {item.detail}
+                </span>
+              )}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
 }

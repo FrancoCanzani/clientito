@@ -21,11 +21,7 @@ export function useSettingsMutations({
  const queryClient = useQueryClient();
 
  const addAccountMutation = useMutation({
- mutationFn: () =>
- beginGmailConnection(`${window.location.pathname}?connected=1`),
- onSuccess: async () => {
- await queryClient.invalidateQueries({ queryKey: accountQueryKeys.all() });
- },
+ mutationFn: () => beginGmailConnection(window.location.pathname),
  onError: () => toast.error("Failed to connect Gmail account"),
  });
 
@@ -105,6 +101,7 @@ export function useSettingsMutations({
  },
  onError: () => toast.error("Failed to save signatures"),
  });
+
 
  const templatesMutation = useMutation({
  mutationFn: async ({

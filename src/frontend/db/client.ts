@@ -1,4 +1,4 @@
-import { applyLabelPatch, STANDARD_LABELS } from "@/features/email/mail/utils/label-patch";
+import { applyLabelPatch, STANDARD_LABELS } from "@/features/email/mail/shared/utils/label-patch";
 import { deviceCapabilities } from "@/lib/device-capabilities";
 import { normalizeEmailAddress } from "@/lib/email";
 import { pendingSubset } from "./pending-lock";
@@ -942,6 +942,66 @@ export const localDb = {
     };
   },
 
+  async getSenderStats(params: {
+    userId: string;
+    mailboxId: number;
+    fromAddr: string;
+    sinceMs: number;
+  }): Promise<{ count: number; firstSeenAt: number | null; lastSeenAt: number | null }> {
+    const { userId, mailboxId, fromAddr, sinceMs } = params;
+    const normalized = fromAddr.trim().toLowerCase();
+    if (!normalized) return { count: 0, firstSeenAt: null, lastSeenAt: null };
+    const res = await dbClient.exec(
+      `SELECT
+         COUNT(DISTINCT COALESCE(thread_id, provider_message_id)) AS count,
+         MIN(date) AS first_seen,
+         MAX(date) AS last_seen
+       FROM emails
+       WHERE user_id = ?
+         AND mailbox_id = ?
+         AND LOWER(from_addr) = ?
+         AND date >= ?`,
+      [userId, mailboxId, normalized, sinceMs],
+      "get",
+    );
+    const row = firstRow<{ count: number; firstSeen: number | null; lastSeen: number | null }>(res);
+    return {
+      count: Number(row?.count ?? 0),
+      firstSeenAt: row?.firstSeen ?? null,
+      lastSeenAt: row?.lastSeen ?? null,
+    };
+  },
+
+  async getSenderRecentThreads(params: {
+    userId: string;
+    mailboxId: number;
+    fromAddr: string;
+    limit?: number;
+  }): Promise<Array<{ threadId: string | null; emailId: string; subject: string | null; date: number }>> {
+    const { userId, mailboxId, fromAddr, limit = 5 } = params;
+    const normalized = fromAddr.trim().toLowerCase();
+    if (!normalized) return [];
+    const res = await dbClient.exec(
+      `SELECT id, thread_id, subject, MAX(date) AS date
+       FROM emails
+       WHERE user_id = ?
+         AND mailbox_id = ?
+         AND LOWER(from_addr) = ?
+       GROUP BY COALESCE(thread_id, provider_message_id)
+       ORDER BY date DESC
+       LIMIT ?`,
+      [userId, mailboxId, normalized, limit],
+      "rows",
+    );
+    return rowsToObjects<{ id: number; threadId: string | null; subject: string | null; date: number }>(res)
+      .map((row) => ({
+        threadId: row.threadId,
+        emailId: String(row.id),
+        subject: row.subject,
+        date: row.date,
+      }));
+  },
+
   async getViewMeta(params: {
     userId: string;
     mailboxId: number;
@@ -1242,6 +1302,36 @@ export const localDb = {
     );
   },
 
+  async getRecentSentStyleSamples(
+    userId: string,
+    mailboxId: number,
+    excludeThreadId?: string,
+    limit = 5,
+  ) {
+    const res = await dbClient.exec(
+      `SELECT emails.subject, b.body_text
+       FROM emails
+       JOIN email_bodies b ON b.email_id = emails.id
+       WHERE emails.user_id = ?
+         AND emails.mailbox_id = ?
+         AND emails.direction = 'sent'
+         AND (? IS NULL OR emails.thread_id <> ?)
+         AND b.body_text IS NOT NULL
+         AND TRIM(b.body_text) <> ''
+       ORDER BY emails.date DESC
+       LIMIT ?`,
+      [
+        userId,
+        mailboxId,
+        excludeThreadId ?? null,
+        excludeThreadId ?? null,
+        limit,
+      ],
+      "rows",
+    );
+    return rowsToObjects<{ subject: string | null; bodyText: string }>(res);
+  },
+
   async getDrafts(userId: string, mailboxId?: number) {
     const fragments: SqlFragment[] = [{ sql: "user_id = ?", params: [userId] }];
     if (mailboxId != null)
@@ -1250,6 +1340,41 @@ export const localDb = {
     const res = await dbClient.exec(
       `SELECT id, compose_key, mailbox_id, to_addr, cc_addr, bcc_addr, subject, body, forwarded_content, thread_id, attachment_keys, updated_at, created_at FROM drafts ${where} ORDER BY updated_at DESC`,
       params,
+      "rows",
+    );
+    const rows = rowsToObjects<Omit<DraftRow, "userId">>(res);
+    return rows.map((r) => ({
+      ...r,
+      attachmentKeys: r.attachmentKeys
+        ? (JSON.parse(r.attachmentKeys) as DraftAttachmentKey[])
+        : null,
+    }));
+  },
+
+  async getEmailBodyTextsByIds(userId: string, emailIds: string[]) {
+    if (emailIds.length === 0) return new Map<string, string>();
+    const numeric = emailIds
+      .map((id) => Number(id))
+      .filter((n) => Number.isFinite(n));
+    if (numeric.length === 0) return new Map<string, string>();
+    const placeholders = numeric.map(() => "?").join(",");
+    const res = await dbClient.exec(
+      `SELECT e.id, b.body_text FROM emails e LEFT JOIN email_bodies b ON b.email_id = e.id WHERE e.user_id = ? AND e.id IN (${placeholders})`,
+      [userId, ...numeric],
+      "rows",
+    );
+    const rows = rowsToObjects<{ id: number; bodyText: string | null }>(res);
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (row.bodyText) map.set(String(row.id), row.bodyText);
+    }
+    return map;
+  },
+
+  async getDraftsByThreadId(userId: string, threadId: string) {
+    const res = await dbClient.exec(
+      `SELECT id, compose_key, mailbox_id, to_addr, cc_addr, bcc_addr, subject, body, forwarded_content, thread_id, attachment_keys, updated_at, created_at FROM drafts WHERE user_id = ? AND thread_id = ? ORDER BY updated_at ASC`,
+      [userId, threadId],
       "rows",
     );
     const rows = rowsToObjects<Omit<DraftRow, "userId">>(res);

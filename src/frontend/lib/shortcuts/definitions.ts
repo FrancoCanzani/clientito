@@ -260,46 +260,6 @@ registerShortcut({
 });
 
 registerShortcut({
-  id: "compose:focus-to",
-  key: "o",
-  label: "Focus To",
-  category: "Compose",
-  contexts: ["compose"],
-});
-
-registerShortcut({
-  id: "compose:focus-cc",
-  key: "c",
-  label: "Focus Cc",
-  category: "Compose",
-  contexts: ["compose"],
-});
-
-registerShortcut({
-  id: "compose:focus-bcc",
-  key: "b",
-  label: "Focus Bcc",
-  category: "Compose",
-  contexts: ["compose"],
-});
-
-registerShortcut({
-  id: "compose:focus-subject",
-  key: "s",
-  label: "Focus subject",
-  category: "Compose",
-  contexts: ["compose"],
-});
-
-registerShortcut({
-  id: "compose:focus-body",
-  key: "m",
-  label: "Focus message body",
-  category: "Compose",
-  contexts: ["compose"],
-});
-
-registerShortcut({
   id: "compose:send",
   key: "$mod+Enter",
   label: "Send email",
@@ -380,4 +340,36 @@ registerShortcut({
   label: "Refresh",
   category: "Actions",
   contexts: ["inbox-list"],
+});
+
+registerShortcut({
+  id: "inbox:open-in-tab",
+  key: "t",
+  label: "Open in new tab",
+  category: "Navigation",
+  contexts: ["inbox-list"],
+});
+
+registerShortcut({
+  id: "reader:next-tab",
+  key: "]",
+  label: "Next tab",
+  category: "Navigation",
+  contexts: ["inbox-list", "email-detail"],
+});
+
+registerShortcut({
+  id: "reader:prev-tab",
+  key: "[",
+  label: "Previous tab",
+  category: "Navigation",
+  contexts: ["inbox-list", "email-detail"],
+});
+
+registerShortcut({
+  id: "reader:close-tab",
+  key: "x",
+  label: "Close tab",
+  category: "Navigation",
+  contexts: ["inbox-list", "email-detail"],
 });

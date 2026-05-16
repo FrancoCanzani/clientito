@@ -1,12 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { respondToCalendarInvite } from "@/features/email/mail/mutations";
-import { fetchCalendarInvitePreview } from "@/features/email/mail/data/calendar";
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { respondToCalendarInvite } from "@/features/email/mail/shared/mutations";
+import { fetchCalendarInvitePreview } from "@/features/email/mail/shared/data/calendar";
+import { emailQueryKeys } from "@/features/email/mail/shared/query-keys";
 import type {
   CalendarInvitePreview,
   CalendarInviteResponseStatus,
   EmailDetailItem,
-} from "@/features/email/mail/types";
+} from "@/features/email/mail/shared/types";
 import { MapPinIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";

@@ -168,6 +168,13 @@
   }
 }
 
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 .tiptap.ProseMirror {
   padding: 0 !important;
 }

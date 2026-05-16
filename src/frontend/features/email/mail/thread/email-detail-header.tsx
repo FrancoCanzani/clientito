@@ -1,6 +1,6 @@
 import { IconButton } from "@/components/ui/icon-button";
-import type { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
-import type { EmailDetailItem } from "@/features/email/mail/types";
+import type { useMailActions } from "@/features/email/mail/shared/hooks/use-mail-actions";
+import type { EmailDetailItem } from "@/features/email/mail/shared/types";
 import { shortcutKey } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import {
@@ -8,8 +8,8 @@ import {
   CaretDownIcon,
   CaretUpIcon,
 } from "@phosphor-icons/react";
-import type { ComposeInitial } from "../types";
-import { EmailActions } from "../list/email-actions";
+import type { ComposeInitial } from "@/features/email/mail/shared/types";
+import { EmailActions } from "@/features/email/mail/list/email-actions";
 
 export function EmailDetailHeader({
   email,

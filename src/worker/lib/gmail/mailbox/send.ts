@@ -52,11 +52,21 @@ function buildMimeMessage(
       filename: string;
       mimeType: string;
       content: ArrayBuffer;
+      disposition?: "attachment" | "inline";
+      contentId?: string;
     }>;
   },
   fromAddr: string,
 ): string {
-  const hasAttachments = input.attachments && input.attachments.length > 0;
+  const attachments = input.attachments ?? [];
+  const inlineAttachments = attachments.filter(
+    (attachment) => attachment.disposition === "inline" && attachment.contentId,
+  );
+  const regularAttachments = attachments.filter(
+    (attachment) => attachment.disposition !== "inline" || !attachment.contentId,
+  );
+  const hasInlineAttachments = inlineAttachments.length > 0;
+  const hasRegularAttachments = regularAttachments.length > 0;
 
   const headers: string[] = [];
   headers.push(`From: ${fromAddr}`);
@@ -77,24 +87,59 @@ function buildMimeMessage(
     headers.push(`References: ${input.references}`);
   }
 
-  if (!hasAttachments) {
+  if (!hasInlineAttachments && !hasRegularAttachments) {
     headers.push('Content-Type: text/html; charset="UTF-8"');
     headers.push("");
     headers.push(input.body);
     return headers.join("\r\n");
   }
 
-  const boundary = `boundary_${crypto.randomUUID().replace(/-/g, "")}`;
-  headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+  const mixedBoundary = `mixed_${crypto.randomUUID().replace(/-/g, "")}`;
+  const relatedBoundary = `related_${crypto.randomUUID().replace(/-/g, "")}`;
+
+  if (hasRegularAttachments) {
+    headers.push(`Content-Type: multipart/mixed; boundary="${mixedBoundary}"`);
+    headers.push("");
+    headers.push(`--${mixedBoundary}`);
+  }
+
+  headers.push(
+    hasInlineAttachments
+      ? `Content-Type: multipart/related; boundary="${relatedBoundary}"`
+      : `Content-Type: text/html; charset="UTF-8"`,
+  );
   headers.push("");
-  headers.push(`--${boundary}`);
-  headers.push('Content-Type: text/html; charset="UTF-8"');
-  headers.push("");
+
+  if (hasInlineAttachments) {
+    headers.push(`--${relatedBoundary}`);
+    headers.push('Content-Type: text/html; charset="UTF-8"');
+    headers.push("");
+  }
+
   headers.push(input.body);
 
-  const attachments = input.attachments ?? [];
-  for (const attachment of attachments) {
-    headers.push(`--${boundary}`);
+  for (const attachment of inlineAttachments) {
+    headers.push(`--${relatedBoundary}`);
+    headers.push(
+      `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"`,
+    );
+    headers.push("Content-Transfer-Encoding: base64");
+    headers.push(`Content-ID: <${attachment.contentId}>`);
+    headers.push(
+      `Content-Disposition: inline; filename="${attachment.filename}"`,
+    );
+    headers.push("");
+    headers.push(arrayBufferToBase64(attachment.content));
+  }
+
+  if (hasInlineAttachments) {
+    headers.push(`--${relatedBoundary}--`);
+  }
+
+  for (const attachment of regularAttachments) {
+    if (hasRegularAttachments) {
+      headers.push(`--${mixedBoundary}`);
+    }
     headers.push(
       `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"`,
     );
@@ -106,7 +151,9 @@ function buildMimeMessage(
     headers.push(arrayBufferToBase64(attachment.content));
   }
 
-  headers.push(`--${boundary}--`);
+  if (hasRegularAttachments) {
+    headers.push(`--${mixedBoundary}--`);
+  }
   return headers.join("\r\n");
 }
 
@@ -128,6 +175,8 @@ export async function sendGmailMessage(
       filename: string;
       mimeType: string;
       content: ArrayBuffer;
+      disposition?: "attachment" | "inline";
+      contentId?: string;
     }>;
   },
 ): Promise<{ gmailId: string; threadId: string }> {

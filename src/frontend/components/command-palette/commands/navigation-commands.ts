@@ -16,7 +16,7 @@ import {
 import type {
  EmailFolderView,
  InboxLabelView,
-} from "@/features/email/mail/views";
+} from "@/features/email/mail/shared/views";
 import { paletteIcon } from "../registry/palette-icon";
 import { registerCommands } from "../registry/registry";
 import type { Command, CommandServices } from "../registry/types";

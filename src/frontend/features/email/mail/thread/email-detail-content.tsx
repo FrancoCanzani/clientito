@@ -1,17 +1,22 @@
 import { useMailCompose } from "@/features/email/mail/compose/compose-context";
-import type { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
+import { useThreadDrafts } from "@/features/email/mail/thread/use-thread-drafts";
+import type { useMailActions } from "@/features/email/mail/shared/hooks/use-mail-actions";
 import type {
   EmailDetailItem,
   EmailThreadItem,
-} from "@/features/email/mail/types";
-import { buildReplyInitial } from "@/features/email/mail/utils/reply-compose";
+} from "@/features/email/mail/shared/types";
+import { buildForwardedEmailHtml } from "@/features/email/mail/thread/build-forwarded-html";
+import {
+  canShowThreadSummary,
+  ThreadAiPanel,
+} from "@/features/email/ai/thread-ai-panel";
 import { useIsScrolled } from "@/hooks/use-is-scrolled";
 import { cn } from "@/lib/utils";
-import { forwardRef, useImperativeHandle, useRef } from "react";
-import type { ComposeInitial } from "../types";
-import { EmailDetailHeader } from "./email-detail-header";
-import { EmailThread } from "./email-thread";
-import { QuickReply, type QuickReplyHandle } from "./quick-reply";
+import { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
+import type { ComposeInitial } from "@/features/email/mail/shared/types";
+import { EmailDetailHeader } from "@/features/email/mail/thread/email-detail-header";
+import { EmailThread } from "@/features/email/mail/thread/email-thread";
+import { QuickReply, type QuickReplyHandle } from "@/features/email/mail/thread/quick-reply";
 
 export type EmailDetailContentHandle = {
   triggerReply: (draft?: string) => void;
@@ -54,14 +59,47 @@ export const EmailDetailContent = forwardRef<
   const scrollRef = useRef<HTMLDivElement>(null);
   const isScrolled = useIsScrolled(scrollRef);
   const { openCompose } = useMailCompose();
+  const draftMessages = useThreadDrafts(email.threadId, email.mailboxId);
+
+  const mergedMessages = useMemo(() => {
+    if (draftMessages.length === 0) return threadMessages;
+    return [...threadMessages, ...draftMessages].sort(
+      (a, b) => a.date - b.date,
+    );
+  }, [threadMessages, draftMessages]);
+  const showsThreadSummary = canShowThreadSummary({
+    mailboxId: email.mailboxId,
+    threadId: email.threadId,
+    messages: threadMessages,
+  });
 
   useImperativeHandle(ref, () => ({
     triggerReply: (draft?: string) =>
-      quickReplyRef.current?.scrollIntoViewAndFocus(draft),
+      quickReplyRef.current?.scrollIntoViewAndFocus({ draft }),
   }));
 
   const handleReplyToMessage = (message: EmailThreadItem) => {
-    openCompose(buildReplyInitial(message, message));
+    quickReplyRef.current?.scrollIntoViewAndFocus({
+      replyTo: message,
+      mode: "reply",
+    });
+  };
+
+  const handleReplyAllToMessage = (message: EmailThreadItem) => {
+    quickReplyRef.current?.scrollIntoViewAndFocus({
+      replyTo: message,
+      mode: "reply-all",
+    });
+  };
+
+  const handleForwardMessage = (message: EmailThreadItem) => {
+    const subject = message.subject
+      ? message.subject.startsWith("Fwd:")
+        ? message.subject
+        : `Fwd: ${message.subject}`
+      : "Fwd:";
+    const bodyHtml = buildForwardedEmailHtml(message as EmailDetailItem);
+    openCompose({ subject, bodyHtml });
   };
 
   return (
@@ -95,16 +133,31 @@ export const EmailDetailContent = forwardRef<
         >
           <EmailThread
             email={email}
-            threadMessages={threadMessages}
+            threadMessages={mergedMessages}
             threadError={threadError}
+            scrollToLatestOnMount={!showsThreadSummary}
+            summary={
+              <div data-print-hide>
+                <ThreadAiPanel
+                  mailboxId={email.mailboxId}
+                  threadId={email.threadId}
+                  messages={threadMessages}
+                  onUseDraft={(draft) =>
+                    quickReplyRef.current?.scrollIntoViewAndFocus({ draft })
+                  }
+                />
+              </div>
+            }
             onReplyToMessage={handleReplyToMessage}
+            onReplyAllToMessage={handleReplyAllToMessage}
+            onForwardMessage={handleForwardMessage}
           />
           <div data-print-hide>
             <QuickReply
               ref={quickReplyRef}
               email={email}
               detail={email}
-              threadMessages={threadMessages}
+              threadMessages={mergedMessages}
             />
           </div>
         </div>

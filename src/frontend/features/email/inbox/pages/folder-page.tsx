@@ -15,14 +15,14 @@ import { useArchivedData } from "@/features/email/inbox/hooks/use-archived-data"
 import { useMailPanelSelection } from "@/features/email/inbox/hooks/use-mail-panel-selection";
 import { useThreadGroupSnooze } from "@/features/email/inbox/hooks/use-thread-group-snooze";
 import { EmailDetailView } from "@/features/email/inbox/pages/email-detail-view";
-import { useMailActions } from "@/features/email/mail/hooks/use-mail-actions";
-import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { useMailActions } from "@/features/email/mail/shared/hooks/use-mail-actions";
+import { useMailViewData } from "@/features/email/mail/shared/hooks/use-mail-view-data";
+import { emailQueryKeys } from "@/features/email/mail/shared/query-keys";
 import { DeleteAllButton } from "@/features/email/mail/list/delete-all-button";
 import { EmailList } from "@/features/email/mail/list/email-list";
 import { MailFilterBar } from "@/features/email/mail/list/mail-filter-bar";
 import { ViewSyncStatusControl } from "@/features/email/mail/list/view-sync-status";
-import { VIEW_LABELS, type EmailFolderView } from "@/features/email/mail/views";
+import { VIEW_LABELS, type EmailFolderView } from "@/features/email/mail/shared/views";
 import {
   MailboxPage,
   MailboxPageHeader,

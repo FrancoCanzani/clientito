@@ -12,17 +12,25 @@ import {
 import type {
  EmailDetailItem,
  EmailListItem,
-} from "../types";
-import type { EmailThreadItem } from "../types";
-import { ComposeEmailFields } from "../compose/compose-email-fields";
-import { useComposeEmail } from "../compose/compose-email-state";
+} from "@/features/email/mail/shared/types";
+import type { EmailThreadItem } from "@/features/email/mail/shared/types";
+import { ComposeEmailFields } from "@/features/email/mail/compose/compose-email-fields";
+import { useComposeEmail } from "@/features/email/mail/compose/compose-email-state";
 import {
  buildReplyInitial,
  pickReplySource,
-} from "../utils/reply-compose";
+} from "@/features/email/mail/thread/reply-compose";
+
+export type QuickReplyMode = "reply" | "reply-all";
+
+export type QuickReplyOptions = {
+ draft?: string;
+ replyTo?: EmailThreadItem;
+ mode?: QuickReplyMode;
+};
 
 export type QuickReplyHandle = {
- scrollIntoViewAndFocus: (draft?: string) => void;
+ scrollIntoViewAndFocus: (options?: QuickReplyOptions | string) => void;
 };
 
 export const QuickReply = forwardRef<
@@ -38,16 +46,21 @@ export const QuickReply = forwardRef<
  id: number;
  text: string;
  } | null>(null);
+ const [replyToOverride, setReplyToOverride] = useState<EmailThreadItem | null>(
+ null,
+ );
+ const [mode, setMode] = useState<QuickReplyMode>("reply");
  const containerRef = useRef<HTMLDivElement>(null);
 
  useImperativeHandle(ref, () => ({
- scrollIntoViewAndFocus: (draft?: string) => {
- if (draft) {
- setPendingDraft({
- id: Date.now(),
- text: draft,
- });
+ scrollIntoViewAndFocus: (options) => {
+ const normalized: QuickReplyOptions | undefined =
+ typeof options === "string" ? { draft: options } : options;
+ if (normalized?.draft) {
+ setPendingDraft({ id: Date.now(), text: normalized.draft });
  }
+ setReplyToOverride(normalized?.replyTo ?? null);
+ setMode(normalized?.mode ?? "reply");
  setOpen(true);
  requestAnimationFrame(() => {
  containerRef.current?.scrollIntoView({
@@ -81,8 +94,14 @@ export const QuickReply = forwardRef<
  detail={detail}
  threadMessages={threadMessages}
  pendingDraft={pendingDraft}
+ replyToOverride={replyToOverride}
+ mode={mode}
  onDraftApplied={() => setPendingDraft(null)}
- onClose={() => setOpen(false)}
+ onClose={() => {
+ setOpen(false);
+ setReplyToOverride(null);
+ setMode("reply");
+ }}
  />
  </div>
  );
@@ -93,6 +112,8 @@ function QuickReplyComposer({
  detail,
  threadMessages,
  pendingDraft,
+ replyToOverride,
+ mode,
  onDraftApplied,
  onClose,
 }: {
@@ -100,6 +121,8 @@ function QuickReplyComposer({
  detail?: EmailDetailItem | null;
  threadMessages: EmailThreadItem[];
  pendingDraft: { id: number; text: string } | null;
+ replyToOverride: EmailThreadItem | null;
+ mode: QuickReplyMode;
  onDraftApplied: () => void;
  onClose: () => void;
 }) {
@@ -117,12 +140,17 @@ function QuickReplyComposer({
  return emails;
  }, [mailboxesQuery.data?.accounts, user?.email]);
  const replySource = useMemo(
- () => pickReplySource(email, threadMessages, selfEmails),
- [email, selfEmails, threadMessages],
+ () => replyToOverride ?? pickReplySource(email, threadMessages, selfEmails),
+ [email, replyToOverride, selfEmails, threadMessages],
  );
  const initial = useMemo(
- () => buildReplyInitial(replySource, replySource.id === detail?.id ? detail : null),
- [replySource, detail],
+ () =>
+ buildReplyInitial(
+ replySource,
+ replySource.id === detail?.id ? detail : null,
+ { replyAll: mode === "reply-all", selfEmails },
+ ),
+ [replySource, detail, mode, selfEmails],
  );
  const compose = useComposeEmail(initial, {
  onQueued: onClose,
@@ -147,7 +175,9 @@ function QuickReplyComposer({
  <div className="flex max-h-[60vh] flex-col overflow-hidden border border-border/40 bg-card shadow-xs">
  <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2">
  <ArrowBendUpLeftIcon className="size-3.5 text-muted-foreground" />
- <span className="flex-1 text-xs text-muted-foreground">Reply</span>
+ <span className="flex-1 text-xs text-muted-foreground">
+ {mode === "reply-all" ? "Reply all" : "Reply"}
+ </span>
  <button
  type="button"
  onClick={handleClose}

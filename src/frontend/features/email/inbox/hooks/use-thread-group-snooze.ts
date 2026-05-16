@@ -1,5 +1,5 @@
-import type { MailSnoozeTarget } from "@/features/email/mail/hooks/use-mail-actions";
-import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
+import type { MailSnoozeTarget } from "@/features/email/mail/shared/hooks/use-mail-actions";
+import type { ThreadGroup } from "@/features/email/mail/thread/group-emails-by-thread";
 import { useCallback } from "react";
 
 export function getThreadGroupSnoozeTarget(

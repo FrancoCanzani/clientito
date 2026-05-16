@@ -1,5 +1,5 @@
 import { ComposeDockedToolbar } from "@/features/email/mail/compose/compose-docked-toolbar";
-import { useComposeEditor } from "@/features/email/mail/hooks/use-compose-editor";
+import { useComposeEditor } from "@/features/email/mail/compose/use-compose-editor";
 import { cn } from "@/lib/utils";
 import { EditorContent } from "@tiptap/react";
 import { useEffect } from "react";

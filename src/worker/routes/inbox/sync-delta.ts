@@ -9,6 +9,7 @@ import {
   getGmailTokenForMailbox,
 } from "../../lib/gmail/client";
 import { handleGmailError } from "../../lib/gmail/errors";
+import { refreshMailboxSignaturesIfStale } from "../../lib/gmail/mailbox/signature";
 import { resolveMailbox } from "../../lib/gmail/mailboxes";
 import { pullDeltaSync } from "../../lib/gmail/sync/history";
 import { markRepliedReminders } from "../../lib/reminders/detect-replies";
@@ -51,12 +52,31 @@ export function registerInboxSyncDelta(api: Hono<AppRouteEnv>) {
           .where(eq(mailboxes.id, mailbox.id));
       };
 
+      const refreshSignatures = (force: boolean) => {
+        c.executionCtx.waitUntil(
+          refreshMailboxSignaturesIfStale(
+            db,
+            {
+              GOOGLE_CLIENT_ID: c.env.GOOGLE_CLIENT_ID,
+              GOOGLE_CLIENT_SECRET: c.env.GOOGLE_CLIENT_SECRET,
+            },
+            {
+              id: mailbox.id,
+              userId: mailbox.userId,
+              signaturesSyncedAt: mailbox.signaturesSyncedAt,
+            },
+            { force },
+          ),
+        );
+      };
+
       const startHistoryId = clientHistoryId ?? null;
 
       if (!startHistoryId) {
         const profile = await getGmailProfile(accessToken);
         const newHistoryId = profile.historyId ?? null;
         await markMailboxHealthy();
+        refreshSignatures(true);
         return c.json({
           status: "noop" as const,
           added: [],
@@ -72,6 +92,7 @@ export function registerInboxSyncDelta(api: Hono<AppRouteEnv>) {
         const profile = await getGmailProfile(accessToken);
         const newHistoryId = profile.historyId ?? result.newHistoryId ?? null;
         await markMailboxHealthy();
+        refreshSignatures(false);
         return c.json({
           status: "stale" as const,
           added: [],
@@ -83,6 +104,7 @@ export function registerInboxSyncDelta(api: Hono<AppRouteEnv>) {
 
       if (result.status === "noop") {
         await markMailboxHealthy();
+        refreshSignatures(false);
         return c.json({
           status: "noop" as const,
           added: [],
@@ -93,6 +115,7 @@ export function registerInboxSyncDelta(api: Hono<AppRouteEnv>) {
       }
 
       await markMailboxHealthy();
+      refreshSignatures(false);
 
       if (result.added.length > 0) {
         await markRepliedReminders(

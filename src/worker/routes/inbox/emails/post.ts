@@ -74,6 +74,8 @@ export function registerPostEmail(api: Hono<AppRouteEnv>) {
           input.attachments.map(async (att) => ({
             filename: att.filename,
             mimeType: att.mimeType,
+            disposition: att.disposition,
+            contentId: att.contentId,
             content: await getAttachmentContent(env, att.key),
           })),
         );

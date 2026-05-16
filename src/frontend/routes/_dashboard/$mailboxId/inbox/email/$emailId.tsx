@@ -1,6 +1,6 @@
 import { Error as RouteError } from "@/components/error";
 import InboxEmailPage from "@/features/email/inbox/pages/inbox-email-page";
-import { parseEmailIdParam } from "@/features/email/mail/views";
+import { parseEmailIdParam } from "@/features/email/mail/shared/views";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute(

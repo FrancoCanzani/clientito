@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { XIcon } from "@phosphor-icons/react";
-import type { AttachmentFile } from "../hooks/use-attachment-upload";
+import type { AttachmentFile } from "@/features/email/mail/compose/use-attachment-upload";
 
 function formatSize(bytes: number): string {
  if (bytes < 1024) return `${bytes} B`;

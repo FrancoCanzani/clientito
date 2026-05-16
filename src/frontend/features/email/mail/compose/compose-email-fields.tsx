@@ -31,7 +31,7 @@ import type { Editor as TiptapEditor } from "@tiptap/core";
 import DOMPurify from "dompurify";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { AttachmentBar } from "./attachment-bar";
+import { AttachmentBar } from "@/features/email/mail/compose/attachment-bar";
 import {
   applyComposerAiReview,
   COMPOSER_AI_ACTIONS,
@@ -39,15 +39,15 @@ import {
   previewComposerAiAction,
   type ComposerAiActionId,
   type ComposerAiReview,
-} from "./compose-ai-actions";
-import { ComposeDockedToolbar } from "./compose-docked-toolbar";
-import { ComposeEditor } from "./compose-editor";
-import { useComposeEmail } from "./compose-email-state";
-import { GrammarDiffView } from "./grammar-diff-view";
-import { RecipientInput } from "./recipient-input";
-import { formatReminderLabel } from "./reply-reminder-options";
-import { ReplyReminderPicker } from "./reply-reminder-picker";
-import { ScheduleSendPicker } from "./schedule-send-picker";
+} from "@/features/email/mail/compose/compose-ai-actions";
+import { ComposeDockedToolbar } from "@/features/email/mail/compose/compose-docked-toolbar";
+import { ComposeEditor } from "@/features/email/mail/compose/compose-editor";
+import { useComposeEmail } from "@/features/email/mail/compose/compose-email-state";
+import { GrammarDiffView } from "@/features/email/mail/compose/grammar-diff-view";
+import { RecipientInput } from "@/features/email/mail/compose/recipient-input";
+import { formatReminderLabel } from "@/features/email/mail/compose/reply-reminder-options";
+import { ReplyReminderPicker } from "@/features/email/mail/compose/reply-reminder-picker";
+import { ScheduleSendPicker } from "@/features/email/mail/compose/schedule-send-picker";
 
 type ComposeEmailFieldsProps = {
   compose: ReturnType<typeof useComposeEmail>;
@@ -236,17 +236,6 @@ export function ComposeEmailFields({
   useShortcuts(
     "compose",
     {
-      "compose:focus-to": () => setFocusedField("to"),
-      "compose:focus-cc": () => {
-        setShowCc(true);
-        setFocusedField("cc");
-      },
-      "compose:focus-bcc": () => {
-        setShowBcc(true);
-        setFocusedField("bcc");
-      },
-      "compose:focus-subject": () => setFocusedField("subject"),
-      "compose:focus-body": () => setFocusedField("body"),
       "compose:send": () => {
         if (canSend && !isPending) send();
       },
@@ -437,6 +426,7 @@ export function ComposeEmailFields({
           <ComposeEditor
             initialContent={body}
             onChange={setBody}
+            uploadInlineImages={compose.uploadInlineImages}
             onSend={() => {
               if (canSend) send();
             }}

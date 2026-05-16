@@ -5,25 +5,25 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { useMailCompose } from "@/features/email/mail/compose/compose-context";
-import type { MailAction } from "@/features/email/mail/hooks/use-mail-actions";
-import { useMailHotkeys } from "@/features/email/mail/hooks/use-mail-hotkeys";
-import { useMailViewData } from "@/features/email/mail/hooks/use-mail-view-data";
-import type { ThreadIdentifier } from "@/features/email/mail/mutations";
-import type { EmailListItem } from "@/features/email/mail/types";
-import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
+import type { MailAction } from "@/features/email/mail/shared/hooks/use-mail-actions";
+import { useMailHotkeys } from "@/features/email/mail/shared/hooks/use-mail-hotkeys";
+import { useMailViewData } from "@/features/email/mail/shared/hooks/use-mail-view-data";
+import type { ThreadIdentifier } from "@/features/email/mail/shared/mutations";
+import type { EmailListItem } from "@/features/email/mail/shared/types";
+import type { ThreadGroup } from "@/features/email/mail/thread/group-emails-by-thread";
 import { useMailboxPageScrollState } from "@/features/email/shell/mailbox-scroll-state";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { ArrowClockwiseIcon, SpinnerGapIcon } from "@phosphor-icons/react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { BlankEmailRow } from "./blank-email-row";
-import { MailFilterBar } from "./mail-filter-bar";
-import { MobileEmailRow } from "./mobile-email-row";
-import { SplitEmailRow } from "./split-email-row";
-import { TaskEmailRow } from "./task-email-row";
-import { useMailListVirtualization } from "./use-mail-list-virtualization";
-import { useMobilePullToRefresh } from "./use-mobile-pull-to-refresh";
+import { BlankEmailRow } from "@/features/email/mail/list/blank-email-row";
+import { MailFilterBar } from "@/features/email/mail/list/mail-filter-bar";
+import { MobileEmailRow } from "@/features/email/mail/list/mobile-email-row";
+import { SplitEmailRow } from "@/features/email/mail/list/split-email-row";
+import { TaskEmailRow } from "@/features/email/mail/list/task-email-row";
+import { useMailListVirtualization } from "@/features/email/mail/list/use-mail-list-virtualization";
+import { useMobilePullToRefresh } from "@/features/email/mail/list/use-mobile-pull-to-refresh";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
@@ -34,6 +34,7 @@ const TASK_ROW_HEIGHT = 56;
 export function EmailList({
   emailData,
   onOpen,
+  onOpenInTab,
   onAction,
   emptyTitle,
   emptyDescription,
@@ -44,9 +45,15 @@ export function EmailList({
   listVariant = "mail",
   selectedEmailId,
   onSnooze,
+  onNextTab,
+  onPrevTab,
+  onCloseTab,
+  canSwitchTab,
+  canCloseTab,
 }: {
   emailData: ReturnType<typeof useMailViewData>;
   onOpen: (email: EmailListItem) => void;
+  onOpenInTab?: (email: EmailListItem) => void;
   onAction: (
     action: MailAction,
     ids?: string[],
@@ -61,6 +68,11 @@ export function EmailList({
   enableKeyboardNavigation?: boolean;
   listVariant?: "mail" | "task";
   selectedEmailId?: string | null;
+  onNextTab?: () => void;
+  onPrevTab?: () => void;
+  onCloseTab?: () => void;
+  canSwitchTab?: boolean;
+  canCloseTab?: boolean;
 }) {
   const {
     view,
@@ -99,14 +111,20 @@ export function EmailList({
       params: { mailboxId: routeMailboxId },
     });
 
-  const { focusedIndex } = useMailHotkeys({
+  const { focusedIndex, setFocusedId, userMovedFocusRef } = useMailHotkeys({
     groups: threadGroups,
     view,
     onOpen,
+    onOpenInTab,
     onAction,
     onCompose: openCompose,
     onSearch: goToSearch,
     onRefresh: () => void emailData.refreshViewAsync(),
+    onNextTab,
+    onPrevTab,
+    onCloseTab,
+    canSwitchTab,
+    canCloseTab,
     enabled: enableKeyboardNavigation && !emailData.isPlaceholderData,
   });
 
@@ -136,6 +154,23 @@ export function EmailList({
 
   useLayoutEffect(() => {
     if (focusedIndex < 0) return;
+    const userInitiated = userMovedFocusRef.current;
+    userMovedFocusRef.current = false;
+
+    const listEl = scrollRef.current;
+    const listHasFocus = !!(
+      listEl &&
+      typeof document !== "undefined" &&
+      document.activeElement instanceof Node &&
+      listEl.contains(document.activeElement)
+    );
+
+    // Only steal DOM focus / scroll the list when the user is actively driving
+    // it. Tab switches, data loads, and reader close should update the visible
+    // highlight silently without yanking focus from search inputs, the reader,
+    // or wherever the user actually is.
+    if (!userInitiated && !listHasFocus) return;
+
     const el = rowRefs.current.get(focusedIndex);
     if (el) {
       el.focus({ preventScroll: true });
@@ -149,6 +184,19 @@ export function EmailList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedIndex]);
 
+  // Keep the list's logical focus pinned to the email currently open in the
+  // reader, so closing the reader leaves the highlight on that row instead of
+  // snapping back to row 0.
+  useEffect(() => {
+    if (!selectedEmailId) return;
+    const group = threadGroups.find((g) =>
+      g.emails.some((email) => email.id === selectedEmailId),
+    );
+    if (!group) return;
+    setFocusedId(group.representative.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmailId, threadGroups]);
+
   useEffect(() => {
     if (!selectedEmailId) return;
     const idx = threadGroups.findIndex((g) =>
@@ -159,6 +207,15 @@ export function EmailList({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmailId]);
+
+  const didResetScrollRef = useRef(false);
+  useEffect(() => {
+    if (didResetScrollRef.current) return;
+    if (threadGroups.length === 0) return;
+    didResetScrollRef.current = true;
+    virtualizer.scrollToIndex(0, { align: "start" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadGroups.length]);
 
   const showLoadMoreSentinel = hasNextPage || isFetchingNextPage;
   const pullIndicatorVisible =
@@ -238,7 +295,7 @@ export function EmailList({
               {focusedIndex >= 0 && focusedIndex < threadGroups.length && (
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute left-0 z-0 w-full bg-muted transition-transform duration-150 ease-out motion-reduce:transition-none"
+                  className="pointer-events-none absolute left-0 z-0 w-full transition-transform duration-150 ease-out motion-reduce:transition-none"
                   style={{
                     height: rowHeight,
                     transform: `translateY(${focusedIndex * rowHeight}px)`,
@@ -260,6 +317,26 @@ export function EmailList({
                         rowRefs.current.delete(virtualItem.index);
                       }
                     }}
+                    onMouseDownCapture={() => {
+                      if (!group) return;
+                      userMovedFocusRef.current = true;
+                      setFocusedId(group.representative.id);
+                    }}
+                    onClickCapture={(e) => {
+                      if (!group || !onOpenInTab) return;
+                      if (e.metaKey || e.ctrlKey) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onOpenInTab(group.representative);
+                      }
+                    }}
+                    onAuxClick={(e) => {
+                      if (!group || !onOpenInTab) return;
+                      if (e.button === 1) {
+                        e.preventDefault();
+                        onOpenInTab(group.representative);
+                      }
+                    }}
                     className="absolute left-0 w-full"
                     style={{
                       height: virtualItem.size,
@@ -271,6 +348,7 @@ export function EmailList({
                         group={group}
                         view={view}
                         onOpen={onOpen}
+                        onOpenInTab={onOpenInTab}
                         onAction={onAction}
                         onSnooze={onSnooze}
                         isFocused={virtualItem.index === focusedIndex}
@@ -291,10 +369,7 @@ export function EmailList({
           ) : isInitialViewPending ? (
             <div className="relative w-full">
               {Array.from({ length: 15 }).map((_, i) => (
-                <div
-                  key={`init-skel-${i}`}
-                  style={{ height: rowHeight }}
-                >
+                <div key={`init-skel-${i}`} style={{ height: rowHeight }}>
                   <BlankEmailRow
                     listVariant={listVariant}
                     isMobile={isMobile}
@@ -303,7 +378,8 @@ export function EmailList({
               ))}
               {isFirstMailboxSync && (
                 <p className="px-4 py-3 text-center text-xs text-muted-foreground">
-                  Getting your mailbox ready — your first sync can take a moment.
+                  Getting your mailbox ready — your first sync can take a
+                  moment.
                 </p>
               )}
             </div>

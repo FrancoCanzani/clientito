@@ -3,15 +3,16 @@ import { DotsThreeIcon } from "@phosphor-icons/react";
 import type { Editor } from "@tiptap/core";
 import { EditorContent } from "@tiptap/react";
 import { useEffect, useMemo, useState } from "react";
-import { useComposeEditor } from "../hooks/use-compose-editor";
+import { useComposeEditor } from "@/features/email/mail/compose/use-compose-editor";
 import {
   registerComposeEditor,
   unregisterComposeEditor,
-} from "./compose-editor-ref";
+} from "@/features/email/mail/compose/compose-editor-ref";
 
 type ComposeEditorProps = {
   initialContent: string;
   onChange: (html: string) => void;
+  uploadInlineImages: Parameters<typeof useComposeEditor>[0]["uploadInlineImages"];
   onSend?: () => void;
   className?: string;
   autoFocus?: boolean;
@@ -23,6 +24,7 @@ type ComposeEditorProps = {
 export function ComposeEditor({
   initialContent,
   onChange,
+  uploadInlineImages,
   onSend,
   className,
   autoFocus,
@@ -30,7 +32,7 @@ export function ComposeEditor({
   onFocusField,
   onEditorReady,
 }: ComposeEditorProps) {
-  const editor = useComposeEditor({ initialContent, onChange });
+  const editor = useComposeEditor({ initialContent, onChange, uploadInlineImages });
   const [showForwardedContent, setShowForwardedContent] = useState(false);
   const hasForwardedContent = useMemo(
     () =>

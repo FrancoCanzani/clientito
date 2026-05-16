@@ -4,16 +4,16 @@ import {
  EmptyHeader,
  EmptyTitle,
 } from "@/components/ui/empty";
-import type { MailAction } from "@/features/email/mail/hooks/use-mail-actions";
-import type { ThreadIdentifier } from "@/features/email/mail/mutations";
-import type { EmailListItem } from "@/features/email/mail/types";
-import { groupEmailsByThread } from "@/features/email/mail/utils/group-emails-by-thread";
+import type { MailAction } from "@/features/email/mail/shared/hooks/use-mail-actions";
+import type { ThreadIdentifier } from "@/features/email/mail/shared/mutations";
+import type { EmailListItem } from "@/features/email/mail/shared/types";
+import { groupEmailsByThread } from "@/features/email/mail/thread/group-emails-by-thread";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { RefCallback } from "react";
 import { useEffect, useMemo, useRef } from "react";
-import { BlankEmailRow } from "../list/blank-email-row";
-import { MobileEmailRow } from "../list/mobile-email-row";
-import { SplitEmailRow } from "../list/split-email-row";
+import { BlankEmailRow } from "@/features/email/mail/list/blank-email-row";
+import { MobileEmailRow } from "@/features/email/mail/list/mobile-email-row";
+import { SearchEmailRow } from "@/features/email/mail/list/search-email-row";
 
 export function SearchResultsList({
  query,
@@ -46,7 +46,7 @@ export function SearchResultsList({
 }) {
  void mailboxId;
  const isMobile = useIsMobile();
- const RowComponent = isMobile ? MobileEmailRow : SplitEmailRow;
+ const RowComponent = isMobile ? MobileEmailRow : SearchEmailRow;
  const groups = useMemo(() => groupEmailsByThread(results), [results]);
  const containerRef = useRef<HTMLDivElement>(null);
 
@@ -75,7 +75,7 @@ if (query.length < 2) {
   return (
   <div className="w-full">
   {Array.from({ length: 12 }).map((_, i) => (
-  <div key={i} className={isMobile ? undefined : "h-21"}>
+  <div key={i} className={isMobile ? undefined : "h-[3.75rem]"}>
   <BlankEmailRow isMobile={isMobile} />
   </div>
   ))}
@@ -103,7 +103,7 @@ if (query.length < 2) {
  <div
  key={group.representative.id}
  data-search-row-index={index}
- className={isMobile ? undefined : "h-21"}
+ className={isMobile ? undefined : "h-[3.75rem]"}
  >
  <RowComponent
  group={group}
@@ -112,6 +112,7 @@ if (query.length < 2) {
  onAction={onAction}
  isFocused={index === focusedIndex}
  highlightTerms={highlightTerms}
+ searchQuery={query}
  />
  </div>
  ))}

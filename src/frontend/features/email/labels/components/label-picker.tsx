@@ -15,7 +15,7 @@ import { applyLabel, createLabel, removeLabel } from "../mutations";
 import { isInternalLabelName } from "../internal-labels";
 import { fetchLabels } from "../queries";
 import type { Label } from "../types";
-import { invalidateInboxQueries } from "../../mail/data/invalidation";
+import { invalidateEmailListsNow, invalidateInboxQueries } from "@/features/email/mail/shared/data/invalidation";
 
 type LabelPickerProps = {
   mailboxId: number;
@@ -73,7 +73,7 @@ export function LabelPicker({
  onSuccess: async () => {
  invalidateInboxQueries();
  await Promise.all([
- queryClient.invalidateQueries({ queryKey: ["emails"] }),
+ invalidateEmailListsNow(),
  queryClient.invalidateQueries({ queryKey: labelQueryKeys.list(mailboxId) }),
  queryClient.invalidateQueries({ queryKey: ["email-detail"] }),
  queryClient.invalidateQueries({ queryKey: ["email-thread"] }),
@@ -98,7 +98,7 @@ export function LabelPicker({
  setSearch("");
  invalidateInboxQueries();
  void Promise.all([
- queryClient.invalidateQueries({ queryKey: ["emails"] }),
+ invalidateEmailListsNow(),
  queryClient.invalidateQueries({ queryKey: labelQueryKeys.list(mailboxId) }),
  queryClient.invalidateQueries({ queryKey: ["email-detail"] }),
  queryClient.invalidateQueries({ queryKey: ["email-thread"] }),

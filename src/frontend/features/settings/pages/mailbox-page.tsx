@@ -3,18 +3,21 @@ import { PageSpinner } from "@/components/page-spinner";
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
 import { useSettingsMutations } from "@/features/settings/hooks/use-settings-mutations";
+import { accountQueryKeys } from "@/features/settings/query-keys";
 import {
   getMailboxDisplayEmail,
   useMailboxes,
   type MailboxAccount,
 } from "@/hooks/use-mailboxes";
 import { ArrowClockwiseIcon } from "@phosphor-icons/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 export default function MailboxPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { mailboxId } = useParams({ from: "/_dashboard/$mailboxId/settings" });
   const handledConnectedImportRef = useRef(false);
   const accountsQuery = useMailboxes();
@@ -31,9 +34,23 @@ export default function MailboxPage() {
       return;
     }
     const params = new URLSearchParams(window.location.search);
-    if (params.get("connected") !== "1") return;
+    const connected = params.get("connected") === "1";
+    const connectError = params.get("connect_error") === "1";
+    const errorCode = params.get("error");
+    if (!connected && !connectError && !errorCode) return;
     handledConnectedImportRef.current = true;
+
+    if (connected) {
+      void queryClient.invalidateQueries({ queryKey: accountQueryKeys.all() });
+      toast.success("Gmail account connected");
+    } else {
+      toast.error(getConnectionErrorMessage(errorCode));
+    }
+
     params.delete("connected");
+    params.delete("connect_error");
+    params.delete("error");
+    params.delete("error_description");
     const nextSearch = params.toString();
     window.history.replaceState(
       {},
@@ -42,7 +59,7 @@ export default function MailboxPage() {
         ? `${window.location.pathname}?${nextSearch}`
         : window.location.pathname,
     );
-  }, []);
+  }, [queryClient]);
 
   return accountsQuery.isPending ? (
     <PageSpinner />
@@ -217,4 +234,19 @@ function confirmReimport(drafts: number): boolean {
   const warning = `You have ${drafts} unsent ${drafts === 1 ? "draft" : "drafts"} stored only in this browser. They will be lost if you re-import now. Continue?`;
   toast.warning(warning);
   return window.confirm(warning);
+}
+
+function getConnectionErrorMessage(errorCode: string | null): string {
+  switch (errorCode) {
+    case "account_already_linked_to_different_user":
+      return "That Gmail account is already linked to another Duomo account.";
+    case "email_doesn't_match":
+      return "Google returned a different email than expected.";
+    case "unable_to_link_account":
+      return "Google account linking was not allowed.";
+    case "invalid_code":
+      return "Google sign-in expired before the account could be connected.";
+    default:
+      return "Failed to connect Gmail account.";
+  }
 }

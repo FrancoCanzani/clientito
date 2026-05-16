@@ -20,6 +20,7 @@ export const mailboxes = sqliteTable(
     provider: text("provider").$type<"google">().notNull().default("google"),
     email: text("email"),
     signature: text("signature"),
+    signaturesSyncedAt: integer("signatures_synced_at"),
     templates: text("templates"),
     historyId: text("history_id"),
     syncWindowMonths: integer("sync_window_months"),
@@ -61,7 +62,13 @@ export const scheduledEmails = sqliteTable(
     references: text("references"),
     threadId: text("thread_id"),
     attachmentKeys: text("attachment_keys", { mode: "json" }).$type<
-      Array<{ key: string; filename: string; mimeType: string }>
+      Array<{
+        key: string;
+        filename: string;
+        mimeType: string;
+        disposition?: "attachment" | "inline";
+        contentId?: string;
+      }>
     >(),
     scheduledFor: integer("scheduled_for").notNull(),
     status: text("status")
@@ -186,5 +193,70 @@ export const replyReminders = sqliteTable(
     ),
     index("reply_reminders_due_idx").on(table.status, table.remindAt),
     index("reply_reminders_user_status_idx").on(table.userId, table.status),
+  ],
+);
+
+export const aiUsageEvents = sqliteTable(
+  "ai_usage_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mailboxId: integer("mailbox_id")
+      .notNull()
+      .references(() => mailboxes.id, { onDelete: "cascade" }),
+    feature: text("feature").notNull(),
+    plan: text("plan").notNull(),
+    modelRoute: text("model_route").notNull(),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    totalTokens: integer("total_tokens"),
+    status: text("status").$type<"succeeded" | "failed">().notNull(),
+    errorCode: text("error_code"),
+    requestId: text("request_id").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    index("ai_usage_events_user_created_idx").on(table.userId, table.createdAt),
+    index("ai_usage_events_mailbox_created_idx").on(
+      table.mailboxId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const aiThreadIntelligence = sqliteTable(
+  "ai_thread_intelligence",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mailboxId: integer("mailbox_id")
+      .notNull()
+      .references(() => mailboxes.id, { onDelete: "cascade" }),
+    threadId: text("thread_id").notNull(),
+    sourceLastMessageId: text("source_last_message_id").notNull(),
+    sourceMessageCount: integer("source_message_count").notNull(),
+    summary: text("summary"),
+    latestReplyDraftBody: text("latest_reply_draft_body"),
+    latestReplyDraftIntent: text("latest_reply_draft_intent"),
+    latestReplyDraftTone: text("latest_reply_draft_tone"),
+    summaryUpdatedAt: integer("summary_updated_at"),
+    replyDraftUpdatedAt: integer("reply_draft_updated_at"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("ai_thread_intelligence_thread_idx").on(
+      table.userId,
+      table.mailboxId,
+      table.threadId,
+    ),
+    index("ai_thread_intelligence_mailbox_idx").on(
+      table.userId,
+      table.mailboxId,
+    ),
   ],
 );

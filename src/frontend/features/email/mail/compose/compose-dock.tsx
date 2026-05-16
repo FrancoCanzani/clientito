@@ -1,8 +1,8 @@
 import { AnimatePresence } from "motion/react";
 import { createPortal } from "react-dom";
-import type { ComposerWindow } from "./compose-context";
-import { ComposeDockFrame } from "./compose-dock-frame";
-import { ComposeModalFrame } from "./compose-modal-frame";
+import type { ComposerWindow } from "@/features/email/mail/compose/compose-context";
+import { ComposeDockFrame } from "@/features/email/mail/compose/compose-dock-frame";
+import { ComposeModalFrame } from "@/features/email/mail/compose/compose-modal-frame";
 
 export function ComposeDock({
   composers,
@@ -25,7 +25,7 @@ export function ComposeDock({
   return createPortal(
     <>
       <div
-        className="pointer-events-none fixed bottom-0 left-4 z-40 hidden flex-row items-end gap-2 sm:flex"
+        className="pointer-events-none fixed bottom-0 right-4 z-40 hidden flex-row-reverse items-end gap-2 sm:flex"
         aria-label="Composer dock"
       >
         <AnimatePresence>

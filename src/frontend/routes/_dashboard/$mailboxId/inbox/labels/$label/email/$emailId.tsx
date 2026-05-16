@@ -3,7 +3,7 @@ import LabelEmailPage from "@/features/email/inbox/pages/label-email-page";
 import {
   parseEmailIdParam,
   parseInboxLabelParam,
-} from "@/features/email/mail/views";
+} from "@/features/email/mail/shared/views";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute(

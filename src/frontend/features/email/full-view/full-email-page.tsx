@@ -9,9 +9,13 @@ import {
 import {
   fetchEmailDetail,
   fetchEmailThread,
-} from "@/features/email/mail/data/thread-detail";
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
+} from "@/features/email/mail/shared/data/thread-detail";
+import { emailQueryKeys } from "@/features/email/mail/shared/query-keys";
 import { EmailThread } from "@/features/email/mail/thread/email-thread";
+import {
+  canShowThreadSummary,
+  ThreadAiPanel,
+} from "@/features/email/ai/thread-ai-panel";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect } from "react";
@@ -83,6 +87,11 @@ export default function FullEmailPage() {
 
   const email = emailQuery.data;
   const threadMessages = threadQuery.data ?? [];
+  const showsThreadSummary = canShowThreadSummary({
+    mailboxId: email.mailboxId,
+    threadId: email.threadId,
+    messages: threadMessages,
+  });
 
   return (
     <div
@@ -95,6 +104,18 @@ export default function FullEmailPage() {
           threadMessages={threadMessages}
           threadError={threadQuery.isError}
           overflowMode="page"
+          scrollToLatestOnMount={!showsThreadSummary}
+          summary={
+            <div data-print-hide>
+              <ThreadAiPanel
+                mailboxId={email.mailboxId}
+                threadId={email.threadId}
+                messages={threadMessages}
+                onUseDraft={() => {}}
+                allowDraft={false}
+              />
+            </div>
+          }
         />
       </div>
     </div>

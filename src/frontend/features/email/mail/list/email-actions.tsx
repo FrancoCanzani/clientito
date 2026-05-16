@@ -24,7 +24,7 @@ import { LabelPicker } from "@/features/email/labels/components/label-picker";
 import { removeLabel } from "@/features/email/labels/mutations";
 import { fetchLabels } from "@/features/email/labels/queries";
 import { labelQueryKeys } from "@/features/email/labels/query-keys";
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { emailQueryKeys } from "@/features/email/mail/shared/query-keys";
 import { unsubscribe } from "@/features/email/subscriptions/queries";
 import { useAuth } from "@/hooks/use-auth";
 import { shortcutKey } from "@/lib/shortcuts";
@@ -52,13 +52,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { invalidateInboxQueries } from "../data/invalidation";
-import type { useMailActions } from "../hooks/use-mail-actions";
-import { blockSender, patchEmail } from "../mutations";
-import type { ComposeInitial, EmailDetailItem } from "../types";
-import { buildForwardedEmailHtml } from "../utils/build-forwarded-html";
-import { formatQuotedDate } from "../utils/formatters";
-import { buildReplyAllRecipients } from "../utils/reply-recipients";
+import { invalidateEmailListsNow, invalidateInboxQueries } from "@/features/email/mail/shared/data/invalidation";
+import type { useMailActions } from "@/features/email/mail/shared/hooks/use-mail-actions";
+import { blockSender, patchEmail } from "@/features/email/mail/shared/mutations";
+import type { ComposeInitial, EmailDetailItem } from "@/features/email/mail/shared/types";
+import { buildForwardedEmailHtml } from "@/features/email/mail/thread/build-forwarded-html";
+import { formatQuotedDate } from "@/features/email/mail/shared/utils/formatters";
+import { buildReplyAllRecipients } from "@/features/email/mail/thread/reply-recipients";
 
 type EmailActionsProps = {
   email: EmailDetailItem;
@@ -133,7 +133,7 @@ export function EmailActions({
     onSuccess: (_data, timestamp) => {
       toast.success(timestamp ? "Snoozed" : "Unsnoozed");
       invalidateEmails();
-      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      invalidateEmailListsNow();
       void queryClient.invalidateQueries({
         queryKey: emailQueryKeys.detail(email.id),
       });
@@ -149,7 +149,7 @@ export function EmailActions({
       removeLabel([email.providerMessageId], labelId, resolvedMailboxId),
     onSuccess: () => {
       invalidateEmails();
-      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      invalidateEmailListsNow();
       void queryClient.invalidateQueries({
         queryKey: emailQueryKeys.detail(email.id),
       });
@@ -169,7 +169,7 @@ export function EmailActions({
         unsubscribeEmail: email.unsubscribeEmail ?? undefined,
       }),
     onSuccess: (result) => {
-      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      invalidateEmailListsNow();
       void queryClient.invalidateQueries({
         queryKey: emailQueryKeys.detail(email.id),
       });
@@ -206,7 +206,7 @@ export function EmailActions({
           : "Sender blocked",
       );
       invalidateEmails();
-      void queryClient.invalidateQueries({ queryKey: emailQueryKeys.all() });
+      invalidateEmailListsNow();
       void queryClient.invalidateQueries({
         queryKey: emailQueryKeys.detail(email.id),
       });

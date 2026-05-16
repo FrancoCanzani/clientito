@@ -1,11 +1,11 @@
 import { localDb } from "@/db/client";
 import { getCurrentUserId } from "@/db/user";
 import { resolveGatekeeperActivatedAt } from "@/features/email/gatekeeper/lib/gatekeeper-activated-at";
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { emailQueryKeys } from "@/features/email/mail/shared/query-keys";
 import { gatekeeperQueryKeys } from "@/features/email/gatekeeper/query-keys";
-import { invalidateInboxQueries } from "@/features/email/mail/data/invalidation";
-import type { EmailListItem, EmailListPage } from "@/features/email/mail/types";
-import { isEmailListInfiniteData } from "@/features/email/mail/utils/email-list-cache";
+import { invalidateInboxQueries } from "@/features/email/mail/shared/data/invalidation";
+import type { EmailListItem, EmailListPage } from "@/features/email/mail/shared/types";
+import { isEmailListInfiniteData } from "@/features/email/mail/list/email-list-cache";
 import { normalizeEmailAddress } from "@/lib/email";
 import { queryClient } from "@/lib/query-client";
 import { useMutation, useQuery } from "@tanstack/react-query";

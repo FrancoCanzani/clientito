@@ -1,9 +1,9 @@
 import { memo, useState } from "react";
-import type { EmailBodySource } from "../types";
+import type { EmailBodySource } from "@/features/email/mail/shared/types";
 import {
   EmailHtmlRenderer,
   type EmailBodyOverflowMode,
-} from "./email-html-renderer";
+} from "@/features/email/mail/render/email-html-renderer";
 
 type PlainTextSections = {
   visibleText: string;

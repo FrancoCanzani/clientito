@@ -1,4 +1,4 @@
-import { VIEW_PAGE_SIZE } from "@/features/email/mail/data/constants";
+import { VIEW_PAGE_SIZE } from "@/features/email/mail/shared/data/constants";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, type RefObject } from "react";
 

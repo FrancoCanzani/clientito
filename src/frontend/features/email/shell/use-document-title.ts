@@ -1,5 +1,5 @@
-import { fetchViewUnreadCounts } from "@/features/email/mail/data/unread-counts";
-import { emailQueryKeys } from "@/features/email/mail/query-keys";
+import { fetchViewUnreadCounts } from "@/features/email/mail/shared/data/unread-counts";
+import { emailQueryKeys } from "@/features/email/mail/shared/query-keys";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect } from "react";

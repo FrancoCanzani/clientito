@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { FileIcon, WarningCircleIcon } from "@phosphor-icons/react";
-import type { EmailAttachment } from "../types";
-import type { AttachmentPreview } from "./attachment-preview-utils";
-import { ImagePreview } from "./image-preview";
-import { PdfPreview } from "./pdf-preview";
+import type { EmailAttachment } from "@/features/email/mail/shared/types";
+import type { AttachmentPreview } from "@/features/email/mail/attachments/attachment-preview-utils";
+import { ImagePreview } from "@/features/email/mail/attachments/image-preview";
+import { PdfPreview } from "@/features/email/mail/attachments/pdf-preview";
 
 type AttachmentPreviewDisplayProps = {
   attachment: EmailAttachment;

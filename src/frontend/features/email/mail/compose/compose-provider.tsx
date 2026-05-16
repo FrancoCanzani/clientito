@@ -1,16 +1,16 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import type { ComposeInitial } from "../types";
+import type { ComposeInitial } from "@/features/email/mail/shared/types";
 import {
   MailComposeContext,
   type ComposerMode,
   type ComposerState,
   type ComposerWindow,
-} from "./compose-context";
-import { ComposeDock } from "./compose-dock";
-import { getComposePanelKey } from "./compose-email-state";
-import { registerOpenComposeListener } from "./compose-events";
+} from "@/features/email/mail/compose/compose-context";
+import { ComposeDock } from "@/features/email/mail/compose/compose-dock";
+import { getComposePanelKey } from "@/features/email/mail/compose/compose-email-state";
+import { registerOpenComposeListener } from "@/features/email/mail/compose/compose-events";
 
 const MAX_EXPANDED_DOCK = 3;
 

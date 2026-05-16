@@ -1,4 +1,4 @@
-import { runDeltaSync } from "@/features/email/mail/data/view-sync";
+import { runDeltaSync } from "@/features/email/mail/shared/data/view-sync";
 import { deviceCapabilities } from "@/lib/device-capabilities";
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";

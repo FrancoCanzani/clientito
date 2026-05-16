@@ -24,6 +24,8 @@ async function sendScheduledEmail(
       key: string;
       filename: string;
       mimeType: string;
+      disposition?: "attachment" | "inline";
+      contentId?: string;
     }> | null;
   },
 ) {
@@ -37,7 +39,13 @@ async function sendScheduledEmail(
   const bodyWithSignature = appendSignature(row.body, mbRow[0]?.signature);
 
   let attachments:
-    | Array<{ filename: string; mimeType: string; content: ArrayBuffer }>
+    | Array<{
+        filename: string;
+        mimeType: string;
+        content: ArrayBuffer;
+        disposition?: "attachment" | "inline";
+        contentId?: string;
+      }>
     | undefined;
   if (row.attachmentKeys && row.attachmentKeys.length > 0) {
     const bucket = env.ATTACHMENTS;
@@ -48,6 +56,8 @@ async function sendScheduledEmail(
         return {
           filename: att.filename,
           mimeType: att.mimeType,
+          disposition: att.disposition,
+          contentId: att.contentId,
           content: await obj.arrayBuffer(),
         };
       }),

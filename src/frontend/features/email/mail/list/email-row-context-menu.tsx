@@ -7,16 +7,17 @@ import {
 } from "@/components/ui/context-menu";
 import { Kbd } from "@/components/ui/kbd";
 import { useMailCompose } from "@/features/email/mail/compose/compose-context";
-import type { MailAction } from "@/features/email/mail/hooks/use-mail-actions";
-import type { ThreadIdentifier } from "@/features/email/mail/mutations";
-import type { ThreadGroup } from "@/features/email/mail/utils/group-emails-by-thread";
-import { buildReplyInitial } from "@/features/email/mail/utils/reply-compose";
+import type { MailAction } from "@/features/email/mail/shared/hooks/use-mail-actions";
+import type { ThreadIdentifier } from "@/features/email/mail/shared/mutations";
+import type { ThreadGroup } from "@/features/email/mail/thread/group-emails-by-thread";
+import { buildReplyInitial } from "@/features/email/mail/thread/reply-compose";
 import { shortcutKey } from "@/lib/shortcuts";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import {
   ArchiveIcon,
   ArrowBendUpLeftIcon,
   ArrowBendUpRightIcon,
+  ArrowSquareOutIcon,
   CopyIcon,
   EnvelopeSimpleIcon,
   EnvelopeSimpleOpenIcon,
@@ -35,6 +36,7 @@ export function EmailRowContextMenu({
   group,
   view,
   onAction,
+  onOpenInTab,
   children,
 }: {
   group: ThreadGroup;
@@ -44,6 +46,7 @@ export function EmailRowContextMenu({
     ids?: string[],
     thread?: ThreadIdentifier,
   ) => void;
+  onOpenInTab?: (email: ThreadGroup["representative"]) => void;
   children: ReactNode;
 }) {
   const { mailboxId } = mailboxRoute.useParams();
@@ -108,6 +111,16 @@ export function EmailRowContextMenu({
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent>
+        {onOpenInTab && (
+          <>
+            <ContextMenuItem onSelect={() => onOpenInTab(email)}>
+              <ArrowSquareOutIcon />
+              <span className="flex-1">Open in new tab</span>
+              <Kbd>{shortcutKey("inbox:open-in-tab")}</Kbd>
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        )}
         <ContextMenuItem onSelect={handleReply}>
           <ArrowBendUpLeftIcon />
           <span className="flex-1">Reply</span>

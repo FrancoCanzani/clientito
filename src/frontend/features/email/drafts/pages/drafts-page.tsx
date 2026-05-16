@@ -6,10 +6,10 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { useMailCompose } from "@/features/email/mail/compose/compose-context";
-import { deleteDraft, fetchDrafts } from "@/features/email/mail/data/drafts";
-import { draftQueryKeys } from "@/features/email/mail/query-keys";
-import type { ComposeInitial, DraftItem } from "@/features/email/mail/types";
-import { htmlToPlainText } from "@/features/email/mail/utils/html-to-plain-text";
+import { deleteDraft, fetchDrafts } from "@/features/email/mail/shared/data/drafts";
+import { draftQueryKeys } from "@/features/email/mail/shared/query-keys";
+import type { ComposeInitial, DraftItem } from "@/features/email/mail/shared/types";
+import { htmlToPlainText } from "@/features/email/mail/render/html-to-plain-text";
 import {
   MailboxPage,
   MailboxPageBody,

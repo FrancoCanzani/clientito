@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import type { MailListFilters } from "@/features/email/mail/hooks/use-mail-view-data";
+import type { MailListFilters } from "@/features/email/mail/shared/hooks/use-mail-view-data";
 import { cn } from "@/lib/utils";
 import {
  EnvelopeSimpleIcon,

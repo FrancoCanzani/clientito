@@ -1,5 +1,5 @@
 import type { Editor } from "@tiptap/core";
-import { escapeHtml } from "../utils/escape-html";
+import { escapeHtml } from "@/features/email/mail/render/escape-html";
 
 let activeEditor: Editor | null = null;
 

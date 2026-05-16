@@ -1,6 +1,6 @@
 import { Error as RouteError } from "@/components/error";
 import FolderPage from "@/features/email/inbox/pages/folder-page";
-import { parseEmailFolderParam } from "@/features/email/mail/views";
+import { parseEmailFolderParam } from "@/features/email/mail/shared/views";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 

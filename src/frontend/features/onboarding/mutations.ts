@@ -7,10 +7,16 @@ export const GMAIL_SCOPES = [
  "https://www.googleapis.com/auth/gmail.settings.basic",
 ];
 
+function withConnectionMarker(callbackURL: string, marker: string) {
+ const separator = callbackURL.includes("?") ? "&" : "?";
+ return `${callbackURL}${separator}${marker}=1`;
+}
+
 export async function beginGmailConnection(callbackURL = "/settings") {
  const result = await authClient.linkSocial({
  provider: "google",
- callbackURL,
+ callbackURL: withConnectionMarker(callbackURL, "connected"),
+ errorCallbackURL: withConnectionMarker(callbackURL, "connect_error"),
  scopes: GMAIL_SCOPES,
  });
 

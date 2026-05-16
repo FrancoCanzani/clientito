@@ -1,5 +1,5 @@
 import type { MailboxSignature, MailboxTemplate } from "@/hooks/use-mailboxes";
-import { buildPlainForwardedHtml } from "../utils/build-forwarded-html";
+import { buildPlainForwardedHtml } from "@/features/email/mail/thread/build-forwarded-html";
 
 export function splitPlainForwardedContent(content: string) {
   const marker = /-{5,}\s*Forwarded message\s*-{5,}/i;

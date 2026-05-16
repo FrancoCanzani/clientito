@@ -3,6 +3,7 @@ import { getCurrentUserId } from "@/db/user";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { subscriptionQueryKeys } from "./query-keys";
+import { invalidateEmailListsNow } from "@/features/email/mail/shared/data/invalidation";
 
 export type UnsubscribeResult = {
   method: string;
@@ -91,7 +92,7 @@ export function useUnsubscribe(mailboxId: number) {
       await queryClient.invalidateQueries({
         queryKey: subscriptionQueryKeys.senders(mailboxId),
       });
-      await queryClient.invalidateQueries({ queryKey: ["emails"] });
+      invalidateEmailListsNow();
     },
     onError: () => toast.error("Unsubscribe failed"),
   });
@@ -144,7 +145,7 @@ export function useBlockSender(mailboxId: number) {
       await queryClient.invalidateQueries({
         queryKey: subscriptionQueryKeys.senders(mailboxId),
       });
-      await queryClient.invalidateQueries({ queryKey: ["emails"] });
+      invalidateEmailListsNow();
     },
     onError: () => toast.error("Failed to block sender"),
   });
