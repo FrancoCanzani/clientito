@@ -19,6 +19,7 @@ import { extractHighlightTerms } from "@/features/email/mail/search/highlight-te
 import {
   parseSearchOperators,
   removeOperator,
+  replaceOperator,
 } from "@/features/email/mail/search/parse-query-operators";
 import {
   pushRecentSearch,
@@ -45,6 +46,13 @@ function normalizeQuery(query: string) {
   return query.trim().replace(/\s+/g, " ");
 }
 
+function removeBareOperator(query: string, key: string) {
+  return query
+    .replace(new RegExp(`\\b${key}:(?=\\s|$)`, "gi"), " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const SEARCH_INSERTIONS = [
   { label: "From", value: "from:" },
   { label: "To", value: "to:" },
@@ -60,6 +68,10 @@ const SEARCH_FILTERS = [
   { label: "Starred", value: "is:starred" },
   { label: "Sent", value: "is:sent" },
 ] as const;
+
+const SINGLE_VALUE_FILTER_KEYS = new Set(
+  SEARCH_INSERTIONS.map((item) => item.value.slice(0, -1)),
+);
 
 export default function InboxSearchPage() {
   const { mailboxId } = searchRoute.useParams();
@@ -255,7 +267,20 @@ export default function InboxSearchPage() {
   }
 
   function appendSearchToken(token: string) {
-    const next = [query.trim(), token].filter(Boolean).join(" ");
+    const [key] = token.split(":");
+    const isSingleValueFilter = SINGLE_VALUE_FILTER_KEYS.has(key);
+    const existingBooleanFilter = activeOperators.find(
+      (operator) => operator.raw === token,
+    );
+
+    const next = isSingleValueFilter
+      ? [removeBareOperator(replaceOperator(query, key, null), key), token]
+          .filter(Boolean)
+          .join(" ")
+      : existingBooleanFilter
+        ? removeOperator(query, token)
+        : [query.trim(), token].filter(Boolean).join(" ");
+
     handleQueryChange(next);
     setSearchTokenMenuKey((current) => current + 1);
     requestAnimationFrame(() => {
@@ -281,6 +306,7 @@ export default function InboxSearchPage() {
       <Button
         type="button"
         variant="secondary"
+        size="default"
         onClick={() =>
           navigate({
             search: (prev) => ({
@@ -295,8 +321,14 @@ export default function InboxSearchPage() {
         Junk {search.includeJunk ? "on" : "off"}
       </Button>
       <Select key={searchTokenMenuKey} onValueChange={appendSearchToken}>
-        <SelectTrigger size="sm" className="h-7">
-          <SelectValue placeholder="Add" />
+        <SelectTrigger size="default" className="min-w-20">
+          <SelectValue
+            placeholder={
+              activeOperators.length > 0
+                ? `Filters · ${activeOperators.length}`
+                : "Filters"
+            }
+          />
         </SelectTrigger>
         <SelectContent align="end">
           <SelectGroup>

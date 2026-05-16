@@ -5,6 +5,7 @@ import { registerDeleteAccount } from "./delete";
 import { registerDeleteConnectedAccount } from "./delete-connected-account";
 import { registerGetSettings } from "./get";
 import { registerGetSyncSettings } from "./get-sync";
+import { registerGoogleConnect } from "./google-connect";
 import { registerPatchMailbox } from "./patch-mailbox";
 import { registerPutSyncSettings } from "./put-sync";
 
@@ -15,6 +16,7 @@ registerDeleteAccount(settingsRoutes);
 registerDeleteConnectedAccount(settingsRoutes);
 registerGetSettings(settingsRoutes);
 registerGetSyncSettings(settingsRoutes);
+registerGoogleConnect(settingsRoutes);
 registerPatchMailbox(settingsRoutes);
 registerPutSyncSettings(settingsRoutes);
 

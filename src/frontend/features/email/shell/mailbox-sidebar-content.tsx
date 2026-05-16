@@ -87,17 +87,19 @@ export function MailboxSidebarContent({
  onNavigate?: () => void;
 }) {
  const { mailboxId } = mailboxRoute.useParams();
- const mailboxAccounts = useMailboxes().data?.accounts ?? [];
+ const mailboxAccounts = useMailboxes().data?.accounts;
  const accounts = useMemo(
  () =>
- [...mailboxAccounts]
+ [...(mailboxAccounts ?? [])]
  .filter((account) => account.mailboxId != null)
  .sort((left, right) => {
+ if (left.mailboxId === mailboxId) return -1;
+ if (right.mailboxId === mailboxId) return 1;
  const leftCreatedAt = left.createdAt ?? Number.POSITIVE_INFINITY;
  const rightCreatedAt = right.createdAt ?? Number.POSITIVE_INFINITY;
  return leftCreatedAt - rightCreatedAt;
  }),
- [mailboxAccounts],
+ [mailboxAccounts, mailboxId],
  );
  const labels = useMailboxLabels(mailboxId);
  const routeState = useSidebarRouteState();
@@ -171,7 +173,7 @@ export function MailboxSidebarContent({
  title="Add account"
  className={sidebarRowClass}
  onClick={() => {
- void beginGmailConnection(`/${mailboxId}/settings`);
+ void beginGmailConnection(`/${mailboxId}/inbox`);
  onNavigate?.();
  }}
  >

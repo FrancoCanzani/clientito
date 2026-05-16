@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -54,7 +55,7 @@ export function ReaderTabs({
                   }
                 }}
                 className={cn(
-                  "group flex w-44 shrink-0 cursor-default items-center gap-1.5 border-r border-border/40 px-2.5 text-xs transition-colors",
+                  "group justify-between flex w-44 shrink-0 cursor-default items-center gap-1.5 border-r border-border/40 px-2.5 text-xs transition-colors",
                   isActive
                     ? "bg-muted text-foreground"
                     : "text-muted-foreground hover:bg-muted/60",
@@ -70,22 +71,18 @@ export function ReaderTabs({
                 >
                   {tab.subject || "(no subject)"}
                 </span>
-                <button
+                <Button
                   type="button"
+                  variant={"ghost"}
+                  size={"icon-sm"}
                   aria-label="Close tab"
                   onClick={(e) => {
                     e.stopPropagation();
                     onClose(tab.id);
                   }}
-                  className={cn(
-                    "flex size-4 shrink-0 items-center justify-center text-muted-foreground transition-opacity hover:text-foreground",
-                    isActive
-                      ? "opacity-100"
-                      : "opacity-0 group-hover:opacity-100",
-                  )}
                 >
                   <XIcon className="size-3" />
-                </button>
+                </Button>
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent>

@@ -13,6 +13,7 @@ import settingsRoutes from "./routes/settings/router";
 import splitViewsRoutes from "./routes/split-views/router";
 import type { AppRouteEnv } from "./routes/types";
 import { handleScheduled } from "./scheduled";
+import { handleGoogleConnectCallback } from "./routes/settings/google-connect";
 
 const app = new Hono<AppRouteEnv>();
 
@@ -46,6 +47,13 @@ app.onError((err, c) => {
 app.get("/api/version", (c) => c.json({ version: c.env.APP_VERSION }));
 
 app.use("*", authMiddleware);
+
+app.get("/api/auth/callback/google", async (c) => {
+  const connectResponse = await handleGoogleConnectCallback(c);
+  if (connectResponse) return connectResponse;
+  const authInstance = auth(c.env);
+  return authInstance.handler(c.req.raw);
+});
 
 app.all("/api/auth/*", async (c) => {
   const authInstance = auth(c.env);

@@ -1,5 +1,3 @@
-import { authClient } from "@/lib/auth-client";
-
 export const GMAIL_SCOPES = [
  "https://www.googleapis.com/auth/gmail.readonly",
  "https://www.googleapis.com/auth/gmail.modify",
@@ -12,15 +10,29 @@ function withConnectionMarker(callbackURL: string, marker: string) {
  return `${callbackURL}${separator}${marker}=1`;
 }
 
-export async function beginGmailConnection(callbackURL = "/settings") {
- const result = await authClient.linkSocial({
- provider: "google",
- callbackURL: withConnectionMarker(callbackURL, "connected"),
- errorCallbackURL: withConnectionMarker(callbackURL, "connect_error"),
- scopes: GMAIL_SCOPES,
- });
+function readConnectURL(value: unknown): string | null {
+ if (typeof value !== "object" || value === null) return null;
+ const data = Reflect.get(value, "data");
+ if (typeof data !== "object" || data === null) return null;
+ const url = Reflect.get(data, "url");
+ return typeof url === "string" ? url : null;
+}
 
- if (result?.error) {
- throw new Error(result.error.message || "Google connection failed.");
+export async function beginGmailConnection(callbackURL = "/settings") {
+ const response = await fetch("/api/settings/accounts/google/connect", {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({
+ callbackURL,
+ errorCallbackURL: withConnectionMarker(callbackURL, "connect_error"),
+ }),
+ });
+ if (!response.ok) {
+ throw new Error("Google connection failed.");
  }
+ const url = readConnectURL(await response.json());
+ if (!url) {
+ throw new Error("Google connection failed.");
+ }
+ window.location.assign(url);
 }
