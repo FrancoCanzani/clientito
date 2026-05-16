@@ -42,7 +42,7 @@ export function ComposeShell({
   return (
     <div
       className={cn(
-        "flex min-h-0 flex-col overflow-hidden border border-border/40 bg-card shadow-2xl",
+        "flex min-h-0 flex-col overflow-hidden rounded border border-border/40 bg-card shadow-2xl",
         containerClassName,
       )}
     >

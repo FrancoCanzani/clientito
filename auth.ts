@@ -39,6 +39,7 @@ export function auth(env: Env) {
     },
     account: {
       accountLinking: {
+        trustedProviders: ["google"],
         allowDifferentEmails: true,
       },
     },

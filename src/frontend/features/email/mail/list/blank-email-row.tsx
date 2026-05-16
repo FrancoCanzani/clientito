@@ -1,21 +1,10 @@
 import { cn } from "@/lib/utils";
 
 export function BlankEmailRow({
-  listVariant = "mail",
   isMobile = false,
 }: {
-  listVariant?: "mail" | "task";
   isMobile?: boolean;
 }) {
-  if (listVariant === "task") {
-    return (
-      <div
-        aria-hidden="true"
-        className="mx-3 my-1 h-12 animate-pulse border border-border/30 bg-muted/40 md:mx-6"
-      />
-    );
-  }
-
   return (
     <div
       aria-hidden="true"

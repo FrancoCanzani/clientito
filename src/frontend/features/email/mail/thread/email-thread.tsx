@@ -1,3 +1,7 @@
+import { AttachmentItem } from "@/features/email/mail/compose/attachment-item";
+import type { EmailBodyOverflowMode } from "@/features/email/mail/render/email-html-renderer";
+import { MessageBody } from "@/features/email/mail/render/message-body";
+import { SenderName } from "@/features/email/mail/sender/sender-name";
 import type {
   EmailAttachment,
   EmailBodySource,
@@ -6,23 +10,19 @@ import type {
   EmailThreadItem,
 } from "@/features/email/mail/shared/types";
 import {
-  CaretDownIcon,
-  CaretRightIcon,
-  PaperclipIcon,
-} from "@phosphor-icons/react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
-import { SenderName } from "@/features/email/mail/sender/sender-name";
-import { AttachmentItem } from "@/features/email/mail/compose/attachment-item";
-import type { EmailBodyOverflowMode } from "@/features/email/mail/render/email-html-renderer";
-import { MessageBody } from "@/features/email/mail/render/message-body";
-import {
   formatEmailDetailDate,
   formatEmailThreadDate,
 } from "@/features/email/mail/shared/utils/formatters";
 import { CalendarInviteCard } from "@/features/email/mail/thread/calendar-invite-card";
 import { DraftThreadMessage } from "@/features/email/mail/thread/draft-thread-message";
 import { MessageActions } from "@/features/email/mail/thread/message-actions";
+import {
+  CaretDownIcon,
+  CaretRightIcon,
+  PaperclipIcon,
+} from "@phosphor-icons/react";
+import type { ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 function normalizeCid(value: string): string {
   return value.trim().replace(/^<|>$/g, "").toLowerCase();
@@ -215,7 +215,7 @@ export function EmailThread({
       <CalendarInviteCard email={email} />
 
       {threadError && showThread && (
-        <p className="border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p className="rounded border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           Could not load the full thread.
         </p>
       )}
@@ -227,7 +227,7 @@ export function EmailThread({
               <h1 className="min-w-0 text-sm font-medium text-foreground">
                 {subject}
               </h1>
-              <span className="shrink-0 font-mono text-[10px] tracking-tighter tabular-nums text-muted-foreground">
+              <span className="shrink-0 font-mono text-xs tracking-tighter tabular-nums text-muted-foreground">
                 {formattedDate}
               </span>
             </div>
@@ -298,8 +298,8 @@ export function EmailThread({
         <article
           className={
             overflowMode === "page"
-              ? "border border-border/40 bg-card shadow-xs"
-              : "overflow-x-auto border border-border/40 bg-card shadow-xs"
+              ? "rounded border border-border/40 bg-card shadow-xs"
+              : "overflow-x-auto rounded border border-border/40 bg-card shadow-xs"
           }
         >
           <header className="space-y-2 px-5 pt-5 pb-4">
@@ -307,7 +307,7 @@ export function EmailThread({
               <h1 className="min-w-0 truncate text-xs font-medium text-foreground">
                 {subject}
               </h1>
-              <span className="shrink-0 font-mono text-[10px] tracking-tighter tabular-nums text-muted-foreground">
+              <span className="shrink-0 font-mono text-xs tracking-tighter tabular-nums text-muted-foreground">
                 {formattedDate}
               </span>
             </div>
@@ -365,8 +365,8 @@ function ThreadMessage({
     <div
       className={
         overflowMode === "page"
-          ? "border border-border/40 bg-card shadow-xs"
-          : "overflow-x-auto border border-border/40 bg-card shadow-xs"
+          ? "rounded border border-border/40 bg-card shadow-xs"
+          : "overflow-x-auto rounded border border-border/40 bg-card shadow-xs"
       }
     >
       <div className="flex w-full items-center gap-3 px-4 py-3 text-left">
@@ -378,8 +378,8 @@ function ThreadMessage({
             <SenderName
               email={email.fromAddr}
               name={email.fromName}
-              showHoverCard={email.direction !== "sent"}
-              className="block truncate text-sm font-medium text-foreground hover:underline"
+              showHoverCard={false}
+              className="block truncate text-sm font-medium text-foreground"
             >
               {expanded ? senderFull : senderName}
             </SenderName>
@@ -396,7 +396,7 @@ function ThreadMessage({
           aria-label={expanded ? "Collapse message" : "Expand message"}
           className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
-          <span className="font-mono text-[10px] tracking-tighter tabular-nums">
+          <span className="font-mono text-xs tracking-tighter tabular-nums">
             {formattedDate}
           </span>
           {expanded ? (

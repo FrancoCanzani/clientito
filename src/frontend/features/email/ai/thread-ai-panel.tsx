@@ -108,7 +108,7 @@ export function ThreadAiPanel({
   if (!enabled) return null;
 
   return (
-    <section className="border border-border/40 bg-card p-3 shadow-xs">
+    <section className="rounded border border-border/40 bg-card p-3 shadow-xs">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-medium">Summary</p>

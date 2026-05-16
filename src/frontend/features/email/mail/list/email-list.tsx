@@ -5,6 +5,12 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { useMailCompose } from "@/features/email/mail/compose/compose-context";
+import { BlankEmailRow } from "@/features/email/mail/list/blank-email-row";
+import { MailFilterBar } from "@/features/email/mail/list/mail-filter-bar";
+import { MobileEmailRow } from "@/features/email/mail/list/mobile-email-row";
+import { SplitEmailRow } from "@/features/email/mail/list/split-email-row";
+import { useMailListVirtualization } from "@/features/email/mail/list/use-mail-list-virtualization";
+import { useMobilePullToRefresh } from "@/features/email/mail/list/use-mobile-pull-to-refresh";
 import type { MailAction } from "@/features/email/mail/shared/hooks/use-mail-actions";
 import { useMailHotkeys } from "@/features/email/mail/shared/hooks/use-mail-hotkeys";
 import { useMailViewData } from "@/features/email/mail/shared/hooks/use-mail-view-data";
@@ -17,19 +23,11 @@ import { cn } from "@/lib/utils";
 import { ArrowClockwiseIcon, SpinnerGapIcon } from "@phosphor-icons/react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { BlankEmailRow } from "@/features/email/mail/list/blank-email-row";
-import { MailFilterBar } from "@/features/email/mail/list/mail-filter-bar";
-import { MobileEmailRow } from "@/features/email/mail/list/mobile-email-row";
-import { SplitEmailRow } from "@/features/email/mail/list/split-email-row";
-import { TaskEmailRow } from "@/features/email/mail/list/task-email-row";
-import { useMailListVirtualization } from "@/features/email/mail/list/use-mail-list-virtualization";
-import { useMobilePullToRefresh } from "@/features/email/mail/list/use-mobile-pull-to-refresh";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
 const MOBILE_ROW_HEIGHT = 88;
 const DESKTOP_ROW_HEIGHT = 84;
-const TASK_ROW_HEIGHT = 56;
 
 export function EmailList({
   emailData,
@@ -42,7 +40,6 @@ export function EmailList({
   onFilterBarOpenChange,
   hideFilterControls = false,
   enableKeyboardNavigation = true,
-  listVariant = "mail",
   selectedEmailId,
   onSnooze,
   onNextTab,
@@ -66,7 +63,6 @@ export function EmailList({
   onFilterBarOpenChange?: (open: boolean) => void;
   hideFilterControls?: boolean;
   enableKeyboardNavigation?: boolean;
-  listVariant?: "mail" | "task";
   selectedEmailId?: string | null;
   onNextTab?: () => void;
   onPrevTab?: () => void;
@@ -81,7 +77,6 @@ export function EmailList({
     hasNextPage,
     isFetchingNextPage,
     isInitialViewPending,
-    isFirstMailboxSync,
     showEmptyState,
     isFetching,
     fetchNextPage,
@@ -98,12 +93,7 @@ export function EmailList({
   const isMobile = useIsMobile();
   const { mailboxId: routeMailboxId } = mailboxRoute.useParams();
   const navigate = useNavigate();
-  const rowHeight =
-    listVariant === "task"
-      ? TASK_ROW_HEIGHT
-      : isMobile
-        ? MOBILE_ROW_HEIGHT
-        : DESKTOP_ROW_HEIGHT;
+  const rowHeight = isMobile ? MOBILE_ROW_HEIGHT : DESKTOP_ROW_HEIGHT;
 
   const goToSearch = () =>
     navigate({
@@ -221,10 +211,7 @@ export function EmailList({
   const pullIndicatorVisible =
     pullToRefresh.pullDistance > 2 || pullToRefresh.isRefreshing;
 
-  const RowComponent = getRowComponent({
-    listVariant,
-    isMobile,
-  });
+  const RowComponent = getRowComponent({ isMobile });
 
   const showFilterControls = hasEmails || hasActiveFilters;
 
@@ -357,10 +344,7 @@ export function EmailList({
                         )}
                       />
                     ) : (
-                      <BlankEmailRow
-                        listVariant={listVariant}
-                        isMobile={isMobile}
-                      />
+                      <BlankEmailRow isMobile={isMobile} />
                     )}
                   </div>
                 );
@@ -370,18 +354,9 @@ export function EmailList({
             <div className="relative w-full">
               {Array.from({ length: 15 }).map((_, i) => (
                 <div key={`init-skel-${i}`} style={{ height: rowHeight }}>
-                  <BlankEmailRow
-                    listVariant={listVariant}
-                    isMobile={isMobile}
-                  />
+                  <BlankEmailRow isMobile={isMobile} />
                 </div>
               ))}
-              {isFirstMailboxSync && (
-                <p className="px-4 py-3 text-center text-xs text-muted-foreground">
-                  Getting your mailbox ready — your first sync can take a
-                  moment.
-                </p>
-              )}
             </div>
           ) : showEmptyState ? (
             <Empty>
@@ -409,13 +384,10 @@ export function EmailList({
 }
 
 function getRowComponent({
-  listVariant,
   isMobile,
 }: {
-  listVariant: "mail" | "task";
   isMobile: boolean;
 }) {
-  if (listVariant === "task") return TaskEmailRow;
   if (isMobile) return MobileEmailRow;
   return SplitEmailRow;
 }

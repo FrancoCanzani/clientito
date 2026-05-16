@@ -37,7 +37,7 @@ export function ReaderTabs({
   const hasOthers = items.length > 1;
 
   return (
-    <div className="scrollbar-none flex h-8 min-h-8 shrink-0 items-stretch overflow-x-auto border-b border-border/40 bg-background">
+    <div className="scrollbar-none flex h-10 min-h-10 shrink-0 items-stretch overflow-x-auto border-b border-border/40 bg-background">
       {items.map((tab) => {
         const isActive = tab.id === activeId;
         return (

@@ -1,10 +1,13 @@
+import { EmailRowContextMenu } from "@/features/email/mail/list/email-row-context-menu";
+import {
+  type EmailRowProps,
+  useEmailRowModel,
+} from "@/features/email/mail/list/email-row-model";
+import { SenderName } from "@/features/email/mail/sender/sender-name";
+import { formatInboxRowDate } from "@/features/email/mail/shared/utils/formatters";
 import { cn } from "@/lib/utils";
 import { CalendarIcon, PaperclipIcon, StarIcon } from "@phosphor-icons/react";
 import { memo } from "react";
-import { SenderName } from "@/features/email/mail/sender/sender-name";
-import { formatInboxRowDate } from "@/features/email/mail/shared/utils/formatters";
-import { EmailRowContextMenu } from "@/features/email/mail/list/email-row-context-menu";
-import { type EmailRowProps, useEmailRowModel } from "@/features/email/mail/list/email-row-model";
 
 export const SplitEmailRow = memo(function SplitEmailRow({
   isFocused: _isFocused = false,
@@ -93,7 +96,7 @@ export const SplitEmailRow = memo(function SplitEmailRow({
                   [{threadCount}]
                 </span>
               )}
-              <span className="whitespace-nowrap font-mono text-[10px] tracking-tighter tabular-nums">
+              <span className="whitespace-nowrap font-mono text-xs tracking-tighter tabular-nums">
                 {formatInboxRowDate(email.date)}
               </span>
             </div>

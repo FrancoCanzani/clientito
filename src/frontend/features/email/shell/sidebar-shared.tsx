@@ -106,4 +106,4 @@ export function SidebarRowLabel({
 }
 
 export const sidebarRowClass =
- "flex h-8 w-full items-center gap-3 overflow-hidden px-2 text-xs transition-colors hover:bg-muted";
+ "flex h-8 w-full items-center gap-3 overflow-hidden rounded px-2 text-xs transition-colors hover:bg-muted";

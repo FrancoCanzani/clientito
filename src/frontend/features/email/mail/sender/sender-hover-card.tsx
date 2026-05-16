@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { emitOpenInTab } from "@/features/email/inbox/hooks/tab-events";
 import { useMailCompose } from "@/features/email/mail/compose/compose-context";
+import { useSenderRecent } from "@/features/email/mail/sender/use-sender-recent";
+import { useSenderStats } from "@/features/email/mail/sender/use-sender-stats";
 import { formatInboxRowDate } from "@/features/email/mail/shared/utils/formatters";
 import { SpinnerGapIcon } from "@phosphor-icons/react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
-import { useSenderRecent } from "@/features/email/mail/sender/use-sender-recent";
-import { useSenderStats } from "@/features/email/mail/sender/use-sender-stats";
 
 const mailboxRoute = getRouteApi("/_dashboard/$mailboxId");
 
@@ -70,7 +70,7 @@ export function SenderHoverCard({
               <span className="truncate">
                 {row.subject?.trim() || "(no subject)"}
               </span>
-              <span className="shrink-0 font-mono text-[10px] tracking-tighter tabular-nums text-muted-foreground">
+              <span className="shrink-0 font-mono text-xs tracking-tighter tabular-nums text-muted-foreground">
                 {formatInboxRowDate(row.date)}
               </span>
             </button>

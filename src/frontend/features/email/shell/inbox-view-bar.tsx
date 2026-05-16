@@ -136,15 +136,16 @@ export function InboxViewBar() {
           <span className="truncate">{view.name}</span>
         </Link>
       ))}
-      <button
+      <Button
         type="button"
         onClick={() => setCreateOpen(true)}
-        className="inline-flex size-7 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        size={"icon-sm"}
+        variant={"ghost"}
         aria-label="Create view"
         title="Create view"
       >
         <PlusIcon className="size-3.5" />
-      </button>
+      </Button>
       <Dialog
         open={createOpen}
         onOpenChange={(open) => {

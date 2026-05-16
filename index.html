@@ -57,10 +57,212 @@
     <!-- Performance hints -->
     <link rel="preconnect" href="https://accounts.google.com" />
     <link rel="dns-prefetch" href="https://accounts.google.com" />
+    <link rel="icon" type="image/png" href="/favicon.ico" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --boot-bg: #ffffff;
+        --boot-sidebar: #f7f7f7;
+        --boot-border: rgba(0, 0, 0, 0.08);
+        --boot-muted: #ebebeb;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --boot-bg: #0a0a0a;
+          --boot-sidebar: #171717;
+          --boot-border: rgba(255, 255, 255, 0.1);
+          --boot-muted: #262626;
+        }
+      }
+
+      html,
+      body {
+        margin: 0;
+        background: var(--boot-bg);
+      }
+
+      .boot-shell {
+        display: flex;
+        min-height: 100vh;
+        width: 100%;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--boot-bg);
+      }
+
+      .boot-topbar {
+        display: flex;
+        min-height: 48px;
+        align-items: center;
+        border-bottom: 1px solid var(--boot-border);
+        padding: 0 16px;
+      }
+
+      .boot-layout {
+        display: flex;
+        min-height: 0;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      .boot-sidebar {
+        display: none;
+        width: 224px;
+        flex-shrink: 0;
+        border-right: 1px solid var(--boot-border);
+        background: var(--boot-sidebar);
+        padding: 12px;
+      }
+
+      .boot-main {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .boot-line,
+      .boot-row {
+        background: var(--boot-muted);
+        animation: boot-pulse 1.5s ease-in-out infinite;
+      }
+
+      .boot-brand {
+        height: 12px;
+        width: 96px;
+      }
+
+      .boot-nav-title {
+        margin-bottom: 20px;
+        height: 12px;
+        width: 80px;
+      }
+
+      .boot-nav-item {
+        height: 28px;
+        margin-bottom: 8px;
+      }
+
+      .boot-mail-row {
+        display: flex;
+        height: 84px;
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
+        border-bottom: 1px solid var(--boot-border);
+        padding: 8px 16px;
+        box-sizing: border-box;
+      }
+
+      .boot-row-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .boot-row-sender {
+        height: 12px;
+        width: 128px;
+      }
+
+      .boot-row-date {
+        margin-left: auto;
+        height: 10px;
+        width: 48px;
+        opacity: 0.75;
+      }
+
+      .boot-row-subject {
+        height: 10px;
+        width: 60%;
+        opacity: 0.6;
+      }
+
+      .boot-row-preview {
+        height: 8px;
+        width: 80%;
+        opacity: 0.4;
+      }
+
+      @media (min-width: 768px) {
+        .boot-sidebar {
+          display: block;
+        }
+      }
+
+      @keyframes boot-pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.55;
+        }
+      }
+    </style>
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-shell" aria-hidden="true">
+        <div class="boot-topbar">
+          <div class="boot-line boot-brand"></div>
+        </div>
+        <div class="boot-layout">
+          <aside class="boot-sidebar">
+            <div class="boot-line boot-nav-title"></div>
+            <div class="boot-line boot-nav-item"></div>
+            <div class="boot-line boot-nav-item"></div>
+            <div class="boot-line boot-nav-item"></div>
+            <div class="boot-line boot-nav-item"></div>
+            <div class="boot-line boot-nav-item"></div>
+            <div class="boot-line boot-nav-item"></div>
+            <div class="boot-line boot-nav-item"></div>
+          </aside>
+          <main class="boot-main">
+            <div class="boot-mail-row">
+              <div class="boot-row-top">
+                <div class="boot-row boot-row-sender"></div>
+                <div class="boot-row boot-row-date"></div>
+              </div>
+              <div class="boot-row boot-row-subject"></div>
+              <div class="boot-row boot-row-preview"></div>
+            </div>
+            <div class="boot-mail-row">
+              <div class="boot-row-top">
+                <div class="boot-row boot-row-sender"></div>
+                <div class="boot-row boot-row-date"></div>
+              </div>
+              <div class="boot-row boot-row-subject"></div>
+              <div class="boot-row boot-row-preview"></div>
+            </div>
+            <div class="boot-mail-row">
+              <div class="boot-row-top">
+                <div class="boot-row boot-row-sender"></div>
+                <div class="boot-row boot-row-date"></div>
+              </div>
+              <div class="boot-row boot-row-subject"></div>
+              <div class="boot-row boot-row-preview"></div>
+            </div>
+            <div class="boot-mail-row">
+              <div class="boot-row-top">
+                <div class="boot-row boot-row-sender"></div>
+                <div class="boot-row boot-row-date"></div>
+              </div>
+              <div class="boot-row boot-row-subject"></div>
+              <div class="boot-row boot-row-preview"></div>
+            </div>
+            <div class="boot-mail-row">
+              <div class="boot-row-top">
+                <div class="boot-row boot-row-sender"></div>
+                <div class="boot-row boot-row-date"></div>
+              </div>
+              <div class="boot-row boot-row-subject"></div>
+              <div class="boot-row boot-row-preview"></div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/frontend/main.tsx"></script>
   </body>
 </html>

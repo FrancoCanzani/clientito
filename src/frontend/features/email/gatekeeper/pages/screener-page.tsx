@@ -149,7 +149,7 @@ export default function ScreenerPage() {
                         <p className="truncate text-sm font-medium">
                           {senderLabel}
                         </p>
-                        <p className="font-mono text-[10px] tracking-tighter tabular-nums text-muted-foreground">
+                        <p className="font-mono text-xs tracking-tighter tabular-nums text-muted-foreground">
                           {formatInboxRowDate(sender.latestDate)}
                         </p>
                         <p className="truncate text-sm text-foreground/90">

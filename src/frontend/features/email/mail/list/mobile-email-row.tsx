@@ -1,4 +1,9 @@
 import { SnoozePicker } from "@/components/snooze-picker";
+import {
+  useEmailRowModel,
+  type EmailRowProps,
+} from "@/features/email/mail/list/email-row-model";
+import { formatInboxRowDate } from "@/features/email/mail/shared/utils/formatters";
 import { cn } from "@/lib/utils";
 import {
   CalendarIcon,
@@ -18,8 +23,6 @@ import {
   useState,
   type PointerEvent,
 } from "react";
-import { formatInboxRowDate } from "@/features/email/mail/shared/utils/formatters";
-import { useEmailRowModel, type EmailRowProps } from "@/features/email/mail/list/email-row-model";
 
 const SWIPE_COMMIT_DISTANCE = 84;
 const SWIPE_MAX_DISTANCE = 148;
@@ -364,7 +367,7 @@ export const MobileEmailRow = memo(function MobileEmailRow({
             {threadCount > 1 && (
               <span className="text-[11px] tabular-nums">[{threadCount}]</span>
             )}
-            <span className="whitespace-nowrap font-mono text-[10px] tracking-tighter tabular-nums">
+            <span className="whitespace-nowrap font-mono text-xs tracking-tighter tabular-nums">
               {formatInboxRowDate(email.date)}
             </span>
           </div>

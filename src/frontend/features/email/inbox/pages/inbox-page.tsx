@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/resizable";
 import { FocusWindowToggle } from "@/features/email/focus-window/focus-window-toggle";
 import { useGatekeeperPending } from "@/features/email/gatekeeper/queries";
-import { useInboxData } from "@/features/email/inbox/hooks/use-inbox-data";
 import { subscribeOpenInTab } from "@/features/email/inbox/hooks/tab-events";
+import { useInboxData } from "@/features/email/inbox/hooks/use-inbox-data";
 import {
   useReaderTabs,
   type ReaderTab,
@@ -22,12 +22,13 @@ import {
 import { useThreadGroupSnooze } from "@/features/email/inbox/hooks/use-thread-group-snooze";
 import { EmailDetailView } from "@/features/email/inbox/pages/email-detail-view";
 import { ReaderTabs } from "@/features/email/inbox/reader/reader-tabs";
-import { fetchViewUnreadCounts } from "@/features/email/mail/shared/data/unread-counts";
-import { useMailActions } from "@/features/email/mail/shared/hooks/use-mail-actions";
 import { EmailList } from "@/features/email/mail/list/email-list";
 import { MailFilterBar } from "@/features/email/mail/list/mail-filter-bar";
 import { ViewSyncStatusControl } from "@/features/email/mail/list/view-sync-status";
+import { fetchViewUnreadCounts } from "@/features/email/mail/shared/data/unread-counts";
+import { useMailActions } from "@/features/email/mail/shared/hooks/use-mail-actions";
 import { emailQueryKeys } from "@/features/email/mail/shared/query-keys";
+import type { EmailListItem } from "@/features/email/mail/shared/types";
 import { InboxViewBar } from "@/features/email/shell/inbox-view-bar";
 import {
   MailboxPage,
@@ -39,7 +40,6 @@ import { FunnelSimpleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, getRouteApi } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import type { EmailListItem } from "@/features/email/mail/shared/types";
 
 const route = getRouteApi("/_dashboard/$mailboxId/inbox/");
 
@@ -169,11 +169,15 @@ export default function InboxPage() {
   };
 
   const modeTabs = (
-    <ButtonGroup aria-label="Inbox view" className="shrink-0">
+    <ButtonGroup
+      aria-label="Inbox view"
+      className="shrink-0 bg-gray-50 dark:bg-gray-950"
+    >
       <Button
         type="button"
         size="sm"
-        variant={inboxMode === "important" ? "default" : "outline"}
+        className="rounded-r-none"
+        variant={inboxMode === "important" ? "secondary" : "ghost"}
         onClick={() => setInboxMode("important")}
         aria-pressed={inboxMode === "important"}
       >
@@ -187,7 +191,8 @@ export default function InboxPage() {
       <Button
         type="button"
         size="sm"
-        variant={inboxMode === "all" ? "default" : "outline"}
+        className="rounded-l-none"
+        variant={inboxMode === "all" ? "secondary" : "ghost"}
         onClick={() => setInboxMode("all")}
         aria-pressed={inboxMode === "all"}
       >
@@ -203,7 +208,7 @@ export default function InboxPage() {
 
   const screenerButton =
     pendingSendersCount > 0 ? (
-      <Button asChild variant="secondary">
+      <Button asChild variant="secondary" size={"sm"}>
         <Link
           to="/$mailboxId/screener"
           params={{ mailboxId }}

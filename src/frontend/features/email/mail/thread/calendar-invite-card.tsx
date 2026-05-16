@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { respondToCalendarInvite } from "@/features/email/mail/shared/mutations";
 import { fetchCalendarInvitePreview } from "@/features/email/mail/shared/data/calendar";
+import { respondToCalendarInvite } from "@/features/email/mail/shared/mutations";
 import { emailQueryKeys } from "@/features/email/mail/shared/query-keys";
 import type {
   CalendarInvitePreview,
@@ -116,10 +116,10 @@ export function CalendarInviteCard({ email }: { email: EmailDetailItem }) {
   const responseStatus = formatStatus(invite.selfResponseStatus);
 
   return (
-    <div className="border border-border/40 bg-card px-3 py-2.5">
+    <div className="rounded border border-border/40 bg-card px-3 py-2.5">
       <div className="flex items-start gap-2.5">
         <div className="min-w-0 flex-1 space-y-1">
-          <p className="font-mono text-[10px] tracking-tighter tabular-nums text-muted-foreground">
+          <p className="font-mono text-xs tracking-tighter tabular-nums text-muted-foreground">
             {formatInviteDate(invite)}
           </p>
           <p className="truncate text-sm font-medium">

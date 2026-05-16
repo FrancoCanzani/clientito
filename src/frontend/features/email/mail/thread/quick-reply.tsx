@@ -74,7 +74,7 @@ export const QuickReply = forwardRef<
  if (!open) {
  return (
  <div ref={containerRef} className="mt-6">
- <div className="overflow-hidden border border-border/40 bg-card shadow-xs">
+ <div className="overflow-hidden rounded border border-border/40 bg-card shadow-xs">
  <button
  type="button"
  onClick={() => setOpen(true)}
@@ -172,7 +172,7 @@ function QuickReplyComposer({
  };
 
  return (
- <div className="flex max-h-[60vh] flex-col overflow-hidden border border-border/40 bg-card shadow-xs">
+ <div className="flex max-h-[60vh] flex-col overflow-hidden rounded border border-border/40 bg-card shadow-xs">
  <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2">
  <ArrowBendUpLeftIcon className="size-3.5 text-muted-foreground" />
  <span className="flex-1 text-xs text-muted-foreground">

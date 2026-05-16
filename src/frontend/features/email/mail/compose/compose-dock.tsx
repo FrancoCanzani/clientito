@@ -1,8 +1,8 @@
-import { AnimatePresence } from "motion/react";
-import { createPortal } from "react-dom";
 import type { ComposerWindow } from "@/features/email/mail/compose/compose-context";
 import { ComposeDockFrame } from "@/features/email/mail/compose/compose-dock-frame";
 import { ComposeModalFrame } from "@/features/email/mail/compose/compose-modal-frame";
+import { AnimatePresence } from "motion/react";
+import { createPortal } from "react-dom";
 
 export function ComposeDock({
   composers,

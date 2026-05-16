@@ -77,6 +77,7 @@ export function FocusWindowToggle() {
         <Button
           type="button"
           variant="secondary"
+          size={"sm"}
           aria-pressed={focusWindow.active}
           title={focusWindow.active ? "Focus is active" : "Start Focus"}
           className={cn(

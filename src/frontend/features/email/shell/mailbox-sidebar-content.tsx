@@ -21,6 +21,7 @@ import {
  useNavigate,
  useRouterState,
 } from "@tanstack/react-router";
+import { Hashvatar } from "hashvatar/react";
 import { useMemo } from "react";
 import {
  SidebarRowLabel,
@@ -125,7 +126,7 @@ export function MailboxSidebarContent({
  const email =
  getMailboxDisplayEmail(account) ?? account.email ?? "";
  const active = account.mailboxId === mailboxId;
- const initial = email.trim().charAt(0).toUpperCase() || "?";
+ const avatarHash = email.trim() || account.accountId;
  return (
  <button
  key={account.accountId}
@@ -139,9 +140,13 @@ export function MailboxSidebarContent({
  onNavigate?.();
  }}
  >
- <span className="flex size-3.5 shrink-0 items-center justify-center bg-background text-left text-[8px] font-medium">
- {initial}
- </span>
+ <Hashvatar
+ hash={avatarHash}
+ mode="dither"
+ animated
+ size={14}
+ className="size-3.5 shrink-0 rounded"
+ />
  <span
  className={cn(
  "min-w-0 flex-1 truncate text-left opacity-0 transition-opacity duration-100 group-hover/sidebar:opacity-100",
@@ -191,7 +196,7 @@ export function MailboxSidebarContent({
  type="button"
  title="New email"
  className={cn(
- "flex h-8 w-full items-center gap-3 overflow-hidden border border-dashed border-blue-900/40 px-2 text-left text-xs text-blue-900 transition-colors hover:bg-blue-900/5",
+ "flex h-8 w-full items-center gap-3 overflow-hidden rounded border border-dashed border-blue-900/40 px-2 text-left text-xs text-blue-900 transition-colors hover:bg-blue-900/5",
  "dark:border-blue-50/40 dark:text-blue-50 dark:hover:bg-blue-50/5",
  )}
  onClick={() => {

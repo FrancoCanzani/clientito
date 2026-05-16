@@ -5,6 +5,7 @@ import "../commands/navigation-commands";
 import "../commands/email-commands";
 import "../commands/compose-commands";
 import "../commands/composer-commands";
+import "../commands/scratchpad-commands";
 import { getCommands } from "./registry";
 import type { Command } from "./types";
 import { useCommandContext } from "./use-command-context";

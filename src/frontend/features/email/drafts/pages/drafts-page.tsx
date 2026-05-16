@@ -6,10 +6,16 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { useMailCompose } from "@/features/email/mail/compose/compose-context";
-import { deleteDraft, fetchDrafts } from "@/features/email/mail/shared/data/drafts";
-import { draftQueryKeys } from "@/features/email/mail/shared/query-keys";
-import type { ComposeInitial, DraftItem } from "@/features/email/mail/shared/types";
 import { htmlToPlainText } from "@/features/email/mail/render/html-to-plain-text";
+import {
+  deleteDraft,
+  fetchDrafts,
+} from "@/features/email/mail/shared/data/drafts";
+import { draftQueryKeys } from "@/features/email/mail/shared/query-keys";
+import type {
+  ComposeInitial,
+  DraftItem,
+} from "@/features/email/mail/shared/types";
 import {
   MailboxPage,
   MailboxPageBody,
@@ -97,7 +103,7 @@ export default function DraftsPage() {
                       <span className="truncate text-sm font-medium">
                         {draft.subject || "(no subject)"}
                       </span>
-                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                      <span className="shrink-0 text-xs text-muted-foreground">
                         {formatDistanceToNow(draft.updatedAt, {
                           addSuffix: true,
                         })}

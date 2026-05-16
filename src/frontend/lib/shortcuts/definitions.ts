@@ -26,6 +26,15 @@ registerShortcut({
 });
 
 registerShortcut({
+  id: "global:scratchpad",
+  key: "$mod+.",
+  label: "Open scratchpad",
+  category: "Global",
+  contexts: ["global"],
+  allowInEditable: true,
+});
+
+registerShortcut({
   id: "global:next-account",
   key: "$mod+Shift+ArrowDown",
   label: "Next account",

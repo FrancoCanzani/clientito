@@ -87,7 +87,7 @@ export function CommandPalette() {
 
  <Command
  shouldFilter={shouldFilter}
- className="flex max-h-[min(72vh,40rem)] min-h-0 flex-col overflow-hidden border border-border bg-background shadow-xl"
+ className="flex max-h-[min(72vh,40rem)] min-h-0 flex-col overflow-hidden rounded border border-border bg-background shadow-xl"
  >
  <div className="border-b border-border px-3 py-2">
  <div className="flex items-center gap-2">

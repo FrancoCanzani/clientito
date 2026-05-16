@@ -1,5 +1,7 @@
 import { AppProviders } from "@/components/providers";
+import { InitialAppSkeleton } from "@/components/initial-app-skeleton";
 import { MailComposeProvider } from "@/features/email/mail/compose/compose-provider";
+import { ScratchpadProvider } from "@/features/scratchpad/scratchpad-provider";
 import { getDashboardGate } from "@/features/onboarding/dashboard-gate";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
@@ -21,14 +23,17 @@ export const Route = createFileRoute("/_dashboard")({
       throw redirect({ to: "/login" });
     }
   },
+  pendingComponent: InitialAppSkeleton,
+  pendingMs: 0,
   component: DashboardLayout,
 });
 
 function DashboardLayout() {
   return (
     <AppProviders>
-      <MailComposeProvider>
-        <div className="relative flex h-dvh min-w-0 flex-col overflow-hidden bg-background">
+      <ScratchpadProvider>
+        <MailComposeProvider>
+          <div className="relative flex h-dvh min-w-0 flex-col overflow-hidden bg-background">
           <a
             href="#main-content"
             className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:bg-background focus:px-3 focus:py-1.5 focus:text-xs focus:font-medium focus:shadow focus:ring-2 focus:ring-ring"
@@ -45,8 +50,9 @@ function DashboardLayout() {
             <CommandPalette />
             <KeyboardShortcutsDialog />
           </Suspense>
-        </div>
-      </MailComposeProvider>
+          </div>
+        </MailComposeProvider>
+      </ScratchpadProvider>
     </AppProviders>
   );
 }

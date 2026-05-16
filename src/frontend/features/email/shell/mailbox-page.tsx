@@ -1,12 +1,12 @@
 import { PageContainer } from "@/components/page-container";
 import { cn } from "@/lib/utils";
 import { useContext, useRef, useState, type ReactNode } from "react";
-import { MailboxSidebarTrigger } from "./mailbox-sidebar";
 import {
   MailboxScrolledContext,
   MailboxSetScrolledContext,
   useMailboxPageScrollState,
 } from "./mailbox-scroll-state";
+import { MailboxSidebarTrigger } from "./mailbox-sidebar";
 
 export function MailboxPage({
   children,
@@ -43,7 +43,7 @@ export function MailboxPageHeader({
   return (
     <header
       className={cn(
-        "flex min-h-10 shrink-0 items-center justify-between gap-3 border-b bg-background px-3 py-1.5 md:px-4",
+        "flex min-h-12 shrink-0 items-center justify-between gap-3 border-b bg-background px-3 py-1.5 md:px-4",
         isScrolled ? "border-border/40" : "border-transparent",
         className,
       )}
